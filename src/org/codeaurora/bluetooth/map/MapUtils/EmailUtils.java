@@ -140,25 +140,19 @@ public class EmailUtils {
         if (V){
             Log.v(TAG, ":: Message Id in getMessageSizeEmail ::"+ messageId);
         }
-        int msgSize = 0;
+        int msgSize = -1;
+        String[] EMAIL_MSGSIZE_PROJECTION = new String[] { "LENGTH(textContent)", "LENGTH(htmlContent)" };
         String textContent, htmlContent;
         Uri uri = Uri.parse("content://com.android.email.provider/body");
 
         Cursor cr = context.getContentResolver().query(
-                uri, null, "messageKey = "+ messageId , null, null);
+                uri, EMAIL_MSGSIZE_PROJECTION, "messageKey = "+ messageId , null, null);
 
         if (cr != null && cr.moveToFirst()) {
             do {
-                textContent = cr.getString(cr.getColumnIndex("textContent"));
-                htmlContent = cr.getString(cr.getColumnIndex("htmlContent"));
-                if(textContent != null && textContent.length() != 0){
-                    msgSize = textContent.length();
-                }
-                else if(textContent == null){
-                    if(htmlContent != null && htmlContent.length() != 0){
-                        msgSize = htmlContent.length();
-                    }
-                }
+                msgSize = cr.getInt(0);
+                if(msgSize == -1 || msgSize == 0)
+                   msgSize = cr.getInt(1);
                 break;
             } while (cr.moveToNext());
         }
@@ -645,8 +639,17 @@ public class EmailUtils {
                 if (emailBody == null || emailBody.length() == 0){
                     String msgBody = cr2.getString(cr2.getColumnIndex("htmlContent"));
                     if (msgBody != null){
+                        msgBody = msgBody.replaceAll("(?s)(<title>)(.*?)(</title>)", "");
+                        msgBody = msgBody.replaceAll("(?s)(<style type=\"text/css\".*?>)(.*?)(</style>)", "");
                         CharSequence msgText = Html.fromHtml(msgBody);
                         emailBody = msgText.toString();
+                        // Wash comments added by Exchange
+                        emailBody = emailBody.replaceAll("(?s)(<!--)(.*?)(-->)", "");
+                        // Solves problem with Porche Car-kit and Gmails.
+                        // Changes unix style line conclusion to DOS style
+                        emailBody = emailBody.replaceAll("(?s)(\\r)", "");
+                        emailBody = emailBody.replaceAll("(?s)(\\n)", "\r\n");
+
                     }
                 }
             }
