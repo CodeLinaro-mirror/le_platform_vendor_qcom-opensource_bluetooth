@@ -299,12 +299,10 @@ public class BluetoothFtpService extends Service {
                 if (mSessionStatusHandler.hasMessages(MSG_INTERNAL_USER_TIMEOUT)) {
                     Intent i = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
                     sendBroadcast(i);
-                    removeFtpNotification(NOTIFICATION_ID_AUTH);
+                    removeFtpNotification(NOTIFICATION_ID_ACCESS);
                 }
                 // Release all resources
                 closeService();
-            } else {
-                removeTimeoutMsg = false;
             }
         } else if (action.equals(ACCESS_ALLOWED_ACTION)) {
             if (!isWaitingAuthorization) {
@@ -628,7 +626,7 @@ public class BluetoothFtpService extends Service {
 
         @Override
         public void run() {
-            while (!stopped) {
+            while (!stopped && mRfcommServerSocket != null) {
                 try {
                     Log.v(RTAG,"Run Accept thread");
                     mConnSocket = mRfcommServerSocket.accept();
