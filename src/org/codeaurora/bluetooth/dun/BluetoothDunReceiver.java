@@ -26,7 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.codeaurora.bluetooth.sap;
+package org.codeaurora.bluetooth.dun;
 
 import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
@@ -35,24 +35,24 @@ import android.content.Intent;
 import android.util.Log;
 import android.os.SystemProperties;
 
-public class BluetoothSapReceiver extends BroadcastReceiver {
+public class BluetoothDunReceiver extends BroadcastReceiver {
 
-    private static final String TAG = "BluetoothSapReceiver";
+    private static final String TAG = "BluetoothDunReceiver";
 
-    private static final boolean V = BluetoothSapService.VERBOSE;
+    private static final boolean V = BluetoothDunService.VERBOSE;
 
     @Override
     public void onReceive(Context context, Intent intent) {
 
-        if(SystemProperties.getBoolean("ro.bluetooth.sap", false) == false) {
+        if(SystemProperties.getBoolean("ro.bluetooth.dun", false) == false) {
             return;
         }
 
-        if (V) Log.v(TAG, "SapReceiver onReceive ");
+        if (V) Log.v(TAG, "DunReceiver onReceive ");
 
         Intent in = new Intent();
         in.putExtras(intent);
-        in.setClass(context, BluetoothSapService.class);
+        in.setClass(context, BluetoothDunService.class);
         String action = intent.getAction();
         in.putExtra("action", action);
         if (V) Log.v(TAG,"action = " + action);
@@ -75,7 +75,7 @@ public class BluetoothSapReceiver extends BroadcastReceiver {
             }
         }
         if (startService) {
-            if (V) Log.v(TAG,"Calling SAP service start service with action = " + in.getAction());
+            if (V) Log.v(TAG,"Calling DUN service start service with action = " + in.getAction());
             context.startService(in);
         }
     }
