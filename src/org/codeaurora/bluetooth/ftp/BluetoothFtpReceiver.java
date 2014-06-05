@@ -38,7 +38,7 @@ public class BluetoothFtpReceiver extends BroadcastReceiver {
 
         private static final String TAG = "BluetoothFtpReceiver";
 
-        private static final boolean V = BluetoothFtpService.VERBOSE;
+        private static final boolean V = Log.isLoggable(BluetoothFtpService.LOG_TAG, Log.VERBOSE) ? true : false;
 
         @Override
         public void  onReceive  (Context context, Intent intent) {
@@ -59,6 +59,8 @@ public class BluetoothFtpReceiver extends BroadcastReceiver {
                      * Other than Tranistioning state, start the FTP service whenever
                      * BT transitioned to OFF/ON, or Adapter returns error
                      */
+                   if(V) Log.v(TAG,"BluetoothFtpReceiver  Action: " + intent.getAction()
+                                 + "STATE: "+state);
                     if ((state == BluetoothAdapter.STATE_TURNING_ON)
                         || (state == BluetoothAdapter.STATE_OFF)) {
                         startService = false;
@@ -69,6 +71,8 @@ public class BluetoothFtpReceiver extends BroadcastReceiver {
                  if (adapter == null || !adapter.isEnabled()) {
                     startService = false;
                  }
+                   if(V) Log.v(TAG,"BluetoothFtpReceiver  Action: " + intent.getAction()
+                                 + "startSeervice : "+startService);
             }
 
             if (startService) {
