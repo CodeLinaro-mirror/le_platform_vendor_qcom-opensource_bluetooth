@@ -43,6 +43,7 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.AudioManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -132,6 +133,22 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
                 int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
                 onReceiveAudioStateChange(device, prevState, state);
                 mIndicatorsFragment.onAudioStateChanged(state, prevState);
+                if (state == BluetoothHandsfreeClient.STATE_AUDIO_CONNECTED) {
+                    Handler handler = new Handler();
+                    handler.postDelayed(new Runnable(){
+                        @Override
+                        public void run(){
+                                if (mBluetoothHandsfreeClient == null || mDevice == null) {
+                                    Logger.v(TAG, "Profile is disconnected");
+                                    return;
+                                }
+                                for (BluetoothHandsfreeClientCall call : mBluetoothHandsfreeClient.getCurrentCalls(mDevice)) {
+                                    Logger.v(TAG, "Updating call controls");
+                                    mCallsListFragment.onCallChanged(call);
+                                }
+                            }
+                    }, 500);
+                }
 
                 // Send MonkeyEvent
                 new MonkeyEvent("hfp-audio-state-changed", true)
