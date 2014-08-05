@@ -69,6 +69,7 @@ import java.util.HashSet;
 
 public class BluetoothFtpService extends Service {
      private static final String TAG = "BluetoothFtpService";
+     public static final String LOG_TAG = "BluetoothFtp";
 
     /**
      * To enable FTP DEBUG/VERBOSE logging - run below cmd in adb shell, and
@@ -82,7 +83,7 @@ public class BluetoothFtpService extends Service {
     //public static final boolean VERBOSE = false;
 
     public static final boolean DEBUG = true;
-    public static final boolean VERBOSE = true;
+    public static boolean VERBOSE;
     private int mState;
 
     /**
@@ -382,6 +383,7 @@ public class BluetoothFtpService extends Service {
     }
 
     private void startRfcommSocketListener() {
+        VERBOSE = Log.isLoggable(BluetoothFtpService.LOG_TAG, Log.VERBOSE) ? true : false;
         if (VERBOSE) Log.v(TAG, "Ftp Service startRfcommSocketListener");
 
         if (mRfcommServerSocket == null) {
@@ -501,12 +503,20 @@ public class BluetoothFtpService extends Service {
             mAuth.setCancelled(false);
         }
         BluetoothFtpTransport transport;
+        if(mConnSocket == null){
+           Log.i(TAG, "mConnSocket = null");
+           throw new IOException("no Connection Socket available");
+        }
         if(isL2capSocket == false) {
             transport = new BluetoothFtpTransport(mConnSocket,BluetoothFtpTransport.TYPE_RFCOMM);
         } else {
             transport = new BluetoothFtpTransport(mConnSocket,BluetoothFtpTransport.TYPE_L2CAP);
         }
 
+        if(transport == null){
+           Log.i(TAG, "transport channel = null");
+           throw new IOException("no transport channel  available");
+        }
         mServerSession = new ServerSession(transport, mFtpServer, mAuth);
 
         if (VERBOSE) {
