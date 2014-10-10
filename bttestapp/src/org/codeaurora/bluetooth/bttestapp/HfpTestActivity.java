@@ -57,6 +57,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Hashtable;
 
 public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnectionObserver,
         CallHistoryDialogListener {
@@ -72,6 +73,8 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
     private final ArrayList<String> mCallHistory = new ArrayList<String>();
 
     private ActionBar mActionBar = null;
+
+    private Hashtable<Integer, BluetoothHandsfreeClientCall> mCalls;
 
    // this should be visible for fragments
     BluetoothHandsfreeClient mBluetoothHandsfreeClient;
@@ -281,6 +284,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
 
         ActivityHelper.initialize(this, R.layout.activity_hfp_test);
         BluetoothConnectionReceiver.registerObserver(this);
+        mCalls = new Hashtable<Integer, BluetoothHandsfreeClientCall>();
 
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
@@ -319,6 +323,25 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
         filter.addAction(BluetoothHandsfreeClient.ACTION_RESULT);
         filter.addAction(BluetoothHandsfreeClient.ACTION_LAST_VTAG);
         registerReceiver(mHfpClientReceiver, filter);
+        if (mBluetoothHandsfreeClient != null) {
+            for (BluetoothHandsfreeClientCall call : mCalls.values()) {
+                call.setState(BluetoothHandsfreeClientCall.CALL_STATE_TERMINATED);
+                mCallsListFragment.onCallChanged(call);
+                new MonkeyEvent("hfp-call-changed", true)
+                        .addExtReply(callToJson(call))
+                        .send();
+            }
+            for (BluetoothHandsfreeClientCall call :
+                    mBluetoothHandsfreeClient.getCurrentCalls(mDevice)) {
+                Logger.v(TAG, "Updating call controls");
+                mCallsListFragment.onCallChanged(call);
+                new MonkeyEvent("hfp-call-changed", true)
+                        .addExtReply(callToJson(call))
+                        .send();
+            }
+        } else {
+            Logger.v(TAG,"mBluetoothHandsfreeClient is null");
+        }
         super.onResume();
     }
 
@@ -327,6 +350,20 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
         Logger.v(TAG, "onPause");
 
         unregisterReceiver(mHfpClientReceiver);
+        if (mBluetoothHandsfreeClient != null) {
+            mCalls.clear();
+            Integer id = 1;
+            // save all calls status
+            if (!mBluetoothHandsfreeClient.getCurrentCalls(mDevice).isEmpty()) {
+                for (BluetoothHandsfreeClientCall call :
+                    mBluetoothHandsfreeClient.getCurrentCalls(mDevice)) {
+                    mCalls.put(id, call);
+                    id++;
+                }
+            }
+        } else {
+            Logger.v(TAG,"mBluetoothHandsfreeClient is null");
+        }
         super.onPause();
     }
 
