@@ -111,6 +111,7 @@ final class BluetoothMasRequestGetMessagesListing extends BluetoothMasRequest {
             oap.add(OAP_TAGID_SUBJECT_LENGTH, (byte) subjectLength);
         }
 
+            oap.add(OAP_TAGID_PARAMETER_MASK, parameters);
         if (maxListCount >= 0) {
             oap.add(OAP_TAGID_MAX_LIST_COUNT, (short) maxListCount);
         }
@@ -135,8 +136,8 @@ final class BluetoothMasRequestGetMessagesListing extends BluetoothMasRequest {
 
         if (oap.exists(OAP_TAGID_MSE_TIME)) {
             String mseTime = oap.getString(OAP_TAGID_MSE_TIME);
-
-            mServerTime = (new ObexTime(mseTime)).getTime();
+            if(mseTime != null )
+               mServerTime = (new ObexTime(mseTime)).getTime();
         }
     }
 
