@@ -663,7 +663,7 @@ public class ServicesFragment extends ListFragment {
 
                 if (type.equals(Service.Type.MAP)) {
                     inst = new BluetoothMasInstance(jsrv.getInt("i_id"), jsrv.getString("i_name"),
-                            jsrv.getInt("i_scn"), jsrv.getInt("i_msg"));
+                            jsrv.getInt("i_scn"), jsrv.getInt("i_msg"), jsrv.getInt("i_l2capPsm"));
                     insts.add(inst);
                 }
 

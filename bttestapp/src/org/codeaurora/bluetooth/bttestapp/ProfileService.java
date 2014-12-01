@@ -255,14 +255,14 @@ public class ProfileService extends Service {
             if (msg.what == BluetoothMasClient.EVENT_CONNECT) {
                 Intent intent = new Intent(ACTION_MAP_CONNECTION_STATE);
                 intent.putExtra(BluetoothDevice.EXTRA_MAS_INSTANCE, new BluetoothMasInstance(
-                        msg.arg2, null, 0, 0));
+                        msg.arg2, null, 0, 0, 0x0FFF));
                 intent.putExtra(EXTRA_CONNECTED, success);
 
                 ProfileService.this.sendBroadcast(intent);
             } else if (msg.what == BluetoothMasClient.EVENT_SET_NOTIFICATION_REGISTRATION) {
                 Intent intent = new Intent(ACTION_MAP_NOTIFICATION_STATE);
                 intent.putExtra(BluetoothDevice.EXTRA_MAS_INSTANCE, new BluetoothMasInstance(
-                        msg.arg2, null, 0, 0));
+                        msg.arg2, null, 0, 0, 0x0FFF));
                 intent.putExtra(EXTRA_NOTIFICATION_STATE, ((Integer) msg.obj).intValue() != 0);
 
                 ProfileService.this.sendBroadcast(intent);
