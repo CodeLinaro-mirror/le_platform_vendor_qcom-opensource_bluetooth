@@ -21,6 +21,7 @@
         android:theme="@style/AppTheme" >
 
         <uses-library android:name="javax.obex" />
+        <uses-library android:name="javax.btobex" />
 
         <activity android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|screenSize" >
