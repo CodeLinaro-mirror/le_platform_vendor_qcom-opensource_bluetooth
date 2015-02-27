@@ -64,6 +64,8 @@ import android.text.TextUtils;
 import android.content.ComponentName;
 import android.os.RemoteException;
 import org.codeaurora.bluetooth.R;
+import com.android.internal.telephony.TelephonyProperties;
+
 
 /**
  * Provides Bluetooth Sap profile, as a service in the BluetoothExt APK.
@@ -657,6 +659,11 @@ public class BluetoothSapService extends Service {
     private final boolean initSapdClientSocket() {
         if (VERBOSE) Log.v(TAG, "SAP initSapdClientSocket");
 
+        if (!(isCardPresent())) {
+            Log.e(TAG, "SIM card locked");
+            return false;
+        }
+
         boolean initSapdSocketOK = false;
 
         try {
@@ -822,6 +829,16 @@ public class BluetoothSapService extends Service {
                 .getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(id);
     }
+
+    public static boolean isCardPresent() {
+        String prop = SystemProperties.get(TelephonyProperties.PROPERTY_SIM_STATE);
+        if ("READY".equals(prop) || "PRESENT".equals(prop)) {
+            return true;
+        }
+
+        return false;
+    }
+
 
     /**
      * A thread that runs in the background waiting for remote rfcomm
