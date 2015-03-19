@@ -64,7 +64,6 @@ import android.text.TextUtils;
 import android.content.ComponentName;
 import android.os.RemoteException;
 import org.codeaurora.bluetooth.R;
-import com.android.internal.telephony.TelephonyProperties;
 
 /**
  * Provides Bluetooth Sap profile, as a service in the BluetoothExt APK.
@@ -155,31 +154,11 @@ public class BluetoothSapService extends Service {
 
     private static final short CONN_STATUS_PARAM_LEN            = 0x01;
 
-    private static final byte STATUS_CHANGE                     = 0x08;
-
-    private static final byte STATUS_IND                        = 0x11;
-
-    private static final short STATUS_IND_PARAM_LEN            = 0x01;
-
-    private static final byte STATUS_IND_NUM_PARAMS            = 0x01;
-
     private static final byte CONNECT_RESP                      = 0x01;
 
     private static final byte CONNECT_RESP_NUM_PARAMS           = 0x01;
 
     private static final byte CONN_ERR                          = 0x01;
-
-    private static final byte CONN_OK                          = 0x00;
-
-    /**
-     * Constants used for default SIM states
-     */
-
-    private static final byte SAP_SIM_CARD_ACCESSIBLE             = 0x01;
-
-    private static final byte SAP_SIM_CARD_LOCKED                 = 0x02;
-
-    private static final byte SAP_SIM_CARD_ABSENT                 = 0x03;
 
     private static IBluetooth mAdapterService                   = null;
 
@@ -679,14 +658,6 @@ public class BluetoothSapService extends Service {
         if (VERBOSE) Log.v(TAG, "SAP initSapdClientSocket");
 
         boolean initSapdSocketOK = false;
-        byte cardStatus = checkCardStatus();
-        if (cardStatus != SAP_SIM_CARD_ACCESSIBLE) {
-            /* Card is either locked or not present,
-             * send the connect ok, and status ind with appropriate error */
-            sendOkConnResp();
-            sendStatusInd(cardStatus);
-            return false;
-        }
 
         try {
             LocalSocketAddress locSockAddr = new LocalSocketAddress(SAP_SERVER);
@@ -850,30 +821,6 @@ public class BluetoothSapService extends Service {
         NotificationManager nm = (NotificationManager) context
                 .getSystemService(Context.NOTIFICATION_SERVICE);
         nm.cancel(id);
-    }
-
-    public static byte checkCardStatus() {
-        String prop = SystemProperties.get(TelephonyProperties.PROPERTY_SIM_STATE);
-        /* It's possible that target could support more than 1 SIM's
-         * check SIM-0 state (UNKNOWN, ABSENT, PIN_REQUIRED, PUK_REQUIRED,
-         * NETWORK_LOCKED, READY */
-        if (prop.contains(",")) {
-            Log.d(TAG, "More than one SIM supported, prop = " + prop);
-            String[] props = prop.split(",");
-            prop = props[0];
-        }
-        Log.d(TAG, "checkCardStatus: prop = " + prop);
-
-        if ("READY".equals(prop) || "PRESENT".equals(prop)) {
-            return SAP_SIM_CARD_ACCESSIBLE;
-        }
-
-        if ("PIN_REQUIRED".equals(prop) || "PUK_REQUIRED".equals(prop) ||
-            "NETWORK_LOCKED".equals(prop)) {
-            return SAP_SIM_CARD_LOCKED;
-        }
-
-        return SAP_SIM_CARD_ABSENT;
     }
 
     /**
@@ -1356,77 +1303,6 @@ public class BluetoothSapService extends Service {
         return true;
     }
 
-    private final boolean sendOkConnResp() {
-        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        OutputStream mRfcommOutputStream = null;
-        int WriteLen = SAP_HEADER_SIZE + SAP_PARAM_HEADER_SIZE +
-                       CONN_STATUS_PARAM_LEN + (4-((CONN_STATUS_PARAM_LEN)%4)); // 4 byte padding
-
-        ByteBuffer IpcMsgBuffer = ByteBuffer.allocate(WriteLen);
-
-        if (mRfcommSocket != null) {
-            if ( mRfcommSocket.isConnected())
-                try {
-                    mRfcommOutputStream = mRfcommSocket.getOutputStream();
-                } catch (IOException ex) {
-                    if (VERBOSE) Log.v(TAG, "mRfcommOutputStream exception: " + ex.toString());
-                }
-            else return false;
-        }
-        else return false;
-
-        IpcMsgBuffer.put(SAP_MSG_OFF_MSG_ID, CONNECT_RESP);
-        IpcMsgBuffer.put(SAP_MSG_OFF_NUM_PARAMS, CONNECT_RESP_NUM_PARAMS);
-        IpcMsgBuffer.put(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_ID,CONNECTION_STATUS);
-        IpcMsgBuffer.putShort(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_LEN, CONN_STATUS_PARAM_LEN);
-        IpcMsgBuffer.put(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_VAL, CONN_OK);
-
-        try {
-            if (mRfcommOutputStream != null) {
-                mRfcommOutputStream.write(IpcMsgBuffer.array(), 0, WriteLen);
-                mRfcommOutputStream.flush();
-            }
-        } catch (IOException ex) {
-            if (VERBOSE) Log.v(TAG, "mRfcommOutputStream  wrtie exception: " + ex.toString());
-        }
-        return true;
-    }
-
-    private final boolean sendStatusInd(byte cardStatus) {
-        enforceCallingOrSelfPermission(BLUETOOTH_PERM, "Need BLUETOOTH permission");
-        OutputStream mRfcommOutputStream = null;
-        int WriteLen = SAP_HEADER_SIZE + SAP_PARAM_HEADER_SIZE +
-                       STATUS_IND_PARAM_LEN + (4-((STATUS_IND_PARAM_LEN)%4)); // 4 byte padding
-
-        ByteBuffer IpcMsgBuffer = ByteBuffer.allocate(WriteLen);
-
-        if (mRfcommSocket != null) {
-            if ( mRfcommSocket.isConnected())
-                try {
-                    mRfcommOutputStream = mRfcommSocket.getOutputStream();
-                } catch (IOException ex) {
-                    if (VERBOSE) Log.v(TAG, "mRfcommOutputStream exception: " + ex.toString());
-                }
-            else return false;
-        }
-        else return false;
-
-        IpcMsgBuffer.put(SAP_MSG_OFF_MSG_ID, STATUS_IND);
-        IpcMsgBuffer.put(SAP_MSG_OFF_NUM_PARAMS, STATUS_IND_NUM_PARAMS);
-        IpcMsgBuffer.put(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_ID, STATUS_CHANGE);
-        IpcMsgBuffer.putShort(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_LEN, STATUS_IND_PARAM_LEN);
-        IpcMsgBuffer.put(SAP_HEADER_SIZE + SAP_MSG_OFF_PARAM_VAL, cardStatus);
-
-        try {
-            if (mRfcommOutputStream != null) {
-                mRfcommOutputStream.write(IpcMsgBuffer.array(), 0, WriteLen);
-                mRfcommOutputStream.flush();
-            }
-        } catch (IOException ex) {
-            if (VERBOSE) Log.v(TAG, "mRfcommOutputStream  wrtie exception: " + ex.toString());
-        }
-        return true;
-    }
 
     int getConnectionState(BluetoothDevice device) {
         BluetoothSapDevice sapDevice = mSapDevices.get(device);
