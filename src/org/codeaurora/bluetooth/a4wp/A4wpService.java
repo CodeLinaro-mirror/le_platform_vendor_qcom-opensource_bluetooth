@@ -59,12 +59,18 @@ import android.wipower.WipowerManager.PowerLevel;
 import android.wipower.WipowerDynamicParam;
 import com.quicinc.wbc.WbcManager;
 import com.quicinc.wbc.WbcTypes;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
 
 import android.bluetooth.le.AdvertiseCallback;
 import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.AdvertiseData;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.os.ParcelUuid;
+import android.os.PowerManager;
+import android.os.SystemProperties;
 
 /**
  * Class which executes A4WP service
@@ -76,6 +82,12 @@ public class A4wpService extends Service
     private BluetoothAdapter mBluetoothAdapter = null;
     private BluetoothGattServer mBluetoothGattServer = null;
     private BluetoothDevice mDevice = null;
+    private PowerManager.WakeLock mWakeLock = null;
+
+    // Advertising variables
+    private final static int START_ADVERTISING = 1;
+    private final static int STOP_ADVERTISING = 0;
+    private WipowerAdvHandler mHandler;
 
     private static final UUID A4WP_SERVICE_UUID = UUID.fromString("6455fffe-a146-11e2-9e96-0800200c9a67");
     //PRU writes
@@ -118,15 +130,46 @@ public class A4wpService extends Service
     private static final byte A4WP_ADV_MIN_INTERVAL = 0x20;
     private static final byte A4WP_ADV_MAX_INTERVAL = 0x20;
 
+    //mask bits for charge port and irect validations
+    private static final int CHARGE_PORT_MASK = 0x02;
+    private static final int IRECT_MASK_MSB = 0x00;
+    private static final int IRECT_MASK_LSB = 0x15;
+    private static final int VRECT_MASK = 0x00;
+
+    //Indices definitions
+    private static final int PRU_ALERT = 16;
+    private static final int IRECT_LSB = 3;
+    private static final int IRECT_MSB = 4;
+    private static final int VRECT_LSB = 1;
+    private static final int VRECT_MSB = 2;
+
     private static boolean mWipowerBoot = false;
     static boolean mChargeComplete = true;
-    static boolean isConnected = false;
 
     private AdvertiseSettings mAdvertiseSettings;
     private AdvertiseData mAdvertisementData;
     private BluetoothLeAdvertiser mAdvertiser;
     private AdvertiseCallback mAdvertiseCallback = new myAdvertiseCallback(1);
     ParcelUuid uuid1 = ParcelUuid.fromString("6455fffe-a146-11e2-9e96-0800200c9a67");
+
+    // Handler to maintain advertisement messages
+    private final class WipowerAdvHandler extends Handler {
+        private WipowerAdvHandler(Looper looper) {
+            super(looper);
+        }
+
+       @Override
+        public void handleMessage(Message msg) {
+           switch (msg.what) {
+               case START_ADVERTISING:
+                   StartAdvertising();
+                   break;
+               case STOP_ADVERTISING:
+                   stopAdvertising();
+                   break;
+           }
+        }
+    }
 
     private WbcManager.WbcEventListener mWbcCallback = new WbcManager.WbcEventListener() {
 
@@ -148,6 +191,26 @@ public class A4wpService extends Service
             Log.v(LOGTAG, "onWbcEventUpdate: charge complete " +  mChargeComplete);
         }
     };
+
+    private  void acquire_wake_lock(boolean wake) {
+        if (wake == true) {
+            if (mWakeLock == null) {
+                PowerManager pm = (PowerManager)getSystemService(
+                Context.POWER_SERVICE);
+                mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                    "StartingWipowerConnection");
+                mWakeLock.setReferenceCounted(false);
+                mWakeLock.acquire();
+                Log.w(LOGTAG, "Acquire Wake Lock");
+            }
+        } else {
+            if (mWakeLock != null) {
+                mWakeLock.release();
+                mWakeLock = null;
+                Log.w(LOGTAG, "Release Wake Lock");
+            }
+       }
+    }
 
     private class PruStaticParam {
         private byte mOptvalidity;
@@ -445,6 +508,11 @@ public class A4wpService extends Service
 
         if (control.getEnablePruOutput()) {
             Log.v(LOGTAG, "do Enable PruOutPut");
+            /* Wake lock is enabled by default, to disbale need to set property */
+            if(SystemProperties.getBoolean("persist.a4wp.skip_connection_wakelock", false) == false) {
+                /* Hold wake lock during connection */
+                acquire_wake_lock(true);
+            }
             mWipowerManager.startCharging();
             mWipowerManager.enableAlertNotification(false);
             mWipowerManager.enableDataNotification(true);
@@ -455,6 +523,9 @@ public class A4wpService extends Service
             }
             mWipowerManager.stopCharging();
             mWipowerManager.enableDataNotification(false);
+            if(SystemProperties.getBoolean("persist.a4wp.skip_connection_wakelock", false) == false) {
+                acquire_wake_lock(false);
+            }
             return status;
         }
 
@@ -521,13 +592,15 @@ public class A4wpService extends Service
             Log.v(LOGTAG, "onPowerApply" + state);
             if (state == PowerApplyEvent.ON) {
                 Log.v(LOGTAG, "StartAdvertising");
-                StartAdvertising();
+                Message msg = mHandler.obtainMessage(START_ADVERTISING);
+                mHandler.sendMessage(msg);
+
             } else {
-                Log.v(LOGTAG, "Cancel connection as part of -" + state);
-                if (mBluetoothGattServer != null) {
-                    if (mDevice != null) {
-                        mBluetoothGattServer.cancelConnection(mDevice);
-                    }
+                if (mBluetoothGattServer != null && mDevice != null) {
+                    Log.v(LOGTAG, "onPowerApply " + state + "dropping Connection");
+                    mBluetoothGattServer.cancelConnection(mDevice);
+                } else {
+                    Log.v(LOGTAG, "onPowerApply " + state + "skip dropping Connection");
                 }
             }
         }
@@ -587,24 +660,22 @@ public class A4wpService extends Service
         public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
             WipowerState state = WipowerState.OFF;
             mState = newState;
-            if (mState == BluetoothProfile.STATE_DISCONNECTED && isConnected == true) {
-                Log.v(LOGTAG, "onConnectionStateChange:DISCONNECTED " + device + "charge complete " + mChargeComplete);
-                isConnected = false;
-                if (mDevice != null && mWipowerManager != null) {
-                    stopAdvertising();
+            if (mState == BluetoothProfile.STATE_DISCONNECTED) {
+                if (mWipowerManager != null  && device.equals(mDevice)) {
+                    Log.v(LOGTAG, "onConnectionStateChange:DISCONNECTED " + device + "charge complete " + mChargeComplete);
                     mWipowerManager.enableDataNotification(false);
                     mWipowerManager.stopCharging();
                     if (mChargeComplete != true) {
                         mWipowerManager.enablePowerApply(true, true, false);
                     }
+                    if(SystemProperties.getBoolean("persist.a4wp.skip_connection_wakelock", false) == false) {
+                        /* Drop wake lock once the connection is dropped gracefully */
+                        acquire_wake_lock(false);
+                    }
                     mDevice = null;
                 }
             } else if (mState == BluetoothProfile.STATE_CONNECTED) {
                 Log.v(LOGTAG, "onConnectionStateChange:CONNECTED");
-                mDevice = device;
-                /* Initiate a dummy connection such that on stop advertisment
-                   the advetisment instances are cleared properly */
-                mBluetoothGattServer.connect(mDevice, false);
             }
         }
 
@@ -631,6 +702,19 @@ public class A4wpService extends Service
                                        offset, value);
                 }
         }
+        /* Due to bad coupling irect value drops to zero and vrect remains
+          constant would render stark to reset the CHG_OK pin, So as to
+          set this pin on coupling being recovered host delivers the charge
+          enable command to set the CHG_OK pin. */
+        private void isChargeEnabled(byte[] value)
+        {
+            if ((byte)(value[PRU_ALERT] & CHARGE_PORT_MASK) == CHARGE_PORT_MASK) {
+                if ((value[IRECT_LSB] <= IRECT_MASK_LSB && value[IRECT_MSB] == IRECT_MASK_MSB)
+                     && (value[VRECT_LSB] > VRECT_MASK || value[VRECT_MSB] > VRECT_MASK)) {
+                    mWipowerManager.startCharging();
+                }
+            }
+        }
 
         @Override
         public void onCharacteristicReadRequest(BluetoothDevice device, int requestId,
@@ -648,7 +732,10 @@ public class A4wpService extends Service
                 else if(id == A4WP_PRU_STATIC_UUID)
                 {
                     value = mPruStaticParam.getValue();
-                    isConnected = true;
+                    mDevice = device;
+                    /* Initiate a dummy connection such that on stop advertisment
+                       the advetisment instances are cleared properly */
+                    mBluetoothGattServer.connect(mDevice, false);
                 }
                 else if (id == A4WP_PRU_DYNAMIC_UUID) {
                     if (mPruDynamicParam == null) {
@@ -661,6 +748,7 @@ public class A4wpService extends Service
                     } else {
                         value[16] = (byte)(value[16] & (~CHARGE_COMPLETE_BIT));
                     }
+                    isChargeEnabled(value);
                 }
                 if (value != null)
                 {
@@ -717,8 +805,8 @@ public class A4wpService extends Service
             .addServiceData(uuid1, serviceData).build();
 
         mAdvertiseSettings = new AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_ULTRA_LOW)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(true)
             .setTimeout(WIPOWER_ADV_TIMEOUT).build();
 
@@ -825,6 +913,11 @@ public class A4wpService extends Service
             Log.v(LOGTAG, "onCreate: charge complete " + mChargeComplete);
             mWbcManager.register(mWbcCallback);
         }
+        // Starting a thread to handle the advertising
+        HandlerThread thread = new HandlerThread("WipowerAdvHandler");
+        thread.start();
+        Looper looper = thread.getLooper();
+        mHandler = new WipowerAdvHandler(looper);
     }
 
     @Override
@@ -834,6 +927,12 @@ public class A4wpService extends Service
              mWipowerManager.unregisterCallback(mWipowerCallback);
         if (mWbcManager != null)
              mWbcManager.unregister(mWbcCallback);
+
+        // Clear thread on destroy
+        Looper looper = mHandler.getLooper();
+        if (looper != null) {
+           looper.quit();
+        }
     }
 
     @Override
@@ -853,6 +952,10 @@ public class A4wpService extends Service
             } else {
                 mWipowerManager.enablePowerApply(true, true, false);
             }
+        }
+        if(SystemProperties.getBoolean("persist.a4wp.skip_connection_wakelock", false) == false) {
+            //release wake lock in case if held during crashes or on BT restart.
+            acquire_wake_lock(false);
         }
         return START_STICKY;
    }
