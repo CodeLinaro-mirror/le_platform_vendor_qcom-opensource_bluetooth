@@ -636,6 +636,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             updatePlayerSettings(mMetaData);
         }
 
+        if ((plSetting == null)||(plSetting.isEmpty())||(repeatText == null)) {
+            Log.w(TAG," not supported, return");
+            return;
+        }
         for (PlayerSettings sett: plSetting) {
             Log.d(TAG," finding the current value " + sett.attr_Id);
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_REPEAT_STATUS) {
@@ -683,6 +687,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
         }
+        if ((plSetting == null)||(plSetting.isEmpty())||(equalizerText == null)) {
+            Log.w(TAG," not supported, return");
+            return;
+        }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_EQUALIZER_STATUS) {
                 int eq_status;
@@ -724,6 +732,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((plSetting == null)||(plSetting.isEmpty())) {
             BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
+        }
+        if ((plSetting == null)||(plSetting.isEmpty())||(scanText == null)) {
+            Log.w(TAG," not supported, return");
+            return;
         }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SCAN_STATUS) {
@@ -768,6 +780,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((plSetting == null)||(plSetting.isEmpty())) {
             BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
+        }
+        if ((plSetting == null)||(plSetting.isEmpty())||(shuffleText == null)) {
+            Log.w(TAG," not supported, return");
+            return;
         }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SHUFFLE_STATUS) {
@@ -914,10 +930,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)!=0) {
                     BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
                     updatePlayerSettings(mMetaData);
+                    registerMetaDataObserver();
                     int[] elementAttribute = new int[1];
                     elementAttribute[0] = BluetoothAvrcpInfo.MEDIA_ATTRIBUTE_ALL;
                     mAvrcpController.getMetaData(elementAttribute);
-                    registerMetaDataObserver();
                 }
                 else {
                     unregisterMetaDataObserver();
