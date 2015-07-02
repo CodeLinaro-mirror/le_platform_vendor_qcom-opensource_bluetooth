@@ -70,6 +70,11 @@ import org.codeaurora.bluetooth.bttestapp.util.MonkeyEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnectionObserver {
 
@@ -189,6 +194,22 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
     };
 
+    private void place_Marker(String marker) {
+    try {
+         File f = new File("/proc/bootkpi/marker_entry");
+         if (!f.exists())
+             return;
+
+         FileOutputStream fos = new FileOutputStream(f);
+         byte[] marker_name = marker.getBytes();
+         fos.write(marker_name);
+         fos.flush();
+         fos.close();
+     } catch (IOException e) {
+         e.printStackTrace();
+     }
+    }
+
     /*
      * PBAP Service.
      */
@@ -223,6 +244,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
             Toast.makeText(PbapTestActivity.this, "Missed calls=" + missedCalls, Toast.LENGTH_SHORT)
                     .show();
+            place_Marker("PBAP_DOWNLOAD-END");
         }
 
         @Override
@@ -764,14 +786,17 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
         try {
             if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
+                place_Marker("PBAP_DOWNLOAD-START");
                 if (mProfileService.getPbapClient().pullPhoneBook(
                         mDownloadSpinner.getSelectedItem().toString(), mDownloadValueFilter,
                         mDownloadValueCardType, mDownloadValueMaxCount, mDownloadValueOffset))
                     startProgressBarDownload();
             } else {
+                    place_Marker("PBAP_DOWNLOAD-ERR");
                     Toast.makeText(this, "PullPhoneBook FAILED", Toast.LENGTH_LONG).show();
             }
         } catch (IllegalArgumentException e) {
+            place_Marker("PBAP_DOWNLOAD-ERR");
             Toast.makeText(this,
                     "PullPhoneBook FAILED: illegal arguments (" + e.getMessage() + ")",
                     Toast.LENGTH_LONG).show();
