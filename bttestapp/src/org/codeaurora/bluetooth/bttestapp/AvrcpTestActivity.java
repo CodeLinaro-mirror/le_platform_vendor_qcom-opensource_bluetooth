@@ -98,17 +98,19 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     };
     ArrayList<PlayerSettings> plSetting= null;
     int remoteSupportedFeatures = 0;
-    public static final int KEY_STATE_PRESSED = 0;
-    public static final int KEY_STATE_RELEASED = 1;
-    public static final int AVRC_ID_PLAY = 0x44;
-    public static final int AVRC_ID_PAUSE = 0x46;
-    public static final int AVRC_ID_VOL_UP = 0x41;
-    public static final int AVRC_ID_VOL_DOWN = 0x42;
-    public static final int AVRC_ID_STOP = 0x45;
-    public static final int AVRC_ID_FF = 0x49;
-    public static final int AVRC_ID_REWIND = 0x48;
-    public static final int AVRC_ID_FORWARD = 0x4B;
-    public static final int AVRC_ID_BACKWARD = 0x4C;
+    public static final int KEY_STATE_PRESSED = BluetoothAvrcpController.KEY_STATE_PRESSED;
+    public static final int KEY_STATE_RELEASED = BluetoothAvrcpController.KEY_STATE_RELEASED;
+    public static final int AVRC_ID_PLAY = BluetoothAvrcpController.AVRC_ID_PLAY;
+    public static final int AVRC_ID_PAUSE = BluetoothAvrcpController.AVRC_ID_PAUSE;
+    public static final int AVRC_ID_VOL_UP = BluetoothAvrcpController.AVRC_ID_VOL_UP;
+    public static final int AVRC_ID_VOL_DOWN = BluetoothAvrcpController.AVRC_ID_VOL_DOWN;
+    public static final int AVRC_ID_STOP = BluetoothAvrcpController.AVRC_ID_STOP;
+    public static final int AVRC_ID_FF = BluetoothAvrcpController.AVRC_ID_FF;
+    public static final int AVRC_ID_REWIND = BluetoothAvrcpController.AVRC_ID_REWIND;
+    public static final int AVRC_ID_FORWARD = BluetoothAvrcpController.AVRC_ID_FORWARD;
+    public static final int AVRC_ID_BACKWARD = BluetoothAvrcpController.AVRC_ID_BACKWARD;
+    public static final int AVRC_ID_NEXT_GRP = BluetoothAvrcpController.AVRC_ID_NEXT_GRP;
+    public static final int AVRC_ID_PREV_GRP = BluetoothAvrcpController.AVRC_ID_PREV_GRP;
 
     public static final int SEND_PASS_THROUGH_CMD = 1;
 
@@ -194,8 +196,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             else if (me.getAction() == MotionEvent.ACTION_DOWN) {
                 if ((mAvrcpController != null) && mDevice != null &&
                         BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-                        //mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_REWIND, KEY_STATE_PRESSED);
-                	if ((mPressandHoldHandler != null)&&(!mPressandHoldHandler.hasMessages(SEND_PASS_THROUGH_CMD)))
+                    if ((mPressandHoldHandler != null)&&(!mPressandHoldHandler.hasMessages(SEND_PASS_THROUGH_CMD)))
                         mPressandHoldHandler.sendMessage(mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD,AVRC_ID_REWIND,KEY_STATE_PRESSED));
                     } else {
                         Logger.e(TAG, "passthru command not sent, connection unavailable");
@@ -590,6 +591,26 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             return;
         getContentResolver().unregisterContentObserver(mAvrcpDataObserver);
         mAvrcpDataObserver = null;
+    }
+    public void onClickPrevGroup(View v) {
+        Logger.v(TAG, "onClickPrevGroup()");
+        if ((mAvrcpController != null) && mDevice != null &&
+            BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
+            mAvrcpController.sendGroupNavigationCmd(mDevice, AVRC_ID_PREV_GRP, KEY_STATE_PRESSED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, AVRC_ID_PREV_GRP, KEY_STATE_RELEASED);
+        } else {
+            Logger.e(TAG, "GRP Navigation not sent, connection unavailable");
+        }
+    }
+    public void onClickNextGroup(View v) {
+        Logger.v(TAG, "onClickNextGroup()");
+        if ((mAvrcpController != null) && mDevice != null &&
+            BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
+            mAvrcpController.sendGroupNavigationCmd(mDevice, AVRC_ID_NEXT_GRP, KEY_STATE_PRESSED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, AVRC_ID_NEXT_GRP, KEY_STATE_RELEASED);
+        } else {
+            Logger.e(TAG, "GRP Navigation not sent, connection unavailable");
+        }
     }
     public void onClickPassthruPlay(View v) {
         Logger.v(TAG, "onClickPassthruPlay()");

@@ -337,6 +337,8 @@
     <string name="passthru_rewind">RW</string>
     <string name="passthru_forward">NEXT_TR</string>
     <string name="passthru_backward">PREV_TR</string>
+    <string name="passthru_nextgrp">NEXT_GRP</string>
+    <string name="passthru_prevgrp">PREV_GRP</string>
     <string name="track_number_default">NO_TRACK</string>
     <string name="title_name_default">NO_TITLE</string>
     <string name="artist_name_default">NO_ARTIST</string>

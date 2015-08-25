@@ -84,6 +84,22 @@
                 android:onClick="onClickPassthruBackward"
                 android:text="@string/passthru_backward" />
 
+            <Button
+                android:id="@+id/onClickNextGroup"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickNextGroup"
+                android:text="@string/passthru_nextgrp" />
+
+            <Button
+                android:id="@+id/onClickPrevGroup"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickPrevGroup"
+                android:text="@string/passthru_prevgrp" />
+
         </TableRow>
 
         <TableRow
