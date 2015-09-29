@@ -348,6 +348,8 @@
     <string name="playing_time_default">NO_TIME</string>
     <string name="total_track_time_default">UNKNOWN</string>
     <string name="play_status_default">STOPPED</string>
+    <string name="battery_status_default">NOT_SUPPORTED</string>
+    <string name="system_status_default">NOT_SUPPORTED</string>
     <string name="shuffle_status_default">SHUFFLE_OFF</string>
     <string name="repeat_status_default">REPEAT_OFF</string>
     <string name="scan_status_default">SCAN_OFF</string>

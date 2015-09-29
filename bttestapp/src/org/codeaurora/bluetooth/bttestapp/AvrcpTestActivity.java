@@ -128,6 +128,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private ToggleButton mCTStartButton;
     private Button ffButton;
     private Button rwButton;
+    private TextView mBatteryStatus;
+    private TextView mSystemStatus;
 
     private String repeatText;
     private String shuffleText;
@@ -140,6 +142,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private String equalizerText;
     private String trackNumText;
     private String titleNameText;
+    private String batteryStatusText;
+    private String systemStatusText;
 
     private final BroadcastReceiver mAvrcpControllerReceiver = new BroadcastReceiver() {
         @Override
@@ -413,6 +417,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                         equalizerText = cursor.getString(index);
                         Logger.e(TAG, " Equalizer Status  " + equalizerText);
                         break;
+                    case 12: //Battery Status
+                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.BATTERY_STATUS);
+                        if (index == -1)
+                            break;
+                        batteryStatusText = cursor.getString(index);
+                        Logger.e(TAG, " batteryStatus  " + batteryStatusText);
+                        break;
+                    case 13: //System Status
+                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.SYSETEM_STATUS);
+                        if (index == -1)
+                            break;
+                        systemStatusText = cursor.getString(index);
+                        Logger.e(TAG, " systemStatus  " + systemStatusText);
+                        break;
                     }
                     num_colums --;
                 }
@@ -451,6 +469,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                         mGenreStatus.setText(genreText);
                         mPlayTime.setText(playText);
                         mAlbumName.setText(albumText);
+                        mBatteryStatus.setText(batteryStatusText);
+                        mSystemStatus.setText(systemStatusText);
                     }
                     finally {
                         mLock.unlock();
@@ -652,8 +672,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
             return;
         }
+        BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
         if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
         }
 
@@ -664,25 +684,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         for (PlayerSettings sett: plSetting) {
             Log.d(TAG," finding the current value " + sett.attr_Id);
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_REPEAT_STATUS) {
-                int repeat_status;
-                mLock.lock();
-                try {
-                    if(repeatText.equals("REPEAT_OFF"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_OFF;
-                    else if (repeatText.equals("REPEAT_SINGLE_TRACK_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_SINGLE_TRACK_REPEAT;
-                    else if (repeatText.equals("REPEAT_GROUP_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_GROUP_REPEAT;
-                    else if (repeatText.equals("REPEAT_ALL_TRACK_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_ALL_TRACK_REPEAT;
-                    else {
-                        Log.d(TAG," Repeat not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
+                sett.attr_val = mMetaData.getCurrentPlayerAttributeVal(sett.attr_Id);
+                int repeat_status = sett.attr_val;
+                Log.d(TAG," shuffle_status " + repeat_status);
                 for (int zz = 0; zz < sett.supported_values.length; zz++) {
                     if (repeat_status == sett.supported_values[zz]) {
                         repeat_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
@@ -704,8 +708,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
             return;
         }
+        BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
         if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
         }
         if ((plSetting == null)||(plSetting.isEmpty())||(equalizerText == null)) {
@@ -714,21 +718,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_EQUALIZER_STATUS) {
-                int eq_status;
-                mLock.lock();
-                try {
-                    if(equalizerText.equals("EQUALIZER_OFF"))
-                        eq_status = BluetoothAvrcpInfo.EQUALIZER_STATUS_OFF;
-                    else if (equalizerText.equals("EQUALIZER_ON"))
-                        eq_status = BluetoothAvrcpInfo.EQUALIZER_STATUS_ON;
-                    else {
-                        Log.d(TAG," Equalizer not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
+                sett.attr_val = mMetaData.getCurrentPlayerAttributeVal(sett.attr_Id);
+                int eq_status = sett.attr_val;
+                Log.d(TAG," equalizer_status " + eq_status);
                 for (int zz = 0; zz < sett.supported_values.length; zz ++) {
                     if (eq_status == sett.supported_values[zz]) {
                         eq_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
@@ -750,8 +742,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
             return;
         }
+        BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
         if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
         }
         if ((plSetting == null)||(plSetting.isEmpty())||(scanText == null)) {
@@ -760,23 +752,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SCAN_STATUS) {
-                int scan_status;
-                mLock.lock();
-                try {
-                    if(scanText.equals("SCAN_OFF"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_OFF;
-                    else if (scanText.equals("SCAN_GROUP_SCAN"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_GROUP_SCAN;
-                    else if (scanText.equals("SCAN_ALL_TRACK_SCAN"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_ALL_TRACK_SCAN;
-                    else {
-                        Log.d(TAG," Scan not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
+                sett.attr_val = mMetaData.getCurrentPlayerAttributeVal(sett.attr_Id);
+                int scan_status = sett.attr_val;
+                Log.d(TAG," scan_status " + scan_status);
                 for (int zz = 0; zz < sett.supported_values.length; zz ++) {
                     if (scan_status == sett.supported_values[zz]) {
                         scan_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
@@ -798,8 +776,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
             return;
         }
+        BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
         if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
             updatePlayerSettings(mMetaData);
         }
         if ((plSetting == null)||(plSetting.isEmpty())||(shuffleText == null)) {
@@ -808,23 +786,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         }
         for (PlayerSettings sett: plSetting) {
             if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SHUFFLE_STATUS) {
-                int shuffle_status;
-                mLock.lock();
-                try {
-                    if(shuffleText.equals("SHUFFLE_OFF"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_OFF;
-                    else if (shuffleText.equals("SHUFFLE_GROUP_SHUFFLE"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_GROUP_SHUFFLE;
-                    else if (shuffleText.equals("SHUFFLE_ALL_TRACK_SHUFFLE"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_ALL_TRACK_SHUFFLE;
-                    else {
-                        Log.d(TAG," Shuffle not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
+                sett.attr_val = mMetaData.getCurrentPlayerAttributeVal(sett.attr_Id);
+                int shuffle_status = sett.attr_val;
+                Log.d(TAG," shuffle_status " + shuffle_status);
                 for (int zz = 0; zz < sett.supported_values.length; zz ++) {
                     if (shuffle_status == sett.supported_values[zz]) {
                         shuffle_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
@@ -895,6 +859,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 genreText = BluetoothAvrcpInfo.GENRE_INVALID;
                 playText = BluetoothAvrcpInfo.PLAY_STATUS_INVALID;
                 albumText = BluetoothAvrcpInfo.ALBUM_NAME_INVALID;
+                batteryStatusText = BluetoothAvrcpInfo.BATTERY_STATUS_INVALID;
+                systemStatusText = BluetoothAvrcpInfo.SYSTEM_STATUS_INVALID;
                 try {
                     mTrackNumber.setText(trackNumText);
                     mTitleName.setText(titleNameText);
@@ -907,6 +873,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                     mGenreStatus.setText(genreText);
                     mPlayTime.setText(playText);
                     mAlbumName.setText(albumText);
+                    mBatteryStatus.setText(batteryStatusText);
+                    mSystemStatus.setText(systemStatusText);
                 }
                 finally {
                     mLock.unlock();
@@ -932,6 +900,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
          rwButton = (Button) findViewById(R.id.onClickPassthruRewind);
          ffButton.setOnTouchListener(onTouchListenerFF);
          rwButton.setOnTouchListener(onTouchListenerRW);
+         mBatteryStatus = (TextView) findViewById(R.id.battery_status);
+         mSystemStatus = (TextView) findViewById(R.id.system_status);
     }
     public void onCTStartToggleClicked(View view) {
         // Is the toggle on?
