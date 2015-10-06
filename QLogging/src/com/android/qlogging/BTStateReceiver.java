@@ -43,7 +43,7 @@ import android.widget.Space;
 import android.widget.Spinner;
 import android.widget.Toast;
 import android.widget.ToggleButton;
-
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
@@ -84,37 +84,44 @@ public class BTStateReceiver extends BroadcastReceiver{
                                     sendIntent.transmitIntent(context, presState, profile, getSecondoryOptions.selected);
                                 }
                             }*/ //TODO:send profiles states
-                            map = Utils.getPreviousSettings(context, Main.STACK_MODULE_ID);
-                            counter = 0;
-                            if (!map.isEmpty()) {
-                                for (String stack : stack_list_names) {
-                                    Object state_obj = map.get(stack);
-                                    if (state_obj != null) {
-                                        String state = state_obj.toString();
-                                        int presState = Character.getNumericValue(state.charAt(2));
-                                        sendIntent.transmitIntent(context, presState, stack_list_tags[counter], Main.STACK_MODULE_ID);
-                                        counter++;
+                            File file_stack  = new File(context.getFilesDir(), "StackSettings.xml");
+                            File file_soc  = new File(context.getFilesDir(), "StackSettings.xml");
+                            if (file_stack.exists()) {
+                                map = Utils.getPreviousSettings(context, Main.STACK_MODULE_ID);
+                                counter = 0;
+                                if (!map.isEmpty()) {
+                                    for (String stack : stack_list_names) {
+                                        Object state_obj = map.get(stack);
+                                        if (state_obj != null) {
+                                            String state = state_obj.toString();
+                                            int presState = Character.getNumericValue(state.charAt(2));
+                                            sendIntent.transmitIntent(context, presState, stack_list_tags[counter], Main.STACK_MODULE_ID);
+                                            counter++;
+                                        }
                                     }
                                 }
-                            }
-                            map = Utils.getPreviousSettings(context, Main.SOC_MODULE_ID);
-                            counter = 0;
-                            getSecondoryOptions.SOC_levels="";
-                            if (!map.isEmpty()) {
-                                for (String soc : soc_list_names) {
-                                    Object state_obj = map.get(soc);
-                                    if (state_obj != null) {
-                                        String state = state_obj.toString();
-                                        int presState = Character.getNumericValue(state.charAt(2));
-                                        getSecondoryOptions.SOC_levels+=String.valueOf(presState);
-                                        counter++;
-                                    }else{
-                                        getSecondoryOptions.SOC_levels+=String.valueOf(0);
+                            } else if (file_soc.exists()) {
+                                map = Utils.getPreviousSettings(context, Main.SOC_MODULE_ID);
+                                counter = 0;
+                                getSecondoryOptions.SOC_levels="";
+                                if (!map.isEmpty()) {
+                                    for (String soc : soc_list_names) {
+                                        Object state_obj = map.get(soc);
+                                        if (state_obj != null) {
+                                            String state = state_obj.toString();
+                                            int presState = Character.getNumericValue(state.charAt(2));
+                                            getSecondoryOptions.SOC_levels+=String.valueOf(presState);
+                                            counter++;
+                                        }else{
+                                            getSecondoryOptions.SOC_levels+=String.valueOf(0);
+                                        }
                                     }
+                                    sendIntent.transmitIntent(context, Main.SOC_ALL_MODULE_ID, getSecondoryOptions.SOC_levels, Main.SOC_ALL_MODULE_ID);
+                                }else{
+                                      Log.d(Main.TAG,"Map empty for SOC");
                                 }
-                                sendIntent.transmitIntent(context, Main.SOC_ALL_MODULE_ID, getSecondoryOptions.SOC_levels, Main.SOC_ALL_MODULE_ID);
-                            }else{
-                                  Log.d(Main.TAG,"Map empty for SOC");
+                            } else {
+                                Log.d(Main.TAG,"File not yet created.");
                             }
                             break;
                         case Main.PROFILE_MODULE_ID:
