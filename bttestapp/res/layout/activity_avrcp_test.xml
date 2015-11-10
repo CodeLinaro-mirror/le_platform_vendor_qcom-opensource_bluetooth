@@ -85,12 +85,36 @@
                 android:text="@string/passthru_backward" />
 
             <Button
-                android:id="@+id/onClickPassthruVolUp"
+                android:id="@+id/onClickNextGroup"
                 style="?android:attr/buttonStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:onClick="onClickPassthruVolUp"
-                android:text="@string/passthru_volup" />
+                android:onClick="onClickNextGroup"
+                android:text="@string/passthru_nextgrp" />
+
+            <Button
+                android:id="@+id/onClickPrevGroup"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickPrevGroup"
+                android:text="@string/passthru_prevgrp" />
+
+            <Button
+                android:id="@+id/onClickPassthruGetElementAttributes"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickPassthruGetElementAttributes"
+                android:text="@string/passthru_ptsgetelm" />
+
+            <Button
+                android:id="@+id/onClickPassthruGetPlayStatus"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickPassthruGetPlayStatus"
+                android:text="@string/passthru_ptsgetplay" />
 
         </TableRow>
 
@@ -145,13 +169,6 @@
                 android:onClick="onClickToggleEq"
                 android:text="@string/toggle_eq" />
 
-            <Button
-                android:id="@+id/onClickPassthruVolDown"
-                style="?android:attr/buttonStyleSmall"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:onClick="onClickPassthruVolDown"
-                android:text="@string/passthru_voldown" />
         </TableRow>
 
         <TableRow
@@ -183,9 +200,8 @@
     </TableLayout>
 
     <TableLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="0.21" >
+        android:layout_width="166dp"
+        android:layout_height="wrap_content" >
 
         <TableRow
             android:id="@+id/tableRow5"
@@ -278,12 +294,19 @@
             android:text="@string/play_status_default"
             android:textAppearance="?android:attr/textAppearanceMedium" />
 
-        <ToggleButton
-            android:id="@+id/toggleButton1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:onClick="onCTStartToggleClicked" />
+
 
     </TableLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+        <ImageView
+            android:id="@+id/cover_art_image_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true" />
+    </RelativeLayout>
 
 </LinearLayout>

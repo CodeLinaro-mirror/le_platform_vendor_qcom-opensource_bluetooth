@@ -33,7 +33,7 @@ import android.app.ActionBar;
 import android.app.DialogFragment;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAvrcpController;
-import android.bluetooth.BluetoothAvrcpInfo;
+import android.bluetooth.BluetoothAvrcpPlayerSettings;
 import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -52,6 +52,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import android.view.View;
@@ -61,10 +62,13 @@ import android.database.Cursor;
 import android.content.ContentResolver;
 import android.os.Handler;
 import android.os.Process;
-import android.net.Uri;
 import android.widget.TextView;
 import android.app.Activity;
+import android.media.MediaMetadata;
+import android.media.session.PlaybackState;
 import java.util.concurrent.TimeUnit;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 import org.codeaurora.bluetooth.bttestapp.R;
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
@@ -72,9 +76,6 @@ import org.codeaurora.bluetooth.bttestapp.util.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
-import android.database.CursorIndexOutOfBoundsException;
-import android.database.sqlite.SQLiteCantOpenDatabaseException;
-import android.database.sqlite.SQLiteException;
 
 public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConnectionObserver {
 
@@ -82,7 +83,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private boolean ffPressed = false;
 
     private ActionBar mActionBar = null;
-    private UpdateThread mUpdateThread;
     private PressandHoldHandler mPressandHoldHandler;
     private View appView;
     private Activity mLocalActivity;
@@ -90,28 +90,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     BluetoothAvrcpController mAvrcpController;
     ProfileService mProfileService = null;
     BluetoothDevice mDevice;
-    BluetoothAvrcpShareContentObserver mAvrcpDataObserver = null;
     private class PlayerSettings
     {
         public byte attr_Id;
         public byte attr_val;
         public byte [] supported_values; // app shld check these values before Setting Player Attributes.
     };
-    ArrayList<PlayerSettings> plSetting= null;
-    int remoteSupportedFeatures = 0;
-    public static final int KEY_STATE_PRESSED = 0;
-    public static final int KEY_STATE_RELEASED = 1;
-    public static final int AVRC_ID_PLAY = 0x44;
-    public static final int AVRC_ID_PAUSE = 0x46;
-    public static final int AVRC_ID_VOL_UP = 0x41;
-    public static final int AVRC_ID_VOL_DOWN = 0x42;
-    public static final int AVRC_ID_STOP = 0x45;
-    public static final int AVRC_ID_FF = 0x49;
-    public static final int AVRC_ID_REWIND = 0x48;
-    public static final int AVRC_ID_FORWARD = 0x4B;
-    public static final int AVRC_ID_BACKWARD = 0x4C;
 
     public static final int SEND_PASS_THROUGH_CMD = 1;
+    public static final int FETCH_CURRENT_INFO = 2;
+    public static final int PTS_GET_ELEMENT_ATTRIBUTE_ID = 0x71;
+    public static final int PTS_GET_PLAY_STATUS_ID       = 0x72;
 
     private TextView mRepeatStatus;
     private TextView mShuffleStatus;
@@ -124,9 +113,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private TextView mEqualizerStatus;
     private TextView mTrackNumber;
     private TextView mTitleName;
-    private ToggleButton mCTStartButton;
     private Button ffButton;
     private Button rwButton;
+    private ImageView mCoverArtImageView;
 
     private String repeatText;
     private String shuffleText;
@@ -139,21 +128,56 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private String equalizerText;
     private String trackNumText;
     private String titleNameText;
+    private long   trackLen;
+    private Bitmap coverArtBitmap;
 
     private final BroadcastReceiver mAvrcpControllerReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            BluetoothDevice device = (BluetoothDevice)
-                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
             if (action.equals(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED)) {
+                BluetoothDevice device = (BluetoothDevice)
+                        intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 int prevState = intent.getIntExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, 0);
                 int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
                 onReceiveActionConnectionStateChanged(device, prevState, state, intent.getExtras());
             }
-        }
+            if (action.equals(BluetoothAvrcpController.ACTION_TRACK_EVENT)) {
+                MediaMetadata mMetaData = (MediaMetadata)
+                        intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_METADATA);
 
+                PlaybackState mState = (PlaybackState)
+                        intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYBACK);
+                if(mMetaData != null)
+                    onMetaDataChanged(mMetaData);
+                if(mState != null)
+                    onPlaybackStateChanged(mState);
+            }
+            if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
+                BluetoothAvrcpPlayerSettings plAppSett = (BluetoothAvrcpPlayerSettings)
+                        intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
+                if(plAppSett != null)
+                    onPlayerAppSettingChanged(plAppSett);
+            }
+        }
+        private void onMetaDataChanged(MediaMetadata mMetaData) {
+            parseMetaData(mMetaData);
+            Log.d(TAG," onMetaDataChanged Title " + titleNameText + " Artist " + artistText +
+                  " genre "+ genreText + " album " + albumText + " TrackNum " + trackNumText);
+            displayMetaData();
+        }
+        private void onPlaybackStateChanged(PlaybackState mState) {
+            parsePlaybackState(mState);
+            Log.d(TAG," onPlaybackStateCHanged playstatus" + playStatusText + " playTime "
+                                                + playText);
+            displayPlayState();
+        }
+        private void onPlayerAppSettingChanged(BluetoothAvrcpPlayerSettings mPlAppSett) {
+            Log.d(TAG," onPlayerAppSettingChanged ");
+            parsePlayerAppSetting(mPlAppSett);
+            displayPlayeAppSetting();
+        }
         private void onReceiveActionConnectionStateChanged(BluetoothDevice device,
                 int prevState, int state, Bundle features) {
             Logger.v(TAG, "onReceiveActionConnectionStateChanged: AVRCP: " +
@@ -163,16 +187,21 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             if (state ==  BluetoothProfile.STATE_DISCONNECTED) {
                 if (device.equals(mDevice))
                     mDevice = null;
-                if (plSetting != null)
-                    plSetting.clear();
-                remoteSupportedFeatures = 0;
-                unregisterMetaDataObserver();
                 resetDisplay();
-                mCTStartButton.setChecked(false);
                 Toast.makeText(mLocalActivity, "Device " + device + " AVRCP Disconnected", Toast.LENGTH_SHORT).show();
             }
             else if(state == BluetoothProfile.STATE_CONNECTED) {
                 mDevice = device;
+                if(mAvrcpController!= null) {
+                    parseMetaData(mAvrcpController.getMetadata(mDevice));
+                    displayMetaData();
+                    parsePlaybackState(mAvrcpController.getPlaybackState(mDevice));
+                    displayPlayState();
+                    parsePlayerAppSetting(mAvrcpController.getPlayerSettings(mDevice));
+                    displayPlayeAppSetting();
+                    int pixel = SystemProperties.getInt("persist.bt.avrcp.ca.pixel", 500);
+                    mAvrcpController.startFetchingAlbumArt("JPEG", pixel, pixel, 2000000);
+                }
                 Toast.makeText(mLocalActivity, "Device " + device + " AVRCP Connected", Toast.LENGTH_SHORT).show();
             }
         }
@@ -187,7 +216,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                         BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
                         //mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_REWIND, KEY_STATE_RELEASED);
                     if (mPressandHoldHandler != null)
-                        mPressandHoldHandler.sendMessageAtFrontOfQueue(mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD,AVRC_ID_REWIND,KEY_STATE_RELEASED));
+                        mPressandHoldHandler.sendMessageAtFrontOfQueue(mPressandHoldHandler.
+                         obtainMessage(SEND_PASS_THROUGH_CMD,BluetoothAvrcpController.
+                         PASS_THRU_CMD_ID_REWIND,BluetoothAvrcpController.KEY_STATE_RELEASED));
                     } else {
                         Logger.e(TAG, "passthru command not sent, connection unavailable");
                     }
@@ -197,7 +228,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                         BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
                         //mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_REWIND, KEY_STATE_PRESSED);
                 	if ((mPressandHoldHandler != null)&&(!mPressandHoldHandler.hasMessages(SEND_PASS_THROUGH_CMD)))
-                        mPressandHoldHandler.sendMessage(mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD,AVRC_ID_REWIND,KEY_STATE_PRESSED));
+                        mPressandHoldHandler.sendMessage(mPressandHoldHandler.
+                         obtainMessage(SEND_PASS_THROUGH_CMD,BluetoothAvrcpController.
+                          PASS_THRU_CMD_ID_REWIND,BluetoothAvrcpController.KEY_STATE_PRESSED));
                     } else {
                         Logger.e(TAG, "passthru command not sent, connection unavailable");
                     }
@@ -215,7 +248,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                         BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
                         //mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_FF, KEY_STATE_RELEASED);
                         if (mPressandHoldHandler != null)
-                            mPressandHoldHandler.sendMessageAtFrontOfQueue(mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD,AVRC_ID_FF,KEY_STATE_RELEASED));
+                            mPressandHoldHandler.sendMessageAtFrontOfQueue(mPressandHoldHandler.
+                             obtainMessage(SEND_PASS_THROUGH_CMD,BluetoothAvrcpController.
+                                PASS_THRU_CMD_ID_FF,BluetoothAvrcpController.KEY_STATE_RELEASED));
                     } else {
                         Logger.e(TAG, "passthru command not sent, connection unavailable");
                     }
@@ -224,7 +259,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 if ((mAvrcpController != null) && mDevice != null &&
                         BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
                         if ((mPressandHoldHandler != null)&&(!mPressandHoldHandler.hasMessages(SEND_PASS_THROUGH_CMD)))
-                            mPressandHoldHandler.sendMessage(mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD,AVRC_ID_FF,KEY_STATE_PRESSED));
+                            mPressandHoldHandler.sendMessage(mPressandHoldHandler.
+                                 obtainMessage(SEND_PASS_THROUGH_CMD,BluetoothAvrcpController.
+                                    PASS_THRU_CMD_ID_FF,BluetoothAvrcpController.KEY_STATE_PRESSED));
                         //mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_FF, KEY_STATE_PRESSED);
                     } else {
                         Logger.e(TAG, "passthru command not sent, connection unavailable");
@@ -245,7 +282,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             int keyCode = msg.arg1;
             switch(msg.what) {
             case SEND_PASS_THROUGH_CMD:
-                if (keyState == KEY_STATE_PRESSED) {
+                if (keyState == BluetoothAvrcpController.KEY_STATE_PRESSED) {
                     Message msgsend = mPressandHoldHandler.obtainMessage(SEND_PASS_THROUGH_CMD, keyCode, keyState);
                     mPressandHoldHandler.sendMessageDelayed(msgsend, 1000);
                     if ((mAvrcpController != null) && mDevice != null &&
@@ -253,7 +290,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                             mAvrcpController.sendPassThroughCmd(mDevice, keyCode, keyState);
                     }
                 }
-                else if(keyState == KEY_STATE_RELEASED) {
+                else if(keyState == BluetoothAvrcpController.KEY_STATE_RELEASED) {
                     if (mPressandHoldHandler.hasMessages(SEND_PASS_THROUGH_CMD))
                         mPressandHoldHandler.removeMessages(SEND_PASS_THROUGH_CMD);
                     if ((mAvrcpController != null) && mDevice != null &&
@@ -262,210 +299,33 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                     }
                 }
                 break;
+            case FETCH_CURRENT_INFO:
+                if(mAvrcpController != null) {
+                    int pixel = SystemProperties.getInt("persist.bt.avrcp.ca.pixel", 500);
+                    mAvrcpController.startFetchingAlbumArt("JPEG", pixel, pixel, 2000000);
+                    List<BluetoothDevice> deviceList = mAvrcpController.getConnectedDevices();
+                    if(deviceList.isEmpty()) break;
+                    /* Right now we support only one connection */
+                    mDevice = deviceList.get(0);
+                    parseMetaData(mAvrcpController.getMetadata(mDevice));
+                    displayMetaData();
+                    parsePlaybackState(mAvrcpController.getPlaybackState(mDevice));
+                    displayPlayState();
+                    parsePlayerAppSetting(mAvrcpController.getPlayerSettings(mDevice));
+                    displayPlayeAppSetting();
+                }
+                break;
             }
         }
     }
-    private class BluetoothAvrcpShareContentObserver extends ContentObserver {
-        public BluetoothAvrcpShareContentObserver() {
-            super(new Handler());
-        }
-        @Override
-        public void onChange(boolean selfChange) {
-            updateFromAvrcpContentProvider();
-        }
-    };
-    private void updateFromAvrcpContentProvider() {
-        Logger.e(TAG," AVRCP DB updated");
-        if (mUpdateThread == null)
-        {
-            Logger.e(TAG, "Starting a new Thread ");
-            mUpdateThread = new UpdateThread();
-            mUpdateThread.start();
-        }
-    }
-    private class UpdateThread extends Thread {
-        public UpdateThread() {
-            super(" BT_TESTAPP AVRCP UpdateThread");
-        }
-        @Override
-        public void run() {
-            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
-            Uri avrcpDataUri = BluetoothAvrcpInfo.CONTENT_URI;
-            String[] mSelectionArgs = {""}; mSelectionArgs[0] = "";
-            Cursor cursor = getContentResolver().query(avrcpDataUri, null, null, null,
-                    BluetoothAvrcpInfo._ID);
 
-            if (cursor != null) {
-                int num_rows = cursor.getCount();
-                int index;
-                cursor.moveToFirst();
-                int num_colums = cursor.getColumnCount();
-                Logger.e(TAG," number of rows " + num_rows + " num Col " + num_colums);
-                mLock.lock();
-                try {
-                while(num_colums > 0){
-                    switch(num_colums) {
-                    case 1: // Track Num
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.TRACK_NUM);
-                        if (index == -1)
-                            break;
-                        int track_num = cursor.getInt(index);
-                        if (track_num == BluetoothAvrcpInfo.TRACK_NUM_INVALID) {
-                            trackNumText = "NOT_SUP";
-                            break;
-                        }
-                        StringBuffer str = new StringBuffer();
-                        str.append(String.valueOf(track_num));
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.TOTAL_TRACKS);
-                        if (index > 0) {
-                            str.append(" | ");
-                            str.append(String.valueOf(cursor.getInt(index)));
-                        }
-                        trackNumText = str.toString();
-                        Logger.e(TAG, " Number of Tracks " + trackNumText);
-                        break;
-                    case 2: // TRACK Title
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.TITLE);
-                        if (index == -1)
-                            break;
-                        titleNameText = cursor.getString(index);
-                        Logger.e(TAG, " Track Title " + titleNameText);
-                        break;
-                    case 3: // Artist Name
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.ARTIST_NAME);
-                        if (index == -1)
-                            break;
-                        artistText = cursor.getString(index);
-                        Logger.e(TAG, " Artist Name " + artistText);
-                        break;
-                    case 4: // Album Name
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.ALBUM_NAME);
-                        if (index == -1)
-                            break;
-                        albumText = cursor.getString(index);
-                        Logger.e(TAG, " album_name " + albumText);
-                        break;
-                    case 5: // play time
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.PLAYING_TIME);
-                        if (index == -1)
-                            break;
-                        long playing_time = cursor.getLong(index);
-                        long minutes = TimeUnit.MILLISECONDS.toMinutes(playing_time);
-                        playing_time = playing_time - (60*minutes*1000);
-                        long seconds = TimeUnit.MILLISECONDS.toSeconds(playing_time);
-                        StringBuffer strPlayTime = new StringBuffer();
-                        strPlayTime.append(String.valueOf(minutes));
-                        strPlayTime.append(":");
-                        strPlayTime.append(String.valueOf(seconds));
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.TOTAL_TRACK_TIME);
-                        if (index > 0) {
-                            strPlayTime.append(" | ");
-                            long totalTrackTime = cursor.getLong(index);
-                            minutes = TimeUnit.MILLISECONDS.toMinutes(totalTrackTime);
-                            totalTrackTime = totalTrackTime - (60*minutes*1000);
-                            seconds = TimeUnit.MILLISECONDS.toSeconds(totalTrackTime);
-                            strPlayTime.append(String.valueOf(minutes));
-                            strPlayTime.append(":");
-                            strPlayTime.append(String.valueOf(seconds));
-                        }
-                        playText = strPlayTime.toString();
-                        Logger.e(TAG, " playing_time " + playText);
-                        break;
-                    case 6: //Genre
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.GENRE);
-                        if (index == -1)
-                            break;
-                        genreText = cursor.getString(index);
-                        Logger.e(TAG, " genre  " + genreText);
-                        break;
-                    case 7:// play Status
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.PLAY_STATUS);
-                        if (index == -1)
-                            break;
-                        playStatusText = cursor.getString(index);
-                        Logger.e(TAG, " playStatus  " + playStatusText);
-                        break;
-                    case 8:// Repeat Status
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.REPEAT_STATUS);
-                        if (index == -1)
-                            break;
-                        repeatText = cursor.getString(index);
-                        Logger.e(TAG, " repetStatus  " + repeatText);
-                        break;
-                    case 9:// ShuffleStatus
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.SHUFFLE_STATUS);
-                        if (index == -1)
-                            break;
-                        shuffleText = cursor.getString(index);
-                        Logger.e(TAG, " ShuffleStatus  " + shuffleText);
-                        break;
-                    case 10:// Scan Status
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.SCAN_STATUS);
-                        if (index == -1)
-                            break;
-                        scanText = cursor.getString(index);
-                        Logger.e(TAG, " Scan Status  " + scanText);
-                        break;
-                    case 11:// Eq Status
-                        index = cursor.getColumnIndex(BluetoothAvrcpInfo.EQUALIZER_STATUS);
-                        if (index == -1)
-                            break;
-                        equalizerText = cursor.getString(index);
-                        Logger.e(TAG, " Equalizer Status  " + equalizerText);
-                        break;
-                    }
-                    num_colums --;
-                }
-                } // try end
-                catch(CursorIndexOutOfBoundsException e) {
-                    Log.d(TAG," CursorIndexOutOfBoundsException happended");
-                }
-                catch(SQLiteCantOpenDatabaseException e) {
-                    Log.d(TAG," SQLiteCantOpenDatabaseException happended");
-                }
-                catch(SQLiteException e) {
-                    Log.d(TAG," SQLiteException happended");
-                }
-                finally {
-                    if(cursor != null)
-                        cursor.close();
-                    mLock.unlock();
-                }
-            }
-            else {
-                Logger.v(TAG," Cursor is NULL");
-            }
-            mLocalActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mLock.lock();
-                    try {
-                        mTrackNumber.setText(trackNumText);
-                        mTitleName.setText(titleNameText);
-                        mEqualizerStatus.setText(equalizerText);
-                        mArtistName.setText(artistText);
-                        mScanStatus.setText(scanText);
-                        mShuffleStatus.setText(shuffleText);
-                        mRepeatStatus.setText(repeatText);
-                        mPlayStatus.setText(playStatusText);
-                        mGenreStatus.setText(genreText);
-                        mPlayTime.setText(playText);
-                        mAlbumName.setText(albumText);
-                    }
-                    finally {
-                        mLock.unlock();
-                    }
-                }
-            });
-            mUpdateThread =  null;
-        }
-    }
     private final ServiceConnection mAvrcpControllerServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             Logger.v(TAG, "onServiceConnected()");
             mProfileService = ((ProfileService.LocalBinder) service).getService();
             mAvrcpController = mProfileService.getAvrcpController();
+            mPressandHoldHandler.sendEmptyMessageDelayed(FETCH_CURRENT_INFO, 200);
         }
 
         @Override
@@ -474,12 +334,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             mProfileService = null;
             mAvrcpController = null;
             mDevice = null;
-            remoteSupportedFeatures = 0;
-            if (plSetting != null)
-                plSetting.clear();
-            unregisterMetaDataObserver();
             resetDisplay();
-            mCTStartButton.setChecked(false);
         }
     };
 
@@ -502,6 +357,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         bindService(intent, mAvrcpControllerServiceConnection, BIND_AUTO_CREATE);
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothAvrcpController.ACTION_TRACK_EVENT);
+        filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         registerReceiver(mAvrcpControllerReceiver, filter);
     }
 
@@ -509,10 +366,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     protected void onDestroy() {
         Logger.v(TAG, "onDestroy");
         mDevice = null;
-        remoteSupportedFeatures = 0;
-        if (plSetting != null)
-            plSetting.clear();
-        unregisterMetaDataObserver();
         unregisterReceiver(mAvrcpControllerReceiver);
         unbindService(mAvrcpControllerServiceConnection);
         BluetoothConnectionReceiver.removeObserver(this);
@@ -552,7 +405,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     public void onDeviceDisconected() {
         Logger.v(TAG, "onDeviceDisconected");
         mDevice = null;
-        remoteSupportedFeatures = 0;
     }
 
     private void prepareActionBar() {
@@ -568,76 +420,71 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         return ((mAvrcpController != null) && mDevice != null &&
                 BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice)));
     }
-    public void registerMetaDataObserver() {
-       if(!isDeviceConnected()) {
-           Logger.e(TAG," Device not Connected");
-           return;
-       }
-       if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA) == 0) {
-           Logger.e(TAG," Device does not support MetaData");
-           return;
-       }
-       /* check if DataObserver is already registered */
-       if (mAvrcpDataObserver != null)
-           return;
-       Uri avrcpDataUri = BluetoothAvrcpInfo.CONTENT_URI;
-       mAvrcpDataObserver = new BluetoothAvrcpShareContentObserver();
-       getContentResolver().registerContentObserver(avrcpDataUri, true, mAvrcpDataObserver);
-       Logger.v(TAG," Registered Content Observer");
-    }
-    public void unregisterMetaDataObserver() {
-        Logger.d(TAG," unregisterMetaDataObserver");
-        if (mAvrcpDataObserver == null)
-            return;
-        getContentResolver().unregisterContentObserver(mAvrcpDataObserver);
-        mAvrcpDataObserver = null;
-    }
+
     public void onClickPassthruPlay(View v) {
         Logger.v(TAG, "onClickPassthruPlay()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_PLAY, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_PLAY, KEY_STATE_RELEASED);
+            mAvrcpController.sendPassThroughCmd(mDevice,BluetoothAvrcpController.
+                          PASS_THRU_CMD_ID_PLAY, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                          PASS_THRU_CMD_ID_PLAY, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
             Logger.e(TAG, "passthru command not sent, connection unavailable");
         }
     }
-    public void onClickPassthruVolUp(View v) {
-        Logger.v(TAG, "onClickPassthruVolUp()");
-        boolean isA2dpSinkEnabled = SystemProperties.getBoolean("persist.service.bt.a2dp.sink", false);
-        if (isA2dpSinkEnabled) {
-            Logger.v(TAG, "Sink Enabled, not sending VOL UP ");
-            return;
-        }
+    public void onClickNextGroup(View v) {
+        Logger.v(TAG, "onClickNextGroup()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_VOL_UP, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_VOL_UP, KEY_STATE_RELEASED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, BluetoothAvrcpController.
+                   PASS_THRU_CMD_ID_NEXT_GRP, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, BluetoothAvrcpController.
+                   PASS_THRU_CMD_ID_NEXT_GRP, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
-            Logger.e(TAG, "passthru command not sent, connection unavailable");
+            Logger.e(TAG, "grp nav command not sent, connection unavailable");
         }
     }
-    public void onClickPassthruVolDown(View v) {
-        Logger.v(TAG, "onClickPassthruVolDown()");
-        boolean isA2dpSinkEnabled = SystemProperties.getBoolean("persist.service.bt.a2dp.sink", false);
-        if (isA2dpSinkEnabled) {
-            Logger.v(TAG, "Sink Enabled, not sending VOL DOWN ");
-            return;
-        }
+    public void onClickPrevGroup(View v) {
+        Logger.v(TAG, "onClickPrevGroup()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_VOL_DOWN, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_VOL_DOWN, KEY_STATE_RELEASED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_PREV_GRP, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendGroupNavigationCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_PREV_GRP, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
-            Logger.e(TAG, "passthru command not sent, connection unavailable");
+            Logger.e(TAG, "grp nav command not sent, connection unavailable");
+        }
+    }
+    public void onClickPassthruGetElementAttributes(View v) {
+        Logger.v(TAG, "onClickPassthruGetElementAttributes()");
+        if ((mAvrcpController != null) && mDevice != null &&
+            BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
+            mAvrcpController.sendPassThroughCmd(mDevice, PTS_GET_ELEMENT_ATTRIBUTE_ID,
+                BluetoothAvrcpController.KEY_STATE_PRESSED);
+        } else {
+            Logger.e(TAG, "onClickPassthruGetElementAttributes not sent, connection unavailable");
+        }
+    }
+    public void onClickPassthruGetPlayStatus(View v) {
+        Logger.v(TAG, "onClickPassthruGetPlayStatus()");
+        if ((mAvrcpController != null) && mDevice != null &&
+            BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
+            mAvrcpController.sendPassThroughCmd(mDevice, PTS_GET_PLAY_STATUS_ID,
+                BluetoothAvrcpController.KEY_STATE_PRESSED);
+        } else {
+            Logger.e(TAG, "onClickPassthruGetElementAttributes not sent, connection unavailable");
         }
     }
     public void onClickPassthruForward(View v) {
         Logger.v(TAG, "onClickPassthruForward()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_FORWARD, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_FORWARD, KEY_STATE_RELEASED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_FORWARD, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_FORWARD, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
             Logger.e(TAG, "passthru command not sent, connection unavailable");
         }
@@ -646,8 +493,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         Logger.v(TAG, "onClickPassthruBackward()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_BACKWARD, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_BACKWARD, KEY_STATE_RELEASED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_BACKWARD, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_BACKWARD, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
             Logger.e(TAG, "passthru command not sent, connection unavailable");
         }
@@ -659,50 +508,38 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             (BluetoothProfile.STATE_CONNECTED != (mAvrcpController.getConnectionState(mDevice)))) {
                return;
         }
-        if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
+        BluetoothAvrcpPlayerSettings mPlAppSetting = mAvrcpController.
+                                                                   getPlayerSettings(mDevice);
+        int setting = mPlAppSetting.getSettings();
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_REPEAT) == 0) {
+            Log.e(TAG,"onClickToggleRepeat repeat not supported");
             return;
         }
-        if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
-            updatePlayerSettings(mMetaData);
-        }
-
-        if ((plSetting == null)||(plSetting.isEmpty())||(repeatText == null)) {
-            Log.w(TAG," not supported, return");
-            return;
-        }
-        for (PlayerSettings sett: plSetting) {
-            Log.d(TAG," finding the current value " + sett.attr_Id);
-            if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_REPEAT_STATUS) {
-                int repeat_status;
-                mLock.lock();
-                try {
-                    if(repeatText.equals("REPEAT_OFF"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_OFF;
-                    else if (repeatText.equals("REPEAT_SINGLE_TRACK_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_SINGLE_TRACK_REPEAT;
-                    else if (repeatText.equals("REPEAT_GROUP_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_GROUP_REPEAT;
-                    else if (repeatText.equals("REPEAT_ALL_TRACK_REPEAT"))
-                        repeat_status = BluetoothAvrcpInfo.REPEAT_STATUS_ALL_TRACK_REPEAT;
-                    else {
-                        Log.d(TAG," Repeat not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
-                for (int zz = 0; zz < sett.supported_values.length; zz++) {
-                    if (repeat_status == sett.supported_values[zz]) {
-                        repeat_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
-                        break;
-                    }
-                }
-                mAvrcpController.setPlayerApplicationSetting(sett.attr_Id, repeat_status);
+        int value = mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT);
+        int nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
+        boolean supported = false;
+        do {
+            switch(value) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_GROUP;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
                 break;
             }
-        }
+            BluetoothAvrcpPlayerSettings mNewRepeatSetting = new
+                    BluetoothAvrcpPlayerSettings(BluetoothAvrcpPlayerSettings.SETTING_REPEAT);
+            mNewRepeatSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT,
+                                                                                   nextVal);
+            supported = mAvrcpController.setPlayerApplicationSetting(mNewRepeatSetting);
+            value = nextVal;
+        }while(!supported);
     }
     public void onClickToggleEq(View v) {
         Logger.v(TAG, "onClickToggleEq()");
@@ -711,44 +548,32 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             (BluetoothProfile.STATE_CONNECTED != (mAvrcpController.getConnectionState(mDevice)))) {
                return;
         }
-        if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
+        BluetoothAvrcpPlayerSettings mPlAppSetting = mAvrcpController.
+                                            getPlayerSettings(mDevice);
+        int setting = mPlAppSetting.getSettings();
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER) == 0) {
+            Log.e(TAG,"onClickToggleEq equalizer not supported");
             return;
         }
-        if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
-            updatePlayerSettings(mMetaData);
-        }
-        if ((plSetting == null)||(plSetting.isEmpty())||(equalizerText == null)) {
-            Log.w(TAG," not supported, return");
-            return;
-        }
-        for (PlayerSettings sett: plSetting) {
-            if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_EQUALIZER_STATUS) {
-                int eq_status;
-                mLock.lock();
-                try {
-                    if(equalizerText.equals("EQUALIZER_OFF"))
-                        eq_status = BluetoothAvrcpInfo.EQUALIZER_STATUS_OFF;
-                    else if (equalizerText.equals("EQUALIZER_ON"))
-                        eq_status = BluetoothAvrcpInfo.EQUALIZER_STATUS_ON;
-                    else {
-                        Log.d(TAG," Equalizer not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
-                for (int zz = 0; zz < sett.supported_values.length; zz ++) {
-                    if (eq_status == sett.supported_values[zz]) {
-                        eq_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
-                        break;
-                    }
-                }
-                mAvrcpController.setPlayerApplicationSetting(sett.attr_Id, eq_status);
+        int value = mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER);
+        int nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
+        boolean supported = false;
+        do {
+            switch(value) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_ON;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ON:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
                 break;
             }
-        }
+            BluetoothAvrcpPlayerSettings mNewRepeatSetting = new
+                    BluetoothAvrcpPlayerSettings(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER);
+            mNewRepeatSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
+                            nextVal);
+            supported = mAvrcpController.setPlayerApplicationSetting(mNewRepeatSetting);
+            value = nextVal;
+        }while(!supported);
     }
     public void onClickToggleScan(View v) {
         Logger.v(TAG, "onClickToggleScan()");
@@ -757,46 +582,35 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             (BluetoothProfile.STATE_CONNECTED != (mAvrcpController.getConnectionState(mDevice)))) {
                return;
         }
-        if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
+        BluetoothAvrcpPlayerSettings mPlAppSetting = mAvrcpController.
+                getPlayerSettings(mDevice);
+        int setting = mPlAppSetting.getSettings();
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_SCAN) == 0) {
+            Log.e(TAG,"onClickToggleScan Scan not supported");
             return;
         }
-        if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
-            updatePlayerSettings(mMetaData);
-        }
-        if ((plSetting == null)||(plSetting.isEmpty())||(scanText == null)) {
-            Log.w(TAG," not supported, return");
-            return;
-        }
-        for (PlayerSettings sett: plSetting) {
-            if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SCAN_STATUS) {
-                int scan_status;
-                mLock.lock();
-                try {
-                    if(scanText.equals("SCAN_OFF"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_OFF;
-                    else if (scanText.equals("SCAN_GROUP_SCAN"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_GROUP_SCAN;
-                    else if (scanText.equals("SCAN_ALL_TRACK_SCAN"))
-                        scan_status = BluetoothAvrcpInfo.SCAN_STATUS_ALL_TRACK_SCAN;
-                    else {
-                        Log.d(TAG," Scan not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
-                for (int zz = 0; zz < sett.supported_values.length; zz ++) {
-                    if (scan_status == sett.supported_values[zz]) {
-                        scan_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
-                        break;
-                    }
-                }
-                mAvrcpController.setPlayerApplicationSetting(sett.attr_Id, scan_status);
+        int value = mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN);
+        int nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
+        boolean supported = false;
+        do {
+            switch(value) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_GROUP;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
                 break;
             }
-        }
+            BluetoothAvrcpPlayerSettings mNewRepeatSetting = new
+                    BluetoothAvrcpPlayerSettings(BluetoothAvrcpPlayerSettings.SETTING_SCAN);
+            mNewRepeatSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN,
+                                        nextVal);
+            supported = mAvrcpController.setPlayerApplicationSetting(mNewRepeatSetting);
+            value = nextVal;
+        }while(!supported);
     }
     public void onClickToggleShuffle(View v) {
         Logger.v(TAG, "onClickToggleShuffle()");
@@ -805,54 +619,45 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             (BluetoothProfile.STATE_CONNECTED != (mAvrcpController.getConnectionState(mDevice)))) {
                return;
         }
-        if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)==0) {
+        BluetoothAvrcpPlayerSettings mPlAppSetting = mAvrcpController.
+                getPlayerSettings(mDevice);
+        int setting = mPlAppSetting.getSettings();
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE) == 0) {
+            Log.e(TAG,"onClickToggleShuffle Shuffle not supported");
             return;
         }
-        if ((plSetting == null)||(plSetting.isEmpty())) {
-            BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
-            updatePlayerSettings(mMetaData);
-        }
-        if ((plSetting == null)||(plSetting.isEmpty())||(shuffleText == null)) {
-            Log.w(TAG," not supported, return");
-            return;
-        }
-        for (PlayerSettings sett: plSetting) {
-            if (sett.attr_Id == BluetoothAvrcpInfo.ATTRIB_SHUFFLE_STATUS) {
-                int shuffle_status;
-                mLock.lock();
-                try {
-                    if(shuffleText.equals("SHUFFLE_OFF"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_OFF;
-                    else if (shuffleText.equals("SHUFFLE_GROUP_SHUFFLE"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_GROUP_SHUFFLE;
-                    else if (shuffleText.equals("SHUFFLE_ALL_TRACK_SHUFFLE"))
-                        shuffle_status = BluetoothAvrcpInfo.SHUFFLE_STATUS_ALL_TRACK_SHUFFLE;
-                    else {
-                        Log.d(TAG," Shuffle not supported ");
-                        return;
-                    }
-                }
-                finally {
-                    mLock.unlock();
-                }
-                for (int zz = 0; zz < sett.supported_values.length; zz ++) {
-                    if (shuffle_status == sett.supported_values[zz]) {
-                        shuffle_status = sett.supported_values[(zz + 1)%sett.supported_values.length];
-                        break;
-                    }
-                }
-                mAvrcpController.setPlayerApplicationSetting(sett.attr_Id, shuffle_status);
+        int value = mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE);
+        int nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
+        boolean supported = false;
+        do {
+            switch(value) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_GROUP;
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                nextVal = BluetoothAvrcpPlayerSettings.STATE_OFF;
                 break;
             }
-        }
+            BluetoothAvrcpPlayerSettings mNewRepeatSetting = new
+                    BluetoothAvrcpPlayerSettings(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE);
+            mNewRepeatSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE,
+                                        nextVal);
+            supported = mAvrcpController.setPlayerApplicationSetting(mNewRepeatSetting);
+            value = nextVal;
+        }while(!supported);
     }
 
     public void onClickPassthruPause(View v) {
         Logger.v(TAG, "onClickPassthruPause()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_PAUSE, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_PAUSE, KEY_STATE_RELEASED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_PAUSE, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_PAUSE, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
             Logger.e(TAG, "passthru command not sent, connection unavailable");
         }
@@ -862,32 +667,217 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
         Logger.v(TAG, "onClickPassthruStop()");
         if ((mAvrcpController != null) && mDevice != null &&
             BluetoothProfile.STATE_DISCONNECTED != (mAvrcpController.getConnectionState(mDevice))){
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_STOP, KEY_STATE_PRESSED);
-            mAvrcpController.sendPassThroughCmd(mDevice, AVRC_ID_STOP, KEY_STATE_RELEASED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_STOP, BluetoothAvrcpController.KEY_STATE_PRESSED);
+            mAvrcpController.sendPassThroughCmd(mDevice, BluetoothAvrcpController.
+                    PASS_THRU_CMD_ID_STOP, BluetoothAvrcpController.KEY_STATE_RELEASED);
         } else {
             Logger.e(TAG, "passthru command not sent, connection unavailable");
         }
 
     }
 
-    private void updatePlayerSettings(BluetoothAvrcpInfo mData) {
-        if (plSetting != null) {
-            plSetting.clear();
+    private void parseMetaData(MediaMetadata mMetaData) {
+        if(mMetaData == null) return;
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_ARTIST))
+            artistText = mMetaData.getString(MediaMetadata.METADATA_KEY_ARTIST);
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_TITLE))
+            titleNameText = mMetaData.getString(MediaMetadata.METADATA_KEY_TITLE);
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_ALBUM))
+            albumText = mMetaData.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_GENRE))
+            genreText = mMetaData.getString(MediaMetadata.METADATA_KEY_GENRE);
+
+        StringBuffer trackNumBuffer = new StringBuffer();
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_TRACK_NUMBER))
+            trackNumBuffer.append(String.valueOf(mMetaData.getLong(MediaMetadata.
+                                                                METADATA_KEY_TRACK_NUMBER)));
+        trackNumBuffer.append(" | ");
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_NUM_TRACKS))
+            trackNumBuffer.append(String.valueOf(mMetaData.getLong(MediaMetadata.
+                                                               METADATA_KEY_NUM_TRACKS)));
+        trackNumText = trackNumBuffer.toString();
+
+        if(mMetaData.containsKey(MediaMetadata.METADATA_KEY_DURATION))
+            trackLen = mMetaData.getLong(MediaMetadata.METADATA_KEY_DURATION);
+        /*
+         * Image is given preference over thumbnail
+         */
+        if (mMetaData.containsKey(MediaMetadata.METADATA_KEY_DISPLAY_ICON)) {
+            Log.d(TAG," ParseMetaData, update Thumbnail");
+            coverArtBitmap = mMetaData.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
         }
-        plSetting = new ArrayList<PlayerSettings>();
-        if (mData == null)
-            return;
-        byte[] plAttributes = mData.getSupportedPlayerAttributes();
-        for (int zz = 0; zz < plAttributes.length; zz++) {
-            PlayerSettings playerSetting = new PlayerSettings();
-            playerSetting.attr_Id = plAttributes[zz];
-            playerSetting.supported_values = new byte[mData.getNumSupportedPlayerAttributeVal(playerSetting.attr_Id)];
-            byte[] plAttribSupportedValues = mData.getSupportedPlayerAttributeVlaues(playerSetting.attr_Id);
-            for (int xx = 0; xx < playerSetting.supported_values.length; xx++) {
-                playerSetting.supported_values[xx] = plAttribSupportedValues[xx];
+        else if (mMetaData.containsKey(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)) {
+            Log.d(TAG," ParseMetaData, update IMAGE");
+            String mImageLocation = mMetaData.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
+            coverArtBitmap = BitmapFactory.decodeFile(mImageLocation);
+        }
+        else
+            coverArtBitmap = null;
+    }
+    private void parsePlaybackState(PlaybackState mState) {
+        if(mState == null) return;
+        playStatusText = "NONE";
+        switch(mState.getState()) {
+        case PlaybackState.STATE_STOPPED:
+            playStatusText = "STOPPED";
+            break;
+        case PlaybackState.STATE_PLAYING:
+            playStatusText = "PLAYING";
+            break;
+        case PlaybackState.STATE_PAUSED:
+            playStatusText = "PAUSED";
+            break;
+        case PlaybackState.STATE_FAST_FORWARDING:
+            playStatusText = "FORWARDING";
+            break;
+        case PlaybackState.STATE_REWINDING:
+            playStatusText = "REWINDING";
+            break;
+        }
+
+        long playing_time = mState.getPosition();
+        long minutes = TimeUnit.MILLISECONDS.toMinutes(playing_time);
+        playing_time = playing_time - (60*minutes*1000);
+        long seconds = TimeUnit.MILLISECONDS.toSeconds(playing_time);
+        StringBuffer strPlayTime = new StringBuffer();
+        strPlayTime.append(String.valueOf(minutes));
+        strPlayTime.append(":");
+        strPlayTime.append(String.valueOf(seconds));
+        strPlayTime.append(" | ");
+        long totalTrackTime = trackLen;
+        minutes = TimeUnit.MILLISECONDS.toMinutes(totalTrackTime);
+        totalTrackTime = totalTrackTime - (60*minutes*1000);
+        seconds = TimeUnit.MILLISECONDS.toSeconds(totalTrackTime);
+        strPlayTime.append(String.valueOf(minutes));
+        strPlayTime.append(":");
+        strPlayTime.append(String.valueOf(seconds));
+        playText = strPlayTime.toString();
+
+    }
+    private void parsePlayerAppSetting(BluetoothAvrcpPlayerSettings mPlAppSetting) {
+        if(mPlAppSetting == null) return;
+        int setting = mPlAppSetting.getSettings();
+        Log.d(TAG," parsePlayerAppSetting Sett" + setting);
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER) != 0) {
+            Log.d(TAG," parsePlayerAppSetting value eq:" + mPlAppSetting.
+                 getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER));
+            switch(mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER)) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                equalizerText = "EQ_OFF";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ON:
+                equalizerText = "EQ_ON";
+                break;
             }
-            plSetting.add(playerSetting);
         }
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_REPEAT) != 0) {
+            Log.d(TAG," parsePlayerAppSetting value rep:" + mPlAppSetting.getSettingValue
+                    (BluetoothAvrcpPlayerSettings.SETTING_REPEAT));
+            switch(mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT)) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                repeatText = "REP_OFF";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK:
+                repeatText = "REP_SINGLE_TRACK";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                repeatText = "REP_ALL_TRACK";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                repeatText = "REP_GRP";
+                break;
+            }
+        }
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE) != 0) {
+            Log.d(TAG," parsePlayerAppSetting value shuffle:" + mPlAppSetting.getSettingValue
+                   (BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE));
+            switch(mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE)) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                shuffleText = "SHUFFLE_OFF";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                shuffleText = "SHUFFLE_ALL";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                shuffleText = "SHUFFLE_GRP";
+                break;
+            }
+        }
+        if((setting & BluetoothAvrcpPlayerSettings.SETTING_SCAN) != 0) {
+            Log.d(TAG," parsePlayerAppSetting value scan:" + mPlAppSetting.getSettingValue
+                    (BluetoothAvrcpPlayerSettings.SETTING_SCAN));
+            switch(mPlAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN)) {
+            case BluetoothAvrcpPlayerSettings.STATE_OFF:
+                scanText = "SCAN_OFF";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK:
+                scanText = "SCAN_ALL";
+                break;
+            case BluetoothAvrcpPlayerSettings.STATE_GROUP:
+                scanText = "SCAN_GRP";
+                break;
+            }
+        }
+    }
+    private void displayMetaData() {
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    mTrackNumber.setText(trackNumText);
+                    mTitleName.setText(titleNameText);
+                    mArtistName.setText(artistText);
+                    mGenreStatus.setText(genreText);
+                    mAlbumName.setText(albumText);
+                    if (coverArtBitmap != null) {
+                        mCoverArtImageView.setImageBitmap(coverArtBitmap);
+                    }
+                    else {
+                        Log.d(TAG," displayMetaData: bitmap is null, invalidate it ");
+                        mCoverArtImageView.setImageBitmap(null);
+                        mCoverArtImageView.invalidate();
+                    }
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
+
+    }
+    private void displayPlayState() {
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    mPlayStatus.setText(playStatusText);
+                    mPlayTime.setText(playText);
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
+    }
+    private void displayPlayeAppSetting() {
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    mEqualizerStatus.setText(equalizerText);
+                    mScanStatus.setText(scanText);
+                    mShuffleStatus.setText(shuffleText);
+                    mRepeatStatus.setText(repeatText);
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
     }
     private void resetDisplay() {
         mLocalActivity.runOnUiThread(new Runnable() {
@@ -895,16 +885,18 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             public void run() {
                 mLock.lock();
                 trackNumText = "NOT_SUPP";
-                titleNameText = BluetoothAvrcpInfo.TITLE_INVALID;
-                equalizerText = BluetoothAvrcpInfo.EQUALIZER_STATUS_INVALID;
-                artistText = BluetoothAvrcpInfo.ARTIST_NAME_INVALID;
-                scanText = BluetoothAvrcpInfo.SCAN_STATUS_INVALID;
-                shuffleText = BluetoothAvrcpInfo.SHUFFLE_STATUS_INVALID;
-                repeatText = BluetoothAvrcpInfo.REPEAT_STATUS_INVALID;
-                playStatusText = BluetoothAvrcpInfo.PLAY_STATUS_INVALID;
-                genreText = BluetoothAvrcpInfo.GENRE_INVALID;
-                playText = BluetoothAvrcpInfo.PLAY_STATUS_INVALID;
-                albumText = BluetoothAvrcpInfo.ALBUM_NAME_INVALID;
+                titleNameText = "NOT_SUPP";
+                equalizerText = "NOT_SUPP";
+                artistText = "NOT_SUPP";
+                scanText = "NOT_SUPP";
+                shuffleText = "NOT_SUPP";
+                repeatText = "NOT_SUPP";
+                playStatusText = "NOT_SUPP";
+                genreText = "NOT_SUPP";
+                playText = "NOT_SUPP";
+                albumText = "NOT_SUPP";
+                trackLen = 0;
+                coverArtBitmap = null;
                 try {
                     mTrackNumber.setText(trackNumText);
                     mTitleName.setText(titleNameText);
@@ -917,6 +909,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                     mGenreStatus.setText(genreText);
                     mPlayTime.setText(playText);
                     mAlbumName.setText(albumText);
+                    mCoverArtImageView.setImageBitmap(null);
+                    mCoverArtImageView.invalidate();
                 }
                 finally {
                     mLock.unlock();
@@ -937,49 +931,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
          mEqualizerStatus = (TextView) findViewById(R.id.equalizer_status);
          mTrackNumber = (TextView) findViewById(R.id.track_number);
          mTitleName = (TextView) findViewById(R.id.title_name);
-         mCTStartButton = (ToggleButton) findViewById(R.id.toggleButton1);
          ffButton = (Button) findViewById(R.id.onClickPassthruFF);
          rwButton = (Button) findViewById(R.id.onClickPassthruRewind);
+         mCoverArtImageView = (ImageView) findViewById(R.id.cover_art_image_view);
+         Log.d(TAG," call setImageBitmap ");
+         mCoverArtImageView.setImageBitmap(null);
          ffButton.setOnTouchListener(onTouchListenerFF);
          rwButton.setOnTouchListener(onTouchListenerRW);
-    }
-    public void onCTStartToggleClicked(View view) {
-        // Is the toggle on?
-        boolean on = ((ToggleButton) view).isChecked();
-        Log.v(TAG, "onCTStartToggleClicked is_on: " + on);
-        if ((mAvrcpController != null)&&(on)) {
-            List<BluetoothDevice> deviceList = mAvrcpController.getConnectedDevices();
-            if (deviceList.size() > 0) {
-                mDevice = deviceList.get(0);
-                if (mAvrcpController.getConnectionState(mDevice) != BluetoothProfile.STATE_CONNECTED) {
-                    mCTStartButton.setChecked(false);
-                    Toast.makeText(mLocalActivity, "Device Not Connected", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                remoteSupportedFeatures = mAvrcpController.getSupportedFeatures(mDevice);
-                Log.d(TAG," getSupportedFeatures " + remoteSupportedFeatures);
-                if ((remoteSupportedFeatures & BluetoothAvrcpInfo.BTRC_FEAT_METADATA)!=0) {
-                    BluetoothAvrcpInfo mMetaData = mAvrcpController.getSupportedPlayerAppSetting(mDevice);
-                    updatePlayerSettings(mMetaData);
-                    registerMetaDataObserver();
-                    int[] elementAttribute = new int[1];
-                    elementAttribute[0] = BluetoothAvrcpInfo.MEDIA_ATTRIBUTE_ALL;
-                    mAvrcpController.getMetaData(elementAttribute);
-                }
-                else {
-                    unregisterMetaDataObserver();
-                    resetDisplay();
-                    mCTStartButton.setChecked(false);
-                    Toast.makeText(mLocalActivity, "Device Don't Support MetaData", Toast.LENGTH_SHORT).show();
-                }
-            }
-            else {  // no device connected
-               mCTStartButton.setChecked(false);
-               Toast.makeText(mLocalActivity, "Device Not Connected", Toast.LENGTH_SHORT).show();
-            }
-        } else if(mAvrcpController != null){
-              unregisterMetaDataObserver();
-              resetDisplay();
-        }
     }
 }
