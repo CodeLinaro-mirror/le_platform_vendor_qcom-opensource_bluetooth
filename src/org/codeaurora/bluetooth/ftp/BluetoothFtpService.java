@@ -402,7 +402,6 @@ public class BluetoothFtpService extends Service {
 
     private void startRfcommSocketListener() {
         VERBOSE = Log.isLoggable(BluetoothFtpService.LOG_TAG, Log.VERBOSE) ? true : false;
-        Log.v(TAG, "Ftp Service startRfcommSocketListener");
 
         if (mRfcommServerSocket == null) {
             if (!initRfcommSocket()) {
@@ -411,9 +410,12 @@ public class BluetoothFtpService extends Service {
             }
         }
         if (mRfcommAcceptThread == null) {
+            Log.d(TAG, "Ftp Service startRfcommSocketListener");
             mRfcommAcceptThread = new RfcommSocketAcceptThread();
             mRfcommAcceptThread.setName("BluetoothFtpRfcommAcceptThread");
             mRfcommAcceptThread.start();
+        } else {
+            Log.d(TAG, "Ftp Service Already ON: startRfcommSocketListener");
         }
     }
     private final boolean initRfcommSocket() {
@@ -491,7 +493,6 @@ public class BluetoothFtpService extends Service {
         } catch (IOException ex) {
             Log.e(TAG, "CloseSocket error: " + ex);
         }
-
         if (mRfcommAcceptThread != null) {
             try {
                 mRfcommAcceptThread.shutdown();
@@ -559,22 +560,14 @@ public class BluetoothFtpService extends Service {
             mServerSession = null;
         }
 
-        if (mRfcommAcceptThread != null) {
-            try {
-                mRfcommAcceptThread.shutdown();
-                mRfcommAcceptThread.join();
-                mRfcommAcceptThread = null;
-            } catch (InterruptedException ex) {
-                Log.w(TAG, "mAcceptThread close error" + ex);
-            }
-        }
-
         try {
             Log.v(TAG, "stopObexServerSession, closeRfcommSocket");
             closeRfcommSocket(false, true);
         } catch (IOException e) {
             Log.e(TAG, "closeSocket error: " + e.toString());
         }
+        // Extra check to startListener if already not available
+        // This will not actually restart listener on every connect/disconnect.
         // Last obex transaction is finished, we start to listen for incoming
         // connection again
         if (mAdapter.isEnabled()) {
@@ -692,7 +685,6 @@ public class BluetoothFtpService extends Service {
                         mSessionStatusHandler.sendMessageDelayed(mSessionStatusHandler
                                 .obtainMessage(MSG_INTERNAL_USER_TIMEOUT), USER_CONFIRM_TIMEOUT_VALUE);
                     }
-                    stopped = true; // job done ,close this thread;
                 } catch (IOException ex) {
                     stopped = true; //IO exception, close the thread
                     Log.v(RTAG, "Accept exception: " + ex.toString());
