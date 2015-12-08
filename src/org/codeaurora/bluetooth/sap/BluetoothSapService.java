@@ -477,7 +477,6 @@ public class BluetoothSapService extends Service {
                     // Release all resources
                     closeSapService();
                     mSapEnable = false;
-                    mConnection = null;
                 }
                 synchronized(mAuthLock) {
                     if (mIsWaitingAuthorization) {
