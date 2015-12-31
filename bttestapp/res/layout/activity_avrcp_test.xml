@@ -100,21 +100,49 @@
                 android:onClick="onClickPrevGroup"
                 android:text="@string/passthru_prevgrp" />
 
-            <Button
-                android:id="@+id/onClickPassthruGetElementAttributes"
+            <EditText
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:inputType="textEmailAddress"
+                android:ems="10"
+                android:id="@+id/editText"
+                android:imeOptions="actionDone"
+                android:layout_column="7" />
+             <Button
+                android:id="@+id/onFolderDown"
                 style="?android:attr/buttonStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:onClick="onClickPassthruGetElementAttributes"
-                android:text="@string/passthru_ptsgetelm" />
-
-            <Button
-                android:id="@+id/onClickPassthruGetPlayStatus"
+                android:onClick="onFolderDown"
+                android:text="@string/folder_dwn" />
+             <Button
+                android:id="@+id/onFolderUP"
                 style="?android:attr/buttonStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:onClick="onClickPassthruGetPlayStatus"
-                android:text="@string/passthru_ptsgetplay" />
+                android:onClick="onFolderUP"
+                android:text="@string/folder_up" />
+             <Button
+                android:id="@+id/onFetchNPL"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onFetchNPL"
+                android:text="@string/fetch_npl" />
+             <Button
+                android:id="@+id/onBrowseRoot"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onBrowseRoot"
+                android:text="@string/browse_root" />
+             <Button
+                android:id="@+id/onFolderRefresh"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onFolderRefresh"
+                android:text="@string/folder_refresh" />
 
         </TableRow>
 
@@ -169,144 +197,253 @@
                 android:onClick="onClickToggleEq"
                 android:text="@string/toggle_eq" />
 
-        </TableRow>
-
-        <TableRow
-            android:id="@+id/tableRow3"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
-
-            <TextView
-                android:id="@+id/shuffle_status"
+            <Button
+                android:id="@+id/onClickPassthruGetElementAttributes"
+                style="?android:attr/buttonStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/shuffle_status_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:onClick="onClickPassthruGetElementAttributes"
+                android:text="@string/passthru_ptsgetelm" />
 
-        </TableRow>
-
-        <TableRow
-            android:id="@+id/tableRow4"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
-
-            <TextView
-                android:id="@+id/repeat_status"
+            <Button
+                android:id="@+id/onClickPassthruGetPlayStatus"
+                style="?android:attr/buttonStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/repeat_status_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:onClick="onClickPassthruGetPlayStatus"
+                android:text="@string/passthru_ptsgetplay" />
+
+            <Button
+                android:id="@+id/onClickSearch"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickSearch"
+                android:text="@string/search_with_id" />
+            <Button
+                android:id="@+id/onClickAddtoNowPlaying"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickAddtoNowPlaying"
+                android:text="@string/add_to_np_list" />
+            <Button
+                android:id="@+id/onClickPlayItem"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClickPlayItem"
+                android:text="@string/play_item" />
+             <Button
+                android:id="@+id/onSetBrowsedPlayer"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onSetBrowsedPlayer"
+                android:text="@string/set_br" />
+             <Button
+                android:id="@+id/onSetAddressedPlayer"
+                style="?android:attr/buttonStyleSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onSetAddressedPlayer"
+                android:text="@string/set_adr" />
+
         </TableRow>
+
     </TableLayout>
-
-    <TableLayout
-        android:layout_width="166dp"
+    <RelativeLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content" >
-
-        <TableRow
-            android:id="@+id/tableRow5"
+        <ImageView
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
+            android:layout_height="fill_parent"
+            android:id="@+id/cover_art_image_view"
+            android:layout_gravity="center"
+            android:layout_centerInParent="true"
+            android:layout_alignParentEnd="false"
+            android:layout_alignBottom="@+id/tableLayout"
+            android:layout_toEndOf="@id/tableLayout" />
 
-            <TextView
-                android:id="@+id/album_name"
+        <TableLayout
+            android:layout_width="166dp"
+            android:layout_height="wrap_content"
+            android:id="@+id/tableLayout"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentStart="true">
+
+            <TableRow
+                android:id="@+id/tableRow3"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/album_name_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:layout_height="wrap_content" >
 
-        </TableRow>
+                <TextView
+                    android:id="@+id/shuffle_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/shuffle_status_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
 
-        <TableRow
-            android:id="@+id/tableRow6"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
+            </TableRow>
 
-            <TextView
-                android:id="@+id/artist_name"
+            <TableRow
+                android:id="@+id/tableRow4"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/artist_name_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:layout_height="wrap_content" >
 
-        </TableRow>
+                <TextView
+                    android:id="@+id/repeat_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/repeat_status_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+            </TableRow>
 
-        <TableRow
-            android:id="@+id/tableRow7"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
-
-            <TextView
-                android:id="@+id/genre_name"
+            <TableRow
+                android:id="@+id/tableRow5"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/genre_name_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:layout_height="wrap_content" >
 
-        </TableRow>
+                <TextView
+                    android:id="@+id/album_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/album_name_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
 
-        <TableRow
-            android:id="@+id/tableRow8"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" >
+            </TableRow>
 
-            <TextView
-                android:id="@+id/scan_status"
+            <TableRow
+                android:id="@+id/tableRow6"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/scan_status_default"
-                android:textAppearance="?android:attr/textAppearanceMedium" />
+                android:layout_height="wrap_content" >
 
-        </TableRow>
+                <TextView
+                    android:id="@+id/artist_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/artist_name_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
 
-        <TextView
-            android:id="@+id/playing_time"
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow7"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/genre_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/genre_name_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow8"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/scan_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/scan_status_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow9"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/playing_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/playing_time_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+
+           </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow10"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+
+                <TextView
+                    android:id="@+id/equalizer_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/equalizer_status_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow11"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+                <TextView
+                    android:id="@+id/track_number"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/track_number_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow12"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+                <TextView
+                    android:id="@+id/title_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/title_name_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+            </TableRow>
+
+            <TableRow
+                android:id="@+id/tableRow13"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" >
+                <TextView
+                    android:id="@+id/play_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/play_status_default"
+                    android:textAppearance="?android:attr/textAppearanceMedium" />
+            </TableRow>
+
+
+        </TableLayout>
+        <ListView
+            android:id="@+id/playerListView"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/playing_time_default"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
-
-        <TextView
-            android:id="@+id/equalizer_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/equalizer_status_default"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
-
-        <TextView
-            android:id="@+id/track_number"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/track_number_default"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
-
-        <TextView
-            android:id="@+id/title_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/title_name_default"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
-
-        <TextView
-            android:id="@+id/play_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/play_status_default"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
-
-
-
-    </TableLayout>
+            android:layout_height="fill_parent"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:layout_alignBottom="@+id/tableLayout"
+            android:layout_toEndOf="@id/cover_art_image_view" />
+    </RelativeLayout>
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content" >
 
-        <ImageView
-            android:id="@+id/cover_art_image_view"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true" />
+        <ListView
+            android:id="@+id/folderListView"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@+id/playerListView" />
+
+
+
     </RelativeLayout>
 
 </LinearLayout>

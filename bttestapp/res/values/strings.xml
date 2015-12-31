@@ -360,4 +360,14 @@
     <string name="toggle_shuffle">SHUF</string>
     <string name="toggle_scan">SCAN</string>
     <string name="toggle_eq">EQ</string>
+    <string name="search_with_id">SEARCH</string>
+    <string name="add_to_np_list">ADD_TO_NP</string>
+    <string name="play_item">PLAY_ITEM</string>
+    <string name="set_br">SET_BR</string>
+    <string name="set_adr">SET_ADR</string>
+    <string name="folder_dwn">DOWN</string>
+    <string name="folder_up">UP</string>
+    <string name="fetch_npl">NPL</string>
+    <string name="browse_root">BR_ROOT</string>
+    <string name="folder_refresh">REFRESH</string>
 </resources>
