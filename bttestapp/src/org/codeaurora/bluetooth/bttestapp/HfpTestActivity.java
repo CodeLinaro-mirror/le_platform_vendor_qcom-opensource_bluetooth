@@ -123,10 +123,12 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
                                     Logger.v(TAG, "Profile is disconnected");
                                     return;
                                 }
-                                for (BluetoothHeadsetClientCall call :
-                                        mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
-                                    Logger.v(TAG, "Updating call controls");
-                                    mCallsListFragment.onCallChanged(call);
+                                if (mBluetoothHeadsetClient.getCurrentCalls(mDevice) != null) {
+                                    for (BluetoothHeadsetClientCall call :
+                                            mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
+                                        Logger.v(TAG, "Updating call controls");
+                                        mCallsListFragment.onCallChanged(call);
+                                    }
                                 }
                             }
                     }, 500);
@@ -167,10 +169,12 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
                                     Logger.v(TAG, "Profile is disconnected");
                                     return;
                                 }
-                                for (BluetoothHeadsetClientCall call :
-                                        mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
-                                    Logger.v(TAG, "Updating call controls");
-                                    mCallsListFragment.onCallChanged(call);
+                                if (mBluetoothHeadsetClient.getCurrentCalls(mDevice) != null) {
+                                    for (BluetoothHeadsetClientCall call :
+                                            mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
+                                        Logger.v(TAG, "Updating call controls");
+                                        mCallsListFragment.onCallChanged(call);
+                                    }
                                 }
                             }
                     }, 500);
@@ -288,9 +292,11 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
 
             if (connState == BluetoothProfile.STATE_CONNECTED) {
                 // trigger refresh of calls list
-                for (BluetoothHeadsetClientCall call : mBluetoothHeadsetClient
-                        .getCurrentCalls(mDevice)) {
-                    mCallsListFragment.onCallChanged(call);
+                if (mBluetoothHeadsetClient.getCurrentCalls(mDevice) != null) {
+                    for (BluetoothHeadsetClientCall call : mBluetoothHeadsetClient
+                            .getCurrentCalls(mDevice)) {
+                        mCallsListFragment.onCallChanged(call);
+                    }
                 }
 
                 // get supported AG features
@@ -378,13 +384,15 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
                         .addExtReply(callToJson(call))
                         .send();
             }
-            for (BluetoothHeadsetClientCall call :
-                    mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
-                Logger.v(TAG, "Updating call controls");
-                mCallsListFragment.onCallChanged(call);
-                new MonkeyEvent("hfp-call-changed", true)
-                        .addExtReply(callToJson(call))
-                        .send();
+            if (mBluetoothHeadsetClient.getCurrentCalls(mDevice) != null) {
+                for (BluetoothHeadsetClientCall call :
+                        mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
+                    Logger.v(TAG, "Updating call controls");
+                    mCallsListFragment.onCallChanged(call);
+                    new MonkeyEvent("hfp-call-changed", true)
+                            .addExtReply(callToJson(call))
+                            .send();
+                }
             }
         } else {
             Logger.v(TAG,"mBluetoothHeadsetClient is null");
@@ -403,6 +411,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
             int connState = mBluetoothHeadsetClient.getConnectionState(mDevice);
             // save all calls status
             if (connState == BluetoothProfile.STATE_CONNECTED &&
+                    (mBluetoothHeadsetClient.getCurrentCalls(mDevice) != null) &&
                     !mBluetoothHeadsetClient.getCurrentCalls(mDevice).isEmpty()) {
                 for (BluetoothHeadsetClientCall call :
                     mBluetoothHeadsetClient.getCurrentCalls(mDevice)) {
