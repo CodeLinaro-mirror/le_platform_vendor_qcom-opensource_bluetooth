@@ -141,6 +141,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     public static final int PTS_GET_PLAY_STATUS_ID       = 0x72;
     public static final int PTS_GET_VFS_ATTR_ID    = 0x73;
     public static final int PTS_GET_ITEM_VFS_ID    = 0x51;
+    public static final int MAX_SUPPORT_LIST_ENTRY = 200;
 
     /* connection state with MediaBrowseService implemented by BT-AVRCP app */
     private static final int DISCONNECTED = 0;
@@ -329,7 +330,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             if ((mSearchItems != null)&&(mSearchItems.size() > 0)) {
                 if (itemDisplayList != null) 
                     itemDisplayList.clear();
-                for (int i = 0; i < mSearchItems.size(); i++) {
+                for (int i = 0; i < mSearchItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                     DisplayItem display = new DisplayItem();
                     StringBuilder str = new StringBuilder();
                     long uid = Long.valueOf(mSearchItems.get(i).
@@ -374,7 +375,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             if ((mNowPlayingItems != null)&&(mNowPlayingItems.size() > 0)) {
                 if (itemDisplayList != null) 
                     itemDisplayList.clear();
-                for (int i = 0; i < mNowPlayingItems.size(); i++) {
+                for (int i = 0; i < mNowPlayingItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                     DisplayItem display = new DisplayItem();
                     StringBuilder str = new StringBuilder();
                     long uid = Long.valueOf(mNowPlayingItems.get(i).
@@ -419,7 +420,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             if ((mFolderItems != null)&&(mFolderItems.size() > 0)) {
                 if (itemDisplayList != null) 
                     itemDisplayList.clear();
-                for (int i = 0; i < mFolderItems.size(); i++) {
+                for (int i = 0; i < mFolderItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                     DisplayItem display = new DisplayItem();
                     StringBuilder str = new StringBuilder();
                     long uid = Long.valueOf(mFolderItems.get(i).getMediaId());
@@ -939,7 +940,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                                     ArrayList<DisplayItem> displayList =
                                             new ArrayList<DisplayItem>();
 
-                                    for (int i = 0; i < mNowPlayingItems.size(); i++) {
+                                    for (int i = 0; i < mNowPlayingItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                                         DisplayItem display = new DisplayItem();
                                         StringBuilder str = new StringBuilder();
                                         str.append(mNowPlayingItems.get(i).getDescription()
@@ -1003,7 +1004,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                                     ArrayList<DisplayItem> displayList =
                                             new ArrayList<DisplayItem>();
 
-                                    for (int i = 0; i < mSearchItems.size(); i++) {
+                                    for (int i = 0; i < mSearchItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                                         DisplayItem display = new DisplayItem();
                                         StringBuilder str = new StringBuilder();
                                         str.append(mSearchItems.get(i).getDescription().getTitle());
@@ -1992,7 +1993,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                     Log.d(TAG," item Size = " + mFolderItems.size());
                     if (mFolderItems.size() > 0) {
                         ArrayList<DisplayItem> displayList = new ArrayList<DisplayItem>();
-                        for (int i = 0; i < mFolderItems.size(); i++) {
+                        for (int i = 0; i < mFolderItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
                             DisplayItem display = new DisplayItem();
                             StringBuilder str = new StringBuilder();
                             str.append(mFolderItems.get(i).getMediaId());
