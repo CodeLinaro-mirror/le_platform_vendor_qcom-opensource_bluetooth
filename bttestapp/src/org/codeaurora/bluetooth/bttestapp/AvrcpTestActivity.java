@@ -1171,11 +1171,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             if (children.size() > 0) {
                 boolean isChildrenFound = true;
                 displayFolderItemList(parentId, mFolderItems);
-            } else {
-                Log.e (TAG, "children list is null for parent id:" + parentId);
-                /* Lets Remove the last element from top, because list is empty here */
-                String itemPopped = mPathStack.pop();
-                Log.d(TAG," Item Popped = " + itemPopped);
             }
         }
     };
