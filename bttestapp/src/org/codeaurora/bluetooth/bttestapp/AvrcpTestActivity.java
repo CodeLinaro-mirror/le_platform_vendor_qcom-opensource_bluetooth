@@ -137,6 +137,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     public static final int TEST_ADD_TO_NPL = 9;
     public static final int TEST_PLAY_ITEM = 10;
     public static final int REFRESH_CURRENT_FOLDER = 11;
+    public static final int UPDATE_NPL_THUMBNAIL = 12;
+    public static final int UPDATE_SEARCH_THUMBNAIL = 13;
+    public static final int UPDATE_VFS_THUMBNAIL = 14;
     public static final int PTS_GET_ELEMENT_ATTRIBUTE_ID = 0x71;
     public static final int PTS_GET_PLAY_STATUS_ID       = 0x72;
     public static final int PTS_GET_VFS_ATTR_ID    = 0x73;
@@ -310,171 +313,27 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
             }
             if(action.equals(BluetoothAvrcpController.AVRCP_BROWSE_THUMBNAILS_UPDATE)) {
                 Bundle extras = intent.getExtras();
+                Bundle data = new Bundle();
+                Message msg = new Message();
                 long [] mediaIdList = extras.getLongArray
                                              (BluetoothAvrcpController.EXTRA_MEDIA_IDS);
                 String [] thumbNailList = extras.getStringArray
                                             (BluetoothAvrcpController.EXTRA_THUMBNAILS);
                 Log.d(TAG," Recvd ThumbNail list size = " + mediaIdList.length);
+                data.putLongArray("mediaIdList", mediaIdList);
+                data.putStringArray("thumbNailList", thumbNailList);
                 if (mCurrentScope == AVRCP_SCOPE_NOW_PLAYING) {
-                    updateNowPlayingThunbNail(mediaIdList, thumbNailList);
+                    msg = mPressandHoldHandler.obtainMessage(UPDATE_NPL_THUMBNAIL);
                 }
                 else if(mCurrentScope == AVRCP_SCOPE_VFS) {
-                    updateVFSListThunbNail(mediaIdList, thumbNailList);
+                    msg = mPressandHoldHandler.obtainMessage(UPDATE_VFS_THUMBNAIL);
                 }
                 else if(mCurrentScope == AVRCP_SCOPE_SEARCH) {
-                    updateSearchListThunbNail(mediaIdList, thumbNailList);
+                    msg = mPressandHoldHandler.obtainMessage(UPDATE_SEARCH_THUMBNAIL);
                 }
+                msg.setData(data);
+                mPressandHoldHandler.sendMessage(msg);
             }
-        }
-        public void updateSearchListThunbNail(long[] mediaIdList, String[] thumbNailList) {
-            if ((mSearchItems != null)&&(mSearchItems.size() > 0)) {
-                if (itemDisplayList != null) 
-                    itemDisplayList.clear();
-                for (int i = 0; i < mSearchItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
-                    DisplayItem display = new DisplayItem();
-                    StringBuilder str = new StringBuilder();
-                    long uid = Long.valueOf(mSearchItems.get(i).
-                                                    getDescription().getMediaId());
-                    str.append(mSearchItems.get(i).getDescription().getMediaId());
-                    str.append(" : ");
-                    str.append(mSearchItems.get(i).getDescription().getTitle());
-                    display.addTextFeild(str.toString());
-                    int imageIndex = -1;
-                    for (int k = 0; k < mediaIdList.length; k++) {
-                        if (uid == mediaIdList[k]) {
-                            imageIndex = k; break;
-                        }
-                    }
-                    if (imageIndex >= 0) {
-                    Bitmap img = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
-                            display.addImageFeild(img);
-                    }
-                    itemDisplayList.add(display);
-                }
-            }
-            else {
-                return;
-            }
-            mLocalActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mLock.lock();
-                    try {
-                        if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
-                            mBluetoothAvrcpFolderAdapter.clear();
-                            mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
-                        }
-                    }
-                    finally {
-                        mLock.unlock();
-                    }
-                }
-            });
-        }
-        public void updateNowPlayingThunbNail(long[] mediaIdList, String[] thumbNailList) {
-            if ((mNowPlayingItems != null)&&(mNowPlayingItems.size() > 0)) {
-                if (itemDisplayList != null) 
-                    itemDisplayList.clear();
-                for (int i = 0; i < mNowPlayingItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
-                    DisplayItem display = new DisplayItem();
-                    StringBuilder str = new StringBuilder();
-                    long uid = Long.valueOf(mNowPlayingItems.get(i).
-                                                    getDescription().getMediaId());
-                    str.append(mNowPlayingItems.get(i).getDescription().getMediaId());
-                    str.append(" : ");
-                    str.append(mNowPlayingItems.get(i).getDescription().getTitle());
-                    display.addTextFeild(str.toString());
-                    int imageIndex = -1;
-                    for (int k = 0; k < mediaIdList.length; k++) {
-                        if (uid == mediaIdList[k]) {
-                            imageIndex = k; break;
-                        }
-                    }
-                    if (imageIndex >= 0) {
-                    Bitmap img = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
-                            display.addImageFeild(img);
-                    }
-                    itemDisplayList.add(display);
-                }
-            }
-            else {
-                return;
-            }
-            mLocalActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mLock.lock();
-                    try {
-                        if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
-                            mBluetoothAvrcpFolderAdapter.clear();
-                            mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
-                        }
-                    }
-                    finally {
-                        mLock.unlock();
-                    }
-                }
-            });
-        }
-        public void updateVFSListThunbNail(long[] mediaIdList, String[] thumbNailList) {
-            if ((mFolderItems != null)&&(mFolderItems.size() > 0)) {
-                if (itemDisplayList != null) 
-                    itemDisplayList.clear();
-                for (int i = 0; i < mFolderItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
-                    DisplayItem display = new DisplayItem();
-                    StringBuilder str = new StringBuilder();
-                    long uid = Long.valueOf(mFolderItems.get(i).getMediaId());
-                    str.append(mFolderItems.get(i).getMediaId());
-                    str.append(" : ");
-                    Bitmap image = null;
-                    if(mFolderItems.get(i).isBrowsable()) {
-                        str.append("Browsable");
-                        image = BitmapFactory.decodeResource(
-                                mContext.getResources(), R.drawable.folder);
-                    } else {
-                        str.append("Non-Browsable");
-                        int imageIndex = -1;
-                        for (int k = 0; k < mediaIdList.length; k++) {
-                            if (uid == mediaIdList[k]) {
-                                imageIndex = k; break;
-                            }
-                        }
-                        if (imageIndex >= 0) {
-                            image = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
-                        }
-                    }
-                    if (image != null)
-                        display.addImageFeild(image);
-                    str.append(" : ");
-                    if(mFolderItems.get(i).isPlayable())
-                        str.append("Playable");
-                    else
-                        str.append("Non-Playable");
-
-                    str.append(" : ");
-                    str.append(mFolderItems.get(i).getDescription().getTitle());
-                    display.addTextFeild(str.toString());
-                    itemDisplayList.add(display);
-                }
-            }
-            else {
-                return;
-            }
-            mLocalActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mLock.lock();
-                    try {
-                        if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
-                            mBluetoothAvrcpFolderAdapter.clear();
-                            mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
-                        }
-                    }
-                    finally {
-                        mLock.unlock();
-                    }
-                }
-            });
         }
         private void onMetaDataChanged(MediaMetadata mMetaData) {
             parseMetaData(mMetaData);
@@ -756,6 +615,24 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 pendingFetchCmd = FETCH_VFS;
                 refershCurrentFolder();
                 break;
+            case UPDATE_NPL_THUMBNAIL:
+                Bundle nplThumbData = msg.getData();
+                long [] mediaIdList = nplThumbData.getLongArray("mediaIdList");
+                String[] thumbNailList = nplThumbData.getStringArray("thumbNailList");
+                updateNowPlayingThunbNail(mediaIdList, thumbNailList);
+                break;
+            case UPDATE_SEARCH_THUMBNAIL:
+                Bundle searchThumbData = msg.getData();
+                mediaIdList = searchThumbData.getLongArray("mediaIdList");
+                thumbNailList = searchThumbData.getStringArray("thumbNailList");
+                updateSearchListThunbNail(mediaIdList, thumbNailList);
+                break;
+            case UPDATE_VFS_THUMBNAIL:
+                Bundle vfsThumbData = msg.getData();
+                mediaIdList = vfsThumbData.getLongArray("mediaIdList");
+                thumbNailList = vfsThumbData.getStringArray("thumbNailList");
+                updateVFSListThunbNail(mediaIdList, thumbNailList);
+                break;
             }
         }
     }
@@ -824,6 +701,156 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 onBrowseConnect();
             }
         }
+    }
+    public void updateNowPlayingThunbNail(long[] mediaIdList, String[] thumbNailList) {
+        if ((mNowPlayingItems != null)&&(mNowPlayingItems.size() > 0)) {
+            if (itemDisplayList != null)
+                itemDisplayList.clear();
+            for (int i = 0; i < mNowPlayingItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
+                DisplayItem display = new DisplayItem();
+                StringBuilder str = new StringBuilder();
+                long uid = Long.valueOf(mNowPlayingItems.get(i).
+                        getDescription().getMediaId());
+                str.append(mNowPlayingItems.get(i).getDescription().getMediaId());
+                str.append(" : ");
+                str.append(mNowPlayingItems.get(i).getDescription().getTitle());
+                display.addTextFeild(str.toString());
+                int imageIndex = -1;
+                for (int k = 0; k < mediaIdList.length; k++) {
+                    if (uid == mediaIdList[k]) {
+                        imageIndex = k; break;
+                    }
+                }
+                if (imageIndex >= 0) {
+                    Bitmap img = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
+                            display.addImageFeild(img);
+                }
+                itemDisplayList.add(display);
+            }
+        }
+        else {
+            return;
+        }
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
+                        mBluetoothAvrcpFolderAdapter.clear();
+                        mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
+                    }
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
+    }
+    public void updateSearchListThunbNail(long[] mediaIdList, String[] thumbNailList) {
+        if ((mSearchItems != null)&&(mSearchItems.size() > 0)) {
+            if (itemDisplayList != null)
+                itemDisplayList.clear();
+            for (int i = 0; i < mSearchItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
+                DisplayItem display = new DisplayItem();
+                StringBuilder str = new StringBuilder();
+                long uid = Long.valueOf(mSearchItems.get(i).
+                                                getDescription().getMediaId());
+                str.append(mSearchItems.get(i).getDescription().getMediaId());
+                str.append(" : ");
+                str.append(mSearchItems.get(i).getDescription().getTitle());
+                display.addTextFeild(str.toString());
+                int imageIndex = -1;
+                for (int k = 0; k < mediaIdList.length; k++) {
+                    if (uid == mediaIdList[k]) {
+                        imageIndex = k; break;
+                    }
+                }
+                if (imageIndex >= 0) {
+                Bitmap img = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
+                        display.addImageFeild(img);
+                }
+                itemDisplayList.add(display);
+            }
+        }
+        else {
+            return;
+        }
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
+                        mBluetoothAvrcpFolderAdapter.clear();
+                        mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
+                    }
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
+    }
+    public void updateVFSListThunbNail(long[] mediaIdList, String[] thumbNailList) {
+        if ((mFolderItems != null)&&(mFolderItems.size() > 0)) {
+            if (itemDisplayList != null)
+                itemDisplayList.clear();
+            for (int i = 0; i < mFolderItems.size() && i < MAX_SUPPORT_LIST_ENTRY; i++) {
+                DisplayItem display = new DisplayItem();
+                StringBuilder str = new StringBuilder();
+                long uid = Long.valueOf(mFolderItems.get(i).getMediaId());
+                str.append(mFolderItems.get(i).getMediaId());
+                str.append(" : ");
+                Bitmap image = null;
+                if(mFolderItems.get(i).isBrowsable()) {
+                    str.append("Browsable");
+                    image = BitmapFactory.decodeResource(
+                            mContext.getResources(), R.drawable.folder);
+                } else {
+                    str.append("Non-Browsable");
+                    int imageIndex = -1;
+                    for (int k = 0; k < mediaIdList.length; k++) {
+                        if (uid == mediaIdList[k]) {
+                            imageIndex = k; break;
+                        }
+                    }
+                    if (imageIndex >= 0) {
+                        image = BitmapFactory.decodeFile(thumbNailList[imageIndex]);
+                    }
+                }
+                if (image != null)
+                    display.addImageFeild(image);
+                str.append(" : ");
+                if(mFolderItems.get(i).isPlayable())
+                    str.append("Playable");
+                else
+                    str.append("Non-Playable");
+
+                str.append(" : ");
+                str.append(mFolderItems.get(i).getDescription().getTitle());
+                display.addTextFeild(str.toString());
+                itemDisplayList.add(display);
+            }
+        }
+        else {
+            return;
+        }
+        mLocalActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLock.lock();
+                try {
+                    if ((itemDisplayList != null)&&(!itemDisplayList.isEmpty())) {
+                        mBluetoothAvrcpFolderAdapter.clear();
+                        mBluetoothAvrcpFolderAdapter.addAll(itemDisplayList);
+                    }
+                }
+                finally {
+                    mLock.unlock();
+                }
+            }
+        });
     }
     /* initialize mediacontroller in order to communicate with BT Avrcp apps */
     private void onBrowseConnect() {
