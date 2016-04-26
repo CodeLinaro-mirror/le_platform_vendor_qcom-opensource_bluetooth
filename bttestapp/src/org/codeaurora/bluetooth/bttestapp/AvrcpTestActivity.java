@@ -145,6 +145,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     public static final int PTS_GET_VFS_ATTR_ID    = 0x73;
     public static final int PTS_GET_ITEM_VFS_ID    = 0x51;
     public static final int MAX_SUPPORT_LIST_ENTRY = 200;
+    private static final int DEFAULT_PLAYER_ID = -1;
 
     /* connection state with MediaBrowseService implemented by BT-AVRCP app */
     private static final int DISCONNECTED = 0;
@@ -158,8 +159,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
     private BluetoothAvrcpRemoteMediaPlayers MediaPlayerList = null;
 
     /* media players Ids which is set as Current Browsed player*/
-    private int mCurrBrowsePlayerID = 0;
-    private int mCurrAddrPlayerID = 0;
+    private int mCurrBrowsePlayerID = DEFAULT_PLAYER_ID;
+    private int mCurrAddrPlayerID = DEFAULT_PLAYER_ID;
 
     /* The mediaId to be used for subscribing for children using the MediaBrowser */
     private String mMediaId = null;
@@ -529,16 +530,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 }
                 break;
             case TEST_SETBROWSED_PLAYER:
-                if (msg.arg1 == 0) break;
+                if (msg.arg1 == DEFAULT_PLAYER_ID) break;
                 setBrowsedPlayer(msg.arg1);
                 break;
             case TEST_SETADDRESSED_PLAYER:
-                if (msg.arg1 == 0) break;
+                if (msg.arg1 == DEFAULT_PLAYER_ID) break;
                 setAddressedPlayer(msg.arg1);
                 break;
             case TEST_CHANGE_PATH:
                 if(!isAvrcpMBSConnected()) return;
-                if((mConnState != CONNECTED) || (mCurrBrowsePlayerID == 0)) break;
+                if((mConnState != CONNECTED) ||
+                   (mCurrBrowsePlayerID == DEFAULT_PLAYER_ID)) break;
                 if (pendingFetchCmd != FETCH_DONE) break;
                 Bundle data = msg.getData();
                 String folderId = data.getString("folder");
@@ -567,12 +569,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                  if(!isAvrcpMBSConnected()) return;
                  if (pendingFetchCmd != FETCH_DONE) break;
                  pendingFetchCmd = FETCH_VFS;
-                 if(mCurrBrowsePlayerID != 0)
+                 if(mCurrBrowsePlayerID != DEFAULT_PLAYER_ID)
                      onBrowseConnect();
                 break;
             case TEST_SEARCH:
                 if(!isAvrcpMBSConnected()) return;
-                if(mCurrBrowsePlayerID == 0) break;
+                if(mCurrBrowsePlayerID == DEFAULT_PLAYER_ID) break;
                 if (pendingFetchCmd != FETCH_DONE) break;
                 if (mSearchItems != null) {
                      mSearchItems.clear(); mSearchItems =  null;
@@ -610,7 +612,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                 }
                 break;
             case REFRESH_CURRENT_FOLDER:
-                if(mCurrBrowsePlayerID == 0) break;
+                if(mCurrBrowsePlayerID == DEFAULT_PLAYER_ID) break;
                 if (pendingFetchCmd != FETCH_DONE) break;
                 pendingFetchCmd = FETCH_VFS;
                 refershCurrentFolder();
@@ -664,18 +666,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
        GetRemoteAvailableMediaPlayers
      */
     private void setBrowsedPlayer(int selectedId) {
-        // checking for error cases
-        if (selectedId == '0') {
-            Log.w(TAG, " No Available Players to set, ERROR!");
-        } else {
-            // update current browse player id
-            mAvrcpController.SetBrowsedPlayer(selectedId);
-            Log.d(TAG, "setBrowsedPlayer for selectedId: " + selectedId);
-        }
+        // update current browse player id
+        mAvrcpController.SetBrowsedPlayer(selectedId);
+        Log.d(TAG, "setBrowsedPlayer for selectedId: " + selectedId);
     }
     private void setAddressedPlayer(int selectedId) {
         // checking for error cases
-        if (isMediaPlayerListEmpty() || selectedId == '0') {
+        if (isMediaPlayerListEmpty()) {
             Log.w(TAG, " No Available Players to set, ERROR!");
         } else {
             // update current addressed player id
@@ -1153,8 +1150,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
               mPathStack   = null;
          }
         mConnState = DISCONNECTED; 
-        mCurrBrowsePlayerID = 0;
-        mCurrAddrPlayerID = 0;
+        mCurrBrowsePlayerID = DEFAULT_PLAYER_ID;
+        mCurrAddrPlayerID = DEFAULT_PLAYER_ID;
         mMediaId = null;
         mRootFolderUid = null;
         mMediaController = null;
