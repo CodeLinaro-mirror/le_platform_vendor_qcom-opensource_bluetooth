@@ -972,6 +972,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                                         str.append(" : ");
                                         str.append(mNowPlayingItems.get(i).getDescription()
                                                 .getTitle());
+                                        str.append(" : ");
+                                        str.append((byte)(mNowPlayingItems.get(i).getDescription().getExtras().getByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE)));
                                         display.addTextFeild(str.toString());
                                         Bitmap img = BitmapFactory.decodeResource(
                                                 mContext.getResources(), R.drawable.deafult_media);
@@ -1035,6 +1037,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                                         str.append(" : ");
                                         str.append(mSearchItems.get(i).getDescription()
                                                 .getMediaId());
+                                        str.append(" : ");
+                                        str.append((byte)(mNowPlayingItems.get(i).getDescription().getExtras().getByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE)));
                                         display.addTextFeild(str.toString());
                                         Bitmap img = BitmapFactory.decodeResource(
                                                 mContext.getResources(), R.drawable.deafult_media);
@@ -2022,10 +2026,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements IBluetoothConne
                                 str.append("Browsable");
                                 image = BitmapFactory.decodeResource(
                                         mContext.getResources(), R.drawable.folder);
+                                str.append(" : ");
+                                str.append((byte)mFolderItems.get(i).getDescription().getExtras().getByte(BluetoothAvrcpController.EXTRA_FOLDER_TYPE));
                             } else {
                                 str.append("Non-Browsable");
                                 image = BitmapFactory.decodeResource(
                                         mContext.getResources(), R.drawable.deafult_media);
+                                str.append(" : ");
+                                str.append((byte)mFolderItems.get(i).getDescription().getExtras().getByte(BluetoothAvrcpController.EXTRA_MEDIA_TYPE));
                             }
                             display.addImageFeild(image);
                             str.append(" : ");
