@@ -15,6 +15,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := com.android.vcard android.bluetooth.client.pbap a
 
 LOCAL_PROGUARD_ENABLED := disabled
 
-include $(BUILD_PACKAGE)
+#Fixmeif needed
+#include $(BUILD_PACKAGE)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
