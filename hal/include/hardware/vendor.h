@@ -28,12 +28,17 @@ __BEGIN_DECLS
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
 
+/** Callback to notify ssr cleanup to app.
+ */
+typedef void (*  btvendor_ssr_cleanup_callback)(void);
+
 
 /** BT-Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtVendorCallbacks) */
     size_t      size;
     btvendor_bredr_cleanup_callback  bredr_cleanup_cb;
+    btvendor_ssr_cleanup_callback    ssr_cleanup_cb;
 } btvendor_callbacks_t;
 
 /** Represents the standard BT-Vendor interface.
