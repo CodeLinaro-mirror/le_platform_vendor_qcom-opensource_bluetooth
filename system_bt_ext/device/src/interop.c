@@ -87,7 +87,7 @@ typedef struct {
   char *name;
   list_t *entries;
 } interop_section_t;
-
+/*
 typedef enum {
     INTEROP_BL_TYPE_ADDR = 0,
     INTEROP_BL_TYPE_NAME,
@@ -107,7 +107,7 @@ typedef struct {
     } entry_type;
 
 } interop_db_entry_t;
-
+*/
 // Config realted functions
 static void interop_config_cleanup(void);
 static void interop_free_entry_(void *data);
@@ -149,6 +149,12 @@ bool interop_match_vendor_product_ids(const interop_feature_t feature,
   return interop_database_match_vndr_prdt(feature, vendor_id, product_id);
 }
 
+bool interop_match_addr_get_max_lat(const interop_feature_t feature,
+    const bt_bdaddr_t *addr, uint16_t *max_lat)
+{
+  return interop_database_match_addr_get_max_lat(feature, addr, max_lat);
+}
+
 void interop_database_add(const uint16_t feature, const bt_bdaddr_t *addr,
                               size_t length)
 {
@@ -179,6 +185,15 @@ static const char* interop_feature_string_(const interop_feature_t feature)
     CASE_RETURN_STR(INTEROP_DISABLE_ROLE_SWITCH)
     CASE_RETURN_STR(INTEROP_DISABLE_ROLE_SWITCH_POLICY)
     CASE_RETURN_STR(INTEROP_HFP_1_7_BLACKLIST)
+    CASE_RETURN_STR(INTEROP_STORE_REMOTE_AVRCP_VERSION_1_4)
+    CASE_RETURN_STR(INTEROP_ADV_PBAP_VER_1_1)
+    CASE_RETURN_STR(INTEROP_UPDATE_HID_SSR_MAX_LAT)
+    CASE_RETURN_STR(INTEROP_DELAY_SCO_FOR_MT_CALL)
+    CASE_RETURN_STR(INTEROP_DISABLE_CODEC_NEGOTIATION)
+    CASE_RETURN_STR(INTEROP_DISABLE_SNIFF_POLICY_DURING_SCO)
+    CASE_RETURN_STR(INTEROP_DISABLE_PLAYER_APPLICATION_SETTING_CMDS)
+    CASE_RETURN_STR(INTEROP_DISABLE_HF_INDICATOR)
+    CASE_RETURN_STR(INTEROP_DISABLE_LE_CONN_UPDATES)
     CASE_RETURN_STR(END_OF_INTEROP_LIST)
   }
   return "UNKNOWN";
@@ -894,6 +909,31 @@ bool interop_database_match_vndr_prdt(const interop_feature_t feature,
       "%s() Device with vendor_id: %d product_id: %d is a match for "
       "interop workaround %s", __func__, vendor_id, product_id,
       interop_feature_string_(feature));
+    return true;
+  }
+
+  return false;
+}
+
+bool interop_database_match_addr_get_max_lat(const interop_feature_t feature,
+                   const bt_bdaddr_t *addr, uint16_t *max_lat)
+{
+
+  interop_db_entry_t entry;
+  interop_db_entry_t *ret_entry = NULL;
+
+  entry.bl_type = INTEROP_BL_TYPE_SSR_MAX_LAT;
+
+  entry.entry_type.ssr_max_lat_entry.feature = feature;
+  memcpy(&entry.entry_type.ssr_max_lat_entry.addr, addr, sizeof(bt_bdaddr_t));
+  entry.entry_type.ssr_max_lat_entry.feature = feature;
+  entry.entry_type.ssr_max_lat_entry.length = sizeof(bt_bdaddr_t);
+  if (interop_database_match_(&entry, &ret_entry)) {
+      bdstr_t bdstr = { '\0' };
+      LOG_WARN(LOG_TAG, "%s() Device %s is a match for interop workaround %s.",
+        __func__, bdaddr_to_string(addr, bdstr, sizeof(bdstr)),
+        interop_feature_string_(feature));
+      *max_lat = ret_entry->entry_type.ssr_max_lat_entry.max_lat;
     return true;
   }
 
