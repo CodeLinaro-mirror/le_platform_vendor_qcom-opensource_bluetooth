@@ -287,11 +287,18 @@ static void btc_stack_listen_handler(void *context)
 static void update_stack_events(void *context)
 {
     int status = -1;
-    btc_event_t event = (btc_event_t)context;
+    btc_event_t event,  orig_event = (btc_event_t)context;
 
     if (stack_sock > 0) {
-        event = htonl(event);
+        event = htonl(orig_event);
         status = write(stack_sock, &event, sizeof(event));
+    }
+    if (BLUETOOTH_ON == orig_event) {
+        LOG_DEBUG(" %s starting abtfilter \n", __func__);
+        property_set_bt("bluetooth.isEnabled", "true");
+    } else if (BLUETOOTH_OFF == orig_event) {
+        LOG_DEBUG(" %s stopping abtfilter \n", __func__);
+        property_set_bt("bluetooth.isEnabled", "false");
     }
 }
 
