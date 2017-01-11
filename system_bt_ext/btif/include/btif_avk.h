@@ -175,14 +175,14 @@ void btif_avk_queue_focus_rquest(void);
 
 /*******************************************************************************
  **
- ** Function         btif_avk_media_enque_pcm_data
+ ** Function         btif_media_enque_sink_data
  **
  ** Description      queues PCM data
  **
  ** Returns          void
  **
  *******************************************************************************/
-void btif_avk_media_enque_pcm_data(UINT8 *data, UINT16 size);
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size);
 
 /*******************************************************************************
  **
@@ -193,7 +193,7 @@ void btif_avk_media_enque_pcm_data(UINT8 *data, UINT16 size);
  ** Returns          size of data read
  **
  *******************************************************************************/
-UINT32 btif_avk_media_fetch_pcm_data(UINT8 *data, UINT32 size);
+UINT32 btif_media_avk_fetch_pcm_data(UINT16 codec_type, UINT8 *data, UINT32 size);
 
 /******************************************************************************
 **
