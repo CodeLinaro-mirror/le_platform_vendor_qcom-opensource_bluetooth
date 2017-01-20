@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -108,7 +108,7 @@ typedef UINT8 tBTA_AVK_HNDL;
 #endif
 
 #ifndef BTA_AVK_MAX_SEPS
-#define BTA_AVK_MAX_SEPS         2
+#define BTA_AVK_MAX_SEPS         5
 #endif
 
 #ifndef BTA_AVK_MAX_A2DP_MTU

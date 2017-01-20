@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -94,7 +94,7 @@ const tBTA_AVK_CO_FUNCTS bta_avk_a2d_cos =
     bta_avk_co_audio_close,
     bta_avk_co_audio_start,
     bta_avk_co_audio_stop,
-    bta_avk_co_audio_src_data_path,
+    bta_avk_co_audio_sink_data_path,
     bta_avk_co_audio_delay
 };
 
@@ -1423,8 +1423,18 @@ void bta_avk_setconfig_rsp (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         if (p_scb->cur_psc_mask & AVDT_PSC_DELAY_RPT)
             p_scb->avdt_version = AVDT_VERSION_SYNC;
 
-
-        if (p_scb->codec_type == BTA_AVK_CODEC_SBC || num > 1)
+        APPL_TRACE_DEBUG(" %s codec_type  = %d ",__func__, p_scb->codec_type);
+        if ((p_scb->codec_type == BTA_AVK_CODEC_SBC)||
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+            (p_scb->codec_type == BTA_AVK_CODEC_M24)||
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+            (p_scb->codec_type == BTA_AVK_CODEC_M12)||
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+            (p_scb->codec_type == A2D_NON_A2DP_MEDIA_CT)||
+#endif
+            (num > 1))
         {
             /* if SBC is used by the SNK as INT, discover req is not sent in bta_avk_config_ind.
                        * call disc_res now */
@@ -2453,7 +2463,6 @@ void bta_avk_data_path (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
                 else
                 {
                     /* too many buffers in a2d_list, drop it. */
-                    bta_avk_co_audio_drop(p_scb->hndl);
                     GKI_freebuf(p_buf);
                 }
             }
