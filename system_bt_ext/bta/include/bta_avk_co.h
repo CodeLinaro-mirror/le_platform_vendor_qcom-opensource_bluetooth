@@ -52,37 +52,14 @@
 
 enum
 {
-    BTA_AVK_CO_ST_INIT,
-    BTA_AVK_CO_ST_IN,
-    BTA_AVK_CO_ST_OUT,
-    BTA_AVK_CO_ST_OPEN,
-    BTA_AVK_CO_ST_STREAM
+    BTIF_SV_AVK_AA_SBC_INDEX = 0,
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    BTIF_SV_AVK_AA_AAC_INDEX,
+    BTIF_SV_AVK_AA_MP3_INDEX,
+#endif
+    BTIF_SV_AVK_AA_SEP_INDEX,  /* Last index */
+    BTIF_SV_AVK_AA_APTX_INDEX //TODO:ADD for APTX_FR
 };
-
-enum
-{
-    BTIF_SV_AV_AA_SBC_INDEX = 0,
-    BTIF_SV_AV_AA_APTX_INDEX,
-    BTIF_SV_AV_AA_SRC_SEP_INDEX  /* Last index */
-};
-
-enum
-{
-    BTIF_SV_AV_AA_SBC_SINK_INDEX = BTIF_SV_AV_AA_SRC_SEP_INDEX,
-    BTIF_SV_AV_AA_SNK_SEP_INDEX  /* Last index */
-};
-
-
-/* data type for the Audio Codec Information*/
-typedef struct
-{
-    UINT16  bit_rate;       /* SBC encoder bit rate in kbps */
-    UINT16  bit_rate_busy;  /* SBC encoder bit rate in kbps */
-    UINT16  bit_rate_swampd;/* SBC encoder bit rate in kbps */
-    UINT8   busy_level;     /* Busy level indicating the bit-rate to be used */
-    UINT8   codec_info[AVDT_CODEC_SIZE];
-    UINT8   codec_type;     /* Codec type */
-} tBTA_AVK_AUDIO_CODEC_INFO;
 
 /*******************************************************************************
 **
@@ -117,21 +94,6 @@ extern void bta_avk_co_audio_disc_res(tBTA_AVK_HNDL hndl, UINT8 num_seps,
 
 /*******************************************************************************
 **
-** Function         bta_avk_co_video_disc_res
-**
-** Description      This callout function is executed by AV to report the
-**                  number of stream end points (SEP) were found during the
-**                  AVDT stream discovery process.
-**
-**
-** Returns          void.
-**
-*******************************************************************************/
-extern void bta_avk_co_video_disc_res(tBTA_AVK_HNDL hndl, UINT8 num_seps,
-                                     UINT8 num_snk, BD_ADDR addr);
-
-/*******************************************************************************
-**
 ** Function         bta_avk_co_audio_getconfig
 **
 ** Description      This callout function is executed by AV to retrieve the
@@ -143,22 +105,6 @@ extern void bta_avk_co_video_disc_res(tBTA_AVK_HNDL hndl, UINT8 num_seps,
 **
 *******************************************************************************/
 extern UINT8 bta_avk_co_audio_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
-                                       UINT8 *p_codec_info, UINT8 *p_sep_info_idx, UINT8 seid,
-                                       UINT8 *p_num_protect, UINT8 *p_protect_info);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_getconfig
-**
-** Description      This callout function is executed by AV to retrieve the
-**                  desired codec and content protection configuration for the
-**                  video stream.
-**
-**
-** Returns          Stream codec and content protection configuration info.
-**
-*******************************************************************************/
-extern UINT8 bta_avk_co_video_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
                                        UINT8 *p_codec_info, UINT8 *p_sep_info_idx, UINT8 seid,
                                        UINT8 *p_num_protect, UINT8 *p_protect_info);
 
@@ -177,20 +123,6 @@ extern void bta_avk_co_audio_setconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_
                                         UINT8 *p_codec_info, UINT8 seid, BD_ADDR addr,
                                         UINT8 num_protect, UINT8 *p_protect_info,UINT8 t_local_sep, UINT8 avdt_handle);
 
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_setconfig
-**
-** Description      This callout function is executed by AV to set the
-**                  codec and content protection configuration of the video stream.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_setconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
-                                      UINT8 *p_codec_info, UINT8 seid, BD_ADDR addr,
-                                      UINT8 num_protect, UINT8 *p_protect_info);
 
 /*******************************************************************************
 **
@@ -206,21 +138,6 @@ extern void bta_avk_co_video_setconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_
 **
 *******************************************************************************/
 extern void bta_avk_co_audio_open(tBTA_AVK_HNDL hndl,
-                                 tBTA_AVK_CODEC codec_type, UINT8 *p_codec_info,
-                                 UINT16 mtu);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_open
-**
-** Description      This function is called by AV when the video stream connection
-**                  is opened.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_open(tBTA_AVK_HNDL hndl,
                                  tBTA_AVK_CODEC codec_type, UINT8 *p_codec_info,
                                  UINT16 mtu);
 
@@ -243,20 +160,6 @@ extern void bta_avk_co_audio_close(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type
 
 /*******************************************************************************
 **
-** Function         bta_avk_co_video_close
-**
-** Description      This function is called by AV when the video stream connection
-**                  is closed.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_close(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
-                                  UINT16 mtu);
-
-/*******************************************************************************
-**
 ** Function         bta_avk_co_audio_start
 **
 ** Description      This function is called by AV when the audio streaming data
@@ -267,20 +170,6 @@ extern void bta_avk_co_video_close(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type
 **
 *******************************************************************************/
 extern void bta_avk_co_audio_start(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
-                                  UINT8 *p_codec_info, BOOLEAN *p_no_rtp_hdr);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_start
-**
-** Description      This function is called by AV when the video streaming data
-**                  transfer is started.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_start(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
                                   UINT8 *p_codec_info, BOOLEAN *p_no_rtp_hdr);
 
 /*******************************************************************************
@@ -297,108 +186,27 @@ extern void bta_avk_co_video_start(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type
 extern void bta_avk_co_audio_stop(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type);
 
 /*******************************************************************************
-**
-** Function         bta_avk_co_video_stop
-**
-** Description      This function is called by AV when the video streaming data
-**                  transfer is stopped.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_stop(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_audio_src_data_path
-**
-** Description      This function is called to get the next data buffer from
-**                  the audio codec
-**
-** Returns          NULL if data is not ready.
-**                  Otherwise, a GKI buffer (BT_HDR*) containing the audio data.
-**
-*******************************************************************************/
-extern void * bta_avk_co_audio_src_data_path(tBTA_AVK_CODEC codec_type,
-                                            UINT32 *p_len, UINT32 *p_timestamp);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_src_data_path
-**
-** Description      This function is called to get the next data buffer from
-**                  the video codec.
-**
-** Returns          NULL if data is not ready.
-**                  Otherwise, a video data buffer (UINT8*).
-**
-*******************************************************************************/
-extern void * bta_avk_co_video_src_data_path(tBTA_AVK_CODEC codec_type,
-                                            UINT32 *p_len, UINT32 *p_timestamp);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_audio_drop
-**
-** Description      An Audio packet is dropped. .
-**                  It's very likely that the connected headset with this handle
-**                  is moved far away. The implementation may want to reduce
-**                  the encoder bit rate setting to reduce the packet size.
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_audio_drop(tBTA_AVK_HNDL hndl);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_report_conn
-**
-** Description      This function is called by AV when the reporting channel is
-**                  opened (open=TRUE) or closed (open=FALSE).
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_report_conn (BOOLEAN open, UINT8 avdt_handle);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_report_rr
-**
-** Description      This function is called by AV when a Receiver Report is
-**                  received
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_report_rr (UINT32 packet_lost);
+ **
+ ** Function         bta_avk_co_audio_sink_data_path
+ **
+ ** Description      Dummy Function, Required just because of co fuctions structure definition
+ **
+ ** Returns          NULL
+ **
+ *******************************************************************************/
+extern void * bta_avk_co_audio_sink_data_path(tBTA_AVK_CODEC codec_type,
+                                                    UINT32 *p_len, UINT32 *p_timestamp);
 
 /*******************************************************************************
 **
 ** Function         bta_avk_co_audio_delay
 **
-** Description      This function is called by AV when the audio stream connection
-**                  needs to send the initial delay report to the connected SRC.
+** Description      Dummy Function, Required just because of co-fuctions structure definition
 **
 **
 ** Returns          void
 **
 *******************************************************************************/
 extern void bta_avk_co_audio_delay(tBTA_AVK_HNDL hndl, UINT16 delay);
-
-/*******************************************************************************
-**
-** Function         bta_avk_co_video_delay
-**
-** Description      This function is called by AV when the video stream connection
-**                  needs to send the initial delay report to the connected SRC.
-**
-**
-** Returns          void
-**
-*******************************************************************************/
-extern void bta_avk_co_video_delay(tBTA_AVK_HNDL hndl, UINT16 delay);
 
 #endif /* BTA_AVK_CO_H */
