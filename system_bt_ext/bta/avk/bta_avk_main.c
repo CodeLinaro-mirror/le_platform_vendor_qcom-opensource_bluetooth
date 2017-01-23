@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -694,18 +694,13 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             if(bta_avk_cb.features & BTA_AVK_FEAT_DELAY_RPT)
                 cs.cfg.psc_mask |= AVDT_PSC_DELAY_RPT;
 
-            if (profile_initialized == UUID_SERVCLASS_AUDIO_SOURCE)
-            {
-                cs.tsep = AVDT_TSEP_SRC;
-                startIndex = BTIF_SV_AV_AA_SBC_INDEX;
-                endIndex = BTIF_SV_AV_AA_SRC_SEP_INDEX;
-            }
-            else if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK)
+            if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK)
             {
                 cs.tsep = AVDT_TSEP_SNK;
+                p_scb->p_cos = &bta_avk_a2d_cos;
                 cs.p_data_cback = bta_avk_stream_data_cback;
-                startIndex = BTIF_SV_AV_AA_SBC_SINK_INDEX;
-                endIndex = BTIF_SV_AV_AA_SNK_SEP_INDEX;
+                startIndex = BTIF_SV_AVK_AA_SBC_INDEX;
+                endIndex = BTIF_SV_AVK_AA_SEP_INDEX;
             }
             /* Initialize Handles to zero */
             for(index = 0; index < (endIndex - startIndex); index++)
@@ -716,20 +711,14 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             memcpy(&p_scb->cfg, &cs.cfg, sizeof(tAVDT_CFG));
             index = startIndex;
             while (index < endIndex &&
-                   (*bta_avk_a2d_cos.init)(&codec_type, cs.cfg.codec_info,
+                   (p_scb->p_cos->init)(&codec_type, cs.cfg.codec_info,
                     &cs.cfg.num_protect, cs.cfg.protect_info, index) == TRUE)
             {
-                if((codec_type == A2D_NON_A2DP_MEDIA_CT) && (A2D_check_and_init_aptX() == false))
-                {
-                   index++;
-                   continue;
-                }
 
                 if(AVDT_CreateStream(&p_scb->seps[index - startIndex].av_handle, &cs) ==
                                                                             AVDT_SUCCESS)
                 {
-                   if ((profile_initialized == UUID_SERVCLASS_AUDIO_SOURCE) &&
-                                        (index == BTIF_SV_AV_AA_APTX_INDEX))
+                   if (index == BTIF_SV_AVK_AA_APTX_INDEX)
                    {
                        UINT8* ptr = cs.cfg.codec_info;
                        tA2D_APTX_CIE* codecInfo = (tA2D_APTX_CIE*) &ptr[3];
@@ -1371,7 +1360,6 @@ void bta_avk_dup_audio_buf(tBTA_AVK_SCB *p_scb, BT_HDR *p_buf)
                     list_append(p_scbi->a2d_list, p_new);
                     if (list_length(p_scbi->a2d_list) >  p_bta_avk_cfg->audio_mqs) {
                         // Drop the oldest packet
-                        bta_avk_co_audio_drop(p_scbi->hndl);
                         BT_HDR *p_buf = list_front(p_scbi->a2d_list);
                         list_remove(p_scbi->a2d_list, p_buf);
                         GKI_freebuf(p_buf);

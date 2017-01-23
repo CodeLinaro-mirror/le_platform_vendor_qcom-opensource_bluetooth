@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -86,25 +86,6 @@ typedef struct
 } tBTIF_AVK_MEDIA_INIT_AUDIO;
 
 #if (BTA_AV_INCLUDED == TRUE)
-/* tBTIF_AVK_MEDIA_UPDATE_AUDIO msg structure */
-typedef struct
-{
-        BT_HDR hdr;
-        UINT16 MinMtuSize; /* Minimum peer mtu size */
-        UINT8 MaxBitPool; /* Maximum peer bitpool */
-        UINT8 MinBitPool; /* Minimum peer bitpool */
-        UINT8 CodecType; /* SBC or Non-A2DP */
-        UINT8 BluetoothVendorID; /* Bluetooth Vendor ID */
-        UINT8 BluetoothCodecID; /* Bluetooth Codec ID */
-} tBTIF_AVK_MEDIA_UPDATE_AUDIO;
-
-/* tBTIF_AVK_MEDIA_INIT_AUDIO_FEEDING msg structure */
-typedef struct
-{
-        BT_HDR hdr;
-        tBTIF_AVK_FEEDING_MODE feeding_mode;
-        tBTIF_AVK_MEDIA_FEEDINGS feeding;
-} tBTIF_AVK_MEDIA_INIT_AUDIO_FEEDING;
 
 typedef struct
 {
@@ -145,41 +126,6 @@ extern void btif_avk_media_task(void);
 
 /*******************************************************************************
  **
- ** Function         btif_avk_media_task_enc_init_req
- **
- ** Description      Request to initialize the media task encoder
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-extern BOOLEAN btif_avk_media_task_enc_init_req(tBTIF_AVK_MEDIA_INIT_AUDIO * p_msg);
-
-/*******************************************************************************
- **
- ** Function         btif_avk_media_task_enc_update_req
- **
- ** Description      Request to update the media task encoder
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-#if (BTA_AV_INCLUDED == TRUE)
-extern BOOLEAN btif_avk_media_task_enc_update_req(tBTIF_AVK_MEDIA_UPDATE_AUDIO * p_msg);
-#endif
-
-/*******************************************************************************
- **
- ** Function         btif_avk_media_task_start_aa_req
- **
- ** Description      Request to start audio encoding task
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-extern BOOLEAN btif_avk_media_task_start_aa_req(void);
-
-/*******************************************************************************
- **
  ** Function         btif_avk_media_task_stop_aa_req
  **
  ** Description      Request to stop audio encoding task
@@ -199,27 +145,6 @@ extern BOOLEAN btif_avk_media_task_stop_aa_req(void);
  **
  *******************************************************************************/
 extern BOOLEAN btif_avk_media_task_aa_rx_flush_req(void);
-/*******************************************************************************
- **
- ** Function         btif_avk_media_task_aa_tx_flush_req
- **
- ** Description      Request to flush audio encoding pipe
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-extern BOOLEAN btif_avk_media_task_aa_tx_flush_req(void);
-
-/*******************************************************************************
- **
- ** Function         btif_avk_media_aa_readbuf
- **
- ** Description      Read an audio GKI buffer from the BTIF media TX queue
- **
- ** Returns          pointer on a GKI aa buffer ready to send
- **
- *******************************************************************************/
-extern BT_HDR *btif_avk_media_aa_readbuf(void);
 
 /*******************************************************************************
  **
@@ -232,55 +157,7 @@ extern BT_HDR *btif_avk_media_aa_readbuf(void);
  *******************************************************************************/
  UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_buf);
 
-
-
-/*******************************************************************************
- **
- ** Function         btif_avk_media_aa_writebuf
- **
- ** Description      Enqueue a Advance Audio media GKI buffer to be processed by btif media task.
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-extern void btif_avk_media_aa_writebuf(BT_HDR *pBuf, UINT32 timestamp, UINT16 seq_num);
-
-/*******************************************************************************
- **
- ** Function         btif_avk_media_av_writebuf
- **
- ** Description      Enqueue a video media GKI buffer to be processed by btif media task.
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-extern BOOLEAN btif_avk_media_av_writebuf(UINT8 *p_media, UINT32 media_len,
-                                     UINT32 timestamp, UINT16 seq_num);
-
-#if (BTA_AV_INCLUDED == TRUE)
-/*******************************************************************************
- **
- ** Function         btif_avk_media_task_audio_feeding_init_req
- **
- ** Description      Request to initialize audio feeding
- **
- ** Returns          TRUE is success
- **
- *******************************************************************************/
-
-extern BOOLEAN btif_avk_media_task_audio_feeding_init_req(tBTIF_AVK_MEDIA_INIT_AUDIO_FEEDING *p_msg);
-#endif
-
-/*******************************************************************************
- **
- ** Function         avk_dump_codec_info
- **
- ** Description      Decode and display codec_info (for debug)
- **
- ** Returns          void
- **
- *******************************************************************************/
-extern void avk_dump_codec_info(unsigned char *p_codec);
+//#endif
 
 /**
  * Local adaptation helper functions between btif and media task
@@ -290,10 +167,9 @@ bool btif_avk_a2dp_start_media_task(void);
 void btif_avk_a2dp_stop_media_task(void);
 bool btif_avk_a2dp_is_media_task_stopped(void);
 void btif_avk_a2dp_on_init(void);
-tBTIF_STATUS btif_avk_a2dp_setup_codec(void);
 void btif_avk_a2dp_on_idle(void);
 void btif_avk_a2dp_on_open(void);
-BOOLEAN btif_avk_a2dp_on_started(tBTA_AVK_START *p_av, BOOLEAN pending_start);
+
 void btif_avk_a2dp_ack_fail(void);
 void btif_a2dp_on_stop_req(void);
 void btif_avk_a2dp_on_stopped(tBTA_AVK_SUSPEND *p_av);
@@ -304,8 +180,20 @@ void btif_avk_a2dp_set_rx_flush(BOOLEAN enable);
 void btif_avk_media_check_iop_exceptions(UINT8 *peer_bda);
 void btif_avk_reset_decoder(UINT8 *p_av);
 
-int btif_avk_a2dp_get_track_frequency(UINT8 frequency);
-int btif_avk_a2dp_get_track_channel_count(UINT8 channeltype);
+int btif_avk_a2dp_get_sbc_track_frequency(UINT8 frequency);
+int btif_avk_a2dp_get_sbc_track_channel_count(UINT8 channeltype);
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+int btif_avk_a2dp_get_aac_track_frequency(UINT16 frequency);
+int btif_avk_a2dp_get_aac_track_channel_count(UINT8 channeltype);
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+int btif_avk_a2dp_get_mp3_track_frequency(UINT16 frequency);
+int btif_avk_a2dp_get_mp3_track_channel_count(UINT8 channeltype);
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+int btif_avk_a2dp_get_aptx_track_frequency(UINT8 frequency);
+int btif_avk_a2dp_get_aptx_track_channel_count(UINT8 channeltype);
+#endif
 void btif_avk_a2dp_set_peer_sep(UINT8 sep);
 #ifdef USE_AUDIO_TRACK
 void btif_avk_a2dp_set_audio_focus_state(btif_avk_media_audio_focus_state state);

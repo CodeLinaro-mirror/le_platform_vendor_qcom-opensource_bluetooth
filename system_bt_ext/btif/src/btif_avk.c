@@ -53,7 +53,6 @@
 **  Constants & Macros
 ******************************************************************************/
 #define BTIF_AVK_SERVICE_NAME "Advanced Audio Sink"
-
 #define BTIF_TIMEOUT_AV_OPEN_ON_RC_SECS  2
 
 /* Number of BTIF-AV control blocks */
@@ -83,16 +82,17 @@ typedef enum {
 #define HOST_ROLE_SLAVE                    0x01
 #define HOST_ROLE_UNKNOWN                  0xff
 
-#define MAX_A2DP_SINK_PCM_QUEUE_SZ         20
+#define MAX_A2DP_SINK_DATA_QUEUE_SZ         20
 
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
 typedef struct
 {
+    UINT16 codec_type;
     UINT16 len;
     UINT16 offset;
-} tBT_AVK_PCM_HDR;
+} tBT_SINK_DATA_HDR;
 
 typedef struct
 {
@@ -109,10 +109,13 @@ typedef struct
     int service;
     BOOLEAN is_slave;
     BOOLEAN is_device_playing;
-    BUFFER_Q RxPcmQ;
+    /************ Variables used for A2DP Sink *************/
+    BUFFER_Q RxDataQ;
+    UINT16 sink_codec_type;
+    /************ Variables used for A2DP Sink *************/
 } btif_avk_cb_t;
 
-static pthread_mutex_t pcm_queue_lock;
+static pthread_mutex_t sink_data_q_lock;
 
 typedef struct
 {
@@ -125,19 +128,23 @@ typedef struct
     int sample_rate;
     int channel_count;
     UINT8 peer_bd[6];
+    UINT8 codec_type;
+    btav_codec_config_t   codec_info;
 } btif_avk_config_req_t;
 
 /*****************************************************************************
 **  Static variables
 ******************************************************************************/
 static btav_callbacks_t *bt_avk_callbacks = NULL;
-static btav_vendor_callbacks_t *bt_avk_vendor_callbacks = NULL;
+static btav_sink_vendor_callbacks_t *bt_av_sink_vendor_callbacks = NULL;
 static btif_avk_cb_t btif_avk_cb[BTIF_AVK_NUM_CB];
 static TIMER_LIST_ENT tle_av_open_on_rc;
 int btif_max_avk_clients = 1;
 static BOOLEAN enable_multicast = FALSE;
 static BOOLEAN is_multicast_supported = FALSE;
 static BOOLEAN multicast_disabled = FALSE;
+static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
+static UINT16 retreive_rtp_header = 0; // by default disable it
 
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAVK_INIT() if (((bt_avk_callbacks == NULL)) \
@@ -385,6 +392,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             btif_avk_cb[index].current_playing = FALSE;
             btif_avk_cb[index].is_slave = FALSE;
             btif_avk_cb[index].is_device_playing = FALSE;
+            btif_avk_cb[index].sink_codec_type = 0xFF;
             for (int i = 0; i < btif_max_avk_clients; i++)
             {
                 btif_avk_cb[i].dual_handoff = FALSE;
@@ -491,13 +499,14 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
         {
             btif_avk_config_req_t req;
             // copy to avoid alignment problems
-            memcpy(&req, p_data, sizeof(req));
-
-            BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d", req.sample_rate,
-                    req.channel_count);
-            if (bt_avk_callbacks != NULL) {
-                HAL_CBACK(bt_avk_callbacks, audio_config_cb, &(req.peer_bd),
-                        req.sample_rate, req.channel_count);
+            /* in this case, L2CAP connection is still up, but bt-app moved to disc state
+               so lets move bt-app to connected state first */
+            btif_report_connection_state(BTAV_CONNECTION_STATE_CONNECTED, &(req.peer_bd));
+            BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %d", req.sample_rate,
+                    req.channel_count, req.codec_type);
+            if (bt_av_sink_vendor_callbacks != NULL) {
+                HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
+                        &(req.peer_bd), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -718,11 +727,11 @@ static BOOLEAN btif_avk_state_opening_handler(btif_sm_event_t event, void *p_dat
             // copy to avoid alignment problems
             memcpy(&req, p_data, sizeof(req));
 
-            BTIF_TRACE_DEBUG("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d", req.sample_rate,
-                    req.channel_count);
-            if (bt_avk_callbacks != NULL) {
-                HAL_CBACK(bt_avk_callbacks, audio_config_cb, &(btif_avk_cb[index].peer_bda),
-                        req.sample_rate, req.channel_count);
+            BTIF_TRACE_DEBUG("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %d", req.sample_rate,
+                    req.channel_count, req.codec_type);
+            if (bt_av_sink_vendor_callbacks != NULL) {
+                HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
+                        &(req.peer_bd), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -905,41 +914,6 @@ static BOOLEAN btif_avk_state_opened_handler(btif_sm_event_t event, void *p_data
                 btif_avk_cb[index].flags |= BTIF_AVK_FLAG_PENDING_START;
                 break;
             }
-            status = btif_avk_a2dp_setup_codec();
-            if (status == BTIF_SUCCESS)
-            {
-                int idx = 0;
-                BTA_AvkStart(btif_avk_cb[index].bta_handle);
-                if (enable_multicast == TRUE)
-                {
-                    /* In A2dp Multicast, DUT initiated stream request
-                    * should be true for all connected A2dp devices. */
-                    for (; idx < btif_max_avk_clients; idx++)
-                    {
-                        btif_avk_cb[idx].flags |= BTIF_AVK_FLAG_PENDING_START;
-                    }
-                }
-                else
-                {
-                    btif_avk_cb[index].flags |= BTIF_AVK_FLAG_PENDING_START;
-                }
-            }
-            else if (status == BTIF_ERROR_SRV_AV_CP_NOT_SUPPORTED)
-            {
-#if defined(BTA_AVK_DISCONNECT_IF_NO_SCMS_T) && (BTA_AVK_DISCONNECT_IF_NO_SCMS_T == TRUE)
-                BTIF_TRACE_ERROR0("SCMST enabled, disconnect as remote does not support SCMST");
-                BTA_AvkDisconnect(btif_avk_cb[index].peer_bda.address);
-#else
-                BTIF_TRACE_WARNING("SCMST enabled, connecting to non SCMST SEP");
-                BTA_AvkStart(btif_avk_cb[index].bta_handle);
-                btif_avk_cb[index].flags |= BTIF_AVK_FLAG_PENDING_START;
-#endif
-            }
-            else
-            {
-                BTIF_TRACE_ERROR("## AV Disconnect## status : %x",status);
-                BTA_AvkDisconnect(btif_avk_cb[index].peer_bda.address);
-            }
             break;
         case BTIF_AVK_SINK_START_STREAM_REQ_EVT:
             // TODO: check if AVRCP connection is there, send AVRCP_PLAY, otherwise send AVDTP_START
@@ -1027,7 +1001,6 @@ static BOOLEAN btif_avk_state_opened_handler(btif_sm_event_t event, void *p_data
                      APPL_TRACE_WARNING("Suspend the AV Data channel");
                      /* ensure tx frames are immediately suspended */
                      btif_avk_a2dp_set_tx_flush(TRUE);
-                     btif_avk_media_task_stop_aa_req();
                  }
              }
              else
@@ -1290,7 +1263,7 @@ static BOOLEAN btif_avk_state_started_handler(btif_sm_event_t event, void *p_dat
 
 #ifdef USE_AUDIO_TRACK
             case BTIF_AVK_SINK_FOCUS_REQ_EVT:
-                HAL_CBACK(bt_avk_vendor_callbacks, audio_focus_request_vendor_cb,
+                HAL_CBACK(bt_av_sink_vendor_callbacks, audio_focus_request_vendor_cb,
                                                    &(btif_avk_cb[index].peer_bda));
             break;
 #endif
@@ -1811,6 +1784,31 @@ static void bte_avk_callback(tBTA_AVK_EVT event, tBTA_AVK *p_data)
                           (char*)p_data, sizeof(tBTA_AVK), btif_avk_event_deep_copy);
 }
 
+UINT8 get_rtp_offset(UINT8* p_start, UINT16 codec_type)
+{
+    UINT8   rtp_version, padding, extension, csrc_count, extension_len;
+    UINT8 offset = 0;
+    UINT8* ptr = p_start;
+    // NO RTP Header for APTX classic
+    if ((codec_type == A2DP_SINK_AUDIO_CODEC_APTX) || (codec_type == A2D_NON_A2DP_MEDIA_CT))
+        return 0;
+    rtp_version = *(p_start) >> 6;
+    padding = (*(p_start) >> 5) & 0x01;
+    extension = (*(p_start) >> 4) & 0x01;
+    csrc_count = *(p_start) & 0x0F;
+
+    BTIF_TRACE_DEBUG(" rtp_v = %d, padding = %d, xtn = %d, csrc_count = %d",
+             rtp_version, padding, extension, csrc_count);
+    offset =  12 + csrc_count *4;
+    if(extension)
+    {
+        ptr = ptr + offset + 2;
+        BE_STREAM_TO_UINT16(extension_len, ptr);
+        offset = offset + 4 + extension_len * 4;
+    }
+    APPL_TRACE_DEBUG(" %s codec_type = %d offset = %d", __FUNCTION__, codec_type, offset);
+    return offset;
+}
 /*Called only in case of A2dp SInk, which runs on index 0*/
 static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
 {
@@ -1818,6 +1816,19 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
     UINT8 que_len;
     tA2D_STATUS a2d_status;
     tA2D_SBC_CIE sbc_cie;
+    UINT8* start_ptr;
+    UINT16 data_len;
+    BT_HDR* p_pkt;
+    UINT8 rtp_offset = 0;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    tA2D_AAC_CIE aac_cie;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+    tA2D_MP3_CIE mp3_cie;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+    tA2D_APTX_CIE aptx_cie;
+#endif
     btif_avk_config_req_t config_req;
     int index =0;
 
@@ -1827,29 +1838,158 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
         if ( (state == BTIF_AVK_STATE_STARTED) || /* send SBC packets only in Started State */
              (state == BTIF_AVK_STATE_OPENED) )
         {
-            que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_data);
-            BTIF_TRACE_DEBUG(" Packets in Que %d",que_len);
+            p_pkt = (BT_HDR *)p_data;
+            start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
+            // now we would always get RTP header from bta.
+            switch (btif_avk_cb[index].sink_codec_type)
+            {
+                case BTIF_AVK_CODEC_SBC:
+                    if (enable_stack_sbc_decoding) {
+                        // in this case we have to remove RTP header and send for decoding
+                        rtp_offset = get_rtp_offset(start_ptr, BTIF_AVK_CODEC_SBC);
+                        p_pkt->offset = p_pkt->offset + rtp_offset;
+                        p_pkt->len = p_pkt->len - rtp_offset;
+                        que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_pkt);
+                        break;
+                    }
+                    if(!retreive_rtp_header) {
+                        // host wants Raw SBC packets without RTP header
+                        rtp_offset = get_rtp_offset(start_ptr, btif_avk_cb[index].sink_codec_type);
+                        p_pkt->offset = p_pkt->offset + rtp_offset;
+                        p_pkt->len = p_pkt->len - rtp_offset;
+                    }
+                    // adjust start and len again
+                    start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
+                    data_len = p_pkt->len;
+                    que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
+                          start_ptr, data_len);
+                    break;
+                case A2D_NON_A2DP_MEDIA_CT:
+                    // APTX does not have RTP header
+                    data_len = p_pkt->len;
+                    que_len = btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_APTX,
+                          start_ptr, data_len);
+                    break;
+                default: // for all other codecs
+                    if(!retreive_rtp_header) {
+                        // host wants Raw SBC packets without RTP header
+                        rtp_offset = get_rtp_offset(start_ptr, btif_avk_cb[index].sink_codec_type);
+                        p_pkt->offset = p_pkt->offset + rtp_offset;
+                        p_pkt->len = p_pkt->len - rtp_offset;
+                    }
+                    // adjust start and len again
+                    start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
+                    data_len = p_pkt->len;
+                    que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
+                          start_ptr, data_len);
+                    break;
+            }
+            BTIF_TRACE_DEBUG(" Codec_Type = %d, Packets in Que %d sbc_decoding = %d",
+                    btif_avk_cb[index].sink_codec_type, que_len, enable_stack_sbc_decoding);
         }
         else
             return;
     }
 
     if (event == BTA_AVK_MEDIA_SINK_CFG_EVT) {
+        UINT8* config = (UINT8*)(p_data->avk_config.codec_info);
+        UINT8 codec_type = config[2];
         /* send a command to BT Media Task */
-        btif_avk_reset_decoder((UINT8*)(p_data->avk_config.codec_info));
-        a2d_status = A2D_ParsSbcInfo(&sbc_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
-        if (a2d_status == A2D_SUCCESS) {
-            /* Switch to BTIF context */
-            config_req.sample_rate = btif_avk_a2dp_get_track_frequency(sbc_cie.samp_freq);
-            config_req.channel_count = btif_avk_a2dp_get_track_channel_count(sbc_cie.ch_mode);
-            memcpy(config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
-                                                              sizeof(config_req.peer_bd));
-            btif_transfer_context(btif_avk_handle_event, BTIF_AVK_SINK_CONFIG_REQ_EVT,
-                                     (char*)&config_req, sizeof(config_req), NULL);
-        }
-        else
+        //memcpy(config_req.codec_info,(UINT8*)(p_data->avk_config.codec_info), AVDT_CODEC_SIZE);
+        config_req.codec_type = codec_type;
+        btif_avk_cb[index].sink_codec_type = codec_type;
+        switch(codec_type)
         {
-            APPL_TRACE_ERROR("ERROR dump_codec_info A2D_ParsSbcInfo fail:%d", a2d_status);
+        case BTIF_AVK_CODEC_SBC:
+            if(enable_stack_sbc_decoding) // if SBC decoding has to be done by Stack
+                btif_avk_reset_decoder((UINT8*)(p_data->avk_config.codec_info));
+            a2d_status = A2D_ParsSbcInfo(&sbc_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
+            if (a2d_status == A2D_SUCCESS) {
+                /* Switch to BTIF context */
+                config_req.sample_rate = btif_a2dp_get_sbc_track_frequency(sbc_cie.samp_freq);
+                config_req.channel_count = btif_a2dp_get_sbc_track_channel_count(sbc_cie.ch_mode);
+                config_req.codec_info.sbc_config.samp_freq = sbc_cie.samp_freq;
+                config_req.codec_info.sbc_config.ch_mode = sbc_cie.ch_mode;
+                config_req.codec_info.sbc_config.block_len = sbc_cie.block_len;
+                config_req.codec_info.sbc_config.alloc_mthd = sbc_cie.alloc_mthd;
+                config_req.codec_info.sbc_config.max_bitpool = sbc_cie.max_bitpool;
+                config_req.codec_info.sbc_config.min_bitpool = sbc_cie.min_bitpool;
+                config_req.codec_info.sbc_config.num_subbands = sbc_cie.num_subbands;
+                memcpy(config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
+                                                                  sizeof(config_req.peer_bd));
+                btif_transfer_context(btif_avk_handle_event, BTIF_AVK_SINK_CONFIG_REQ_EVT,
+                                         (char*)&config_req, sizeof(config_req), NULL);
+            }
+            else
+            {
+                APPL_TRACE_ERROR("ERROR dump_codec_info A2D_ParsSbcInfo fail:%d", a2d_status);
+            }
+            break;
+
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+        case BTA_AVK_CODEC_M24:
+            a2d_status = A2D_ParsAacInfo(&aac_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
+            if (a2d_status == A2D_SUCCESS) {
+                /* Switch to BTIF context */
+                config_req.sample_rate = btif_a2dp_get_aac_track_frequency(aac_cie.samp_freq);
+                config_req.channel_count = btif_a2dp_get_aac_track_channel_count(aac_cie.channels);
+                config_req.codec_info.aac_config.bit_rate = aac_cie.bit_rate;
+                config_req.codec_info.aac_config.sampling_freq = aac_cie.samp_freq;
+                config_req.codec_info.aac_config.obj_type = aac_cie.object_type;
+                config_req.codec_info.aac_config.channel_count = aac_cie.channels;
+                config_req.codec_info.aac_config.vbr = aac_cie.vbr;
+                memcpy(&config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
+                                                                  sizeof(config_req.peer_bd));
+                btif_transfer_context(btif_avk_handle_event, BTIF_AVK_SINK_CONFIG_REQ_EVT,
+                                     (char*)&config_req, sizeof(config_req), NULL);
+            } else {
+                APPL_TRACE_ERROR("ERROR dump_codec_info A2D_ParsAacInfo fail:%d", a2d_status);
+            }
+            break;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+        case BTA_AVK_CODEC_M12:
+            a2d_status = A2D_ParsMp3Info(&mp3_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
+            if (a2d_status == A2D_SUCCESS) {
+                /* Switch to BTIF context */
+                config_req.sample_rate = btif_a2dp_get_mp3_track_frequency(mp3_cie.samp_freq);
+                config_req.channel_count = btif_a2dp_get_mp3_track_channel_count(mp3_cie.channels);
+                config_req.codec_info.mp3_config.bit_rate = mp3_cie.bit_rate;
+                config_req.codec_info.mp3_config.sampling_freq = mp3_cie.samp_freq;
+                config_req.codec_info.mp3_config.layer = mp3_cie.layer;
+                config_req.codec_info.mp3_config.channel_count = mp3_cie.channels;
+                config_req.codec_info.mp3_config.vbr = mp3_cie.vbr;
+                config_req.codec_info.mp3_config.mpf = mp3_cie.mpf;
+                config_req.codec_info.mp3_config.crc = mp3_cie.crc;
+                memcpy(&config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
+                                                                  sizeof(config_req.peer_bd));
+                btif_transfer_context(btif_avk_handle_event, BTIF_AVK_SINK_CONFIG_REQ_EVT,
+                                     (char*)&config_req, sizeof(config_req), NULL);
+            } else {
+                APPL_TRACE_ERROR("ERROR dump_codec_info A2D_ParsMp3Info fail:%d", a2d_status);
+            }
+            break;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+        case A2D_NON_A2DP_MEDIA_CT:
+            a2d_status = A2D_ParsAptxInfo(&aptx_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
+            if (a2d_status == A2D_SUCCESS) {
+                /* Switch to BTIF context */
+                /* setting APTX for Vendor specific codec right now */
+                config_req.codec_type = A2DP_SINK_AUDIO_CODEC_APTX;
+                config_req.sample_rate = btif_a2dp_get_aptx_track_frequency(aptx_cie.sampleRate);
+                config_req.channel_count = btif_a2dp_get_aptx_track_channel_count(aptx_cie.channelMode);
+                config_req.codec_info.aptx_config.sampling_freq = aptx_cie.sampleRate;
+                config_req.codec_info.aptx_config.channel_count = aptx_cie.channelMode;
+                memcpy(&config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
+                                                                  sizeof(config_req.peer_bd));
+                btif_transfer_context(btif_avk_handle_event, BTIF_AVK_SINK_CONFIG_REQ_EVT,
+                                     (char*)&config_req, sizeof(config_req), NULL);
+            } else {
+                APPL_TRACE_ERROR("ERROR dump_codec_info A2D_ParsAptxInfo fail:%d", a2d_status);
+            }
+            break;
+#endif
         }
     }
 }
@@ -1922,12 +2062,12 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
 ** Returns          bt_status_t
 **
 *******************************************************************************/
-static bt_status_t init_sink_vendor(btav_vendor_callbacks_t* callbacks, int max,
-                             int a2dp_multicast_state)
+static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int max,
+                             int a2dp_multicast_state, uint8_t streaming_prarm)
 {
     bt_status_t status;
 
-    BTIF_TRACE_EVENT("%s", __FUNCTION__);
+    BTIF_TRACE_IMP("%s", __FUNCTION__);
 
     enable_multicast = FALSE; // Clear multicast flag for sink
     if (max > 1)
@@ -1941,71 +2081,184 @@ static bt_status_t init_sink_vendor(btav_vendor_callbacks_t* callbacks, int max,
 
 
     if (status == BT_STATUS_SUCCESS) {
-        bt_avk_vendor_callbacks = callbacks;
+        bt_av_sink_vendor_callbacks = callbacks;
         //BTA_AvEnable_Sink(TRUE);
     }
 
+    enable_stack_sbc_decoding = streaming_prarm & A2DP_SINK_ENABLE_SBC_DECODING;
+    retreive_rtp_header = streaming_prarm & A2DP_SINK_RETREIVE_RTP_HEADER;
+
+    BTIF_TRACE_IMP(" enable_sbc_decoding = %d, retreive RTP header = %d",
+            enable_stack_sbc_decoding, retreive_rtp_header);
+
     /* initializing mutex for sink */
-    pthread_mutex_init(&pcm_queue_lock, NULL);
+    pthread_mutex_init(&sink_data_q_lock, NULL);
 
     return status;
 }
 
+/* to be used for non-pcm codecs
+ * size should include RTP header size
+ */
+static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t size)
+{
+    uint16_t q_bytes_left = 0;// bytes left in topmost element of Q
+    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    UINT8* p_src;
+    // map input buffer
+    UINT8* p_start = data;
+    UINT8* p_end = data + size;
+    UINT8* p_curr = data;
+    /* at any point p_curr - p_start => bytes written till now
+     *              p_end  - p_curr =>  space left in input buffer
+     */
+    UINT8 rtp_offset = 0;
+    BTIF_TRACE_DEBUG(" %s size = %d codec_type_requested = %d ", __FUNCTION__, size, codec_type);
 
+    if (p_end <= p_start) {
+        BTIF_TRACE_DEBUG("%s input params wrong, returning", __FUNCTION__);
+        return 0;
+    }
+    pthread_mutex_lock(&sink_data_q_lock);
+    if(GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)) {
+        BTIF_TRACE_DEBUG("%s Sink Que Empty, returning", __FUNCTION__);
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return 0;
+    }
+
+    // consistency check: check codec from remote and codec info in Q
+    p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+    if (p_data_q_buf == NULL) {
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return 0;
+    }
+    if (codec_type != p_data_q_buf->codec_type)
+    {
+        BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
+            __FUNCTION__, codec_type, p_data_q_buf->codec_type);
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return 0;
+    }
+    p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+    if (retreive_rtp_header) {
+        // rtp_offset will be same for all packets
+        rtp_offset = get_rtp_offset(p_src, codec_type);
+    }
+    while (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ))
+    {
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+        if (p_data_q_buf == NULL) {
+            BTIF_TRACE_IMP(" %s Que Pointer Null, Bail out ", __FUNCTION__);
+            break;
+        }
+        q_bytes_left = p_data_q_buf->len;// this will include RTP header
+        if(retreive_rtp_header) {
+            // check if we have enough space for RTP Header and audio data
+            if (((p_end - p_curr) < (q_bytes_left - rtp_offset)) ||
+                ((p_end - p_curr) < (rtp_offset))) {
+                BTIF_TRACE_IMP(" %s Not enough space, Bail out ", __FUNCTION__);
+                break;
+            }
+            // write rtp header first.
+            p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            memcpy(p_start, p_src, rtp_offset);
+            if ((p_start + rtp_offset) > p_curr) {
+                // writing RTP header for first time
+                p_curr += rtp_offset;
+            }
+            p_data_q_buf->offset += rtp_offset;
+            p_data_q_buf->len = p_data_q_buf->len - rtp_offset;
+        }
+        q_bytes_left = p_data_q_buf->len;// readjust after removing RTP
+        BTIF_TRACE_DEBUG(" %s Q_Len %d, input buffer space %d, bytes_left_in_Q %d", __FUNCTION__,
+                GKI_queue_length(&btif_avk_cb[0].RxDataQ), (p_end - p_curr), q_bytes_left);
+        // write encoded packets
+        if ((p_end - p_curr) >= q_bytes_left)
+        {
+            // read from topmost element and deque it
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(btif_avk_cb[0].RxDataQ));
+            p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            memcpy(p_curr, p_src, q_bytes_left);
+            GKI_freebuf(p_data_q_buf);
+            p_curr += q_bytes_left;
+        }
+        else
+        {
+            /* we don't have enough space left in input buffer to fit a packet */
+            break;
+        }
+
+    }
+    BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
+    pthread_mutex_unlock(&sink_data_q_lock);
+    return (p_curr - p_start);
+}
 /*******************************************************************************
 **
-** Function         get_pcm_data_vendor
+** Function         get_a2dp_sink_streaming_data
 **
-** Description      get pcm data stored from PCM Q
+** Description      get a2dp sink data stored from Data Q
 **
 ** Returns          number of bytes returned
 **
 *******************************************************************************/
-static uint32_t get_pcm_data_vendor (UINT8* data, uint32_t size)
+static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* data, uint32_t size)
 {
-    uint16_t pcm_q_bytes_left = 0;// bytes left in topmost element of PCM Q
-    tBT_AVK_PCM_HDR* p_pcm_q_buf; // pointer to first element in que;
+    uint16_t q_bytes_left = 0;// bytes left in topmost element of PCM Q
+    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
     uint32_t bytes_to_be_written = size;// bytes written to buffer supplied by app.
     UINT8* p_src; UINT8* p_dest;
     BTIF_TRACE_DEBUG(" %s size = %d", __FUNCTION__, size);
-    pthread_mutex_lock(&pcm_queue_lock);
-    if(GKI_queue_is_empty(&btif_avk_cb[0].RxPcmQ)) {
-        BTIF_TRACE_DEBUG("%s PCM Que Empty, returning", __FUNCTION__);
-        pthread_mutex_unlock(&pcm_queue_lock);
+    if (codec_type != A2DP_SINK_AUDIO_CODEC_PCM) {
+        return get_frame_aligned_data(codec_type, data, size);
+    }
+    pthread_mutex_lock(&sink_data_q_lock);
+    if(GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)) {
+        BTIF_TRACE_DEBUG("%s Sink Que Empty, returning", __FUNCTION__);
+        pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
     }
 
-    while ((bytes_to_be_written > 0) && (!GKI_queue_is_empty(&btif_avk_cb[0].RxPcmQ)))
+    // consistency check: check codec from remote and codec info in Q
+    p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+    if (codec_type != p_data_q_buf->codec_type)
     {
-        p_pcm_q_buf = (tBT_AVK_PCM_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxPcmQ));
-        if (p_pcm_q_buf == NULL)
+        BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
+            __FUNCTION__, codec_type, p_data_q_buf->codec_type);
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return 0;
+    }
+    while ((bytes_to_be_written > 0) && (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)))
+    {
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+        if (p_data_q_buf == NULL)
             break;
-        pcm_q_bytes_left = p_pcm_q_buf->len - p_pcm_q_buf->offset;
+        q_bytes_left = p_data_q_buf->len - p_data_q_buf->offset;
         BTIF_TRACE_DEBUG(" %s Q_Len %d, bytes_to_be_written %d, bytes_left_in_Q %d", __FUNCTION__,
-                GKI_queue_length(&btif_avk_cb[0].RxPcmQ), bytes_to_be_written, pcm_q_bytes_left);
-        if (bytes_to_be_written >= pcm_q_bytes_left)
+                GKI_queue_length(&btif_avk_cb[0].RxDataQ), bytes_to_be_written, q_bytes_left);
+        if (bytes_to_be_written >= q_bytes_left)
         {
             // read from topmost element and deque it
-            p_pcm_q_buf = (tBT_AVK_PCM_HDR *)GKI_dequeue(&(btif_avk_cb[0].RxPcmQ));
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(btif_avk_cb[0].RxDataQ));
             p_dest = data + (size - bytes_to_be_written);
-            p_src = (UINT8*)(p_pcm_q_buf + 1) + p_pcm_q_buf->offset;
-            memcpy(p_dest, p_src, pcm_q_bytes_left);
-            GKI_freebuf(p_pcm_q_buf);
-            bytes_to_be_written = bytes_to_be_written - pcm_q_bytes_left;
+            p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            memcpy(p_dest, p_src, q_bytes_left);
+            GKI_freebuf(p_data_q_buf);
+            bytes_to_be_written = bytes_to_be_written - q_bytes_left;
         }
         else
         {
             // read only required data and keep the node in Q
             p_dest = data + (size - bytes_to_be_written);
-            p_src = (UINT8*)(p_pcm_q_buf + 1) + p_pcm_q_buf->offset;
+            p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, bytes_to_be_written);
-            p_pcm_q_buf->offset += bytes_to_be_written;
+            p_data_q_buf->offset += bytes_to_be_written;
             bytes_to_be_written = 0;
         }
 
     }
     BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, size - bytes_to_be_written);
-    pthread_mutex_unlock(&pcm_queue_lock);
+    pthread_mutex_unlock(&sink_data_q_lock);
     return (size - bytes_to_be_written);
 }
 
@@ -2018,31 +2271,31 @@ static uint32_t get_pcm_data_vendor (UINT8* data, uint32_t size)
  ** Returns          void
  **
  *******************************************************************************/
-uint32_t btif_avk_media_fetch_pcm_data(UINT8 *data, UINT32 size)
+uint32_t btif_avk_media_fetch_pcm_data(UINT16 codec_type, UINT8 *data, UINT32 size)
 {
-    return get_pcm_data_vendor(data,size);
+    return get_a2dp_sink_streaming_data_vendor(codec_type, data,size);
 }
 
 /*******************************************************************************
  **
- ** Function         btif_avk_media_enque_pcm_data
+ ** Function         btif_media_enque_sink_data
  **
- ** Description      queues PCM data
+ ** Description      queues a2dp Sink data
  **
  ** Returns          void
  **
  *******************************************************************************/
-void btif_avk_media_enque_pcm_data(UINT8 *data, UINT16 size)
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size)
 {
-    tBT_AVK_PCM_HDR* p_msg;
-    pthread_mutex_lock(&pcm_queue_lock);
-    if(GKI_queue_length(&btif_avk_cb[0].RxPcmQ) >= MAX_A2DP_SINK_PCM_QUEUE_SZ)
+    tBT_SINK_DATA_HDR* p_msg;
+    pthread_mutex_lock(&sink_data_q_lock);
+    if(GKI_queue_length(&btif_avk_cb[0].RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
     {
-         BTIF_TRACE_DEBUG(" %s PCM Que Full, returning", __FUNCTION__);
-         pthread_mutex_unlock(&pcm_queue_lock);
-         return;
+         BTIF_TRACE_DEBUG(" %s DATA Que Full, returning", __FUNCTION__);
+         pthread_mutex_unlock(&sink_data_q_lock);
+         return GKI_queue_length(&btif_avk_cb[0].RxDataQ);
     }
-    if ((p_msg = (tBT_AVK_PCM_HDR *)GKI_getbuf(sizeof(tBT_AVK_PCM_HDR) + size)) != NULL)
+    if ((p_msg = (tBT_SINK_DATA_HDR *)GKI_getbuf(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
     {
         UINT8 *p_dest;
 
@@ -2051,22 +2304,24 @@ void btif_avk_media_enque_pcm_data(UINT8 *data, UINT16 size)
 
         p_msg->len = size;
         p_msg->offset = 0;
+        p_msg->codec_type = codec_type;
 
-        GKI_enqueue(&(btif_avk_cb[0].RxPcmQ), p_msg);
-        BTIF_TRACE_DEBUG("%s pkt_size %d  PCM_Q_Size %d", __FUNCTION__, size,
-                                                GKI_queue_length(&btif_avk_cb[0].RxPcmQ));
+        GKI_enqueue(&(btif_avk_cb[0].RxDataQ), p_msg);
+        BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d", __FUNCTION__, size,
+                                                GKI_queue_length(&btif_avk_cb[0].RxDataQ));
     }
-    pthread_mutex_unlock(&pcm_queue_lock);
+    pthread_mutex_unlock(&sink_data_q_lock);
+    return GKI_queue_length(&btif_avk_cb[0].RxDataQ);
 }
 static void btif_avk_media_clear_pcm_queue()
 {
-    BTIF_TRACE_DEBUG(" Clear PCM QUeue ");
-    pthread_mutex_lock(&pcm_queue_lock);
-    while (!GKI_queue_is_empty(&btif_avk_cb[0].RxPcmQ))
+    BTIF_TRACE_DEBUG(" Clear A2DP Data QUeue ");
+     pthread_mutex_lock(&sink_data_q_lock);
+    while (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ))
     {
-        GKI_freebuf(GKI_dequeue(&btif_avk_cb[0].RxPcmQ));
+        GKI_freebuf(GKI_dequeue(&btif_avk_cb[0].RxDataQ));
     }
-    pthread_mutex_unlock(&pcm_queue_lock);
+    pthread_mutex_unlock(&sink_data_q_lock);
 }
 #ifdef USE_AUDIO_TRACK
 /*******************************************************************************
@@ -2300,14 +2555,15 @@ static void cleanup_sink(void) {
     BTIF_TRACE_EVENT("%s", __FUNCTION__);
     cleanup(BTA_A2DP_SINK_SERVICE_ID);
     btif_avk_media_clear_pcm_queue();
-    pthread_mutex_destroy(&pcm_queue_lock);
+    enable_stack_sbc_decoding = 0;
+    pthread_mutex_destroy(&sink_data_q_lock);
 }
 
 static void cleanup_sink_vendor(void) {
     BTIF_TRACE_EVENT("%s", __FUNCTION__);
-    if (bt_avk_vendor_callbacks)
+    if (bt_av_sink_vendor_callbacks)
     {
-        bt_avk_vendor_callbacks = NULL;
+        bt_av_sink_vendor_callbacks = NULL;
     }
     BTIF_TRACE_EVENT("%s completed", __FUNCTION__);
 }
@@ -2320,16 +2576,15 @@ static const btav_interface_t bt_av_sink_interface = {
     cleanup_sink,
 };
 
-static const btav_vendor_interface_t bt_av_sink_vendor_interface = {
-    sizeof(btav_vendor_interface_t),
+static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
+    sizeof(btav_sink_vendor_interface_t),
     init_sink_vendor,
-    NULL,
 #ifdef USE_AUDIO_TRACK
     sink_audio_focus_status_vendor,
 #else
     NULL,
 #endif
-    get_pcm_data_vendor,
+    get_a2dp_sink_streaming_data_vendor,
     cleanup_sink_vendor,
 };
 
@@ -2543,10 +2798,10 @@ const btav_interface_t *btif_avk_get_sink_interface(void)
 ** Returns          btav_interface_t
 **
 *******************************************************************************/
-const btav_interface_t *btif_avk_get_sink_vendor_interface(void)
+const btav_sink_vendor_interface_t *btif_avk_get_sink_vendor_interface(void)
 {
-    BTIF_TRACE_EVENT("%s", __FUNCTION__);
-    return &bt_av_sink_vendor_interface;
+    BTIF_TRACE_IMP("%s", __FUNCTION__);
+    return &bt_avk_sink_vendor_interface;
 }
 
 /*******************************************************************************

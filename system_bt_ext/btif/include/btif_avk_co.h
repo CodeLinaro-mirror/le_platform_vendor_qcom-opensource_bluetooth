@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -37,45 +37,6 @@
 
 /*******************************************************************************
  **
- ** Function         bta_avk_co_cp_is_active
- **
- ** Description      Get the current configuration of content protection
- **
- ** Returns          TRUE if the current streaming has CP, FALSE otherwise
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_cp_is_active(void);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_cp_get_flag
- **
- ** Description      Get content protection flag
- **                  BTA_AVK_CP_SCMS_COPY_NEVER
- **                  BTA_AVK_CP_SCMS_COPY_ONCE
- **                  BTA_AVK_CP_SCMS_COPY_FREE
- **
- ** Returns          The current flag value
- **
- *******************************************************************************/
-UINT8 bta_avk_co_cp_get_flag(void);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_cp_set_flag
- **
- ** Description      Set content protection flag
- **                  BTA_AVK_CP_SCMS_COPY_NEVER
- **                  BTA_AVK_CP_SCMS_COPY_ONCE
- **                  BTA_AVK_CP_SCMS_COPY_FREE
- **
- ** Returns          TRUE if setting the SCMS flag is supported else FALSE
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_cp_set_flag(UINT8 cp_flag);
-
-/*******************************************************************************
- **
  ** Function         bta_avk_co_audio_codec_reset
  **
  ** Description      Reset the current codec configuration
@@ -84,87 +45,6 @@ BOOLEAN bta_avk_co_cp_set_flag(UINT8 cp_flag);
  **
  *******************************************************************************/
 void bta_avk_co_audio_codec_reset(void);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_audio_codec_supported
- **
- ** Description      Check if all opened connections are compatible with a codec
- **                  configuration
- **
- ** Returns          TRUE if all opened devices support this codec, FALSE otherwise
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_audio_codec_supported(tBTIF_STATUS *p_status);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_audio_set_codec
- **
- ** Description      Set the current codec configuration from the feeding type.
- **                  This function is starting to modify the configuration, it
- **                  should be protected.
- **
- ** Returns          TRUE if successful, FALSE otherwise
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_audio_set_codec(const tBTIF_AVK_MEDIA_FEEDINGS *p_feeding, tBTIF_STATUS *p_status);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_get_current_codec
- **
- ** Description      Get the current codec type.
- **
- ** Returns          Codec Type Value
- **
- *******************************************************************************/
-UINT8 bta_avk_get_current_codec();
-
-/*******************************************************************************
- **
- ** Function         bta_avk_get_current_codecInfo
- **
- ** Description      Get the current codec Info.
- **
- ** Returns          Returns  pointer to Info
- **
- *******************************************************************************/
-UINT8* bta_avk_get_current_codecInfo();
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_audio_get_codec_config
- **
- ** Description     Retrieves the current codec configuration.  On Failure return the default
- **                      codec configuration.
- **
- ** Returns          TRUE if codec is SBC, FALSE otherwise
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_audio_get_codec_config(UINT8 *p_sbc_config, UINT16 *p_minmtu, UINT8 type);
-/*******************************************************************************
- **
- ** Function         bta_avk_co_audio_get_sbc_config
- **
- ** Description      Retrieves the SBC codec configuration.  If the codec in use
- **                  is not SBC, return the default SBC codec configuration.
- **
- ** Returns          TRUE if codec is SBC, FALSE otherwise
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_audio_get_sbc_config(tA2D_SBC_CIE *p_sbc_config, UINT16 *p_minmtu);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_audio_discard_config
- **
- ** Description      Discard the codec configuration of a connection
- **
- ** Returns          Nothing
- **
- *******************************************************************************/
-void bta_avk_co_audio_discard_config(tBTA_AVK_HNDL hndl);
 
 /*******************************************************************************
  **
@@ -177,29 +57,15 @@ void bta_avk_co_audio_discard_config(tBTA_AVK_HNDL hndl);
  *******************************************************************************/
 void bta_avk_co_init(void);
 
-
 /*******************************************************************************
  **
- ** Function         bta_avk_co_peer_cp_supported
+ ** Function         bta_avk_get_current_codec
  **
- ** Description      Checks if the peer supports CP
+ ** Description      Get the current codec type.
  **
- ** Returns          TRUE if the peer supports CP
- **
- *******************************************************************************/
-BOOLEAN bta_avk_co_peer_cp_supported(tBTA_AVK_HNDL hndl);
-
-/*******************************************************************************
- **
- ** Function         bta_avk_co_get_remote_bitpool_pref
- **
- ** Description      Check if remote side did a setconfig within the limits
- **                  of our exported bitpool range. If set we will set the
- **                  remote preference.
- **
- ** Returns          TRUE if config set, FALSE otherwize
+ ** Returns          Codec Type Value
  **
  *******************************************************************************/
-BOOLEAN bta_avk_co_get_remote_bitpool_pref(UINT8 *min, UINT8 *max);
+UINT8 bta_avk_get_current_codec();
 
 #endif

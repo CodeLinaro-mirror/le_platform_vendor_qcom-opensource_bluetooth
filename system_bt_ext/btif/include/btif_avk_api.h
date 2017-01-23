@@ -1,5 +1,5 @@
 /******************************************************************************
- *  Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a contribution.
  ******************************************************************************/
@@ -42,7 +42,16 @@
 #include "btif_avk_media.h"
 #include "a2d_api.h"
 #include "a2d_sbc.h"
-
+#include "bt_utils.h"
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+#include "a2d_aac.h"
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+#include "a2d_mp3.h"
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+#include "a2d_aptx.h"
+#endif
 
 /*****************************************************************************
  **  Constants and data types
