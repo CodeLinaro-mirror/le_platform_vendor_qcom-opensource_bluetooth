@@ -57,8 +57,8 @@ enum
     BTIF_SV_AVK_AA_AAC_INDEX,
     BTIF_SV_AVK_AA_MP3_INDEX,
 #endif
+    BTIF_SV_AVK_AA_APTX_INDEX,
     BTIF_SV_AVK_AA_SEP_INDEX,  /* Last index */
-    BTIF_SV_AVK_AA_APTX_INDEX //TODO:ADD for APTX_FR
 };
 
 /*******************************************************************************
