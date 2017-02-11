@@ -2165,6 +2165,8 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
             __FUNCTION__, codec_type, p_data_q_buf->codec_type);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&RxDataQ);
+        GKI_freebuf(p_data_q_buf);
         pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
     }
@@ -2290,6 +2292,8 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
             __FUNCTION__, codec_type, p_data_q_buf->codec_type);
         pthread_mutex_unlock(&sink_data_q_lock);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&RxDataQ);
+        GKI_freebuf(p_data_q_buf);
         return 0;
     }
     while ((bytes_to_be_written > 0) && (!GKI_queue_is_empty(&RxDataQ)))
@@ -2387,9 +2391,10 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
         memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
 
         GKI_enqueue(&(RxDataQ), p_msg);
-        BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d bd_addr %s",
+        BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d bd_addr %s, codec_type = %d",
                   __FUNCTION__, size, GKI_queue_length(&RxDataQ),
-                  bdaddr_to_string((bt_bdaddr_t *)p_msg->bd_addr, &addr1, sizeof(addr1)));
+                  bdaddr_to_string((bt_bdaddr_t *)p_msg->bd_addr, &addr1, sizeof(addr1)),
+                  p_msg->codec_type);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
     return GKI_queue_length(&RxDataQ);
