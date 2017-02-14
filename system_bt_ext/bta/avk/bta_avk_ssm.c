@@ -410,7 +410,7 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
     if(p_scb == NULL)
     {
         /* this stream is not registered */
-        APPL_TRACE_EVENT("AV channel not registered");
+        APPL_TRACE_EVENT("AVK channel not registered");
         return;
     }
 
@@ -438,10 +438,10 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
     if ((event != BTA_AVK_STR_WRITE_CFM_EVT) && (event != BTA_AVK_SRC_DATA_READY_EVT))
     {
         #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-            APPL_TRACE_IMP("AV Sevent(0x%x)=0x%x(%s) state=%d(%s)",
+            APPL_TRACE_IMP("AVK Sevent(0x%x)=0x%x(%s) state=%d(%s)",
                p_scb->hndl, event, bta_avk_evt_code(event), p_scb->state, bta_avk_sst_code(p_scb->state));
         #else
-            APPL_TRACE_IMP("AV Sevent=0x%x state=%d", event, p_scb->state);
+            APPL_TRACE_IMP("AVK Sevent=0x%x state=%d", event, p_scb->state);
         #endif
     }
 

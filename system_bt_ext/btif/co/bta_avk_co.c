@@ -236,7 +236,7 @@ static tBTA_AVK_CO_CB bta_avk_co_cb;
 /* codec preferance, put corresponding codec id here */
 UINT8 codec_pref[BTIF_SV_AVK_AA_SEP_INDEX] = {
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
-                                                    //A2D_NON_A2DP_MEDIA_CT, TODO:ADD for APTX_FR
+                                                    A2D_NON_A2DP_MEDIA_CT,
 #endif
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
                                                     BTA_AVK_CODEC_M24,

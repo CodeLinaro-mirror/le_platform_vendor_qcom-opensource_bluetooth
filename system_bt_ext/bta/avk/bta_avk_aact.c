@@ -626,7 +626,8 @@ void bta_avk_stream_data_cback(UINT8 handle, BT_HDR *p_pkt, UINT32 time_stamp, U
         return;
     }
     p_pkt->event = BTA_AVK_MEDIA_DATA_EVT;
-    p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_DATA_EVT, (tBTA_AVK_MEDIA*)p_pkt);
+    p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_DATA_EVT,
+                                (tBTA_AVK_MEDIA*)p_pkt, p_scb->peer_addr);
     GKI_freebuf(p_pkt);  /* a copy of packet had been delivered, we free this buffer */
 }
 
@@ -1400,7 +1401,7 @@ void bta_avk_setconfig_rsp (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         memcpy(av_sink_codec_info.avk_config.bd_addr,p_scb->peer_addr,sizeof(BD_ADDR));
         av_sink_codec_info.avk_config.codec_info = p_scb->cfg.codec_info;
         p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_SINK_CFG_EVT,
-                                              &av_sink_codec_info);
+                                   &av_sink_codec_info, av_sink_codec_info.avk_config.bd_addr);
     }
 
 
@@ -2059,7 +2060,7 @@ void bta_avk_getcap_results (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             memcpy(av_sink_codec_info.avk_config.bd_addr,p_scb->peer_addr,sizeof(BD_ADDR));
             av_sink_codec_info.avk_config.codec_info = p_scb->cfg.codec_info;
             p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_SINK_CFG_EVT,
-                     &av_sink_codec_info);
+                     &av_sink_codec_info, av_sink_codec_info.avk_config.bd_addr);
         }
 
         if ((uuid_int == UUID_SERVCLASS_AUDIO_SOURCE) &&

@@ -354,7 +354,7 @@ typedef struct {
     /** set to sizeof(BtRcCtVendorInterface) */
     size_t          size;
 
-    bt_status_t (*init_vendor)( btrc_ctrl_vendor_callbacks_t* callbacks );
+    bt_status_t (*init_vendor)(btrc_ctrl_vendor_callbacks_t* callbacks, int max_avrcp_connections);
 
     bt_status_t (*getcapabilities_command_vendor) (uint8_t cap_id);
 
