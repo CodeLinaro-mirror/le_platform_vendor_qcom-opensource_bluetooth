@@ -423,7 +423,7 @@ static void a2dp_cmd_acknowledge(int status)
     btif_avk_media_cb.a2dp_cmd_pending = A2DP_CTRL_CMD_NONE;
 
     /* acknowledge start request */
-    UIPC_Send(UIPC_CH_ID_AV_CTRL, 0, &ack, 1);
+    UIPC_AVK_Send(UIPC_CH_ID_AVK_CTRL, 0, &ack, 1);
 }
 
 
@@ -431,13 +431,13 @@ static void btif_recv_ctrl_data(void)
 {
     UINT8 cmd = 0;
     int n;
-    n = UIPC_Read(UIPC_CH_ID_AV_CTRL, NULL, &cmd, 1);
+    n = UIPC_AVK_Read(UIPC_CH_ID_AVK_CTRL, NULL, &cmd, 1);
 
     /* detach on ctrl channel means audioflinger process was terminated */
     if (n == 0)
     {
         APPL_TRACE_IMP("CTRL CH DETACHED");
-        UIPC_Close(UIPC_CH_ID_AV_CTRL);
+        UIPC_AVK_Close(UIPC_CH_ID_AVK_CTRL);
         /* we can operate only on datachannel, if af client wants to
            do send additional commands the ctrl channel would be reestablished */
         //btif_audiopath_detached();
@@ -493,7 +493,7 @@ static void btif_recv_ctrl_data(void)
             /* If we are Sink, check if AVRCP Connection is there, send AVRCP_PLAY, AVDTP_START otherwise */
             if (btif_avk_media_cb.peer_sep == AVDT_TSEP_SRC)
             {
-                UIPC_Open(UIPC_CH_ID_AV_AUDIO, btif_a2dp_data_cb);
+                UIPC_AVK_Open(UIPC_CH_ID_AVK_AUDIO, btif_a2dp_data_cb);
                 btif_avk_dispatch_sm_event(BTIF_AVK_SINK_START_STREAM_REQ_EVT, NULL, 0);
                 //acknowlwdge here itself, because sock client will wait for recv call
                 a2dp_cmd_acknowledge(A2DP_CTRL_ACK_SUCCESS);
@@ -509,14 +509,14 @@ static void btif_recv_ctrl_data(void)
             {
                 /* already started, setup audio data channel listener
                 * and ack back immediately */
-                UIPC_Open(UIPC_CH_ID_AV_AUDIO, btif_a2dp_data_cb);
+                UIPC_AVK_Open(UIPC_CH_ID_AVK_AUDIO, btif_a2dp_data_cb);
 
                 a2dp_cmd_acknowledge(A2DP_CTRL_ACK_SUCCESS);
             }
             else if (btif_avk_stream_ready() == TRUE)
             {
                 /* setup audio data channel listener */
-                UIPC_Open(UIPC_CH_ID_AV_AUDIO, btif_a2dp_data_cb);
+                UIPC_AVK_Open(UIPC_CH_ID_AVK_AUDIO, btif_a2dp_data_cb);
 
                 /* post start event and wait for audio path to open */
                 if (btif_avk_media_cb.peer_sep == AVDT_TSEP_SNK)
@@ -563,8 +563,8 @@ static void btif_recv_ctrl_data(void)
             uint8_t channel_count = btif_avk_media_cb.channel_count;
 
             a2dp_cmd_acknowledge(A2DP_CTRL_ACK_SUCCESS);
-            UIPC_Send(UIPC_CH_ID_AV_CTRL, 0, (UINT8 *)&sample_rate, 4);
-            UIPC_Send(UIPC_CH_ID_AV_CTRL, 0, &channel_count, 1);
+            UIPC_AVK_Send(UIPC_CH_ID_AVK_CTRL, 0, (UINT8 *)&sample_rate, 4);
+            UIPC_AVK_Send(UIPC_CH_ID_AVK_CTRL, 0, &channel_count, 1);
             break;
         }
 
@@ -580,22 +580,22 @@ static void btif_a2dp_ctrl_cb(tUIPC_CH_ID ch_id, tUIPC_EVENT event)
 {
     UNUSED(ch_id);
 
-    APPL_TRACE_IMP("A2DP-CTRL-CHANNEL EVENT %s", dump_uipc_event(event));
+    APPL_TRACE_IMP("A2DP-CTRL-CHANNEL EVENT %s", dump_avk_uipc_event(event));
 
     switch(event)
     {
-        case UIPC_OPEN_EVT:
+        case UIPC_AVK_Open_EVT:
             /* fetch av statemachine handle */
             btif_avk_media_cb.av_sm_hdl = btif_avk_get_sm_handle();
             break;
 
-        case UIPC_CLOSE_EVT:
+        case UIPC_AVK_Close_EVT:
             /* restart ctrl server unless we are shutting down */
             if (avk_media_task_running == AVK_MEDIA_TASK_STATE_ON)
-                UIPC_Open(UIPC_CH_ID_AV_CTRL , btif_a2dp_ctrl_cb);
+                UIPC_AVK_Open(UIPC_CH_ID_AVK_CTRL , btif_a2dp_ctrl_cb);
             break;
 
-        case UIPC_RX_DATA_READY_EVT:
+        case UIPC_AVK_RX_DATA_READY_EVT:
             btif_recv_ctrl_data();
             break;
 
@@ -609,16 +609,16 @@ static void btif_a2dp_data_cb(tUIPC_CH_ID ch_id, tUIPC_EVENT event)
 {
     UNUSED(ch_id);
 
-    APPL_TRACE_DEBUG("BTIF MEDIA (A2DP-DATA) EVENT %s", dump_uipc_event(event));
+    APPL_TRACE_DEBUG("BTIF MEDIA (A2DP-DATA) EVENT %s", dump_avk_uipc_event(event));
 
     switch(event)
     {
-        case UIPC_OPEN_EVT:
+        case UIPC_AVK_Open_EVT:
 
             /*  read directly from media task from here on (keep callback for
                 connection events */
-            UIPC_Ioctl(UIPC_CH_ID_AV_AUDIO, UIPC_REG_REMOVE_ACTIVE_READSET, NULL);
-            UIPC_Ioctl(UIPC_CH_ID_AV_AUDIO, UIPC_SET_READ_POLL_TMO,
+            UIPC_AVK_Ioctl(UIPC_CH_ID_AVK_AUDIO, UIPC_REG_REMOVE_ACTIVE_READSET, NULL);
+            UIPC_AVK_Ioctl(UIPC_CH_ID_AVK_AUDIO, UIPC_SET_READ_POLL_TMO,
                        (void *)A2DP_DATA_READ_POLL_MS);
 
             btif_avk_media_cb.data_channel_open = TRUE;
@@ -626,7 +626,7 @@ static void btif_a2dp_data_cb(tUIPC_CH_ID ch_id, tUIPC_EVENT event)
             /* ack back when media task is fully started */
             break;
 
-        case UIPC_CLOSE_EVT:
+        case UIPC_AVK_Close_EVT:
             a2dp_cmd_acknowledge(A2DP_CTRL_ACK_SUCCESS);
             btif_audiopath_detached();
             btif_avk_media_cb.data_channel_open = FALSE;
@@ -805,7 +805,7 @@ void btif_avk_a2dp_on_open(void)
     APPL_TRACE_IMP("## ON A2DP OPEN ##");
 
     /* always use callback to notify socket events */
-    UIPC_Open(UIPC_CH_ID_AV_AUDIO, btif_a2dp_data_cb);
+    UIPC_AVK_Open(UIPC_CH_ID_AVK_AUDIO, btif_a2dp_data_cb);
 }
 
 /*******************************************************************************
@@ -900,7 +900,7 @@ void btif_avk_a2dp_on_stopped(tBTA_AVK_SUSPEND *p_av)
         btif_avk_media_task_aa_rx_flush_req();
         //btif_avk_media_task_aa_handle_stop_decoding();
 #ifndef USE_AUDIO_TRACK
-        UIPC_Close(UIPC_CH_ID_AV_AUDIO);
+        UIPC_AVK_Close(UIPC_CH_ID_AVK_AUDIO);
 #endif
         btif_avk_media_cb.data_channel_open = FALSE;
         return;
@@ -1086,11 +1086,11 @@ static void btif_avk_media_task_aa_handle_uipc_rx_rdy(void)
 static void btif_avk_media_thread_init(UNUSED_ATTR void *context) {
   APPL_TRACE_IMP(" btif_avk_media_thread_init");
   memset(&btif_avk_media_cb, 0, sizeof(btif_avk_media_cb));
-  UIPC_Init(NULL);
+  UIPC_AVK_Init(NULL);
 
 #if (BTA_AV_INCLUDED == TRUE)
   btif_avk_media_cb.RxSbcQ = fixed_queue_new(SIZE_MAX);
-  UIPC_Open(UIPC_CH_ID_AV_CTRL , btif_a2dp_ctrl_cb);
+  UIPC_AVK_Open(UIPC_CH_ID_AVK_CTRL , btif_a2dp_ctrl_cb);
 #endif
 
   raise_priority_a2dp(TASK_HIGH_MEDIA);
@@ -1102,7 +1102,7 @@ static void btif_avk_media_thread_cleanup(UNUSED_ATTR void *context) {
   APPL_TRACE_IMP(" btif_avk_media_thread_cleanup");
 
   /* this calls blocks until uipc is fully closed */
-  UIPC_Close(UIPC_CH_ID_ALL);
+  UIPC_AVK_Close(UIPC_CH_ID_ALL);
 
   /* Clear media task flag */
   avk_media_task_running = AVK_MEDIA_TASK_STATE_OFF;
@@ -1191,7 +1191,7 @@ static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR v
        // get data from PCM que, and send to UIPC
        size = btif_avk_media_fetch_pcm_data(A2DP_SINK_AUDIO_CODEC_PCM, btif_avk_media_cb.a2dp_sink_pcm_buf,
                btif_avk_media_cb.a2dp_sink_pcm_buf_size);
-       UIPC_Send(UIPC_CH_ID_AV_AUDIO, 0, (UINT8 *)btif_avk_media_cb.a2dp_sink_pcm_buf, size);
+       UIPC_AVK_Send(UIPC_CH_ID_AVK_AUDIO, 0, (UINT8 *)btif_avk_media_cb.a2dp_sink_pcm_buf, size);
        break;
 #endif
     default:
@@ -1273,7 +1273,7 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
         btif_avk_media_task_feed_audio_hal();
     }
 #else
-    //UIPC_Send(UIPC_CH_ID_AV_AUDIO, 0, (UINT8 *)pcmData, (sizeof(pcmData) - availPcmBytes));
+    //UIPC_AVK_Send(UIPC_CH_ID_AVK_AUDIO, 0, (UINT8 *)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
     APPL_TRACE_LATENCY_AUDIO("Written to audio, seq number %d", p_msg->layer_specific);
 }
@@ -1553,7 +1553,6 @@ static void btif_avk_media_task_aa_handle_decoder_reset(BT_HDR *p_msg)
         APPL_TRACE_ERROR("OI_CODEC_SBC_DecoderReset failed with error code %d\n", status);
     }
 
-#ifdef USE_AUDIO_TRACK
     APPL_TRACE_DEBUG("A2dpSink: sbc Create Track");
 #if (defined(DUMP_PCM_DATA) && (DUMP_PCM_DATA == TRUE))
     outputPcmSampleFile = fopen(outputFilename, "ab");
@@ -1563,9 +1562,6 @@ static void btif_avk_media_task_aa_handle_decoder_reset(BT_HDR *p_msg)
         APPL_TRACE_ERROR("A2dpSink: Track creation fails!!!");
         return;
     }
-#endif
-#else
-    //UIPC_Open(UIPC_CH_ID_AV_AUDIO, btif_a2dp_data_cb);
 #endif
 
     switch(sbc_cie.samp_freq)

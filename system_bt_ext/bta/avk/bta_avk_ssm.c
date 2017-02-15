@@ -410,7 +410,7 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
     if(p_scb == NULL)
     {
         /* this stream is not registered */
-        APPL_TRACE_EVENT("AVK channel not registered");
+        APPL_TRACE_EVENT("bta_avk_ssm_execute AVK channel not registered");
         return;
     }
 
@@ -449,7 +449,7 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
     state_table = bta_avk_sst_tbl[p_scb->state];
 
     event -= BTA_AVK_FIRST_SSM_EVT;
-
+    APPL_TRACE_IMP("Event =0x%x", event);
     if((p_scb->state != BTA_AVK_OPENING_SST) &&
         (state_table[event][BTA_AVK_SNEXT_STATE] == BTA_AVK_OPENING_SST))
     {
@@ -469,7 +469,7 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
                     /* There is other SCB in opening state
                      * keep the service state in progress
                      */
-                    APPL_TRACE_VERBOSE("SCB in opening state. Keep Busy");
+                    APPL_TRACE_VERBOSE("bta_avk_ssm_execute SCB in opening state. Keep Busy");
                     keep_busy = TRUE;
                     break;
                 }
@@ -487,12 +487,15 @@ void bta_avk_ssm_execute(tBTA_AVK_SCB *p_scb, UINT16 event, tBTA_AVK_DATA *p_dat
         }
     }
 
+    APPL_TRACE_IMP("bta_avk_ssm_execute AVK Current State==%d", p_scb->state);
     /* set next state */
     p_scb->state = state_table[event][BTA_AVK_SNEXT_STATE];
+    APPL_TRACE_IMP("bta_avk_ssm_execute AVK Next State==%d", p_scb->state);
 
     /* execute action functions */
     for(i=0; i< BTA_AVK_SACTIONS; i++)
     {
+        APPL_TRACE_IMP("bta_avk_ssm_execute action==%d", state_table[event][i]);
         if ((action = state_table[event][i]) != BTA_AVK_SIGNORE)
         {
             (*p_scb->p_act_tbl[action])(p_scb, p_data);

@@ -37,7 +37,7 @@
 
 #include "bt_target.h"
 #include "bta_avk_api.h"
-#include "uipc.h"
+#include "uipc_avk.h"
 
 #include "btif_avk_media.h"
 #include "a2d_api.h"

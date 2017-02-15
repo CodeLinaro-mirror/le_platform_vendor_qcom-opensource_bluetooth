@@ -51,6 +51,7 @@
 #if (AVRC_CTLR_INCLUDED == TRUE)
 #include <cutils/properties.h>
 #endif
+#include "bta_ar_int_ext.h"
 /*****************************************************************************
 **  Constants
 *****************************************************************************/
@@ -375,6 +376,7 @@ UINT8 bta_avk_rc_create(tBTA_AVK_CB *p_cb, UINT8 role, UINT8 shdl, UINT8 lidx)
     ccb.p_msg_cback = bta_avk_rc_msg_cback;
     ccb.company_id = p_bta_avk_cfg->company_id;
     ccb.conn = role;
+    ccb.av_sep_type = BTA_AV_RC_PROFILE_SINK;
     /* note: BTA_AVK_FEAT_RCTG = AVRC_CT_TARGET, BTA_AVK_FEAT_RCCT = AVRC_CT_CONTROL */
     ccb.control = p_cb->features & (BTA_AVK_FEAT_RCTG | BTA_AVK_FEAT_RCCT | AVRC_CT_PASSIVE);
 
@@ -1490,7 +1492,7 @@ void bta_avk_conn_chg(tBTA_AVK_DATA *p_data)
         {
             /* one audio channel goes down and there's one audio channel remains open.
              * restore the switch role in default link policy */
-            bta_sys_set_default_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH);
+            bta_sys_set_default_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH);
             /* allow role switch, if this is the last connection */
             bta_avk_restore_switch();
         }
@@ -1649,7 +1651,9 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
                         APPL_TRACE_DEBUG("Incoming L2CAP acquired, set state as incoming", NULL);
                         bdcpy(p_cb->p_scb[xx]->peer_addr, p_data->str_msg.bd_addr);
                         p_cb->p_scb[xx]->use_rc = TRUE;     /* allowing RC for incoming connection */
+                        APPL_TRACE_DEBUG("Event sent =0x%x, Base Event = 0x%x diff = %d", BTA_AVK_ACP_CONNECT_EVT, BTA_AVK_FIRST_SSM_EVT, BTA_AVK_ACP_CONNECT_EVT-BTA_AVK_FIRST_SSM_EVT);
                         bta_avk_ssm_execute(p_cb->p_scb[xx], BTA_AVK_ACP_CONNECT_EVT, p_data);
+                        APPL_TRACE_DEBUG("Will start Avk sig timer");
 
                         /* The Pending Event should be sent as soon as the L2CAP signalling channel
                          * is set up, which is NOW. Earlier this was done only after
@@ -1658,7 +1662,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
                          */
                         bta_avk_sig_timer(NULL);
                         APPL_TRACE_DEBUG("Re-start timer for AVDTP service");
-                        bta_sys_conn_open(BTA_ID_AV, p_cb->p_scb[xx]->app_id,
+                        bta_sys_conn_open(BTA_ID_AVK, p_cb->p_scb[xx]->app_id,
                                 p_cb->p_scb[xx]->peer_addr);
                         /* Possible collision : need to avoid outgoing processing while the timer is running */
                         p_cb->p_scb[xx]->coll_mask = BTA_AVK_COLL_INC_TMR;
@@ -1678,7 +1682,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
             {
                 /* We do not have scb for this avdt connection.     */
                 /* Silently close the connection.                   */
-                APPL_TRACE_ERROR("av scb not available for avdt connection");
+                APPL_TRACE_ERROR("avk scb not available for avdt connection");
                 AVDT_DisconnectReq (p_data->str_msg.bd_addr, NULL);
                 return;
             }
@@ -1695,6 +1699,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
         /* disconnected. */
         int is_lcb_used = bta_avk_cb.conn_lcb;
         APPL_TRACE_DEBUG(" is_lcb_used is %d",is_lcb_used);
+        dealloc_ar_device_info(p_data->str_msg.bd_addr);
         p_lcb = bta_avk_find_lcb(p_data->str_msg.bd_addr, BTA_AVK_LCB_FREE);
         if (p_lcb && (p_lcb->conn_msk || is_lcb_used))
         {
@@ -1707,7 +1712,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
                         (bdcmp(p_cb->p_scb[xx]->peer_addr, p_data->str_msg.bd_addr) == 0) )
                 {
                     APPL_TRACE_DEBUG("Closing timer for AVDTP service");
-                    bta_sys_conn_close(BTA_ID_AV, p_cb->p_scb[xx]->app_id,p_cb->p_scb[xx]->peer_addr);
+                    bta_sys_conn_close(BTA_ID_AVK, p_cb->p_scb[xx]->app_id,p_cb->p_scb[xx]->peer_addr);
                 }
                 mask = 1 << (xx + 1);
                 if (((mask & p_lcb->conn_msk) || is_lcb_used)

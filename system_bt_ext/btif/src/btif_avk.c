@@ -417,7 +417,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             break;
 
         case BTA_AVK_ENABLE_EVT:
-            BTIF_TRACE_EVENT("AV is enabled now for index: %d", index);
+            BTIF_TRACE_EVENT("AVK is enabled now for index: %d", index);
             break;
 
         case BTA_AVK_REGISTER_EVT:
