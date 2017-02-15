@@ -45,7 +45,7 @@
 enum
 {
     /* these events are handled by the AV main state machine */
-    BTA_AVK_API_DISABLE_EVT = BTA_SYS_EVT_START(BTA_ID_AV),
+    BTA_AVK_API_DISABLE_EVT = BTA_SYS_EVT_START(BTA_ID_AVK),
     BTA_AVK_API_REMOTE_CMD_EVT,
     BTA_AVK_API_VENDOR_CMD_EVT,
     BTA_AVK_API_VENDOR_RSP_EVT,
@@ -150,7 +150,7 @@ enum
 #define BTA_AVK_QUEUE_DATA_CHK_NUM   L2CAP_HIGH_PRI_MIN_XMIT_QUOTA
 
 /* the number of ACL links with AVDT */
-#define BTA_AVK_NUM_LINKS            AVDT_NUM_LINKS
+#define BTA_AVK_NUM_LINKS            (AVDT_NUM_LINKS/2)
 
 #define BTA_AVK_CO_ID_TO_BE_STREAM(p, u32) {*(p)++ = (UINT8)((u32) >> 16); *(p)++ = (UINT8)((u32) >> 8); *(p)++ = (UINT8)(u32); }
 #define BTA_AVK_BE_STREAM_TO_CO_ID(u32, p) {u32 = (((UINT32)(*((p) + 2))) + (((UINT32)(*((p) + 1))) << 8) + (((UINT32)(*(p))) << 16)); (p) += 3;}
@@ -655,6 +655,7 @@ extern BOOLEAN bta_avk_is_scb_init (tBTA_AVK_SCB *p_scb);
 extern void bta_avk_set_scb_sst_incoming (tBTA_AVK_SCB *p_scb);
 extern tBTA_AVK_LCB * bta_avk_find_lcb(BD_ADDR addr, UINT8 op);
 extern BOOLEAN bta_avk_is_multicast_enabled();
+extern BOOLEAN bta_avk_is_scb_available();
 
 /* main functions */
 extern void bta_avk_api_deregister(tBTA_AVK_DATA *p_data);

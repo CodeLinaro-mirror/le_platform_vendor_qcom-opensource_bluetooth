@@ -63,7 +63,7 @@ void BTA_AvkEnable(tBTA_SEC sec_mask, tBTA_AVK_FEAT features, tBTA_AVK_CBACK *p_
     tBTA_AVK_API_ENABLE  *p_buf;
 
     /* register with BTA system manager */
-    bta_sys_register(BTA_ID_AV, &bta_avk_reg);
+    bta_sys_register(BTA_ID_AVK, &bta_avk_reg);
 
     if ((p_buf = (tBTA_AVK_API_ENABLE *) osi_malloc(sizeof(tBTA_AVK_API_ENABLE))) != NULL)
     {
@@ -88,7 +88,7 @@ void BTA_AvkDisable(void)
 {
     BT_HDR  *p_buf;
 
-    bta_sys_deregister(BTA_ID_AV);
+    bta_sys_deregister(BTA_ID_AVK);
     if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->event = BTA_AVK_API_DISABLE_EVT;
