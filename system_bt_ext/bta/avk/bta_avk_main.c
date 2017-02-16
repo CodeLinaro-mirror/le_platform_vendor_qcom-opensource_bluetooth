@@ -769,7 +769,9 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
 
                 /* start listening when A2DP is registered */
                 if (bta_avk_cb.features & BTA_AVK_FEAT_RCTG)
+                {
                     bta_avk_rc_create(&bta_avk_cb, AVCT_ACP, p_scb->hdi, BTA_AVK_NUM_LINKS + 1);
+                }
 
                 /* if the AV and AVK are both supported, it cannot support the CT role */
                 if (bta_avk_cb.features & (BTA_AVK_FEAT_RCCT))
@@ -1387,10 +1389,10 @@ void bta_avk_sm_execute(tBTA_AVK_CB *p_cb, UINT16 event, tBTA_AVK_DATA *p_data)
     UINT8               action;
 
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-    APPL_TRACE_EVENT("AV event=0x%x(%s) state=%d(%s)",
+    APPL_TRACE_EVENT("AVK event=0x%x(%s) state=%d(%s)",
         event, bta_avk_evt_code(event), p_cb->state, bta_avk_st_code(p_cb->state));
 #else
-    APPL_TRACE_EVENT("AV event=0x%x state=%d", event, p_cb->state);
+    APPL_TRACE_EVENT("AVK event=0x%x state=%d", event, p_cb->state);
 #endif
 
     /* look up the state table for the current state */
@@ -1424,6 +1426,7 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
 {
     UINT16 event = p_msg->event;
     UINT16 first_event = BTA_AVK_FIRST_NSM_EVT;
+    APPL_TRACE_VERBOSE("bta_avk_hdl_event handle=0x%x", p_msg->layer_specific);
 
     if (event > BTA_AVK_LAST_EVT)
     {
@@ -1433,9 +1436,9 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
     if(event >= first_event)
     {
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-        APPL_TRACE_VERBOSE("AV nsm event=0x%x(%s)", event, bta_avk_evt_code(event));
+        APPL_TRACE_VERBOSE("AVK nsm event=0x%x(%s)", event, bta_avk_evt_code(event));
 #else
-        APPL_TRACE_VERBOSE("AV nsm event=0x%x", event);
+        APPL_TRACE_VERBOSE("AVK nsm event=0x%x", event);
 #endif
         /* non state machine events */
 
@@ -1444,16 +1447,16 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
     else if (event >= BTA_AVK_FIRST_SM_EVT && event <= BTA_AVK_LAST_SM_EVT)
     {
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-        APPL_TRACE_VERBOSE("AV sm event=0x%x(%s)", event, bta_avk_evt_code(event));
+        APPL_TRACE_VERBOSE("AVK sm event=0x%x(%s)", event, bta_avk_evt_code(event));
 #else
-        APPL_TRACE_VERBOSE("AV sm event=0x%x", event);
+        APPL_TRACE_VERBOSE("AVK sm event=0x%x", event);
 #endif
         /* state machine events */
         bta_avk_sm_execute(&bta_avk_cb, p_msg->event, (tBTA_AVK_DATA *) p_msg);
     }
     else
     {
-        APPL_TRACE_VERBOSE("handle=0x%x", p_msg->layer_specific);
+        APPL_TRACE_VERBOSE("avk : handle=0x%x", p_msg->layer_specific);
         /* stream state machine events */
         bta_avk_ssm_execute( bta_avk_hndl_to_scb(p_msg->layer_specific),
                                 p_msg->event, (tBTA_AVK_DATA *) p_msg);

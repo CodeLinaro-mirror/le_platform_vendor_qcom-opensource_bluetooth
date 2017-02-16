@@ -200,6 +200,7 @@ static int  uinput_create(char *name);
 static int  init_uinput (void);
 static void close_uinput (void);
 static bt_status_t send_passthrough_cmd(bt_bdaddr_t *bd_addr, uint8_t key_code, uint8_t key_state);
+static UINT8 btif_avk_rc_idx_by_bdaddr( BD_ADDR bd_addr);
 #if (AVRC_CTLR_INCLUDED == TRUE)
 static BOOLEAN conn_status = FALSE;
 #endif
@@ -632,7 +633,13 @@ static void btif_avk_rc_handle_rc_passthrough_rsp ( tBTA_AVK_REMOTE_RSP *p_remot
 {
 #if (AVRC_CTLR_INCLUDED == TRUE)
     const char *status;
-    int index = BTIF_AVK_RC_DEFAULT_INDEX; // 0th index is RC
+    int index = btif_avk_rc_get_idx_by_rc_handle(p_remote_rsp->rc_handle);
+    BTIF_TRACE_DEBUG("%s: index=%d", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return;
+    }
     if (btif_avk_rc_cb[index].rc_features & BTA_AVK_FEAT_RCTG)
     {
         int key_state;
@@ -1177,10 +1184,17 @@ static bt_status_t init_ctrl(btrc_ctrl_callbacks_t* callbacks )
 ** Returns          bt_status_t
 **
 *******************************************************************************/
-static bt_status_t init_ctrl_vendor(btrc_ctrl_vendor_callbacks_t* callbacks )
+static bt_status_t init_ctrl_vendor(btrc_ctrl_vendor_callbacks_t* callbacks, int max_connections )
 {
+    int i;
     bt_status_t result = BT_STATUS_SUCCESS;
     btif_avk_rc_ctrl_vendor_callbacks = callbacks;
+    btif_max_rc_clients = max_connections;
+    memset (&btif_avk_rc_cb, 0, sizeof(btif_avk_rc_cb));
+    for (i = 0; i < btif_max_rc_clients; i++)
+    {
+       btif_avk_rc_cb[i].rc_vol_label=MAX_LABEL;
+    }
     return result;
 }
 #if (AVRC_CTLR_INCLUDED == TRUE)
@@ -1919,6 +1933,28 @@ static bt_status_t send_register_abs_vol_rsp_vendor(uint8_t rsp_type, uint8_t ab
     return status;
 }
 
+/*******************************************************************************
+**
+** Function         btif_avk_rc_idx_by_bdaddr
+**
+** Description      Get the rc index corresponding to BD addr
+**
+** Returns          UNIT8
+**
+*******************************************************************************/
+
+static UINT8 btif_avk_rc_idx_by_bdaddr(BD_ADDR bd_addr)
+{
+    int i;
+    for (i = 0; i < btif_max_rc_clients; i++)
+    {
+        if ((bdcmp(bd_addr,
+                  btif_avk_rc_cb[i].rc_addr) == 0))
+            return i;
+    }
+    return i;
+}
+
 /***************************************************************************
 **
 ** Function         send_passthrough_cmd
@@ -1935,7 +1971,14 @@ static bt_status_t send_passthrough_cmd(bt_bdaddr_t *bd_addr, uint8_t key_code, 
      * In normal case AVRCP controller will not be used, hence
      * updating this is required.
      */
-    int index = BTIF_AVK_RC_DEFAULT_INDEX; //For RC it should be 0
+    int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
+    BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
 #if (AVRC_CTLR_INCLUDED == TRUE)
     rc_transaction_t *p_transaction=NULL;
     CHECK_AVK_RC_CONNECTED
