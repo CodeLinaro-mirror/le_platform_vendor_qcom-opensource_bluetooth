@@ -250,6 +250,7 @@ typedef struct
     UINT16 len;
     UINT16 offset;
     UINT16 layer_specific;
+    BD_ADDR bd_addr;
 } tBT_AVK_SBC_HDR;
 
 typedef struct
@@ -1219,6 +1220,7 @@ static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR v
 static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 {
     UINT8 *sbc_start_frame = ((UINT8*)(p_msg + 1) + p_msg->offset + 1);
+    bdstr_t addr1;
     int count;
     UINT32 pcmBytes, availPcmBytes;
     OI_INT16 *pcmDataPointer = pcmData; /*Will be overwritten on next packet receipt*/
@@ -1226,7 +1228,8 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
     int num_sbc_frames = p_msg->num_frames_to_be_processed;
     UINT32 sbc_frame_len = p_msg->len - 1;
     availPcmBytes = sizeof(pcmData);
-
+    BD_ADDR bd_addr;
+    memcpy(bd_addr, p_msg->bd_addr, sizeof(BD_ADDR));
 #ifdef USE_AUDIO_TRACK
     int retwriteAudioTrack = 0;
 #endif
@@ -1243,7 +1246,9 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
         return;
     }
 #endif
-    APPL_TRACE_DEBUG("Number of sbc frames %d, frame_len %d", num_sbc_frames, sbc_frame_len);
+    APPL_TRACE_DEBUG("Number of sbc frames %d, frame_len %d bd_addr = %s",
+            num_sbc_frames, sbc_frame_len,
+            bdaddr_to_string((bt_bdaddr_t *)bd_addr, &addr1, sizeof(addr1)));
 
     for(count = 0; count < num_sbc_frames && sbc_frame_len != 0; count ++)
     {
@@ -1266,7 +1271,8 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 #ifdef ANDROID
     retwriteAudioTrack = btWriteData((void*)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
-    btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM, (void*)pcmData, (sizeof(pcmData) - availPcmBytes));
+    btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM,
+            (void*)pcmData, (sizeof(pcmData) - availPcmBytes), bd_addr);
     if(btif_avk_media_cb.data_channel_open)
         btif_avk_media_task_feed_audio_hal();
 #else
@@ -1687,7 +1693,7 @@ static UINT64 time_now_us()
  **
  ** Returns          size of the queue
  *******************************************************************************/
-UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt)
+UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt, BD_ADDR bd_addr)
 {
     tBT_AVK_SBC_HDR *p_msg;
 
@@ -1711,6 +1717,7 @@ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt)
         p_msg->len = p_pkt->len;
         p_msg->offset = 0;
         p_msg->layer_specific = p_pkt->layer_specific;
+        memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
 
         BTIF_TRACE_VERBOSE("btif_avk_media_sink_enque_buf %d", p_msg->num_frames_to_be_processed);
         GKI_enqueue(&(btif_avk_media_cb.RxSbcQ), p_msg);

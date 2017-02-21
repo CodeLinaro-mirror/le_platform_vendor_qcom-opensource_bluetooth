@@ -239,10 +239,14 @@ typedef struct {
                         int a2dp_multicast_state, uint8_t streaming_prarm);
 
     /** Sends Audio Focus State. */
-    void  (*audio_focus_state_vendor)( int focus_state );
+    void  (*audio_focus_state_vendor)( int focus_state,  bt_bdaddr_t *bd_addr );
 
    /** Request PCM sample. */
    uint32_t  (*get_a2dp_sink_streaming_data_vendor)( uint16_t codec_type, uint8_t* data, uint32_t size );
+
+   /** Send streaming device address to stack*/
+   void (*update_streaming_device_vendor)( bt_bdaddr_t *bd_addr);
+
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );
