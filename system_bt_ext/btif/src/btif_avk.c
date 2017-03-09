@@ -2259,6 +2259,48 @@ void update_streaming_device_vendor(bt_bdaddr_t *bd_addr)
 
 /*******************************************************************************
 **
+** Function         update_flush_device_vendor
+**
+** Description      Updates the current streaming device from apps
+**
+** Returns          void
+**
+*******************************************************************************/
+void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
+{
+    BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
+    bdstr_t addr1, addr2;
+    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    bt_bdaddr_t bda;
+    int count = 0, queue_size = 0;
+    queue_size = GKI_queue_length(&RxDataQ);
+    BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
+    while ((!GKI_queue_is_empty(&RxDataQ)) || count < queue_size)
+    {
+        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(RxDataQ));
+        if (p_data_q_buf == NULL)
+            break;
+
+        bdcpy(bda.address, p_data_q_buf->bd_addr);
+        BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
+            bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
+            bdaddr_to_string(&bda, &addr2, sizeof(addr2)));
+
+        if ((bd_addr != NULL) &&
+            !memcmp(bd_addr->address, p_data_q_buf->bd_addr, sizeof(BD_ADDR)))
+        {
+            BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
+                __FUNCTION__);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&RxDataQ);
+            GKI_freebuf(p_data_q_buf);
+        }
+        count++;
+    }
+}
+
+/*******************************************************************************
+**
 ** Function         get_a2dp_sink_streaming_data
 **
 ** Description      get a2dp sink data stored from Data Q
@@ -2672,6 +2714,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
 #endif
     get_a2dp_sink_streaming_data_vendor,
     update_streaming_device_vendor,
+    update_flushing_device_vendor,
     cleanup_sink_vendor,
 };
 
