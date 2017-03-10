@@ -2097,7 +2097,7 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
 static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int max,
                              int a2dp_multicast_state, uint8_t streaming_prarm)
 {
-    bt_status_t status;
+    bt_status_t status = BT_STATUS_FAIL;
 
     BTIF_TRACE_IMP("%s max = %d", __FUNCTION__, max);
 
@@ -2221,6 +2221,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(RxDataQ));
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_curr, p_src, q_bytes_left);
             GKI_freebuf(p_data_q_buf);
@@ -2364,6 +2368,10 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(RxDataQ));
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_dest = data + (size - bytes_to_be_written);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, q_bytes_left);
