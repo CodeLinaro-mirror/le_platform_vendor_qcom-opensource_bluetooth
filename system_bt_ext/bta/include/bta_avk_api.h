@@ -488,7 +488,7 @@ typedef union
 typedef struct
 {
     UINT8      *codec_info;
-    BD_ADDR         bd_addr;;
+    BD_ADDR         bd_addr;
 }tBTA_AVK_SINK_CONFIG;
 /* union of data associated with AV Media callback */
 typedef union
@@ -515,7 +515,7 @@ typedef union
 
 /* AV callback */
 typedef void (tBTA_AVK_CBACK)(tBTA_AVK_EVT event, tBTA_AVK *p_data);
-typedef void (tBTA_AVK_DATA_CBACK)(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data);
+typedef void (tBTA_AVK_DATA_CBACK)(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, BD_ADDR bd_addr);
 
 /* type for stream state machine action functions */
 typedef void (*tBTA_AVK_ACT)(void *p_cb, void *p_data);

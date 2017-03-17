@@ -46,6 +46,7 @@
 
 #define LOG_TAG "bt_bta_av"
 #include "osi/include/log.h"
+#include "osi/include/osi.h"
 
 #if (AVRC_CTLR_INCLUDED == TRUE)
 #include <cutils/properties.h>
@@ -68,6 +69,8 @@
 #define AVRC_MIN_META_CMD_LEN 20
 #endif
 
+extern fixed_queue_t *btu_bta_alarm_queue;
+
 /* state machine states */
 enum
 {
@@ -85,7 +88,7 @@ struct avk_blacklist_entry
     char addr[3];
 };
 
-static void bta_avk_acp_sig_timer_cback (TIMER_LIST_ENT *p_tle);
+static void bta_avk_acp_sig_timer_cback (void *data);
 
 /*******************************************************************************
 **
@@ -146,7 +149,7 @@ void bta_avk_del_rc(tBTA_AVK_RCB *p_rcb)
                     p_scb->rc_handle = BTA_AVK_RC_HANDLE_NONE;
                 /* just in case the RC timer is active
                 if(bta_avk_cb.features & BTA_AVK_FEAT_RCCT && p_scb->chnl == BTA_AVK_CHNL_AUDIO) */
-                    bta_sys_stop_timer(&p_scb->timer);
+                    alarm_cancel(p_scb->avrc_ct_timer);
             }
         }
 
@@ -228,7 +231,7 @@ static void bta_avk_avrc_sdp_cback(UINT16 status)
     BT_HDR *p_msg;
     UNUSED(status);
 
-    if ((p_msg = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_msg = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_msg->event = BTA_AVK_SDP_AVRC_DISC_EVT;
         bta_sys_sendmsg(p_msg);
@@ -269,7 +272,7 @@ static void bta_avk_rc_ctrl_cback(UINT8 handle, UINT8 event, UINT16 result, BD_A
 
     if (msg_event)
     {
-        if ((p_msg = (tBTA_AVK_RC_CONN_CHG *) GKI_getbuf(sizeof(tBTA_AVK_RC_CONN_CHG))) != NULL)
+        if ((p_msg = (tBTA_AVK_RC_CONN_CHG *) osi_malloc(sizeof(tBTA_AVK_RC_CONN_CHG))) != NULL)
         {
             p_msg->hdr.event = msg_event;
             p_msg->handle    = handle;
@@ -312,7 +315,7 @@ static void bta_avk_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_
 
     /* Create a copy of the message */
     tBTA_AVK_RC_MSG *p_buf =
-        (tBTA_AVK_RC_MSG *)GKI_getbuf((UINT16)(sizeof(tBTA_AVK_RC_MSG) + data_len));
+        (tBTA_AVK_RC_MSG *)osi_malloc((UINT16)(sizeof(tBTA_AVK_RC_MSG) + data_len));
     if (p_buf != NULL) {
         p_buf->hdr.event = BTA_AVK_AVRC_MSG_EVT;
         p_buf->handle = handle;
@@ -550,7 +553,7 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
             APPL_TRACE_DEBUG("bta_avk_rc_opened shdl:%d, srch %d", i + 1, p_scb->rc_handle);
             shdl = i+1;
             LOG_INFO("%s allow incoming AVRCP connections:%d", __func__, p_scb->use_rc);
-            bta_sys_stop_timer(&p_scb->timer);
+            alarm_cancel(p_scb->avrc_ct_timer);
             disc = p_scb->hndl;
             break;
         }
@@ -729,7 +732,7 @@ void bta_avk_rc_meta_rsp(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     }
 
     if (do_free)
-        GKI_freebuf (p_data->api_meta_rsp.p_pkt);
+        osi_free (p_data->api_meta_rsp.p_pkt);
 }
 
 /*******************************************************************************
@@ -745,7 +748,7 @@ void bta_avk_rc_free_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     UNUSED(p_cb);
 
-    GKI_freebuf (p_data->api_meta_rsp.p_pkt);
+    osi_free (p_data->api_meta_rsp.p_pkt);
 }
 
 /*******************************************************************************
@@ -830,7 +833,7 @@ tBTA_AVK_EVT bta_avk_proc_meta_cmd(tAVRC_RESPONSE  *p_rc_rsp, tBTA_AVK_RC_MSG *p
     p_rc_rsp->pdu = pdu;
     *p_ctype = AVRC_RSP_REJ;
     /* Check for valid Meta Length, AVRCP minimum Meta command length 20 */
-    if ((AVRC_MIN_META_CMD_LEN + p_vendor->vendor_len) > AVRC_META_CMD_POOL_SIZE)
+    if ((AVRC_MIN_META_CMD_LEN + p_vendor->vendor_len) > AVRC_META_CMD_BUF_SIZE)
     {
         /* reject it */
         evt = 0;
@@ -1192,7 +1195,7 @@ void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
                     /* just in case the RC timer is active
                     if(bta_avk_cb.features & BTA_AVK_FEAT_RCCT &&
                        p_scb->chnl == BTA_AVK_CHNL_AUDIO) */
-                        bta_sys_stop_timer(&p_scb->timer);
+                        alarm_cancel(p_scb->avrc_ct_timer);
                 }
             }
 
@@ -1446,7 +1449,7 @@ void bta_avk_conn_chg(tBTA_AVK_DATA *p_data)
                 /* just in case the RC timer is active
                 if(p_cb->features & BTA_AVK_FEAT_RCCT) */
                 {
-                    bta_sys_stop_timer(&p_scb->timer);
+                    alarm_cancel(p_scb->avrc_ct_timer);
                 }
                 /* one audio channel goes down. check if we need to restore high priority */
                 chk_restore = TRUE;
@@ -1532,7 +1535,7 @@ void bta_avk_disable(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     /*Cancel SDP if it had been started. */
     if(p_cb->p_disc_db) {
         (void)SDP_CancelServiceSearch (p_cb->p_disc_db);
-        utl_freebuf((void **) &p_cb->p_disc_db);
+         osi_free_and_reset((void **) &p_cb->p_disc_db);
     }
 
     /* disable audio/video - de-register all channels,
@@ -1556,7 +1559,7 @@ void bta_avk_disable(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 void bta_avk_api_disconnect(tBTA_AVK_DATA *p_data)
 {
     AVDT_DisconnectReq(p_data->api_discnt.bd_addr, bta_avk_conn_cback);
-    bta_sys_stop_timer(&bta_avk_cb.sig_tmr);
+    alarm_cancel(bta_avk_cb.link_signalling_timer);
 }
 
 /*******************************************************************************
@@ -1597,9 +1600,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
              * is a chance to get here if the incoming connection has passed
              * the L2CAP connection stage.
              */
-            if((p_data->hdr.offset == AVDT_ACP) &&
-                ((p_cb->acp_sig_tmr.p_cback != NULL) ||
-                (AVDT_GetServiceBusyState() == TRUE)))
+            if((p_data->hdr.offset == AVDT_ACP) && (AVDT_GetServiceBusyState() == TRUE))
             {
                 APPL_TRACE_ERROR("%s Incoming conn while processing another.. Reject",
                     __FUNCTION__);
@@ -1658,9 +1659,11 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
                         /* Possible collision : need to avoid outgoing processing while the timer is running */
                         p_cb->p_scb[xx]->coll_mask = BTA_AVK_COLL_INC_TMR;
 
-                        p_cb->acp_sig_tmr.param = (UINT32)xx;
-                        p_cb->acp_sig_tmr.p_cback = (TIMER_CBACK*)&bta_avk_acp_sig_timer_cback;
-                        bta_sys_start_timer(&p_cb->acp_sig_tmr, 0, BTA_AVK_ACP_SIG_TIME_VAL);
+                        alarm_set_on_queue(p_cb->accept_signalling_timer,
+                                           BTA_AVK_ACP_SIG_TIME_VAL,
+                                           bta_avk_acp_sig_timer_cback,
+                                           UINT_TO_PTR(xx),
+                                           btu_bta_alarm_queue);
                     }
                     break;
                 }
@@ -1680,7 +1683,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
     else if (event == BTA_AR_AVDT_CONN_EVT)
     {
-        bta_sys_stop_timer(&bta_avk_cb.sig_tmr);
+        alarm_cancel(bta_avk_cb.link_signalling_timer);
     }
 #endif
     else
@@ -1746,7 +1749,8 @@ void bta_avk_sig_timer(tBTA_AVK_DATA *p_data)
             p_lcb = &p_cb->lcb[xx];
             if(!p_lcb->conn_msk)
             {
-                bta_sys_start_timer(&p_cb->sig_tmr, BTA_AVK_SIG_TIMER_EVT, BTA_AVK_SIG_TIME_VAL);
+                bta_sys_start_timer(p_cb->link_signalling_timer, BTA_AVK_SIG_TIME_VAL,
+                                    BTA_AVK_SIG_TIMER_EVT, 0);
                 bdcpy(pend.bd_addr, p_lcb->addr);
                 APPL_TRACE_DEBUG("bta_avk_sig_timer on IDX = %d",xx);
                 //Copy the handle of SCB
@@ -1767,24 +1771,11 @@ void bta_avk_sig_timer(tBTA_AVK_DATA *p_data)
 ** Returns          void
 **
 *******************************************************************************/
-static void bta_avk_acp_sig_timer_cback (TIMER_LIST_ENT *p_tle)
+static void bta_avk_acp_sig_timer_cback (void *data)
 {
-    UINT8   inx = (UINT8)p_tle->param;
+    UINT8   inx = PTR_TO_UINT(data);
     tBTA_AVK_CB  *p_cb = &bta_avk_cb;
     tBTA_AVK_SCB *p_scb = NULL;
-    tBTA_AVK_API_OPEN  *p_buf;
-
-    /* Clean up p_cback in AV Control Block to
-     * indicate that device is not busy processing
-     * incoming connection.
-     * This assignment is safe here as there is only
-     * one task context(BTU) executing this callback
-     * and bta_avk_sig_chg.
-     * As there is no API currently to check if the
-     * timer is active, p_cback is used to identify
-     * the state of acp_sig_tmr. NULL means not active
-     */
-    p_cb->acp_sig_tmr.p_cback = NULL;
 
     if (inx < BTA_AVK_NUM_STRS)
     {
@@ -1805,9 +1796,11 @@ static void bta_avk_acp_sig_timer_cback (TIMER_LIST_ENT *p_tle)
                     /* We are still doing SDP. Run the timer again. */
                     p_scb->coll_mask |= BTA_AVK_COLL_INC_TMR;
 
-                    p_cb->acp_sig_tmr.param = (UINT32)inx;
-                    p_cb->acp_sig_tmr.p_cback = (TIMER_CBACK *)&bta_avk_acp_sig_timer_cback;
-                    bta_sys_start_timer(&p_cb->acp_sig_tmr, 0, BTA_AVK_ACP_SIG_TIME_VAL);
+                    alarm_set_on_queue(p_cb->accept_signalling_timer,
+                                       BTA_AVK_ACP_SIG_TIME_VAL,
+                                       bta_avk_acp_sig_timer_cback,
+                                       UINT_TO_PTR(inx),
+                                       btu_bta_alarm_queue);
                 }
                 else
                 {
@@ -1825,7 +1818,9 @@ static void bta_avk_acp_sig_timer_cback (TIMER_LIST_ENT *p_tle)
                     p_scb->coll_mask &= ~BTA_AVK_COLL_API_CALLED;
 
                     /* BTA_AVK_API_OPEN_EVT */
-                    if ((p_buf = (tBTA_AVK_API_OPEN *) GKI_getbuf(sizeof(tBTA_AVK_API_OPEN))) != NULL)
+                     tBTA_AVK_API_OPEN  *p_buf =
+                        (tBTA_AVK_API_OPEN *)osi_malloc(sizeof(tBTA_AVK_API_OPEN));
+                    if (p_buf != NULL)
                     {
                         memcpy(p_buf, &(p_scb->open_api), sizeof(tBTA_AVK_API_OPEN));
                         bta_sys_sendmsg(p_buf);
@@ -1954,7 +1949,7 @@ tBTA_AVK_FEAT bta_avk_src_check_peer_features (UINT16 service_uuid)
                         peer_features |= (BTA_AVK_FEAT_BROWSE);
                         APPL_TRACE_DEBUG("peer supports browsing");
                     }
-                    if (categories & AVRC_SUPF_CT_CA_GET_IMAGE_FEAT & AVRC_SUPF_CT_CA_GET_THUMBNAIL_FEAT)
+                    if (categories & AVRC_SUPF_CT_COVER_ART_GET_IMAGE & AVRC_SUPF_CT_COVER_ART_GET_THUMBNAIL)
                     {
                         peer_features |=  BTA_AVK_FEAT_CA;
                         APPL_TRACE_DEBUG("peer supports cover art");
@@ -2140,7 +2135,7 @@ void bta_avk_rc_disc_done(tBTA_AVK_DATA *p_data)
     }
 
     p_cb->disc = 0;
-    utl_freebuf((void **) &p_cb->p_disc_db);
+    osi_free_and_reset((void **) &p_cb->p_disc_db);
 
     APPL_TRACE_DEBUG("peer_features 0x%x, features 0x%x", peer_features, p_cb->features);
 
@@ -2360,7 +2355,7 @@ void bta_avk_rc_disc(UINT8 disc)
         /* allocate discovery database */
         if (p_cb->p_disc_db == NULL)
         {
-            p_cb->p_disc_db = (tSDP_DISCOVERY_DB *) GKI_getbuf(BTA_AVK_DISC_BUF_SIZE);
+            p_cb->p_disc_db = (tSDP_DISCOVERY_DB *) osi_malloc(BTA_AVK_DISC_BUF_SIZE);
         }
 
         if (p_cb->p_disc_db)
@@ -2421,7 +2416,7 @@ void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data)
                 while (!list_is_empty(p_scb->a2d_list)) {
                     p_buf = (BT_HDR*)list_front(p_scb->a2d_list);
                     list_remove(p_scb->a2d_list, p_buf);
-                    GKI_freebuf(p_buf);
+                    osi_free(p_buf);
                 }
             }
 
@@ -2459,8 +2454,8 @@ void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data)
         }
 
         /* make sure that the timer is not active */
-        bta_sys_stop_timer(&p_scb->timer);
-        utl_freebuf((void **)&p_cb->p_scb[p_scb->hdi]);
+        alarm_cancel(p_scb->avrc_ct_timer);
+        osi_free_and_reset((void **)&p_cb->p_scb[p_scb->hdi]);
     }
 
     APPL_TRACE_DEBUG("audio 0x%x, video: 0x%x, disable:%d",

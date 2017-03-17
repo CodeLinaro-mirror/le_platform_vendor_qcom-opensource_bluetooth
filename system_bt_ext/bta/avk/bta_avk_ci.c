@@ -46,7 +46,7 @@ void bta_avk_ci_src_data_ready(tBTA_AVK_CHNL chnl)
 {
     BT_HDR  *p_buf;
 
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->layer_specific   = chnl;
         p_buf->event = BTA_AVK_CI_SRC_DATA_READY_EVT;
@@ -72,7 +72,7 @@ void bta_avk_ci_setconfig(tBTA_AVK_HNDL hndl, UINT8 err_code, UINT8 category,
 {
     tBTA_AVK_CI_SETCONFIG  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_CI_SETCONFIG *) GKI_getbuf(sizeof(tBTA_AVK_CI_SETCONFIG))) != NULL)
+    if ((p_buf = (tBTA_AVK_CI_SETCONFIG *) osi_malloc(sizeof(tBTA_AVK_CI_SETCONFIG))) != NULL)
     {
         p_buf->hdr.layer_specific   = hndl;
         p_buf->hdr.event = (err_code == AVDT_SUCCESS) ?

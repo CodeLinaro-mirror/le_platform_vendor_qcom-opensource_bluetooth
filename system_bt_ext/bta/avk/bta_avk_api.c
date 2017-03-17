@@ -31,8 +31,9 @@
 #include "bta_sys.h"
 #include "bta_avk_api.h"
 #include "bta_avk_int.h"
-#include "gki.h"
+#include "bt_common.h"
 #include <string.h>
+#include "osi/include/allocator.h"
 
 /*****************************************************************************
 **  Constants
@@ -64,7 +65,7 @@ void BTA_AvkEnable(tBTA_SEC sec_mask, tBTA_AVK_FEAT features, tBTA_AVK_CBACK *p_
     /* register with BTA system manager */
     bta_sys_register(BTA_ID_AV, &bta_avk_reg);
 
-    if ((p_buf = (tBTA_AVK_API_ENABLE *) GKI_getbuf(sizeof(tBTA_AVK_API_ENABLE))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_ENABLE *) osi_malloc(sizeof(tBTA_AVK_API_ENABLE))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_ENABLE_EVT;
         p_buf->p_cback  = p_cback;
@@ -88,7 +89,7 @@ void BTA_AvkDisable(void)
     BT_HDR  *p_buf;
 
     bta_sys_deregister(BTA_ID_AV);
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->event = BTA_AVK_API_DISABLE_EVT;
         bta_sys_sendmsg(p_buf);
@@ -114,14 +115,13 @@ void BTA_AvkRegister(tBTA_AVK_CHNL chnl, const char *p_service_name, UINT8 app_i
     tBTA_AVK_API_REG  *p_buf;
 
 
-    if ((p_buf = (tBTA_AVK_API_REG *) GKI_getbuf(sizeof(tBTA_AVK_API_REG))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_REG *) osi_malloc(sizeof(tBTA_AVK_API_REG))) != NULL)
     {
         p_buf->hdr.layer_specific   = chnl;
         p_buf->hdr.event = BTA_AVK_API_REGISTER_EVT;
         if(p_service_name)
         {
-            BCM_STRNCPY_S(p_buf->p_service_name, sizeof(p_buf->p_service_name), p_service_name, BTA_SERVICE_NAME_LEN);
-            p_buf->p_service_name[BTA_SERVICE_NAME_LEN-1] = 0;
+            strlcpy(p_buf->p_service_name, p_service_name, BTA_SERVICE_NAME_LEN);
         }
         else
         {
@@ -147,7 +147,7 @@ void BTA_AvkDeregister(tBTA_AVK_HNDL hndl)
 {
     BT_HDR  *p_buf;
 
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->layer_specific   = hndl;
         p_buf->event = BTA_AVK_API_DEREGISTER_EVT;
@@ -171,7 +171,7 @@ void BTA_AvkOpen(BD_ADDR bd_addr, tBTA_AVK_HNDL handle, BOOLEAN use_rc, tBTA_SEC
 {
     tBTA_AVK_API_OPEN  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_OPEN *) GKI_getbuf(sizeof(tBTA_AVK_API_OPEN))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_OPEN *) osi_malloc(sizeof(tBTA_AVK_API_OPEN))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_OPEN_EVT;
         p_buf->hdr.layer_specific   = handle;
@@ -197,7 +197,7 @@ void BTA_AvkClose(tBTA_AVK_HNDL handle)
 {
     BT_HDR  *p_buf;
 
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->event = BTA_AVK_API_CLOSE_EVT;
         p_buf->layer_specific   = handle;
@@ -218,7 +218,7 @@ void BTA_AvkDisconnect(BD_ADDR bd_addr)
 {
     tBTA_AVK_API_DISCNT  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_DISCNT *) GKI_getbuf(sizeof(tBTA_AVK_API_DISCNT))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_DISCNT *) osi_malloc(sizeof(tBTA_AVK_API_DISCNT))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_DISCONNECT_EVT;
         bdcpy(p_buf->bd_addr, bd_addr);
@@ -239,7 +239,7 @@ void BTA_AvkStart(tBTA_AVK_HNDL handle)
 {
     BT_HDR  *p_buf;
 
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->layer_specific   = handle;
         p_buf->event = BTA_AVK_API_START_EVT;
@@ -260,7 +260,7 @@ void BTA_AvkEnable_Sink(int enable)
 {
 #if (BTA_AV_SINK_INCLUDED == TRUE)
     BT_HDR  *p_buf;
-    if ((p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if ((p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         p_buf->event = BTA_AVK_API_SINK_ENABLE_EVT;
         p_buf->layer_specific = enable;
@@ -286,7 +286,7 @@ void BTA_AvkStop(BOOLEAN suspend, tBTA_AVK_HNDL handle)
 {
     tBTA_AVK_API_STOP  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_STOP *) GKI_getbuf(sizeof(tBTA_AVK_API_STOP))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_STOP *) osi_malloc(sizeof(tBTA_AVK_API_STOP))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_STOP_EVT;
         p_buf->hdr.layer_specific   = handle;
@@ -309,7 +309,7 @@ void BTA_AvkEnableMultiCast(BOOLEAN state, tBTA_AVK_HNDL handle)
 {
     tBTA_AVK_ENABLE_MULTICAST  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_ENABLE_MULTICAST *) GKI_getbuf(sizeof(tBTA_AVK_ENABLE_MULTICAST))) != NULL)
+    if ((p_buf = (tBTA_AVK_ENABLE_MULTICAST *) osi_malloc(sizeof(tBTA_AVK_ENABLE_MULTICAST))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_ENABLE_MULTICAST_EVT;
         p_buf->hdr.layer_specific   = handle;
@@ -336,7 +336,7 @@ void BTA_AvkReconfig(tBTA_AVK_HNDL hndl, BOOLEAN suspend, UINT8 sep_info_idx,
 {
     tBTA_AVK_API_RCFG  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_RCFG *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_RCFG) + num_protect))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_RCFG *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_RCFG) + num_protect))) != NULL)
     {
         p_buf->hdr.layer_specific   = hndl;
         p_buf->hdr.event    = BTA_AVK_API_RECONFIG_EVT;
@@ -364,7 +364,7 @@ void BTA_AvkProtectReq(tBTA_AVK_HNDL hndl, UINT8 *p_data, UINT16 len)
 {
     tBTA_AVK_API_PROTECT_REQ  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_PROTECT_REQ *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_PROTECT_REQ) + len))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_PROTECT_REQ *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_PROTECT_REQ) + len))) != NULL)
     {
         p_buf->hdr.layer_specific   = hndl;
         p_buf->hdr.event = BTA_AVK_API_PROTECT_REQ_EVT;
@@ -398,7 +398,7 @@ void BTA_AvkProtectRsp(tBTA_AVK_HNDL hndl, UINT8 error_code, UINT8 *p_data, UINT
 {
     tBTA_AVK_API_PROTECT_RSP  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_PROTECT_RSP *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_PROTECT_RSP) + len))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_PROTECT_RSP *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_PROTECT_RSP) + len))) != NULL)
     {
         p_buf->hdr.layer_specific   = hndl;
         p_buf->hdr.event    = BTA_AVK_API_PROTECT_RSP_EVT;
@@ -431,7 +431,7 @@ void BTA_AvkRemoteCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_RC rc_id, tBTA_AVK_
 {
     tBTA_AVK_API_REMOTE_CMD  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_REMOTE_CMD *) GKI_getbuf(sizeof(tBTA_AVK_API_REMOTE_CMD))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_REMOTE_CMD *) osi_malloc(sizeof(tBTA_AVK_API_REMOTE_CMD))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_REMOTE_CMD_EVT;
         p_buf->hdr.layer_specific   = rc_handle;
@@ -459,7 +459,7 @@ void BTA_AvkVendorCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CODE cmd_code, UINT
 {
     tBTA_AVK_API_VENDOR  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_VENDOR *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_VENDOR) + len))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_VENDOR *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_VENDOR) + len))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_VENDOR_CMD_EVT;
         p_buf->hdr.layer_specific   = rc_handle;
@@ -498,7 +498,7 @@ void BTA_AvkVendorRsp(UINT8 rc_handle, UINT8 label, tBTA_AVK_CODE rsp_code, UINT
 {
     tBTA_AVK_API_VENDOR  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_VENDOR *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_VENDOR) + len))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_VENDOR *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_VENDOR) + len))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_VENDOR_RSP_EVT;
         p_buf->hdr.layer_specific   = rc_handle;
@@ -538,7 +538,7 @@ void BTA_AvkOpenRc(tBTA_AVK_HNDL handle)
 {
     tBTA_AVK_API_OPEN_RC  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_OPEN_RC *) GKI_getbuf(sizeof(tBTA_AVK_API_OPEN_RC))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_OPEN_RC *) osi_malloc(sizeof(tBTA_AVK_API_OPEN_RC))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_RC_OPEN_EVT;
         p_buf->hdr.layer_specific   = handle;
@@ -559,7 +559,7 @@ void BTA_AvkCloseRc(UINT8 rc_handle)
 {
     tBTA_AVK_API_CLOSE_RC  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_CLOSE_RC *) GKI_getbuf(sizeof(tBTA_AVK_API_CLOSE_RC))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_CLOSE_RC *) osi_malloc(sizeof(tBTA_AVK_API_CLOSE_RC))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_RC_CLOSE_EVT;
         p_buf->hdr.layer_specific   = rc_handle;
@@ -584,7 +584,7 @@ void BTA_AvkMetaRsp(UINT8 rc_handle, UINT8 label, tBTA_AVK_CODE rsp_code,
 {
     tBTA_AVK_API_META_RSP  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_META_RSP *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_META_RSP)))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_META_RSP *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_META_RSP)))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_META_RSP_EVT;
         p_buf->hdr.layer_specific   = rc_handle;
@@ -595,7 +595,7 @@ void BTA_AvkMetaRsp(UINT8 rc_handle, UINT8 label, tBTA_AVK_CODE rsp_code,
 
         bta_sys_sendmsg(p_buf);
     } else if (p_pkt) {
-        GKI_freebuf(p_pkt);
+        osi_free(p_pkt);
     }
 }
 
@@ -617,7 +617,7 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
 {
     tBTA_AVK_API_META_RSP  *p_buf;
 
-    if ((p_buf = (tBTA_AVK_API_META_RSP *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_API_META_RSP)))) != NULL)
+    if ((p_buf = (tBTA_AVK_API_META_RSP *) osi_malloc((UINT16) (sizeof(tBTA_AVK_API_META_RSP)))) != NULL)
     {
         p_buf->hdr.event = BTA_AVK_API_META_RSP_EVT;
         p_buf->hdr.layer_specific   = rc_handle;

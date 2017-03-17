@@ -182,7 +182,7 @@ void btif_avk_queue_focus_rquest(void);
  ** Returns          void
  **
  *******************************************************************************/
-UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size);
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr);
 
 /*******************************************************************************
  **

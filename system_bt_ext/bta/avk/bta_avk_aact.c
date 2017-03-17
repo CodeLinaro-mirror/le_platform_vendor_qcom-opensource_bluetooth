@@ -366,7 +366,8 @@ static void bta_avk_st_rc_timer(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         (p_scb->use_rc == TRUE || (p_scb->role & BTA_AVK_ROLE_AD_ACP)) )
     {
         if ((p_scb->wait & BTA_AVK_WAIT_ROLE_SW_BITS) == 0)
-            bta_sys_start_timer(&p_scb->timer, BTA_AVK_AVRC_TIMER_EVT, BTA_AVK_RC_DISC_TIME_VAL);
+            bta_sys_start_timer(p_scb->avrc_ct_timer, BTA_AVK_RC_DISC_TIME_VAL,
+                                BTA_AVK_AVRC_TIMER_EVT, p_scb->hndl);
         else
             p_scb->wait |= BTA_AVK_WAIT_CHECK_RC;
     }
@@ -408,7 +409,7 @@ static BOOLEAN bta_avk_next_getcap(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             /* we got a stream; get its capabilities */
             if (p_scb->p_cap == NULL)
             {
-                p_scb->p_cap = (tAVDT_CFG *) GKI_getbuf(sizeof(tAVDT_CFG));
+                p_scb->p_cap = (tAVDT_CFG *) osi_malloc(sizeof(tAVDT_CFG));
             }
             if (p_scb->p_cap == NULL)
             {
@@ -472,7 +473,7 @@ static void bta_avk_proc_stream_evt(UINT8 handle, BD_ADDR bd_addr, UINT8 event, 
         }
     }
 
-    if (p_scb && (p_msg = (tBTA_AVK_STR_MSG *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_STR_MSG) + sec_len))) != NULL)
+    if (p_scb && (p_msg = (tBTA_AVK_STR_MSG *) osi_malloc((UINT16) (sizeof(tBTA_AVK_STR_MSG) + sec_len))) != NULL)
     {
 
         /* copy event data, bd addr, and handle to event message buffer */
@@ -622,12 +623,13 @@ void bta_avk_stream_data_cback(UINT8 handle, BT_HDR *p_pkt, UINT32 time_stamp, U
     }
     if(index == BTA_AVK_NUM_STRS) /* cannot find correct handler */
     {
-        GKI_freebuf(p_pkt);
+        osi_free(p_pkt);
         return;
     }
     p_pkt->event = BTA_AVK_MEDIA_DATA_EVT;
-    p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_DATA_EVT, (tBTA_AVK_MEDIA*)p_pkt);
-    GKI_freebuf(p_pkt);  /* a copy of packet had been delivered, we free this buffer */
+    p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_DATA_EVT,
+                                (tBTA_AVK_MEDIA*)p_pkt, p_scb->peer_addr);
+    osi_free(p_pkt);  /* a copy of packet had been delivered, we free this buffer */
 }
 
 /*******************************************************************************
@@ -742,7 +744,7 @@ static void bta_avk_a2d_sdp_cback(BOOLEAN found, tA2D_Service *p_service)
     tBTA_AVK_SDP_RES *p_msg;
     tBTA_AVK_SCB     *p_scb;
 
-    if ((p_msg = (tBTA_AVK_SDP_RES *) GKI_getbuf(sizeof(tBTA_AVK_SDP_RES))) != NULL)
+    if ((p_msg = (tBTA_AVK_SDP_RES *) osi_malloc(sizeof(tBTA_AVK_SDP_RES))) != NULL)
     {
         p_msg->hdr.event = (found) ? BTA_AVK_SDP_DISC_OK_EVT : BTA_AVK_SDP_DISC_FAIL_EVT;
 
@@ -1062,7 +1064,8 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     if (p_scb->wait & BTA_AVK_WAIT_CHECK_RC)
     {
         p_scb->wait &= ~BTA_AVK_WAIT_CHECK_RC;
-        bta_sys_start_timer(&p_scb->timer, BTA_AVK_AVRC_TIMER_EVT, BTA_AVK_RC_DISC_TIME_VAL);
+        bta_sys_start_timer(&p_scb->avrc_ct_timer, BTA_AVK_RC_DISC_TIME_VAL,
+                                 BTA_AVK_AVRC_TIMER_EVT,p_scb->hndl);
     }
 
     if (bta_avk_cb.features & BTA_AVK_FEAT_MASTER)
@@ -1102,7 +1105,7 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             /* set up parameters */
         db_params.db_len = BTA_AVK_DISC_BUF_SIZE;
         db_params.num_attr = 3;
-        db_params.p_db = NULL; // we will allocate memory in Stack
+        //db_params.p_db = NULL; // we will allocate memory in Stack
         db_params.p_attrs = attr_list;
         p_scb->uuid_int = p_data->api_open.uuid;
         p_scb->sdp_discovery_started = TRUE;
@@ -1143,7 +1146,7 @@ void bta_avk_cleanup(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     APPL_TRACE_DEBUG("bta_avk_cleanup");
 
     /* free any buffers */
-    utl_freebuf((void **) &p_scb->p_cap);
+    osi_free_and_reset((void **) &p_scb->p_cap);
     p_scb->sdp_discovery_started = FALSE;
     p_scb->avdt_version = 0;
 
@@ -1160,7 +1163,22 @@ void bta_avk_cleanup(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     p_scb->num_disc_snks = 0;
     p_scb->coll_mask = 0;
     p_scb->skip_sdp = FALSE;
-    bta_sys_stop_timer(&p_scb->timer);
+    alarm_cancel(p_scb->avrc_ct_timer);
+
+#if 0
+    vendor_get_interface()->send_command(
+        (vendor_opcode_t)BT_VND_OP_A2DP_OFFLOAD_STOP, (void*)&p_scb->l2c_cid);
+    if (p_scb->offload_start_pending) {
+        tBTA_AV_STATUS status = BTA_AV_FAIL_STREAM;
+        (*bta_avk_cb.p_cback)(BTA_AV_OFFLOAD_START_RSP_EVT, (tBTA_AV *)&status);
+    }
+    p_scb->offload_start_pending = FALSE;
+    p_scb->skip_sdp = FALSE;
+    p_scb->coll_mask = 0;
+
+    p_scb->skip_sdp = FALSE;
+#endif
+
     if (p_scb->deregistring)
     {
         /* remove stream */
@@ -1234,12 +1252,7 @@ void bta_avk_config_ind (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         APPL_TRACE_WARNING(" bta_avk_config_ind config_ind called before Open");
         p_scb->coll_mask |= BTA_AVK_COLL_SETCONFIG_IND;
     }
-    bta_sys_stop_timer(&bta_avk_cb.acp_sig_tmr);
-    /* As there is no API currently to check if the
-     * timer is active, p_cback is used to identify
-     * the state of acp_sig_tmr. NULL means not active.
-     */
-    bta_avk_cb.acp_sig_tmr.p_cback = NULL;
+    alarm_cancel(bta_avk_cb.accept_signalling_timer);
 
     /* if no codec parameters in configuration, fail */
     if ((p_evt_cfg->num_codec == 0) ||
@@ -1316,8 +1329,8 @@ void bta_avk_disconnect_req (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
 
     APPL_TRACE_DEBUG("bta_avk_disconnect_req conn_lcb: 0x%x", bta_avk_cb.conn_lcb);
 
-    bta_sys_stop_timer(&bta_avk_cb.sig_tmr);
-    bta_sys_stop_timer(&p_scb->timer);
+    alarm_cancel(bta_avk_cb.link_signalling_timer);
+    alarm_cancel(p_scb->avrc_ct_timer);
     if(bta_avk_cb.conn_lcb)
     {
         p_rcb = bta_avk_get_rcb_by_shdl((UINT8)(p_scb->hdi + 1));
@@ -1400,14 +1413,14 @@ void bta_avk_setconfig_rsp (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         memcpy(av_sink_codec_info.avk_config.bd_addr,p_scb->peer_addr,sizeof(BD_ADDR));
         av_sink_codec_info.avk_config.codec_info = p_scb->cfg.codec_info;
         p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_SINK_CFG_EVT,
-                                              &av_sink_codec_info);
+                                   &av_sink_codec_info, av_sink_codec_info.avk_config.bd_addr);
     }
 
 
     AVDT_ConfigRsp(p_scb->avdt_handle, p_scb->avdt_label, p_data->ci_setconfig.err_code,
                    p_data->ci_setconfig.category);
 
-    bta_sys_stop_timer(&bta_avk_cb.sig_tmr);
+    alarm_cancel(bta_avk_cb.link_signalling_timer);
 
     if(p_data->ci_setconfig.err_code == AVDT_SUCCESS)
     {
@@ -1661,8 +1674,7 @@ void bta_avk_do_close (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     {
         bta_avk_str_stopped(p_scb, NULL);
     }
-    bta_sys_stop_timer(&bta_avk_cb.sig_tmr);
-
+    alarm_cancel(bta_avk_cb.link_signalling_timer);
     /* close stream */
     p_scb->started = FALSE;
 
@@ -1674,9 +1686,10 @@ void bta_avk_do_close (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
      * for whatever reason the the close request can not be sent in time.
      * when this timer expires, AVDT_DisconnectReq will be called to disconnect the link
      */
-    bta_sys_start_timer(&p_scb->timer,
-                        (UINT16)BTA_AVK_API_CLOSE_EVT,
-                        BTA_AVK_CLOSE_REQ_TIME_VAL);
+    bta_sys_start_timer(p_scb->avrc_ct_timer,
+                        BTA_AVK_CLOSE_REQ_TIME_VAL,
+                        BTA_AVK_API_CLOSE_EVT,
+                        p_scb->hndl);
 
 }
 
@@ -2059,7 +2072,7 @@ void bta_avk_getcap_results (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             memcpy(av_sink_codec_info.avk_config.bd_addr,p_scb->peer_addr,sizeof(BD_ADDR));
             av_sink_codec_info.avk_config.codec_info = p_scb->cfg.codec_info;
             p_scb->seps[p_scb->sep_idx].p_app_data_cback(BTA_AVK_MEDIA_SINK_CFG_EVT,
-                     &av_sink_codec_info);
+                     &av_sink_codec_info, av_sink_codec_info.avk_config.bd_addr);
         }
 
         if ((uuid_int == UUID_SERVCLASS_AUDIO_SOURCE) &&
@@ -2078,7 +2091,7 @@ void bta_avk_getcap_results (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         if (!bta_avk_is_rcfg_sst(p_scb))
         {
             /* free capabilities buffer */
-            utl_freebuf((void **) &p_scb->p_cap);
+            osi_free_and_reset((void **) &p_scb->p_cap);
         }
     }
     else
@@ -2241,7 +2254,7 @@ void bta_avk_str_stopped (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         {
             p_buf = (BT_HDR *)list_front(p_scb->a2d_list);
             list_remove(p_scb->a2d_list, p_buf);
-            GKI_freebuf(p_buf);
+            osi_free(p_buf);
         }
 
     /* drop the audio buffers queued in L2CAP */
@@ -2310,7 +2323,7 @@ void bta_avk_reconfig (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     /* store the new configuration in control block */
     if (p_scb->p_cap == NULL)
     {
-        p_scb->p_cap = (tAVDT_CFG *) GKI_getbuf(sizeof(tAVDT_CFG));
+        p_scb->p_cap = (tAVDT_CFG *) osi_malloc(sizeof(tAVDT_CFG));
     }
     if((p_cfg = p_scb->p_cap) == NULL)
     {
@@ -2327,7 +2340,7 @@ void bta_avk_reconfig (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     }
 
     /*if(bta_avk_cb.features & BTA_AVK_FEAT_RCCT)*/
-        bta_sys_stop_timer(&p_scb->timer);
+    alarm_cancel(p_scb->avrc_ct_timer);
 
     memcpy(p_cfg, &p_scb->cfg, sizeof(tAVDT_CFG));
     p_cfg->num_protect = p_rcfg->num_protect;
@@ -2463,7 +2476,7 @@ void bta_avk_data_path (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
                 else
                 {
                     /* too many buffers in a2d_list, drop it. */
-                    GKI_freebuf(p_buf);
+                    osi_free(p_buf);
                 }
             }
         }
@@ -2879,7 +2892,7 @@ void bta_avk_rcfg_str_ok (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
 
     /* rc listen */
     bta_avk_st_rc_timer(p_scb, NULL);
-    utl_freebuf((void **)&p_scb->p_cap);
+    osi_free_and_reset((void **)&p_scb->p_cap);
 
     /* No need to keep the role bits once reconfig is done. */
     p_scb->role &= ~BTA_AVK_ROLE_AD_ACP;
@@ -3203,7 +3216,7 @@ void bta_avk_open_rc (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         if (!bta_avk_link_role_ok(p_scb, A2D_SET_ONE_BIT))
         {
             APPL_TRACE_ERROR ("failed to start streaming for role management reasons!!");
-            bta_sys_stop_timer(&p_scb->timer);
+            alarm_cancel(p_scb->avrc_ct_timer);
             start.chnl   = p_scb->chnl;
             start.status = BTA_AVK_FAIL_ROLE;
             start.initiator = TRUE;
@@ -3231,7 +3244,8 @@ void bta_avk_open_rc (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             {
                 /* AVRC channel is not connected. delay a little bit */
                 if ((p_scb->wait & BTA_AVK_WAIT_ROLE_SW_BITS) == 0)
-                    bta_sys_start_timer(&p_scb->timer, BTA_AVK_AVRC_TIMER_EVT, BTA_AVK_RC_DISC_TIME_VAL);
+                    bta_sys_start_timer(p_scb->avrc_ct_timer,BTA_AVK_RC_DISC_TIME_VAL, 
+                                        BTA_AVK_AVRC_TIMER_EVT, (p_scb->hndl));
                 else
                     p_scb->wait |= BTA_AVK_WAIT_CHECK_RC;
             }
@@ -3298,7 +3312,7 @@ void bta_avk_open_at_inc (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         p_scb->coll_mask = 0;
         bta_avk_set_scb_sst_init (p_scb);
 
-        if ((p_buf = (tBTA_AVK_API_OPEN *) GKI_getbuf(sizeof(tBTA_AVK_API_OPEN))) != NULL)
+        if ((p_buf = (tBTA_AVK_API_OPEN *) osi_malloc(sizeof(tBTA_AVK_API_OPEN))) != NULL)
         {
             memcpy(p_buf, &(p_scb->open_api), sizeof(tBTA_AVK_API_OPEN));
             p_scb->skip_sdp = TRUE;
