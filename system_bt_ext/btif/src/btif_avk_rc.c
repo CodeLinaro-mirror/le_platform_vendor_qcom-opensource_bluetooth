@@ -635,6 +635,7 @@ static void btif_avk_rc_handle_rc_passthrough_rsp ( tBTA_AVK_REMOTE_RSP *p_remot
     const char *status;
     int index = btif_avk_rc_get_idx_by_rc_handle(p_remote_rsp->rc_handle);
     BTIF_TRACE_DEBUG("%s: index=%d", __FUNCTION__, index);
+    bt_bdaddr_t rc_addr;
     if (index >= btif_max_rc_clients)
     {
         BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
@@ -655,10 +656,11 @@ static void btif_avk_rc_handle_rc_passthrough_rsp ( tBTA_AVK_REMOTE_RSP *p_remot
         }
 
         BTIF_TRACE_DEBUG("%s: rc_id=%d status=%s", __FUNCTION__, p_remote_rsp->rc_id, status);
-
+        bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
         release_transaction(p_remote_rsp->label);
-        if (btif_avk_rc_ctrl_callbacks != NULL) {
-            HAL_CBACK(btif_avk_rc_ctrl_callbacks, passthrough_rsp_cb, p_remote_rsp->rc_id, key_state);
+        if (btif_avk_rc_ctrl_vendor_callbacks != NULL) {
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, passthrough_rsp_vendor_cb,
+                    p_remote_rsp->rc_id, key_state, &rc_addr);
         }
     }
     else

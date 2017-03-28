@@ -504,6 +504,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             // copy to avoid alignment problems
             /* in this case, L2CAP connection is still up, but bt-app moved to disc state
                so lets move bt-app to connected state first */
+            memcpy(&req, p_data, sizeof(req));
             btif_report_connection_state(BTAV_CONNECTION_STATE_CONNECTED, &(req.peer_bd));
             BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
                     req.sample_rate, req.channel_count,
@@ -512,7 +513,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
 
             if (bt_av_sink_vendor_callbacks != NULL) {
                 HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
-                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
+                        &(req.peer_bd), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -2097,7 +2098,7 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
 static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int max,
                              int a2dp_multicast_state, uint8_t streaming_prarm)
 {
-    bt_status_t status;
+    bt_status_t status = BT_STATUS_FAIL;
 
     BTIF_TRACE_IMP("%s max = %d", __FUNCTION__, max);
 
@@ -2221,6 +2222,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(RxDataQ));
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_curr, p_src, q_bytes_left);
             GKI_freebuf(p_data_q_buf);
@@ -2255,6 +2260,48 @@ void update_streaming_device_vendor(bt_bdaddr_t *bd_addr)
     memcpy(&streaming_bda, bd_addr, sizeof(bt_bdaddr_t));
     BTIF_TRACE_DEBUG(" %s streaming bda %s ", __FUNCTION__, bdaddr_to_string(&streaming_bda, &addr1, sizeof(addr1)));
 
+}
+
+/*******************************************************************************
+**
+** Function         update_flush_device_vendor
+**
+** Description      Updates the current streaming device from apps
+**
+** Returns          void
+**
+*******************************************************************************/
+void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
+{
+    BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
+    bdstr_t addr1, addr2;
+    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    bt_bdaddr_t bda;
+    int count = 0, queue_size = 0;
+    queue_size = GKI_queue_length(&RxDataQ);
+    BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
+    while ((!GKI_queue_is_empty(&RxDataQ)) || count < queue_size)
+    {
+        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(RxDataQ));
+        if (p_data_q_buf == NULL)
+            break;
+
+        bdcpy(bda.address, p_data_q_buf->bd_addr);
+        BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
+            bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
+            bdaddr_to_string(&bda, &addr2, sizeof(addr2)));
+
+        if ((bd_addr != NULL) &&
+            !memcmp(bd_addr->address, p_data_q_buf->bd_addr, sizeof(BD_ADDR)))
+        {
+            BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
+                __FUNCTION__);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&RxDataQ);
+            GKI_freebuf(p_data_q_buf);
+        }
+        count++;
+    }
 }
 
 /*******************************************************************************
@@ -2322,6 +2369,10 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(RxDataQ));
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_dest = data + (size - bytes_to_be_written);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, q_bytes_left);
@@ -2672,6 +2723,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
 #endif
     get_a2dp_sink_streaming_data_vendor,
     update_streaming_device_vendor,
+    update_flushing_device_vendor,
     cleanup_sink_vendor,
 };
 
