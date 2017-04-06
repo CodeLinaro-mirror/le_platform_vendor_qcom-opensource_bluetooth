@@ -247,6 +247,8 @@ typedef struct {
    /** Send streaming device address to stack*/
    void (*update_streaming_device_vendor)( bt_bdaddr_t *bd_addr);
 
+   /** Send flushing device address to stack*/
+   void (*update_flushing_device_vendor)( bt_bdaddr_t *bd_addr);
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );

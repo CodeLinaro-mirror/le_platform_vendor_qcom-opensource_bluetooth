@@ -588,6 +588,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
     do
     {
         p_scb = bta_avk_alloc_scb(registr.chnl);
+        cs.registration_id = p_scb->hdi;
         if(p_scb == NULL)
         {
             APPL_TRACE_ERROR("failed to alloc SCB");
@@ -718,6 +719,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                 if(AVDT_CreateStream(&p_scb->seps[index - startIndex].av_handle, &cs) ==
                                                                             AVDT_SUCCESS)
                 {
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
                    if (index == BTIF_SV_AVK_AA_APTX_INDEX)
                    {
                        UINT8* ptr = cs.cfg.codec_info;
@@ -731,6 +733,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                             index, p_scb->seps[index - startIndex].vendorId,
                             p_scb->seps[index - startIndex].codecId);
                     }
+#endif
                     p_scb->seps[index - startIndex].codec_type = codec_type;
                     p_scb->seps[index - startIndex].tsep = cs.tsep;
                     if(cs.tsep == AVDT_TSEP_SNK)
