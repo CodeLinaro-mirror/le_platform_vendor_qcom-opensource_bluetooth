@@ -53,7 +53,6 @@
 
 #include "bt_utils.h"
 #include "bt_target.h"
-#include "gki.h"
 #include "bta_api.h"
 #include "btu.h"
 #include "bta_sys.h"
@@ -88,9 +87,6 @@
 #if (BTA_AV_SINK_INCLUDED == TRUE)
 #include "oi_codec_sbc.h"
 #include "oi_status.h"
-#endif
-#ifdef USE_AUDIO_TRACK
-#include "bluetoothTrack.h"
 #endif
 #include "stdio.h"
 #include <dlfcn.h>
@@ -250,6 +246,7 @@ typedef struct
     UINT16 len;
     UINT16 offset;
     UINT16 layer_specific;
+    BD_ADDR bd_addr;
 } tBT_AVK_SBC_HDR;
 
 typedef struct
@@ -269,7 +266,8 @@ typedef union
 typedef struct
 {
 #if (BTA_AV_INCLUDED == TRUE)
-    BUFFER_Q RxSbcQ;
+    fixed_queue_t *TxAaQ;
+    fixed_queue_t  *RxSbcQ;
     BOOLEAN is_tx_timer;
     BOOLEAN is_rx_timer;
     UINT16 TxAaMtuSize;
@@ -321,7 +319,7 @@ extern OI_STATUS OI_CODEC_SBC_DecoderReset(OI_CODEC_SBC_DECODER_CONTEXT *context
                                            OI_UINT8 pcmStride,
                                            OI_BOOL enhanced);
 #endif
-static void btif_avk_media_flush_q(BUFFER_Q *p_q);
+static void btif_avk_media_flush_q(fixed_queue_t  *p_q);
 static void btif_avk_media_task_aa_handle_stop_decoding(void );
 static void btif_avk_media_task_aa_rx_flush(void);
 
@@ -780,7 +778,7 @@ void btif_avk_a2dp_on_idle(void)
         btif_avk_media_cb.rx_flush = TRUE;
         btif_avk_media_cb.a2dp_sink_pcm_buf_size = 0;
         if(btif_avk_media_cb.a2dp_sink_pcm_buf != NULL)
-            GKI_freebuf(btif_avk_media_cb.a2dp_sink_pcm_buf);
+            osi_free(btif_avk_media_cb.a2dp_sink_pcm_buf);
         btif_avk_media_cb.a2dp_sink_pcm_buf = NULL;
         btif_avk_media_task_aa_rx_flush_req();
         //btif_avk_media_task_aa_handle_stop_decoding();
@@ -824,7 +822,7 @@ static BOOLEAN btif_avk_media_task_clear_track(void)
 {
     BT_HDR *p_buf;
 
-    if (NULL == (p_buf = GKI_getbuf(sizeof(BT_HDR))))
+    if (NULL == (p_buf = osi_malloc(sizeof(BT_HDR))))
     {
         return FALSE;
     }
@@ -854,7 +852,7 @@ void btif_avk_reset_decoder(UINT8 *p_av)
             p_av[4], p_av[5], p_av[6]);
 
     tBTIF_AVK_MEDIA_SINK_CFG_UPDATE *p_buf;
-    if (NULL == (p_buf = GKI_getbuf(sizeof(tBTIF_AVK_MEDIA_SINK_CFG_UPDATE))))
+    if (NULL == (p_buf = osi_malloc(sizeof(tBTIF_AVK_MEDIA_SINK_CFG_UPDATE))))
     {
         APPL_TRACE_EVENT("btif_avk_reset_decoder No Buffer ");
         return;
@@ -984,7 +982,7 @@ void btif_avk_a2dp_set_audio_focus_state(btif_avk_media_audio_focus_state state)
 {
     APPL_TRACE_EVENT("btif_avk_a2dp_set_audio_focus_state");
     tBTIF_AVK_MEDIA_SINK_FOCUS_UPDATE *p_buf;
-    if (NULL == (p_buf = GKI_getbuf(sizeof(tBTIF_AVK_MEDIA_SINK_FOCUS_UPDATE))))
+    if (NULL == (p_buf = osi_malloc(sizeof(tBTIF_AVK_MEDIA_SINK_FOCUS_UPDATE))))
     {
         APPL_TRACE_EVENT("btif_avk_a2dp_set_audio_focus_state No Buffer ");
         return;
@@ -999,13 +997,11 @@ void btif_avk_a2dp_set_audio_focus_state(btif_avk_media_audio_focus_state state)
 #if (BTA_AV_SINK_INCLUDED == TRUE)
 static void btif_avk_media_task_avk_handle_timer(UNUSED_ATTR void *context)
 {
-    UINT8 count;
     tBT_AVK_SBC_HDR *p_msg;
     int num_sbc_frames;
     int num_frames_to_process;
 
-    count = btif_avk_media_cb.RxSbcQ._count;
-    if (0 == count)
+    if (!fixed_queue_length(btif_avk_media_cb.RxSbcQ))
     {
         APPL_TRACE_DEBUG("  QUE  EMPTY ");
     }
@@ -1041,13 +1037,13 @@ static void btif_avk_media_task_avk_handle_timer(UNUSED_ATTR void *context)
 
         do
         {
-            p_msg = (tBT_AVK_SBC_HDR *)GKI_getfirst(&(btif_avk_media_cb.RxSbcQ));
+            p_msg = (tBT_AVK_SBC_HDR *)fixed_queue_try_peek_first(btif_avk_media_cb.RxSbcQ);
             if (p_msg == NULL)
                 return;
             num_sbc_frames  = p_msg->num_frames_to_be_processed; /* num of frames in Que Packets */
             APPL_TRACE_DEBUG(" Frames left in topmost packet %d", num_sbc_frames);
             APPL_TRACE_DEBUG(" Remaining frames to process in tick %d", num_frames_to_process);
-            APPL_TRACE_DEBUG(" Num of Packets in Que %d", btif_avk_media_cb.RxSbcQ._count);
+            APPL_TRACE_DEBUG(" Num of Packets in Que %d", fixed_queue_length(btif_avk_media_cb.RxSbcQ));
 
             if ( num_sbc_frames > num_frames_to_process) /*  Que Packet has more frames*/
             {
@@ -1060,14 +1056,14 @@ static void btif_avk_media_task_avk_handle_timer(UNUSED_ATTR void *context)
             else                                        /*  Que packet has less frames */
             {
                 btif_avk_media_task_handle_inc_media(p_msg);
-                p_msg = (tBT_AVK_SBC_HDR *)GKI_dequeue(&(btif_avk_media_cb.RxSbcQ));
+                p_msg = (tBT_AVK_SBC_HDR *)fixed_queue_try_dequeue(btif_avk_media_cb.RxSbcQ);
                 if( p_msg == NULL )
                 {
                      APPL_TRACE_ERROR("Insufficient data in que ");
                      break;
                 }
                 num_frames_to_process = num_frames_to_process - p_msg->num_frames_to_be_processed;
-                GKI_freebuf(p_msg);
+                osi_free(p_msg);
             }
         }while(num_frames_to_process > 0);
 
@@ -1094,6 +1090,8 @@ static void btif_avk_media_thread_init(UNUSED_ATTR void *context) {
   UIPC_Init(NULL);
 
 #if (BTA_AV_INCLUDED == TRUE)
+  btif_avk_media_cb.TxAaQ = fixed_queue_new(SIZE_MAX);
+  btif_avk_media_cb.RxSbcQ = fixed_queue_new(SIZE_MAX);
   UIPC_Open(UIPC_CH_ID_AV_CTRL , btif_a2dp_ctrl_cb);
 #endif
 
@@ -1125,7 +1123,7 @@ static void btif_avk_media_thread_cleanup(UNUSED_ATTR void *context) {
 static BOOLEAN btif_avk_media_task_send_cmd_evt(UINT16 Evt)
 {
     BT_HDR *p_buf;
-    if (NULL == (p_buf = GKI_getbuf(sizeof(BT_HDR))))
+    if (NULL == (p_buf = osi_malloc(sizeof(BT_HDR))))
     {
         return FALSE;
     }
@@ -1146,11 +1144,11 @@ static BOOLEAN btif_avk_media_task_send_cmd_evt(UINT16 Evt)
  ** Returns          void
  **
  *******************************************************************************/
-static void btif_avk_media_flush_q(BUFFER_Q *p_q)
+static void btif_avk_media_flush_q(fixed_queue_t  *p_q)
 {
-    while (!GKI_queue_is_empty(p_q))
+    while (! fixed_queue_is_empty(p_q))
     {
-        GKI_freebuf(GKI_dequeue(p_q));
+        osi_free(fixed_queue_try_dequeue(p_q));
     }
 }
 
@@ -1201,7 +1199,7 @@ static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR v
     default:
         APPL_TRACE_ERROR("ERROR in %s unknown event %d", __func__, p_msg->event);
     }
-    GKI_freebuf(p_msg);
+    osi_free(p_msg);
     APPL_TRACE_IMP("%s: %s DONE", __func__, dump_media_event(p_msg->event));
 }
 
@@ -1219,6 +1217,7 @@ static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR v
 static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 {
     UINT8 *sbc_start_frame = ((UINT8*)(p_msg + 1) + p_msg->offset + 1);
+    bdstr_t addr1;
     int count;
     UINT32 pcmBytes, availPcmBytes;
     OI_INT16 *pcmDataPointer = pcmData; /*Will be overwritten on next packet receipt*/
@@ -1226,7 +1225,8 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
     int num_sbc_frames = p_msg->num_frames_to_be_processed;
     UINT32 sbc_frame_len = p_msg->len - 1;
     availPcmBytes = sizeof(pcmData);
-
+    BD_ADDR bd_addr;
+    memcpy(bd_addr, p_msg->bd_addr, sizeof(BD_ADDR));
 #ifdef USE_AUDIO_TRACK
     int retwriteAudioTrack = 0;
 #endif
@@ -1243,7 +1243,9 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
         return;
     }
 #endif
-    APPL_TRACE_DEBUG("Number of sbc frames %d, frame_len %d", num_sbc_frames, sbc_frame_len);
+    APPL_TRACE_DEBUG("Number of sbc frames %d, frame_len %d bd_addr = %s",
+            num_sbc_frames, sbc_frame_len,
+            bdaddr_to_string((bt_bdaddr_t *)bd_addr, &addr1, sizeof(addr1)));
 
     for(count = 0; count < num_sbc_frames && sbc_frame_len != 0; count ++)
     {
@@ -1266,9 +1268,13 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 #ifdef ANDROID
     retwriteAudioTrack = btWriteData((void*)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
-    btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM, (void*)pcmData, (sizeof(pcmData) - availPcmBytes));
-    if(btif_avk_media_cb.data_channel_open)
+    APPL_TRACE_ERROR("calling btif_media_enque_sink_data");
+    btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM,
+            (void*)pcmData, (sizeof(pcmData) - availPcmBytes), bd_addr);
+    if(btif_avk_media_cb.data_channel_open) {
+       APPL_TRACE_ERROR("Feeding to audio HAL");
         btif_avk_media_task_feed_audio_hal();
+    }
 #else
     //UIPC_Send(UIPC_CH_ID_AV_AUDIO, 0, (UINT8 *)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
@@ -1290,7 +1296,7 @@ static BOOLEAN btif_avk_media_task_decode_req(void)
 {
     BT_HDR *p_buf;
 
-    if (NULL == (p_buf = GKI_getbuf(sizeof(BT_HDR))))
+    if (NULL == (p_buf = osi_malloc(sizeof(BT_HDR))))
     {
         return FALSE;
     }
@@ -1314,7 +1320,7 @@ BOOLEAN btif_avk_media_task_feed_audio_hal(void)
 {
     BT_HDR *p_buf;
 
-    if (NULL == (p_buf = GKI_getbuf(sizeof(BT_HDR))))
+    if (NULL == (p_buf = osi_malloc(sizeof(BT_HDR))))
     {
         return FALSE;
     }
@@ -1340,10 +1346,10 @@ BOOLEAN btif_avk_media_task_aa_rx_flush_req(void)
 {
     BT_HDR *p_buf;
 
-    if (GKI_queue_is_empty(&(btif_avk_media_cb.RxSbcQ))== TRUE) /*  Que is already empty */
+    if (fixed_queue_is_empty(btif_avk_media_cb.RxSbcQ)== TRUE) /*  Que is already empty */
         return TRUE;
 
-    if (NULL == (p_buf = GKI_getbuf(sizeof(BT_HDR))))
+    if (NULL == (p_buf = osi_malloc(sizeof(BT_HDR))))
     {
         return FALSE;
     }
@@ -1370,7 +1376,7 @@ void btif_avk_media_task_decode(void)
     int num_sbc_frames;
     int num_frames_to_process;
 
-    if(GKI_queue_is_empty(&btif_avk_media_cb.RxSbcQ)) {
+    if(fixed_queue_is_empty(btif_avk_media_cb.RxSbcQ)) {
         APPL_TRACE_DEBUG("  QUE  EMPTY ");
         return;
     }
@@ -1379,11 +1385,11 @@ void btif_avk_media_task_decode(void)
         btif_avk_media_flush_q(&(btif_avk_media_cb.RxSbcQ));
         return;
     }
-    p_msg = (tBT_AVK_SBC_HDR *)GKI_dequeue(&(btif_avk_media_cb.RxSbcQ));
+    p_msg = (tBT_AVK_SBC_HDR *)fixed_queue_try_dequeue(btif_avk_media_cb.RxSbcQ);
     if (p_msg == NULL)
         return;
     btif_avk_media_task_handle_inc_media(p_msg);
-    GKI_freebuf(p_msg);
+    osi_free(p_msg);
 }
 /*******************************************************************************
  **
@@ -1481,7 +1487,7 @@ static void btif_avk_media_task_aa_handle_start_decoding(void) {
   btStartTrack();
 #endif
 #endif
-  btif_avk_media_cb.decode_alarm = alarm_new();
+  btif_avk_media_cb.decode_alarm = alarm_new_periodic("btif.media_decode");
   if (!btif_avk_media_cb.decode_alarm) {
     LOG_ERROR("%s unable to allocate decode alarm.", __func__);
     return;
@@ -1664,7 +1670,7 @@ static void btif_avk_media_task_aa_handle_decoder_reset(BT_HDR *p_msg)
     btif_avk_media_cb.a2dp_sink_pcm_buf_size  = freq_multiple * 4 * 2;
     if (btif_avk_media_cb.a2dp_sink_pcm_buf == NULL)
     {
-        btif_avk_media_cb.a2dp_sink_pcm_buf = GKI_getbuf(btif_avk_media_cb.a2dp_sink_pcm_buf_size);
+        btif_avk_media_cb.a2dp_sink_pcm_buf = osi_malloc(btif_avk_media_cb.a2dp_sink_pcm_buf_size);
     }
     APPL_TRACE_DEBUG(" Frames to be processed in 20 ms %d",btif_avk_media_cb.frames_to_process);
 }
@@ -1687,20 +1693,20 @@ static UINT64 time_now_us()
  **
  ** Returns          size of the queue
  *******************************************************************************/
-UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt)
+UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt, BD_ADDR bd_addr)
 {
     tBT_AVK_SBC_HDR *p_msg;
 
     if(btif_avk_media_cb.rx_flush == TRUE) /* Flush enabled, do not enque*/
-        return GKI_queue_length(&btif_avk_media_cb.RxSbcQ);
-    if(GKI_queue_length(&btif_avk_media_cb.RxSbcQ) >= MAX_OUTPUT_A2DP_FRAME_QUEUE_SZ)
+        return fixed_queue_length(btif_avk_media_cb.RxSbcQ);
+    if(fixed_queue_length(btif_avk_media_cb.RxSbcQ) >= MAX_OUTPUT_A2DP_FRAME_QUEUE_SZ)
     {
-         return GKI_queue_length(&btif_avk_media_cb.RxSbcQ);
+         return fixed_queue_length(btif_avk_media_cb.RxSbcQ);
     }
 
     BTIF_TRACE_VERBOSE("btif_avk_media_sink_enque_buf + ");
     /* allocate and Queue this buffer */
-    if ((p_msg = (tBT_AVK_SBC_HDR *)GKI_getbuf(sizeof(tBT_AVK_SBC_HDR) + p_pkt->len)) != NULL)
+    if ((p_msg = (tBT_AVK_SBC_HDR *)osi_malloc(sizeof(tBT_AVK_SBC_HDR) + p_pkt->len)) != NULL)
     {
         UINT8 *p_dest;
 
@@ -1711,9 +1717,10 @@ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt)
         p_msg->len = p_pkt->len;
         p_msg->offset = 0;
         p_msg->layer_specific = p_pkt->layer_specific;
+        memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
 
         BTIF_TRACE_VERBOSE("btif_avk_media_sink_enque_buf %d", p_msg->num_frames_to_be_processed);
-        GKI_enqueue(&(btif_avk_media_cb.RxSbcQ), p_msg);
+        fixed_queue_enqueue(btif_avk_media_cb.RxSbcQ, p_msg);
         btif_avk_media_task_decode_req();
     }
     else
@@ -1721,7 +1728,7 @@ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt)
         /* let caller deal with a failed allocation */
         BTIF_TRACE_VERBOSE("btif_avk_media_sink_enque_buf No Buffer left - ");
     }
-    return GKI_queue_length(&btif_avk_media_cb.RxSbcQ);
+    return fixed_queue_length(btif_avk_media_cb.RxSbcQ);
 }
 
 #endif /* BTA_AV_INCLUDED == TRUE */

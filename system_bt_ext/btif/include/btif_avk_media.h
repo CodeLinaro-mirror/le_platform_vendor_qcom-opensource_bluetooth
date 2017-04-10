@@ -36,7 +36,6 @@
 #include <stdbool.h>
 
 #include "bta_api.h"
-#include "gki.h"
 #include "btif_avk_api.h"
 #include "audio_a2dp_hw.h"
 
@@ -155,7 +154,7 @@ extern BOOLEAN btif_avk_media_task_aa_rx_flush_req(void);
  **
  ** Returns          size of the queue
  *******************************************************************************/
- UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_buf);
+ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_buf, BD_ADDR bd_addr);
 
 //#endif
 

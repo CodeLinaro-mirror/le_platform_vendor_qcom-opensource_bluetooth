@@ -367,7 +367,7 @@ typedef struct {
     /**
      * Register the BtRc callbacks
      */
-    bt_status_t (*init)( btrc_callbacks_t* callbacks , int max_avrcp_connections);
+    bt_status_t (*init)( btrc_callbacks_t* callbacks);
 
     /** Respose to GetPlayStatus request. Contains the current
     **  1. Play status
@@ -434,19 +434,6 @@ typedef struct {
     ** volume: Should be in the range 0-127. bit7 is reseved and cannot be set
     */
     bt_status_t (*set_volume)(uint8_t volume, bt_bdaddr_t *bd_addr);
-    bt_status_t (*get_folder_items_rsp) (btrc_folder_list_entries_t *p_param, bt_bdaddr_t *bd_addr);
-
-    bt_status_t (*set_addressed_player_rsp) (btrc_status_t status_code, bt_bdaddr_t *bd_addr);
-    bt_status_t (*set_browsed_player_rsp) (btrc_set_browsed_player_rsp_t *p_param,
-            bt_bdaddr_t *bd_addr);
-    bt_status_t (*change_path_rsp) (uint8_t status_code, uint32_t item_count,
-            bt_bdaddr_t *bd_addr);
-    bt_status_t (*play_item_rsp) (uint8_t status_code, bt_bdaddr_t *bd_addr);
-    bt_status_t (*get_item_attr_rsp)( uint8_t num_attr, btrc_element_attr_val_t *p_attrs,
-            bt_bdaddr_t *bd_addr);
-    bt_status_t (*is_device_active_in_handoff) (bt_bdaddr_t *bd_addr);
-    bt_status_t (*get_total_items_rsp) (uint8_t status_code, uint32_t item_count,
-            uint16_t uid_counter, bt_bdaddr_t *bd_addr);
 
     /** Closes the interface. */
     void  (*cleanup)( void );

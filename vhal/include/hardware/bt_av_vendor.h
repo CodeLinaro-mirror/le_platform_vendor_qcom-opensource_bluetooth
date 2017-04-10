@@ -178,6 +178,10 @@ typedef void (* btav_connection_priority_vendor_callback)(bt_bdaddr_t *bd_addr);
  */
 typedef void (* btav_is_multicast_enabled_vendor_callback)(int state);
 
+/** Callback to notify reconfig a2dp when A2dp Soft Handoff is triggered
+*/
+typedef void(* btav_reconfig_a2dp_trigger_callback)(int reason, bt_bdaddr_t *bd_addr);
+
 /*
  * Vendor callback for audio focus request to be used only in
  * case of A2DP Sink. This is required because we are using
@@ -192,6 +196,7 @@ typedef struct {
     btav_connection_priority_vendor_callback connection_priority_vendor_cb;
     btav_is_multicast_enabled_vendor_callback multicast_state_vendor_cb;
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
+    btav_reconfig_a2dp_trigger_callback reconfig_a2dp_trigger_cb;
 } btav_vendor_callbacks_t;
 
 typedef struct {
@@ -211,16 +216,16 @@ typedef struct {
      * Register the BtAvVendorcallbacks
      */
     bt_status_t (*init_vendor)( btav_vendor_callbacks_t* callbacks , int max_a2dp_connections,
-                        int a2dp_multicast_state);
+                        int a2dp_multicast_state, const char *offload_cap);
 
     /** Send priority of device to stack*/
     void (*allow_connection_vendor)( int is_valid , bt_bdaddr_t *bd_addr);
 
-    /** Sends Audio Focus State. */
-    void  (*audio_focus_state_vendor)( int focus_state );
-
    /** Request PCM sample. */
    uint32_t  (*get_pcm_data_vendor)( uint8_t* data, uint32_t size );
+
+   /** Send priority of device to stack*/
+   void (*allow_connection)( int is_valid , bt_bdaddr_t *bd_addr);
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );
@@ -239,10 +244,14 @@ typedef struct {
                         int a2dp_multicast_state, uint8_t streaming_prarm);
 
     /** Sends Audio Focus State. */
-    void  (*audio_focus_state_vendor)( int focus_state );
+    void  (*audio_focus_state_vendor)( int focus_state,  bt_bdaddr_t *bd_addr );
 
    /** Request PCM sample. */
    uint32_t  (*get_a2dp_sink_streaming_data_vendor)( uint16_t codec_type, uint8_t* data, uint32_t size );
+
+   /** Send streaming device address to stack*/
+   void (*update_streaming_device_vendor)( bt_bdaddr_t *bd_addr);
+
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );

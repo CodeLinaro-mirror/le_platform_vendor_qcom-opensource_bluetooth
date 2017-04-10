@@ -215,6 +215,7 @@ static char *bta_avk_st_code(UINT8 state);
 #endif
 
 static BOOLEAN is_multicast_enabled = FALSE;
+#if 0
 /*******************************************************************************
 **
 ** Function         bta_avk_timer_cback
@@ -241,7 +242,7 @@ static void bta_avk_timer_cback(void *p_tle)
         }
     }
 
-    if (p_scb && (p_buf = (BT_HDR *) GKI_getbuf(sizeof(BT_HDR))) != NULL)
+    if (p_scb && (p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
     {
         /* send the event through the audio state machine.
          * only when the audio SM is open, the main SM opens the RC connection as INT */
@@ -250,6 +251,7 @@ static void bta_avk_timer_cback(void *p_tle)
         bta_sys_sendmsg(p_buf);
     }
 }
+#endif
 
 /*******************************************************************************
 **
@@ -273,6 +275,9 @@ static void bta_avk_api_enable(tBTA_AVK_DATA *p_data)
         bta_avk_cb.rcb[i].handle = BTA_AVK_RC_HANDLE_NONE;
 
     bta_avk_cb.rc_acp_handle = BTA_AVK_RC_HANDLE_NONE;
+
+    bta_avk_cb.link_signalling_timer = alarm_new("bta_avk.link_signalling_timer");
+    bta_avk_cb.accept_signalling_timer = alarm_new("bta_avk.accept_signalling_timer");
 
     /* store parameters */
     bta_avk_cb.p_cback  = p_data->api_enable.p_cback;
@@ -388,7 +393,7 @@ static tBTA_AVK_SCB * bta_avk_alloc_scb(tBTA_AVK_CHNL chnl)
             if(bta_avk_cb.p_scb[xx] == NULL)
             {
                 /* found an empty spot */
-                p_ret = (tBTA_AVK_SCB *)GKI_getbuf(sizeof(tBTA_AVK_SCB));
+                p_ret = (tBTA_AVK_SCB *)osi_malloc(sizeof(tBTA_AVK_SCB));
                 if(p_ret)
                 {
                     memset(p_ret, 0, sizeof(tBTA_AVK_SCB));
@@ -397,6 +402,7 @@ static tBTA_AVK_SCB * bta_avk_alloc_scb(tBTA_AVK_CHNL chnl)
                     p_ret->hndl = (tBTA_AVK_HNDL)((xx + 1) | chnl);
                     p_ret->hdi  = xx;
                     p_ret->a2d_list = list_new(NULL);
+                    p_ret->avrc_ct_timer = alarm_new("bta_avk.avrc_ct_timer");
                     bta_avk_cb.p_scb[xx] = p_ret;
                     APPL_TRACE_EVENT("AV: Alloc success, handle is =%d", p_ret->hndl);
                 }
@@ -423,7 +429,7 @@ static void bta_avk_free_scb(tBTA_AVK_SCB *p_scb)
     assert(p_scb != NULL);
 
     list_free(p_scb->a2d_list);
-    GKI_freebuf(p_scb);
+    osi_free(p_scb);
 }
 
 /*******************************************************************************
@@ -457,7 +463,7 @@ void bta_avk_conn_cback(UINT8 handle, BD_ADDR bd_addr, UINT8 event, tAVDT_CTRL *
             //(AVDT_CONNECT_IND_EVT == event && AVDT_ACP == p_data->hdr.err_param))
 
             (AVDT_CONNECT_IND_EVT == event))&& */
-            (p_msg = (tBTA_AVK_STR_MSG *) GKI_getbuf((UINT16) (sizeof(tBTA_AVK_STR_MSG)))) != NULL)
+            (p_msg = (tBTA_AVK_STR_MSG *) osi_malloc((UINT16) (sizeof(tBTA_AVK_STR_MSG)))) != NULL)
         {
             p_msg->hdr.event = evt;
             p_msg->hdr.layer_specific = event;
@@ -517,8 +523,7 @@ static void bta_avk_api_sink_enable(tBTA_AVK_DATA *p_data)
     activate_sink = p_data->hdr.layer_specific;
     APPL_TRACE_DEBUG("bta_avk_api_sink_enable %d ", activate_sink)
     char p_service_name[BTA_SERVICE_NAME_LEN+1];
-    BCM_STRNCPY_S(p_service_name, sizeof(p_service_name),
-            BTIF_AVK_SERVICE_NAME, BTA_SERVICE_NAME_LEN);
+    strlcpy(p_service_name, BTIF_AVK_SERVICE_NAME, BTA_SERVICE_NAME_LEN);
 
     if(activate_sink)
     {
@@ -598,7 +603,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
         p_scb->app_id   = registr.app_id;
 
         /* initialize the stream control block */
-        p_scb->timer.p_cback = (TIMER_CBACK*)&bta_avk_timer_cback;
+        //p_scb->timer.p_cback = (TIMER_CBACK*)&bta_avk_timer_cback;
         registr.status = BTA_AVK_SUCCESS;
 
         if((bta_avk_cb.reg_audio + bta_avk_cb.reg_video) == 0)
@@ -629,7 +634,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                 if (profile_initialized == UUID_SERVCLASS_AUDIO_SOURCE) {
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REM_CTRL_TARGET, "AV Remote Control Target",
                         NULL, p_bta_avk_cfg->avrc_tg_cat, BTA_ID_AVK,
-                        (bta_avk_cb.features & BTA_AVK_FEAT_BROWSE));
+                        (bta_avk_cb.features & BTA_AVK_FEAT_BROWSE),AVRC_REV_1_3);
                 }
 #endif
             }
@@ -769,7 +774,9 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
 
                 /* start listening when A2DP is registered */
                 if (bta_avk_cb.features & BTA_AVK_FEAT_RCTG)
+                {
                     bta_avk_rc_create(&bta_avk_cb, AVCT_ACP, p_scb->hdi, BTA_AVK_NUM_LINKS + 1);
+                }
 
                 /* if the AV and AVK are both supported, it cannot support the CT role */
                 if (bta_avk_cb.features & (BTA_AVK_FEAT_RCCT))
@@ -791,7 +798,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
                     /* create an SDP record as AVRC CT. */
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REMOTE_CONTROL, NULL, NULL,
-                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE));
+                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_3);
 #endif
                 }
             }
@@ -1058,7 +1065,7 @@ static void bta_avk_sys_rs_cback (tBTA_SYS_CONN_STATUS status,UINT8 id, UINT8 ap
         /* note that more than one SCB (a2dp & vdp) maybe waiting for this event */
         p_scb = bta_avk_cb.p_scb[i];
         if (p_scb && (bdcmp (peer_addr, p_scb->peer_addr) == 0) &&
-            (p_buf = (tBTA_AVK_ROLE_RES *) GKI_getbuf(sizeof(tBTA_AVK_ROLE_RES))) != NULL)
+            (p_buf = (tBTA_AVK_ROLE_RES *) osi_malloc(sizeof(tBTA_AVK_ROLE_RES))) != NULL)
         {
             APPL_TRACE_DEBUG("new_role:%d, hci_status:x%x hndl: x%x", id, app_id, p_scb->hndl);
             /*
@@ -1217,7 +1224,8 @@ BOOLEAN bta_avk_switch_if_needed(tBTA_AVK_SCB *p_scb)
                 {
                     /* can not switch role on SCBI
                      * start the timer on SCB - because this function is ONLY called when SCB gets API_OPEN */
-                    bta_sys_start_timer(&p_scb->timer, BTA_AVK_AVRC_TIMER_EVT, BTA_AVK_RS_TIME_VAL);
+                    bta_sys_start_timer(p_scb->avrc_ct_timer, BTA_AVK_RS_TIME_VAL,
+                                        BTA_AVK_AVRC_TIMER_EVT, p_scb->hndl);
                 }
                 needed = TRUE;
                 /* mark the original channel as waiting for RS result */
@@ -1342,7 +1350,6 @@ void bta_avk_dup_audio_buf(tBTA_AVK_SCB *p_scb, BT_HDR *p_buf)
 
     if(bta_avk_cb.audio_open_cnt >= 2)
     {
-        size = GKI_get_buf_size(p_buf);
         copy_size = BT_HDR_SIZE + p_buf->len + p_buf->offset;
         /* more than one audio channel is connected */
         for(i=0; i<BTA_AVK_NUM_STRS; i++)
@@ -1353,7 +1360,7 @@ void bta_avk_dup_audio_buf(tBTA_AVK_SCB *p_scb, BT_HDR *p_buf)
                 p_scbi && p_scbi->co_started ) /* scb is used and started */
             {
                 /* enqueue the data only when the stream is started */
-                p_new = (BT_HDR *)GKI_getbuf(size);
+                p_new = (BT_HDR *)osi_malloc(copy_size);
                 if(p_new)
                 {
                     memcpy(p_new, p_buf, copy_size);
@@ -1362,7 +1369,7 @@ void bta_avk_dup_audio_buf(tBTA_AVK_SCB *p_scb, BT_HDR *p_buf)
                         // Drop the oldest packet
                         BT_HDR *p_buf = list_front(p_scbi->a2d_list);
                         list_remove(p_scbi->a2d_list, p_buf);
-                        GKI_freebuf(p_buf);
+                        osi_free(p_buf);
                     }
                 }
             }
@@ -1387,10 +1394,10 @@ void bta_avk_sm_execute(tBTA_AVK_CB *p_cb, UINT16 event, tBTA_AVK_DATA *p_data)
     UINT8               action;
 
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-    APPL_TRACE_EVENT("AV event=0x%x(%s) state=%d(%s)",
+    APPL_TRACE_EVENT("AVK event=0x%x(%s) state=%d(%s)",
         event, bta_avk_evt_code(event), p_cb->state, bta_avk_st_code(p_cb->state));
 #else
-    APPL_TRACE_EVENT("AV event=0x%x state=%d", event, p_cb->state);
+    APPL_TRACE_EVENT("AVK event=0x%x state=%d", event, p_cb->state);
 #endif
 
     /* look up the state table for the current state */
@@ -1424,6 +1431,7 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
 {
     UINT16 event = p_msg->event;
     UINT16 first_event = BTA_AVK_FIRST_NSM_EVT;
+    APPL_TRACE_VERBOSE("bta_avk_hdl_event handle=0x%x", p_msg->layer_specific);
 
     if (event > BTA_AVK_LAST_EVT)
     {
@@ -1433,9 +1441,9 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
     if(event >= first_event)
     {
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-        APPL_TRACE_VERBOSE("AV nsm event=0x%x(%s)", event, bta_avk_evt_code(event));
+        APPL_TRACE_VERBOSE("AVK nsm event=0x%x(%s)", event, bta_avk_evt_code(event));
 #else
-        APPL_TRACE_VERBOSE("AV nsm event=0x%x", event);
+        APPL_TRACE_VERBOSE("AVK nsm event=0x%x", event);
 #endif
         /* non state machine events */
 
@@ -1444,16 +1452,16 @@ BOOLEAN bta_avk_hdl_event(BT_HDR *p_msg)
     else if (event >= BTA_AVK_FIRST_SM_EVT && event <= BTA_AVK_LAST_SM_EVT)
     {
 #if (defined(BTA_AVK_DEBUG) && BTA_AVK_DEBUG == TRUE)
-        APPL_TRACE_VERBOSE("AV sm event=0x%x(%s)", event, bta_avk_evt_code(event));
+        APPL_TRACE_VERBOSE("AVK sm event=0x%x(%s)", event, bta_avk_evt_code(event));
 #else
-        APPL_TRACE_VERBOSE("AV sm event=0x%x", event);
+        APPL_TRACE_VERBOSE("AVK sm event=0x%x", event);
 #endif
         /* state machine events */
         bta_avk_sm_execute(&bta_avk_cb, p_msg->event, (tBTA_AVK_DATA *) p_msg);
     }
     else
     {
-        APPL_TRACE_VERBOSE("handle=0x%x", p_msg->layer_specific);
+        APPL_TRACE_VERBOSE("avk : handle=0x%x", p_msg->layer_specific);
         /* stream state machine events */
         bta_avk_ssm_execute( bta_avk_hndl_to_scb(p_msg->layer_specific),
                                 p_msg->event, (tBTA_AVK_DATA *) p_msg);

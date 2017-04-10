@@ -35,7 +35,7 @@
 #include "bta_avk_api.h"
 #include "avdt_api.h"
 #include "bta_avk_co.h"
-#include "list.h"
+#include "osi/include/list.h"
 
 #define BTA_AVK_DEBUG TRUE
 /*****************************************************************************
@@ -492,7 +492,7 @@ typedef struct
     tBTA_AVK_Q_INFO      q_info;
     tAVDT_SEP_INFO      sep_info[BTA_AVK_NUM_SEPS];      /* stream discovery results */
     tAVDT_CFG           cfg;            /* local SEP configuration */
-    TIMER_LIST_ENT      timer;          /* delay timer for AVRC CT */
+    alarm_t             *avrc_ct_timer; /* delay timer for AVRC CT */
     BD_ADDR             peer_addr;      /* peer BD address */
     UINT16              l2c_cid;        /* L2CAP channel ID */
     UINT16              stream_mtu;     /* MTU of stream */
@@ -580,8 +580,8 @@ typedef struct
     tBTA_AVK_CBACK       *p_cback;       /* application callback function */
     tBTA_AVK_RCB         rcb[BTA_AVK_NUM_RCB];  /* RCB control block */
     tBTA_AVK_LCB         lcb[BTA_AVK_NUM_LINKS+1];  /* link control block */
-    TIMER_LIST_ENT      sig_tmr;        /* link timer */
-    TIMER_LIST_ENT      acp_sig_tmr;    /* timer to monitor signalling when accepting */
+    alarm_t             *link_signalling_timer;
+    alarm_t             *accept_signalling_timer; /* timer to monitor signalling when accepting */
     UINT32              sdp_a2d_handle; /* SDP record handle for audio src */
 #if (BTA_AV_SINK_INCLUDED == TRUE)
     UINT32              sdp_a2d_snk_handle; /* SDP record handle for audio snk */

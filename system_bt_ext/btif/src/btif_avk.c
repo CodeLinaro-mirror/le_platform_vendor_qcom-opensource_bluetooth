@@ -44,7 +44,6 @@
 #include "btif_avk_media.h"
 #include "bta_avk_api.h"
 #include "bta_avk_api.h"
-#include "gki.h"
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
@@ -92,6 +91,7 @@ typedef struct
     UINT16 codec_type;
     UINT16 len;
     UINT16 offset;
+    BD_ADDR bd_addr;
 } tBT_SINK_DATA_HDR;
 
 typedef struct
@@ -110,7 +110,6 @@ typedef struct
     BOOLEAN is_slave;
     BOOLEAN is_device_playing;
     /************ Variables used for A2DP Sink *************/
-    BUFFER_Q RxDataQ;
     UINT16 sink_codec_type;
     /************ Variables used for A2DP Sink *************/
 } btif_avk_cb_t;
@@ -138,13 +137,15 @@ typedef struct
 static btav_callbacks_t *bt_avk_callbacks = NULL;
 static btav_sink_vendor_callbacks_t *bt_av_sink_vendor_callbacks = NULL;
 static btif_avk_cb_t btif_avk_cb[BTIF_AVK_NUM_CB];
-static TIMER_LIST_ENT tle_av_open_on_rc;
+static alarm_t *avk_open_on_rc_timer = NULL;
 int btif_max_avk_clients = 1;
 static BOOLEAN enable_multicast = FALSE;
 static BOOLEAN is_multicast_supported = FALSE;
 static BOOLEAN multicast_disabled = FALSE;
 static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
+fixed_queue_t *RxDataQ;
+static bt_bdaddr_t streaming_bda;
 
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAVK_INIT() if (((bt_avk_callbacks == NULL)) \
@@ -218,6 +219,7 @@ extern UINT16 btif_dm_get_le_links();
 extern void btif_avk_rc_ctrl_send_pause(bt_bdaddr_t *bd_addr);
 extern void btif_avk_rc_ctrl_send_play(bt_bdaddr_t *bd_addr);
 
+extern fixed_queue_t *btu_general_alarm_queue;
 /*****************************************************************************
 ** Local helper functions
 ******************************************************************************/
@@ -287,7 +289,7 @@ static BD_ADDR bd_null= {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 *****************************************************************************/
 /*******************************************************************************
 **
-** Function         btif_initiate_avk_open_tmr_hdlr
+** Function         btif_initiate_avk_open_timer_timeout
 **
 ** Description      Timer to trigger AV open if the remote headset establishes
 **                  RC connection w/o AV connection. The timer is needed to IOP
@@ -296,18 +298,13 @@ static BD_ADDR bd_null= {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 ** Returns          void
 **
 *******************************************************************************/
-static void btif_initiate_avk_open_tmr_hdlr(TIMER_LIST_ENT *tle)
+static void btif_initiate_avk_open_timer_timeout(UNUSED_ATTR void *data)
 {
     BD_ADDR peer_addr;
-    UNUSED(tle);
-    btif_avk_connect_req_t connect_req;
-    int index = 0;
-    int i;
-    // Need to get the proper index to initiate AV connection
-    UNUSED(tle);
+
     /* is there at least one RC connection - There should be */
     /*We have Two Connections.*/
-    if (btif_avk_rc_get_connected_peer(peer_addr))
+    if (btif_rc_get_connected_peer(peer_addr))
     {
         /*Check if this peer_addr is same as currently connected AV*/
         if (btif_get_conn_state_of_device(peer_addr) == BTIF_AVK_STATE_OPENED)
@@ -322,7 +319,7 @@ static void btif_initiate_avk_open_tmr_hdlr(TIMER_LIST_ENT *tle)
              * If not available, AV got connected to different devices.
              * Disconnect this RC connection without AV connection.
              */
-            rc_handle = btif_avk_rc_get_connected_peer_handle(peer_addr);
+            rc_handle = btif_rc_get_connected_peer_handle(peer_addr);
             index = btif_avk_get_valid_idx_for_rc_events(peer_addr, rc_handle);
             if(index >= btif_max_avk_clients)
             {
@@ -342,7 +339,6 @@ static void btif_initiate_avk_open_tmr_hdlr(TIMER_LIST_ENT *tle)
     }
 
 }
-
 
 /*****************************************************************************
 **  Static functions
@@ -486,10 +482,10 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
                 }
                 else if(event == BTA_AVK_RC_OPEN_EVT)
                 {
-                    memset(&tle_av_open_on_rc, 0, sizeof(tle_av_open_on_rc));
-                    tle_av_open_on_rc.param = (UINT32)btif_initiate_avk_open_tmr_hdlr;
-                    btu_start_timer(&tle_av_open_on_rc, BTU_TTYPE_USER_FUNC,
-                            BTIF_TIMEOUT_AV_OPEN_ON_RC_SECS);
+                    alarm_set_on_queue(avk_open_on_rc_timer,
+                                       BTIF_TIMEOUT_AV_OPEN_ON_RC_SECS,
+                                       btif_initiate_avk_open_timer_timeout, NULL,
+                                       btu_general_alarm_queue);
                     btif_avk_rc_handler(event, p_data);
                 }
             }
@@ -498,15 +494,19 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
         case BTIF_AVK_SINK_CONFIG_REQ_EVT:
         {
             btif_avk_config_req_t req;
+            bdstr_t addr1;
             // copy to avoid alignment problems
             /* in this case, L2CAP connection is still up, but bt-app moved to disc state
                so lets move bt-app to connected state first */
             btif_report_connection_state(BTAV_CONNECTION_STATE_CONNECTED, &(req.peer_bd));
-            BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %d", req.sample_rate,
-                    req.channel_count, req.codec_type);
+            BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
+                    req.sample_rate, req.channel_count,
+                    bdaddr_to_string(&(btif_avk_cb[index].peer_bda),
+                    &addr1, sizeof(addr1)), req.codec_type);
+
             if (bt_av_sink_vendor_callbacks != NULL) {
                 HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
-                        &(req.peer_bd), req.codec_type, req.codec_info);
+                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -579,10 +579,8 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             break;
 
         case BTA_AVK_RC_CLOSE_EVT:
-            if (tle_av_open_on_rc.in_use) {
-                BTIF_TRACE_DEBUG("BTA_AVK_RC_CLOSE_EVT: Stopping AV timer.");
-                btu_stop_timer(&tle_av_open_on_rc);
-            }
+            BTIF_TRACE_DEBUG("BTA_AV_RC_CLOSE_EVT: Stopping AV timer.");
+            alarm_cancel(avk_open_on_rc_timer);
             btif_avk_rc_handler(event, p_data);
             break;
 
@@ -704,7 +702,7 @@ static BOOLEAN btif_avk_state_opening_handler(btif_sm_event_t event, void *p_dat
                     /* In A2dp Multicast, stack will take care of starting
                      * the stream on newly connected A2dp device. If Handoff
                      * is supported, trigger Handoff here. */
-                    if (btif_avk_is_playing())
+                    if (btif_avk_is_playing() && btif_avk_cb[index].peer_sep == AVDT_TSEP_SNK)
                     {
                         BTIF_TRACE_DEBUG("Trigger Dual A2dp Handoff on %d", index);
                         btif_avk_trigger_dual_handoff(TRUE, btif_avk_cb[index].peer_bda.address);
@@ -724,14 +722,18 @@ static BOOLEAN btif_avk_state_opening_handler(btif_sm_event_t event, void *p_dat
         case BTIF_AVK_SINK_CONFIG_REQ_EVT:
         {
             btif_avk_config_req_t req;
+            bdstr_t addr1;
             // copy to avoid alignment problems
             memcpy(&req, p_data, sizeof(req));
 
-            BTIF_TRACE_DEBUG("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %d", req.sample_rate,
-                    req.channel_count, req.codec_type);
+            BTIF_TRACE_DEBUG("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
+                    req.sample_rate, req.channel_count,
+                    bdaddr_to_string(&(btif_avk_cb[index].peer_bda),
+                    &addr1, sizeof(addr1)), req.codec_type);
+
             if (bt_av_sink_vendor_callbacks != NULL) {
                 HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
-                        &(req.peer_bd), req.codec_type, req.codec_info);
+                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -1052,6 +1054,23 @@ static BOOLEAN btif_avk_state_opened_handler(btif_sm_event_t event, void *p_data
             break;
 
         CHECK_AVK_RC_EVENT(event, p_data);
+
+        case BTIF_AVK_SINK_CONFIG_REQ_EVT:
+        {
+            btif_avk_config_req_t req;
+            bdstr_t addr1;
+            // copy to avoid alignment problems
+            memcpy(&req, p_data, sizeof(req));
+
+            BTIF_TRACE_DEBUG("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
+                    req.sample_rate, req.channel_count,
+                    bdaddr_to_string(&(btif_avk_cb[index].peer_bda), &addr1,
+                    sizeof(addr1)), req.codec_type);
+            if (bt_av_sink_vendor_callbacks != NULL) {
+                HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
+                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
+            }
+        } break;
 
         default:
             BTIF_TRACE_WARNING("%s : unhandled event:%s", __FUNCTION__,
@@ -1427,10 +1446,10 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
 {
     int index = 0;
     tBTA_AVK *p_bta_data = (tBTA_AVK*)p_param;
-    bt_bdaddr_t * bt_addr;
+    bt_bdaddr_t *bt_addr, bt_addr1;
     UINT8 role;
     int uuid;
-
+    btif_avk_config_req_t req;
     switch (event)
     {
         case BTIF_AVK_INIT_REQ_EVT:
@@ -1445,6 +1464,8 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
             btif_avk_a2dp_stop_media_task();
             return;
         case BTIF_AVK_CONNECT_REQ_EVT:
+            bt_addr = (bt_bdaddr_t *)p_param;
+            index = btif_avk_idx_by_bdaddr(bt_addr->address);
             break;
         case BTIF_AVK_DISCONNECT_REQ_EVT:
             /*Bd address passed should help us in getting the handle*/
@@ -1452,18 +1473,9 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
             index = btif_avk_idx_by_bdaddr(bt_addr->address);
             break;
         case BTIF_AVK_START_STREAM_REQ_EVT:
-            /* Get the last connected device on which START can be issued
-            * Get the Dual A2dp Handoff Device first, if none is present,
-            * go for lastest connected.
-            * In A2dp Multicast, the index selected can be any of the
-            * connected device. Stack will ensure to START the steaming
-            * on both the devices. */
-            index = btif_get_latest_device_idx_to_start();
-            break;
         case BTIF_AVK_STOP_STREAM_REQ_EVT:
         case BTIF_AVK_SUSPEND_STREAM_REQ_EVT:
-            /*Should be handled by current STARTED*/
-            index = btif_get_latest_playing_device_idx();
+            index = btif_avk_idx_by_bdaddr(&streaming_bda.address);
             break;
         /*Events from the stack, BTA*/
         case BTA_AVK_ENABLE_EVT:
@@ -1543,13 +1555,18 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
         case BTA_AVK_RC_FEAT_EVT:
         case BTA_AVK_BROWSE_MSG_EVT:
             index = 0;
-            BTIF_TRACE_EVENT("RC events: on index = %d", index);
+            break;
+        case BTIF_AVK_SINK_CONFIG_REQ_EVT:
+            // copy to avoid alignment problems
+            memcpy(&req, p_param, sizeof(req));
+            memcpy(&bt_addr1, &(req.peer_bd), sizeof(bt_bdaddr_t));
+            index = btif_avk_idx_by_bdaddr(&bt_addr1.address);
             break;
         default:
-            BTIF_TRACE_ERROR("Unhandled event = %d", event);
+            BTIF_TRACE_ERROR("Unhandled AVK event = %d", event);
             break;
     }
-    BTIF_TRACE_DEBUG("Handle the AV event = %x on index = %d", event, index);
+    BTIF_TRACE_DEBUG("Handle the AVK event = %x on index = %d", event, index);
     if (index >= 0 && index < btif_max_avk_clients)
         btif_sm_dispatch(btif_avk_cb[index].sm_handle, event, (void*)p_param);
     else
@@ -1809,8 +1826,8 @@ UINT8 get_rtp_offset(UINT8* p_start, UINT16 codec_type)
     APPL_TRACE_DEBUG(" %s codec_type = %d offset = %d", __FUNCTION__, codec_type, offset);
     return offset;
 }
-/*Called only in case of A2dp SInk, which runs on index 0*/
-static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
+/*Called only in case of A2dp SInk*/
+static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, BD_ADDR bd_addr)
 {
     btif_sm_state_t state;
     UINT8 que_len;
@@ -1830,13 +1847,20 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
     tA2D_APTX_CIE aptx_cie;
 #endif
     btif_avk_config_req_t config_req;
-    int index =0;
+    int index = btif_avk_idx_by_bdaddr(bd_addr);
+    if (index >= btif_max_avk_clients)
+    {
+        BTIF_TRACE_DEBUG("%s Invalid index for device", __FUNCTION__);
+        return;
+    }
 
     if (event == BTA_AVK_MEDIA_DATA_EVT)/* Switch to BTIF_MEDIA context */
     {
         state= btif_sm_get_state(btif_avk_cb[index].sm_handle);
-        if ( (state == BTIF_AVK_STATE_STARTED) || /* send SBC packets only in Started State */
-             (state == BTIF_AVK_STATE_OPENED) )
+        BTIF_TRACE_DEBUG("%s index = %d state = %d", __FUNCTION__, index, state);
+        if (((state == BTIF_AVK_STATE_STARTED) || /* send SBC packets only in Started State */
+             (state == BTIF_AVK_STATE_OPENED)) &&
+             (&streaming_bda != NULL) && !memcmp(&streaming_bda.address, bd_addr, sizeof(BD_ADDR)))
         {
             p_pkt = (BT_HDR *)p_data;
             start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
@@ -1849,7 +1873,7 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
                         rtp_offset = get_rtp_offset(start_ptr, BTIF_AVK_CODEC_SBC);
                         p_pkt->offset = p_pkt->offset + rtp_offset;
                         p_pkt->len = p_pkt->len - rtp_offset;
-                        que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_pkt);
+                        que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_pkt, bd_addr);
                         break;
                     }
                     if(!retreive_rtp_header) {
@@ -1862,13 +1886,13 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
-                          start_ptr, data_len);
+                          start_ptr, data_len, bd_addr);
                     break;
                 case A2D_NON_A2DP_MEDIA_CT:
                     // APTX does not have RTP header
                     data_len = p_pkt->len;
                     que_len = btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_APTX,
-                          start_ptr, data_len);
+                          start_ptr, data_len, bd_addr);
                     break;
                 default: // for all other codecs
                     if(!retreive_rtp_header) {
@@ -1881,7 +1905,7 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data)
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
-                          start_ptr, data_len);
+                          start_ptr, data_len, bd_addr);
                     break;
             }
             BTIF_TRACE_DEBUG(" Codec_Type = %d, Packets in Que %d sbc_decoding = %d",
@@ -2009,9 +2033,12 @@ bt_status_t btif_avk_init(int service_id)
     if (btif_avk_cb[0].sm_handle == NULL)
     {
         BTIF_TRACE_IMP("%s", __FUNCTION__);
+        alarm_free(avk_open_on_rc_timer);
+        avk_open_on_rc_timer = alarm_new("btif_av.avk_open_on_rc_timer");
         if(!btif_avk_a2dp_is_media_task_stopped())
             return BT_STATUS_FAIL;
         btif_avk_cb[0].service = service_id;
+        RxDataQ = fixed_queue_new(SIZE_MAX);
 
         /* Also initialize the AV state machine */
         for (i = 0; i < btif_max_avk_clients; i++)
@@ -2045,7 +2072,7 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
 
     BTIF_TRACE_EVENT("%s", __FUNCTION__);
 
-    status = btif_avk_init(BTA_A2DP_SINK_SERVICE_ID);
+    status = BT_STATUS_SUCCESS;
 
     if (status == BT_STATUS_SUCCESS) {
         bt_avk_callbacks = callbacks;
@@ -2067,17 +2094,12 @@ static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int
 {
     bt_status_t status;
 
-    BTIF_TRACE_IMP("%s", __FUNCTION__);
+    BTIF_TRACE_IMP("%s max = %d", __FUNCTION__, max);
 
     enable_multicast = FALSE; // Clear multicast flag for sink
-    if (max > 1)
-    {
-        BTIF_TRACE_ERROR("Only one Sink can be initialized");
-        max = 1;
-    }
-    btif_max_avk_clients = max; //Should be 1
+    btif_max_avk_clients = max;
     if (bt_avk_callbacks != NULL)
-        status = BT_STATUS_SUCCESS;
+        status = btif_avk_init(BTA_A2DP_SINK_SERVICE_ID);
 
 
     if (status == BT_STATUS_SUCCESS) {
@@ -2104,6 +2126,8 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
 {
     uint16_t q_bytes_left = 0;// bytes left in topmost element of Q
     tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    bdstr_t addr1, addr2;
+    bt_bdaddr_t bda;
     UINT8* p_src;
     // map input buffer
     UINT8* p_start = data;
@@ -2120,14 +2144,14 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         return 0;
     }
     pthread_mutex_lock(&sink_data_q_lock);
-    if(GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)) {
+    if(fixed_queue_is_empty(RxDataQ)) {
         BTIF_TRACE_DEBUG("%s Sink Que Empty, returning", __FUNCTION__);
         pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
     }
 
     // consistency check: check codec from remote and codec info in Q
-    p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+    p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
     if (p_data_q_buf == NULL) {
         pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
@@ -2136,6 +2160,8 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
             __FUNCTION__, codec_type, p_data_q_buf->codec_type);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+        osi_free(p_data_q_buf);
         pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
     }
@@ -2144,12 +2170,25 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         // rtp_offset will be same for all packets
         rtp_offset = get_rtp_offset(p_src, codec_type);
     }
-    while (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ))
+    while (!fixed_queue_is_empty(RxDataQ))
     {
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
         if (p_data_q_buf == NULL) {
             BTIF_TRACE_IMP(" %s Que Pointer Null, Bail out ", __FUNCTION__);
             break;
+        }
+        bdcpy(bda.address, p_data_q_buf->bd_addr);
+        BTIF_TRACE_DEBUG(" %s bd_addr %s p_pcm_q_buf->bd_addr %s", __FUNCTION__,
+                bdaddr_to_string(&streaming_bda, &addr1, sizeof(addr1)),
+                bdaddr_to_string(&bda, &addr2, sizeof(addr2)));
+        if ((&streaming_bda != NULL) &&
+                memcmp(&streaming_bda.address, p_data_q_buf->bd_addr, sizeof(BD_ADDR)))
+        {
+            BTIF_TRACE_DEBUG("%s app fetching data for diff device, dequeue this packet",
+                    __FUNCTION__);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            osi_free(p_data_q_buf);
+            continue;
         }
         q_bytes_left = p_data_q_buf->len;// this will include RTP header
         if(retreive_rtp_header) {
@@ -2171,15 +2210,15 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         }
         q_bytes_left = p_data_q_buf->len;// readjust after removing RTP
         BTIF_TRACE_DEBUG(" %s Q_Len %d, input buffer space %d, bytes_left_in_Q %d", __FUNCTION__,
-                GKI_queue_length(&btif_avk_cb[0].RxDataQ), (p_end - p_curr), q_bytes_left);
+                  fixed_queue_length(RxDataQ), (p_end - p_curr), q_bytes_left);
         // write encoded packets
         if ((p_end - p_curr) >= q_bytes_left)
         {
             // read from topmost element and deque it
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(btif_avk_cb[0].RxDataQ));
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_curr, p_src, q_bytes_left);
-            GKI_freebuf(p_data_q_buf);
+            osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }
         else
@@ -2193,6 +2232,26 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     pthread_mutex_unlock(&sink_data_q_lock);
     return (p_curr - p_start);
 }
+
+/*******************************************************************************
+**
+** Function         update_streaming_device_vendor
+**
+** Description      Updates the current streaming device from apps
+**
+** Returns          void
+**
+*******************************************************************************/
+void update_streaming_device_vendor(bt_bdaddr_t *bd_addr)
+{
+    bdstr_t addr1;
+    BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
+    memset(&streaming_bda, 0, sizeof(bt_bdaddr_t));
+    memcpy(&streaming_bda, bd_addr, sizeof(bt_bdaddr_t));
+    BTIF_TRACE_DEBUG(" %s streaming bda %s ", __FUNCTION__, bdaddr_to_string(&streaming_bda, &addr1, sizeof(addr1)));
+
+}
+
 /*******************************************************************************
 **
 ** Function         get_a2dp_sink_streaming_data
@@ -2208,42 +2267,60 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
     tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
     uint32_t bytes_to_be_written = size;// bytes written to buffer supplied by app.
     UINT8* p_src; UINT8* p_dest;
+    bdstr_t addr1, addr2;
+    bt_bdaddr_t bda;
     BTIF_TRACE_DEBUG(" %s size = %d", __FUNCTION__, size);
     if (codec_type != A2DP_SINK_AUDIO_CODEC_PCM) {
         return get_frame_aligned_data(codec_type, data, size);
     }
     pthread_mutex_lock(&sink_data_q_lock);
-    if(GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)) {
+    if(fixed_queue_is_empty(RxDataQ)) {
         BTIF_TRACE_DEBUG("%s Sink Que Empty, returning", __FUNCTION__);
         pthread_mutex_unlock(&sink_data_q_lock);
         return 0;
     }
 
     // consistency check: check codec from remote and codec info in Q
-    p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+    p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
     if (codec_type != p_data_q_buf->codec_type)
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
             __FUNCTION__, codec_type, p_data_q_buf->codec_type);
         pthread_mutex_unlock(&sink_data_q_lock);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+        osi_free(p_data_q_buf);
         return 0;
     }
-    while ((bytes_to_be_written > 0) && (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ)))
+    while ((bytes_to_be_written > 0) && (!fixed_queue_is_empty(RxDataQ)))
     {
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_getfirst(&(btif_avk_cb[0].RxDataQ));
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
         if (p_data_q_buf == NULL)
             break;
+        bdcpy(bda.address, p_data_q_buf->bd_addr);
+        BTIF_TRACE_DEBUG(" %s bd_addr %s p_data_q_buf->bd_addr %s", __FUNCTION__,
+            bdaddr_to_string(&streaming_bda, &addr1, sizeof(addr1)),
+            bdaddr_to_string(&bda, &addr2, sizeof(addr2)));
+
+        if ((&streaming_bda != NULL) &&
+                memcmp(&streaming_bda.address, p_data_q_buf->bd_addr, sizeof(BD_ADDR)))
+        {
+            BTIF_TRACE_DEBUG("%s app fetching data for diff device, dequeue this packet",
+                    __FUNCTION__);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            osi_free(p_data_q_buf);
+            continue;
+        }
         q_bytes_left = p_data_q_buf->len - p_data_q_buf->offset;
         BTIF_TRACE_DEBUG(" %s Q_Len %d, bytes_to_be_written %d, bytes_left_in_Q %d", __FUNCTION__,
-                GKI_queue_length(&btif_avk_cb[0].RxDataQ), bytes_to_be_written, q_bytes_left);
+                 fixed_queue_length(RxDataQ), bytes_to_be_written, q_bytes_left);
         if (bytes_to_be_written >= q_bytes_left)
         {
             // read from topmost element and deque it
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)GKI_dequeue(&(btif_avk_cb[0].RxDataQ));
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
             p_dest = data + (size - bytes_to_be_written);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, q_bytes_left);
-            GKI_freebuf(p_data_q_buf);
+            osi_free(p_data_q_buf);
             bytes_to_be_written = bytes_to_be_written - q_bytes_left;
         }
         else
@@ -2273,7 +2350,7 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
  *******************************************************************************/
 uint32_t btif_avk_media_fetch_pcm_data(UINT16 codec_type, UINT8 *data, UINT32 size)
 {
-    return get_a2dp_sink_streaming_data_vendor(codec_type, data,size);
+    return get_a2dp_sink_streaming_data_vendor(codec_type, data, size);
 }
 
 /*******************************************************************************
@@ -2285,41 +2362,52 @@ uint32_t btif_avk_media_fetch_pcm_data(UINT16 codec_type, UINT8 *data, UINT32 si
  ** Returns          void
  **
  *******************************************************************************/
-UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size)
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr)
 {
     tBT_SINK_DATA_HDR* p_msg;
+    bdstr_t addr1;
+    BTIF_TRACE_DEBUG("enetered btif_media_enque_sink_data size= %d", size);
     pthread_mutex_lock(&sink_data_q_lock);
-    if(GKI_queue_length(&btif_avk_cb[0].RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
+    BTIF_TRACE_DEBUG("pthread_mutex_lock ed");
+    if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
     {
          BTIF_TRACE_DEBUG(" %s DATA Que Full, returning", __FUNCTION__);
          pthread_mutex_unlock(&sink_data_q_lock);
-         return GKI_queue_length(&btif_avk_cb[0].RxDataQ);
+         return  fixed_queue_length(RxDataQ);
     }
-    if ((p_msg = (tBT_SINK_DATA_HDR *)GKI_getbuf(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
+    
+    if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
     {
         UINT8 *p_dest;
-
+        BTIF_TRACE_DEBUG(" allocated the sizeof(tBT_SINK_DATA_HDR) + size");
         p_dest = (UINT8*)(p_msg + 1);
         memcpy(p_dest, (UINT8*)(data), size);
+        BTIF_TRACE_DEBUG("memcpy(p_dest, (UINT8*)(data), size)");
 
         p_msg->len = size;
         p_msg->offset = 0;
         p_msg->codec_type = codec_type;
+        memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
+        BTIF_TRACE_DEBUG("RxDataQ:fixed_queue_length(RxDataQ):%d",fixed_queue_length(RxDataQ)); 
+        BTIF_TRACE_DEBUG("memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR))");
 
-        GKI_enqueue(&(btif_avk_cb[0].RxDataQ), p_msg);
-        BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d", __FUNCTION__, size,
-                                                GKI_queue_length(&btif_avk_cb[0].RxDataQ));
+        fixed_queue_enqueue(RxDataQ, p_msg);
+        BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d bd_addr %s, codec_type = %d",
+                  __FUNCTION__, size, fixed_queue_length(RxDataQ),
+                  bdaddr_to_string((bt_bdaddr_t *)p_msg->bd_addr, &addr1, sizeof(addr1)),
+                  p_msg->codec_type);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
-    return GKI_queue_length(&btif_avk_cb[0].RxDataQ);
+    BTIF_TRACE_DEBUG("exit btif_media_enque_sink_data");
+    return fixed_queue_length(RxDataQ);
 }
 static void btif_avk_media_clear_pcm_queue()
 {
     BTIF_TRACE_DEBUG(" Clear A2DP Data QUeue ");
      pthread_mutex_lock(&sink_data_q_lock);
-    while (!GKI_queue_is_empty(&btif_avk_cb[0].RxDataQ))
+    while (!fixed_queue_is_empty(RxDataQ))
     {
-        GKI_freebuf(GKI_dequeue(&btif_avk_cb[0].RxDataQ));
+        osi_free(fixed_queue_try_dequeue(RxDataQ));
     }
     pthread_mutex_unlock(&sink_data_q_lock);
 }
@@ -2333,7 +2421,7 @@ static void btif_avk_media_clear_pcm_queue()
 ** Returns          None
 **
 *******************************************************************************/
-void sink_audio_focus_status_vendor(int state)
+void sink_audio_focus_status_vendor(int state, bt_bdaddr_t *bd_addr)
 {
     BTIF_TRACE_DEBUG(" sink_audio_focus_status  %d ",state);
     btif_avk_a2dp_set_audio_focus_state(state);
@@ -2585,6 +2673,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
     NULL,
 #endif
     get_a2dp_sink_streaming_data_vendor,
+    update_streaming_device_vendor,
     cleanup_sink_vendor,
 };
 
@@ -2749,6 +2838,7 @@ void btif_avk_dispatch_sm_event(btif_avk_sm_event_t event, void *p_data, int len
 *******************************************************************************/
 bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
 {
+     int i;
      if (b_enable)
      {
          /* Added BTA_AVK_FEAT_NO_SCO_SSPD - this ensures that the BTA does not
@@ -2758,17 +2848,23 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
                                             BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
                                             BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
                                                                         bte_avk_callback);
-         BTA_AvkRegister(BTA_AVK_CHNL_AUDIO, BTIF_AVK_SERVICE_NAME, 0, bte_avk_media_callback,
+         for (i = 0; i < btif_max_avk_clients; i++)
+         {
+             BTA_AvkRegister(BTA_AVK_CHNL_AUDIO, BTIF_AVK_SERVICE_NAME, 0, bte_avk_media_callback,
                                                                 UUID_SERVCLASS_AUDIO_SINK);
+         }
      }
      else {
-         if (btif_avk_cb[0].sm_handle != NULL)
+         for (i = 0; i < btif_max_avk_clients; i++)
          {
-             BTIF_TRACE_IMP("%s: shutting down AV SM", __FUNCTION__);
-             btif_sm_shutdown(btif_avk_cb[0].sm_handle);
-             btif_avk_cb[0].sm_handle = NULL;
+             if (btif_avk_cb[i].sm_handle != NULL)
+             {
+                 BTIF_TRACE_IMP("%s: shutting down AV SM", __FUNCTION__);
+                 btif_sm_shutdown(btif_avk_cb[i].sm_handle);
+                 btif_avk_cb[i].sm_handle = NULL;
+             }
+             BTA_AvkDeregister(btif_avk_cb[i].bta_handle);
          }
-         BTA_AvkDeregister(btif_avk_cb[0].bta_handle);
          BTA_AvkDisable();
      }
      return BT_STATUS_SUCCESS;
