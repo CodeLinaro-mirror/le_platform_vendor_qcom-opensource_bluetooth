@@ -102,7 +102,7 @@ const tA2D_AAC_CIE bta_avk_co_aac_caps =
     (A2D_AAC_IE_SAMP_FREQ_44100 | A2D_AAC_IE_SAMP_FREQ_48000 ), /* samp_freq */
     (A2D_AAC_IE_CHANNELS_1 | A2D_AAC_IE_CHANNELS_2 ), /* channels  */
     A2D_AAC_IE_BIT_RATE, /* BIT RATE */
-    A2D_AAC_IE_VBR_NOT_SUPP   /* variable bit rate */
+    A2D_AAC_IE_VBR_SUPP   /* variable bit rate */
 };
 #define BTIF_AVK_AAC_DEFAULT_BIT_RATE 0x000409B6
 #endif
@@ -138,6 +138,7 @@ const tA2D_SBC_CIE btif_avk_sbc_default_config =
     A2D_SBC_IE_MIN_BITPOOL          /* min_bitpool */
 };
 
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
 /* Default AAC codec configuration */
 const tA2D_AAC_CIE btif_avk_aac_default_config =
 {
@@ -145,9 +146,10 @@ const tA2D_AAC_CIE btif_avk_aac_default_config =
     A2D_AAC_IE_SAMP_FREQ_44100,         /* samp_freq */
     A2D_AAC_IE_CHANNELS_2,              /* channels  */
     BTIF_AVK_AAC_DEFAULT_BIT_RATE,      /* bit rate */
-    A2D_AAC_IE_VBR_NOT_SUPP                     /* variable bit rate */
+    A2D_AAC_IE_VBR_SUPP                 /* variable bit rate */
 };
-
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
 /* Default MP3 codec configuration */
 const tA2D_MP3_CIE btif_avk_mp3_default_config =
 {
@@ -159,7 +161,7 @@ const tA2D_MP3_CIE btif_avk_mp3_default_config =
     A2D_MP3_IE_VBR,                     /* VBR Enabled */
     BTIF_AVK_MP3_DEFAULT_BIT_RATE       /* bit rate */
 };
-
+#endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
 /*  APTX codec capabilities */
 const tA2D_APTX_CIE bta_avk_co_aptx_caps =
@@ -1433,6 +1435,7 @@ void bta_avk_co_audio_codec_reset(void)
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldSbcInfo failed");
         }
         break;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M24:
         if (A2D_BldAacInfo(A2D_MEDIA_TYPE_AUDIO, (tA2D_AAC_CIE *)&btif_avk_aac_default_config,
                                                  bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
@@ -1440,6 +1443,8 @@ void bta_avk_co_audio_codec_reset(void)
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldAacInfo failed");
         }
         break;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M12:
         if (A2D_BldMp3Info(A2D_MEDIA_TYPE_AUDIO, (tA2D_MP3_CIE *)&btif_avk_mp3_default_config,
                                                  bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
@@ -1447,6 +1452,8 @@ void bta_avk_co_audio_codec_reset(void)
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldMp3Info failed");
         }
         break;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
     case A2D_NON_A2DP_MEDIA_CT:
         if (A2D_BldAptxInfo(A2D_MEDIA_TYPE_AUDIO, (tA2D_APTX_CIE *)&btif_avk_aptx_default_config,
                                                  bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
@@ -1454,6 +1461,7 @@ void bta_avk_co_audio_codec_reset(void)
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldAptxInfo failed");
         }
         break;
+#endif
     }
     mutex_global_unlock();
 }

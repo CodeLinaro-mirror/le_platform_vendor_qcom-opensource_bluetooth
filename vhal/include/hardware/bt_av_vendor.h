@@ -223,11 +223,11 @@ typedef struct {
     /** Send priority of device to stack*/
     void (*allow_connection_vendor)( int is_valid , bt_bdaddr_t *bd_addr);
 
+   /** Sends Audio Focus State. */
+   void  (*audio_focus_state_vendor)( int focus_state );
+
    /** Request PCM sample. */
    uint32_t  (*get_pcm_data_vendor)( uint8_t* data, uint32_t size );
-
-   /** Send priority of device to stack*/
-   void (*allow_connection)( int is_valid , bt_bdaddr_t *bd_addr);
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );
@@ -254,6 +254,8 @@ typedef struct {
    /** Send streaming device address to stack*/
    void (*update_streaming_device_vendor)( bt_bdaddr_t *bd_addr);
 
+   /** Send flushing device address to stack*/
+   void (*update_flushing_device_vendor)( bt_bdaddr_t *bd_addr);
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );

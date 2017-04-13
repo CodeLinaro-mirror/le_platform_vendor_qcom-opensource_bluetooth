@@ -1064,7 +1064,7 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     if (p_scb->wait & BTA_AVK_WAIT_CHECK_RC)
     {
         p_scb->wait &= ~BTA_AVK_WAIT_CHECK_RC;
-        bta_sys_start_timer(&p_scb->avrc_ct_timer, BTA_AVK_RC_DISC_TIME_VAL,
+        bta_sys_start_timer(p_scb->avrc_ct_timer, BTA_AVK_RC_DISC_TIME_VAL,
                                  BTA_AVK_AVRC_TIMER_EVT,p_scb->hndl);
     }
 
@@ -1105,7 +1105,6 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             /* set up parameters */
         db_params.db_len = BTA_AVK_DISC_BUF_SIZE;
         db_params.num_attr = 3;
-        //db_params.p_db = NULL; // we will allocate memory in Stack
         db_params.p_attrs = attr_list;
         p_scb->uuid_int = p_data->api_open.uuid;
         p_scb->sdp_discovery_started = TRUE;
@@ -1164,21 +1163,6 @@ void bta_avk_cleanup(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     p_scb->coll_mask = 0;
     p_scb->skip_sdp = FALSE;
     alarm_cancel(p_scb->avrc_ct_timer);
-
-#if 0
-    vendor_get_interface()->send_command(
-        (vendor_opcode_t)BT_VND_OP_A2DP_OFFLOAD_STOP, (void*)&p_scb->l2c_cid);
-    if (p_scb->offload_start_pending) {
-        tBTA_AV_STATUS status = BTA_AV_FAIL_STREAM;
-        (*bta_avk_cb.p_cback)(BTA_AV_OFFLOAD_START_RSP_EVT, (tBTA_AV *)&status);
-    }
-    p_scb->offload_start_pending = FALSE;
-    p_scb->skip_sdp = FALSE;
-    p_scb->coll_mask = 0;
-
-    p_scb->skip_sdp = FALSE;
-#endif
-
     if (p_scb->deregistring)
     {
         /* remove stream */
@@ -3244,7 +3228,7 @@ void bta_avk_open_rc (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             {
                 /* AVRC channel is not connected. delay a little bit */
                 if ((p_scb->wait & BTA_AVK_WAIT_ROLE_SW_BITS) == 0)
-                    bta_sys_start_timer(p_scb->avrc_ct_timer,BTA_AVK_RC_DISC_TIME_VAL, 
+                    bta_sys_start_timer(p_scb->avrc_ct_timer,BTA_AVK_RC_DISC_TIME_VAL,
                                         BTA_AVK_AVRC_TIMER_EVT, (p_scb->hndl));
                 else
                     p_scb->wait |= BTA_AVK_WAIT_CHECK_RC;

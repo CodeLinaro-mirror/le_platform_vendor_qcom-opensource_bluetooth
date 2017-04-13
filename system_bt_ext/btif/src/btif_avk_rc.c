@@ -166,6 +166,7 @@ typedef struct {
     btif_avk_rc_reg_notifications_t rc_notif[MAX_RC_NOTIFICATIONS];
     unsigned int                rc_volume;
     uint8_t                     rc_vol_label;
+    BOOLEAN                     rc_features_processed;
     BOOLEAN                     rc_play_processed;
 } btif_avk_rc_cb_t;
 
@@ -243,6 +244,7 @@ static int btif_avk_rc_get_idx_by_addr(BD_ADDR address);
 #if (AVRC_CTLR_INCLUDED == TRUE)
 static void handle_avk_rc_metamsg_cmd(tBTA_AVK_META_MSG *pmeta_msg);
 static void handle_avk_rc_metamsg_rsp(tBTA_AVK_META_MSG *pmeta_msg);
+static bt_status_t getcapabilities_cmd_vendor(uint8_t cap_id);
 static void btif_avk_rc_ctrl_upstreams_rsp_cmd(UINT8 event, tAVRC_COMMAND *pavrc_cmd, UINT8 label);
 static void btif_avk_rc_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pavrc_resp,
                                            UINT8* p_buf, UINT16 buf_len, UINT8 rsp_type, UINT8 index);
@@ -299,9 +301,19 @@ void btif_avk_rc_handle_rc_ctrl_features(int index)
             rc_features |= BTRC_FEAT_ABSOLUTE_VOLUME;
         }
         if ((btif_avk_rc_cb[index].rc_features & BTA_AVK_FEAT_METADATA)&&
-            (btif_avk_rc_cb[index].rc_features & BTA_AVK_FEAT_VENDOR))
+            (btif_avk_rc_cb[index].rc_features & BTA_AVK_FEAT_VENDOR)&&
+            (btif_avk_rc_cb[index].rc_features_processed != TRUE))
         {
             rc_features |= BTRC_FEAT_METADATA;
+            /* Mark rc features processed to avoid repeating
+             * the AVRCP procedure every time on receiving this
+             * update.
+             */
+            if (btif_avk_rc_cb[index].rc_features_processed == FALSE)
+            {
+                btif_avk_rc_cb[index].rc_features_processed = TRUE;
+                getcapabilities_cmd_vendor (AVRC_CAP_COMPANY_ID);
+            }
         }
         BTIF_TRACE_DEBUG("Update rc features to CTRL %d",rc_features);
         HAL_CBACK(btif_avk_rc_ctrl_callbacks, getrcfeatures_cb, &rc_addr, rc_features);
@@ -634,6 +646,7 @@ static void btif_avk_rc_handle_rc_passthrough_rsp ( tBTA_AVK_REMOTE_RSP *p_remot
     const char *status;
     int index = btif_avk_rc_get_idx_by_rc_handle(p_remote_rsp->rc_handle);
     BTIF_TRACE_DEBUG("%s: index=%d", __FUNCTION__, index);
+    bt_bdaddr_t rc_addr;
     if (index >= btif_max_rc_clients)
     {
         BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
@@ -654,10 +667,11 @@ static void btif_avk_rc_handle_rc_passthrough_rsp ( tBTA_AVK_REMOTE_RSP *p_remot
         }
 
         BTIF_TRACE_DEBUG("%s: rc_id=%d status=%s", __FUNCTION__, p_remote_rsp->rc_id, status);
-
+        bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
         release_transaction(p_remote_rsp->label);
-        if (btif_avk_rc_ctrl_callbacks != NULL) {
-            HAL_CBACK(btif_avk_rc_ctrl_callbacks, passthrough_rsp_cb, p_remote_rsp->rc_id, key_state);
+        if (btif_avk_rc_ctrl_vendor_callbacks != NULL) {
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, passthrough_rsp_vendor_cb,
+                    p_remote_rsp->rc_id, key_state, &rc_addr);
         }
     }
     else

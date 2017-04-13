@@ -215,43 +215,6 @@ static char *bta_avk_st_code(UINT8 state);
 #endif
 
 static BOOLEAN is_multicast_enabled = FALSE;
-#if 0
-/*******************************************************************************
-**
-** Function         bta_avk_timer_cback
-**
-** Description      forward the event to stream state machine
-**
-** Returns          void
-**
-*******************************************************************************/
-static void bta_avk_timer_cback(void *p_tle)
-{
-    BT_HDR          *p_buf;
-    TIMER_LIST_ENT  *p = (TIMER_LIST_ENT *)p_tle;
-    int xx;
-    tBTA_AVK_SCB *p_scb = NULL;
-
-    /* find the SCB that has the timer */
-    for(xx=0; xx<BTA_AVK_NUM_STRS; xx++)
-    {
-        if(bta_avk_cb.p_scb[xx] && &(bta_avk_cb.p_scb[xx]->timer)== p)
-        {
-            p_scb = bta_avk_cb.p_scb[xx];
-            break;
-        }
-    }
-
-    if (p_scb && (p_buf = (BT_HDR *) osi_malloc(sizeof(BT_HDR))) != NULL)
-    {
-        /* send the event through the audio state machine.
-         * only when the audio SM is open, the main SM opens the RC connection as INT */
-        p_buf->event = p->event;
-        p_buf->layer_specific = p_scb->hndl;
-        bta_sys_sendmsg(p_buf);
-    }
-}
-#endif
 
 /*******************************************************************************
 **
@@ -593,6 +556,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
     do
     {
         p_scb = bta_avk_alloc_scb(registr.chnl);
+        cs.registration_id = p_scb->hdi;
         if(p_scb == NULL)
         {
             APPL_TRACE_ERROR("failed to alloc SCB");
@@ -603,7 +567,6 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
         p_scb->app_id   = registr.app_id;
 
         /* initialize the stream control block */
-        //p_scb->timer.p_cback = (TIMER_CBACK*)&bta_avk_timer_cback;
         registr.status = BTA_AVK_SUCCESS;
 
         if((bta_avk_cb.reg_audio + bta_avk_cb.reg_video) == 0)
@@ -723,6 +686,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                 if(AVDT_CreateStream(&p_scb->seps[index - startIndex].av_handle, &cs) ==
                                                                             AVDT_SUCCESS)
                 {
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
                    if (index == BTIF_SV_AVK_AA_APTX_INDEX)
                    {
                        UINT8* ptr = cs.cfg.codec_info;
@@ -736,6 +700,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                             index, p_scb->seps[index - startIndex].vendorId,
                             p_scb->seps[index - startIndex].codecId);
                     }
+#endif
                     p_scb->seps[index - startIndex].codec_type = codec_type;
                     p_scb->seps[index - startIndex].tsep = cs.tsep;
                     if(cs.tsep == AVDT_TSEP_SNK)
@@ -798,7 +763,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
                     /* create an SDP record as AVRC CT. */
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REMOTE_CONTROL, NULL, NULL,
-                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_3);
+                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_0);
 #endif
                 }
             }

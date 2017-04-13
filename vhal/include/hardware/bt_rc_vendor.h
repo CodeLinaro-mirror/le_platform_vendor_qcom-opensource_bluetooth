@@ -249,6 +249,36 @@ typedef struct {
 
     bt_status_t (*init_vendor)( btrc_vendor_callbacks_t* callbacks , int max_avrcp_connections);
 
+    bt_status_t (*get_play_status_response_vendor)( btrc_play_status_t play_status, uint32_t song_len,
+            int32_t song_pos, bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*list_player_app_attr_response_vendor)( uint8_t num_attr, btrc_player_attr_t *p_attrs,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*list_player_app_value_response_vendor)( uint8_t num_val, uint8_t *p_vals,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*get_player_app_value_response_vendor)( btrc_player_settings_t *p_vals,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*get_player_app_attr_text_response_vendor)( int num_attr, btrc_player_setting_text_t *p_attrs,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*get_player_app_value_text_response_vendor)( int num_val, btrc_player_setting_text_t *p_vals,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*get_element_attr_response_vendor)( uint8_t num_attr, btrc_element_attr_val_t *p_attrs,
+            bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*set_player_app_value_response_vendor)(btrc_status_t rsp_status, bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*register_notification_response_vendor)(btrc_vendor_event_id_t event_id,
+                                                         btrc_vendor_notification_type_t type,
+                                                         btrc_vendor_register_notification_t *p_param,
+                                                         bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*set_vol_vendor)(uint8_t volume, bt_bdaddr_t *bd_addr);
+
     bt_status_t (*get_folder_items_response_vendor) (btrc_vendor_folder_list_entries_t *p_param, bt_bdaddr_t *bd_addr);
 
     bt_status_t (*set_addressed_player_response_vendor) (btrc_status_t status_code, bt_bdaddr_t *bd_addr);
@@ -298,6 +328,9 @@ typedef void (* btavrc_ctrl_getelementattrib_rsp_vendor_callback) (bt_bdaddr_t *
 typedef void (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, int param_len, uint8_t* play_status_rsp
                                                                            ,uint8_t rsp_type);
 
+typedef void (* btavrc_ctrl_passthrough_rsp_vendor_callback) (int id, int key_state,
+                                                                  bt_bdaddr_t *bd_addr);
+
 /** BT-RC Controller Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtRcCtVendorCallbacks) */
@@ -309,6 +342,7 @@ typedef struct {
     btavrc_ctrl_notification_rsp_vendor_callback                    notification_rsp_vendor_cb;
     btavrc_ctrl_getelementattrib_rsp_vendor_callback                getelementattrib_rsp_vendor_cb;
     btavrc_ctrl_getplaystatus_rsp_vendor_callback                   getplaystatus_rsp_vendor_cb;//need to check
+    btavrc_ctrl_passthrough_rsp_vendor_callback                     passthrough_rsp_vendor_cb;
 } btrc_ctrl_vendor_callbacks_t;
 
 /** Represents the standard BT-RC AVRCP Controller Vendor interface. */

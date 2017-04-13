@@ -304,7 +304,7 @@ static void btif_initiate_avk_open_timer_timeout(UNUSED_ATTR void *data)
 
     /* is there at least one RC connection - There should be */
     /*We have Two Connections.*/
-    if (btif_rc_get_connected_peer(peer_addr))
+    if (btif_avk_rc_get_connected_peer(peer_addr))
     {
         /*Check if this peer_addr is same as currently connected AV*/
         if (btif_get_conn_state_of_device(peer_addr) == BTIF_AVK_STATE_OPENED)
@@ -319,7 +319,7 @@ static void btif_initiate_avk_open_timer_timeout(UNUSED_ATTR void *data)
              * If not available, AV got connected to different devices.
              * Disconnect this RC connection without AV connection.
              */
-            rc_handle = btif_rc_get_connected_peer_handle(peer_addr);
+            rc_handle = btif_avk_rc_get_connected_peer_handle(peer_addr);
             index = btif_avk_get_valid_idx_for_rc_events(peer_addr, rc_handle);
             if(index >= btif_max_avk_clients)
             {
@@ -498,6 +498,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             // copy to avoid alignment problems
             /* in this case, L2CAP connection is still up, but bt-app moved to disc state
                so lets move bt-app to connected state first */
+            memcpy(&req, p_data, sizeof(req));
             btif_report_connection_state(BTAV_CONNECTION_STATE_CONNECTED, &(req.peer_bd));
             BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
                     req.sample_rate, req.channel_count,
@@ -506,7 +507,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
 
             if (bt_av_sink_vendor_callbacks != NULL) {
                 HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
-                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
+                        &(req.peer_bd), req.codec_type, req.codec_info);
             }
         } break;
 
@@ -2092,7 +2093,7 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
 static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int max,
                              int a2dp_multicast_state, uint8_t streaming_prarm)
 {
-    bt_status_t status;
+    bt_status_t status = BT_STATUS_FAIL;
 
     BTIF_TRACE_IMP("%s max = %d", __FUNCTION__, max);
 
@@ -2216,6 +2217,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_curr, p_src, q_bytes_left);
             osi_free(p_data_q_buf);
@@ -2250,6 +2255,48 @@ void update_streaming_device_vendor(bt_bdaddr_t *bd_addr)
     memcpy(&streaming_bda, bd_addr, sizeof(bt_bdaddr_t));
     BTIF_TRACE_DEBUG(" %s streaming bda %s ", __FUNCTION__, bdaddr_to_string(&streaming_bda, &addr1, sizeof(addr1)));
 
+}
+
+/*******************************************************************************
+**
+** Function         update_flush_device_vendor
+**
+** Description      Updates the current streaming device from apps
+**
+** Returns          void
+**
+*******************************************************************************/
+void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
+{
+    BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
+    bdstr_t addr1, addr2;
+    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    bt_bdaddr_t bda;
+    int count = 0, queue_size = 0;
+    queue_size = fixed_queue_length(&RxDataQ);
+    BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
+    while ((!fixed_queue_is_empty(&RxDataQ)) || count < queue_size)
+    {
+        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(&(RxDataQ));
+        if (p_data_q_buf == NULL)
+            break;
+
+        bdcpy(bda.address, p_data_q_buf->bd_addr);
+        BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
+            bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
+            bdaddr_to_string(&bda, &addr2, sizeof(addr2)));
+
+        if ((bd_addr != NULL) &&
+            !memcmp(bd_addr->address, p_data_q_buf->bd_addr, sizeof(BD_ADDR)))
+        {
+            BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
+                __FUNCTION__);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(&RxDataQ);
+            osi_free(p_data_q_buf);
+        }
+        count++;
+    }
 }
 
 /*******************************************************************************
@@ -2317,6 +2364,10 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
         {
             // read from topmost element and deque it
             p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            if (p_data_q_buf == NULL) {
+                BTIF_TRACE_IMP(" %s: p_data_q_buf is NULL", __FUNCTION__);
+                break;
+            }
             p_dest = data + (size - bytes_to_be_written);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, q_bytes_left);
@@ -2366,31 +2417,22 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
 {
     tBT_SINK_DATA_HDR* p_msg;
     bdstr_t addr1;
-    BTIF_TRACE_DEBUG("enetered btif_media_enque_sink_data size= %d", size);
     pthread_mutex_lock(&sink_data_q_lock);
-    BTIF_TRACE_DEBUG("pthread_mutex_lock ed");
     if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
     {
          BTIF_TRACE_DEBUG(" %s DATA Que Full, returning", __FUNCTION__);
          pthread_mutex_unlock(&sink_data_q_lock);
          return  fixed_queue_length(RxDataQ);
     }
-    
     if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
     {
         UINT8 *p_dest;
-        BTIF_TRACE_DEBUG(" allocated the sizeof(tBT_SINK_DATA_HDR) + size");
         p_dest = (UINT8*)(p_msg + 1);
         memcpy(p_dest, (UINT8*)(data), size);
-        BTIF_TRACE_DEBUG("memcpy(p_dest, (UINT8*)(data), size)");
-
         p_msg->len = size;
         p_msg->offset = 0;
         p_msg->codec_type = codec_type;
         memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
-        BTIF_TRACE_DEBUG("RxDataQ:fixed_queue_length(RxDataQ):%d",fixed_queue_length(RxDataQ)); 
-        BTIF_TRACE_DEBUG("memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR))");
-
         fixed_queue_enqueue(RxDataQ, p_msg);
         BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d bd_addr %s, codec_type = %d",
                   __FUNCTION__, size, fixed_queue_length(RxDataQ),
@@ -2398,7 +2440,6 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
                   p_msg->codec_type);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
-    BTIF_TRACE_DEBUG("exit btif_media_enque_sink_data");
     return fixed_queue_length(RxDataQ);
 }
 static void btif_avk_media_clear_pcm_queue()
@@ -2662,6 +2703,8 @@ static const btav_interface_t bt_av_sink_interface = {
     sink_connect_src,
     disconnect,
     cleanup_sink,
+    NULL,
+    NULL,
 };
 
 static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
@@ -2674,6 +2717,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
 #endif
     get_a2dp_sink_streaming_data_vendor,
     update_streaming_device_vendor,
+    update_flushing_device_vendor,
     cleanup_sink_vendor,
 };
 
