@@ -225,6 +225,8 @@ typedef struct {
 
    /** Sends Audio Focus State. */
    void  (*audio_focus_state_vendor)( int focus_state );
+    /** request config codec information **/
+    bool (*get_src_codec_config)(uint8_t *codecinfo , uint8_t *codectype);
 
    /** Request PCM sample. */
    uint32_t  (*get_pcm_data_vendor)( uint8_t* data, uint32_t size );
