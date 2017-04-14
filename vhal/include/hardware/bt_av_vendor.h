@@ -189,6 +189,7 @@ typedef void(* btav_reconfig_a2dp_trigger_callback)(int reason, bt_bdaddr_t *bd_
  */
 typedef void (* btav_audio_focus_request_vendor_callback)(bt_bdaddr_t *bd_addr);
 
+typedef void (* btav_delay_report_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t report_delay);
 /** BT-AV Vendor callback structure. */
 typedef struct {
     /** set to sizeof(btav_vendor_callbacks_t) */
@@ -197,6 +198,7 @@ typedef struct {
     btav_is_multicast_enabled_vendor_callback multicast_state_vendor_cb;
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
     btav_reconfig_a2dp_trigger_callback reconfig_a2dp_trigger_cb;
+    btav_delay_report_vendor_callback delay_report_vendor_cb;
 } btav_vendor_callbacks_t;
 
 typedef struct {
