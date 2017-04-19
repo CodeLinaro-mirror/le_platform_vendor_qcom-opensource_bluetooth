@@ -404,6 +404,10 @@ typedef struct {
     */
     bt_status_t (*set_volume)(uint8_t volume, bt_bdaddr_t *bd_addr);
 
+    /** send pass through command to target */
+    bt_status_t (*send_pass_through_cmd) (bt_bdaddr_t *bd_addr, uint8_t key_code,
+            uint8_t key_state );
+
     /** Closes the interface. */
     void  (*cleanup)( void );
 } btrc_interface_t;
