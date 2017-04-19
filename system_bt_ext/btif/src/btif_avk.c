@@ -145,6 +145,7 @@ static BOOLEAN is_multicast_supported = FALSE;
 static BOOLEAN multicast_disabled = FALSE;
 static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
+static UINT16 enable_delay_reporting = 0; // by default disable it
 BUFFER_Q RxDataQ;
 static bt_bdaddr_t streaming_bda;
 
@@ -2115,9 +2116,10 @@ static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int
 
     enable_stack_sbc_decoding = streaming_prarm & A2DP_SINK_ENABLE_SBC_DECODING;
     retreive_rtp_header = streaming_prarm & A2DP_SINK_RETREIVE_RTP_HEADER;
+    enable_delay_reporting = streaming_prarm & A2DP_SINK_ENABLE_DELAY_REPORTING;
 
-    BTIF_TRACE_IMP(" enable_sbc_decoding = %d, retreive RTP header = %d",
-            enable_stack_sbc_decoding, retreive_rtp_header);
+    BTIF_TRACE_IMP(" ~~ enable_sbc_decoding = %d, retreive RTP header = %d, enable_delay_reporting = %d",
+            enable_stack_sbc_decoding, retreive_rtp_header, enable_delay_reporting);
 
     /* initializing mutex for sink */
     pthread_mutex_init(&sink_data_q_lock, NULL);
@@ -2894,10 +2896,22 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
          /* Added BTA_AVK_FEAT_NO_SCO_SSPD - this ensures that the BTA does not
           * auto-suspend av streaming on AG events(SCO or Call). The suspend shall
           * be initiated by the app/audioflinger layers */
-         BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
-                                            BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
-                                            BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
-                                                                        bte_avk_callback);
+        if(enable_delay_reporting) {
+        /* Added BTA_AVK_FEAT_DELAY_RPT - this enables delay reporting feature for A2DP1.3 */
+        BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
+                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
+                BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG|BTA_AVK_FEAT_DELAY_RPT,
+                bte_avk_callback);
+        BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
+        }
+        else
+        {
+            BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
+                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
+                BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
+                bte_avk_callback);
+            BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable NOT Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
+        }
          for (i = 0; i < btif_max_avk_clients; i++)
          {
              BTA_AvkRegister(BTA_AVK_CHNL_AUDIO, BTIF_AVK_SERVICE_NAME, 0, bte_avk_media_callback,
