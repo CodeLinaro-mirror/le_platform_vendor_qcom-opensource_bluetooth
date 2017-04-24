@@ -417,10 +417,12 @@ static BOOLEAN bta_avk_next_getcap(tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             }
             if ((p_scb->avdt_version >= AVDT_VERSION_SYNC) && (a2d_get_avdt_sdp_ver() >= AVDT_VERSION_SYNC) )
             {
+                APPL_TRACE_DEBUG("%s ~~ current conn avdt ver = %d local avdt ver = %d",__func__,p_scb->avdt_version,a2d_get_avdt_sdp_ver());
                 p_req = AVDT_GetAllCapReq;
             }
             else
             {
+                APPL_TRACE_DEBUG("%s ~~current conn avdt ver = %d local avdt ver = %d",__func__,p_scb->avdt_version,a2d_get_avdt_sdp_ver());
                 p_req = AVDT_GetCapReq;
             }
             (*p_req)(p_scb->peer_addr,
@@ -755,6 +757,7 @@ static void bta_avk_a2d_sdp_cback(BOOLEAN found, tA2D_Service *p_service)
             else
                 p_scb->avdt_version = 0x00;
 
+            APPL_TRACE_DEBUG(" %s ~~ p_scb->avdt_version [%d]", __func__,p_scb->avdt_version);
             p_msg->hdr.layer_specific = bta_avk_cb.handle;
             bta_sys_sendmsg(p_msg);
             if (!found)
@@ -1267,6 +1270,8 @@ void bta_avk_config_ind (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
 
         p_scb->role      |= BTA_AVK_ROLE_AD_ACP;
         p_scb->cur_psc_mask = p_evt_cfg->psc_mask;
+        APPL_TRACE_DEBUG(" %s ~~ p_evt_cfg->psc_mask [%d]",__func__,p_evt_cfg->psc_mask);
+
         if (bta_avk_cb.features & BTA_AVK_FEAT_RCTG)
             p_scb->use_rc = TRUE;
         else
@@ -1420,9 +1425,17 @@ void bta_avk_setconfig_rsp (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         /* callout module tells BTA the number of "good" SEPs and their SEIDs.
          * getcap on these SEID */
         p_scb->num_seps = num;
-
+        APPL_TRACE_DEBUG(" %s ~~ p_scb->cur_psc_mask [%d]",__func__,p_scb->cur_psc_mask);
         if (p_scb->cur_psc_mask & AVDT_PSC_DELAY_RPT)
+        {
+            APPL_TRACE_DEBUG(" %s ~~ AVDTP version is v1.3",__func__);
             p_scb->avdt_version = AVDT_VERSION_SYNC;
+        }
+        else
+        {
+            APPL_TRACE_DEBUG(" %s ~~ AVDTP version is v1.2",__func__);
+            p_scb->avdt_version = AVDT_VERSION;
+        }
 
         APPL_TRACE_DEBUG(" %s codec_type  = %d ",__func__, p_scb->codec_type);
         if ((p_scb->codec_type == BTA_AVK_CODEC_SBC)||
@@ -2050,8 +2063,13 @@ void bta_avk_getcap_results (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             bta_avk_adjust_seps_idx(p_scb, bta_avk_get_scb_handle(p_scb, AVDT_TSEP_SNK));
 
         /* use only the services peer supports */
+        APPL_TRACE_DEBUG(" %s ~~ cfg.psc_mask [%d] p_scb->p_cap->psc_mask [%d]",__func__,cfg.psc_mask,p_scb->p_cap->psc_mask);
         cfg.psc_mask &= p_scb->p_cap->psc_mask;
         p_scb->cur_psc_mask = cfg.psc_mask;
+        if (p_scb->cur_psc_mask & AVDT_PSC_DELAY_RPT)
+            p_scb->avdt_version = AVDT_VERSION_SYNC;
+        else
+            p_scb->avdt_version = AVDT_VERSION;
 
         if ((uuid_int == UUID_SERVCLASS_AUDIO_SINK) &&
             (p_scb->seps[p_scb->sep_idx].p_app_data_cback != NULL))
