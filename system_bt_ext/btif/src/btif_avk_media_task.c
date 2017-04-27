@@ -266,7 +266,6 @@ typedef union
 typedef struct
 {
 #if (BTA_AV_INCLUDED == TRUE)
-    fixed_queue_t *TxAaQ;
     fixed_queue_t  *RxSbcQ;
     BOOLEAN is_tx_timer;
     BOOLEAN is_rx_timer;
@@ -1090,7 +1089,6 @@ static void btif_avk_media_thread_init(UNUSED_ATTR void *context) {
   UIPC_Init(NULL);
 
 #if (BTA_AV_INCLUDED == TRUE)
-  btif_avk_media_cb.TxAaQ = fixed_queue_new(SIZE_MAX);
   btif_avk_media_cb.RxSbcQ = fixed_queue_new(SIZE_MAX);
   UIPC_Open(UIPC_CH_ID_AV_CTRL , btif_a2dp_ctrl_cb);
 #endif
@@ -1268,7 +1266,6 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 #ifdef ANDROID
     retwriteAudioTrack = btWriteData((void*)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
-    APPL_TRACE_ERROR("calling btif_media_enque_sink_data");
     btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM,
             (void*)pcmData, (sizeof(pcmData) - availPcmBytes), bd_addr);
     if(btif_avk_media_cb.data_channel_open) {
@@ -1493,7 +1490,7 @@ static void btif_avk_media_task_aa_handle_start_decoding(void) {
     return;
   }
 
-  alarm_set_periodic(btif_avk_media_cb.decode_alarm, BTIF_SINK_MEDIA_TIME_TICK, btif_decode_alarm_cb, NULL);
+  alarm_set(btif_avk_media_cb.decode_alarm, BTIF_SINK_MEDIA_TIME_TICK, btif_decode_alarm_cb, NULL);
 }
 
 #if (BTA_AV_SINK_INCLUDED == TRUE)

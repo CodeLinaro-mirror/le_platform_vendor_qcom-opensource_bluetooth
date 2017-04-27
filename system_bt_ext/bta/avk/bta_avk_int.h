@@ -625,7 +625,6 @@ extern tBTA_AVK_CB *bta_avk_cb_ptr;
 
 /* config struct */
 extern tBTA_AVK_CFG *p_bta_avk_cfg;
-extern const tBTA_AVK_CFG bta_avk_src_cfg;
 extern const tBTA_AVK_CFG bta_avk_sink_cfg;
 
 /* rc id config struct */

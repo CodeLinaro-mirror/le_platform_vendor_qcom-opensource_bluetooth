@@ -722,7 +722,7 @@ void bta_avk_rc_meta_rsp(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
             (!p_data->api_meta_rsp.is_rsp && (p_cb->features & BTA_AVK_FEAT_RCCT)) )
         {
             p_rcb = &p_cb->rcb[p_data->hdr.layer_specific];
-            if (p_rcb->handle != BTA_AVK_RC_HANDLE_NONE) {
+            if ((p_rcb->handle != BTA_AVK_RC_HANDLE_NONE) && (p_rcb->handle < AVCT_NUM_CONN))  {
                 AVRC_MsgReq(p_rcb->handle, p_data->api_meta_rsp.label,
                             p_data->api_meta_rsp.rsp_code,
                             p_data->api_meta_rsp.p_pkt);
@@ -1545,6 +1545,10 @@ void bta_avk_disable(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
         hdr.layer_specific = xx + 1;
         bta_avk_api_deregister((tBTA_AVK_DATA *)&hdr);
     }
+    alarm_free(p_cb->link_signalling_timer);
+    p_cb->link_signalling_timer = NULL;
+    alarm_free(p_cb->accept_signalling_timer);
+    p_cb->accept_signalling_timer = NULL;
 }
 
 /*******************************************************************************
@@ -2152,7 +2156,7 @@ void bta_avk_rc_disc_done(tBTA_AVK_DATA *p_data)
                 if(p_lcb)
                 {
                     rc_handle = bta_avk_rc_create(p_cb, AVCT_INT, (UINT8)(p_scb->hdi + 1), p_lcb->lidx);
-                    if(rc_handle != BTA_AVK_RC_HANDLE_NONE)
+                    if((rc_handle != BTA_AVK_RC_HANDLE_NONE) && (rc_handle < BTA_AVK_NUM_RCB))
                     {
                         p_cb->rcb[rc_handle].peer_features = peer_features;
                     }
@@ -2185,7 +2189,7 @@ void bta_avk_rc_disc_done(tBTA_AVK_DATA *p_data)
             }
         }
     }
-    else
+    else if (rc_handle < BTA_AVK_NUM_RCB)
     {
         p_cb->rcb[rc_handle].peer_features = peer_features;
         rc_feat.rc_handle =  rc_handle;
