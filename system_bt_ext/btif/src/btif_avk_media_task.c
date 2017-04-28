@@ -247,6 +247,7 @@ typedef struct
     UINT16 offset;
     UINT16 layer_specific;
     BD_ADDR bd_addr;
+    UINT64 enque_ms;   //time of packet enqueue RxSbcQ (millisecond)
 } tBT_AVK_SBC_HDR;
 
 typedef struct
@@ -1273,8 +1274,9 @@ static void btif_avk_media_task_handle_inc_media(tBT_AVK_SBC_HDR*p_msg)
 #ifdef ANDROID
     retwriteAudioTrack = btWriteData((void*)pcmData, (sizeof(pcmData) - availPcmBytes));
 #endif
+    APPL_TRACE_ERROR("calling btif_media_enque_sink_data");
     btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_PCM,
-            (void*)pcmData, (sizeof(pcmData) - availPcmBytes), bd_addr);
+            (void*)pcmData, (sizeof(pcmData) - availPcmBytes), bd_addr, p_msg->enque_ms);
     if(btif_avk_media_cb.data_channel_open) {
        APPL_TRACE_ERROR("Feeding to audio HAL");
         btif_avk_media_task_feed_audio_hal();
@@ -1693,7 +1695,7 @@ static UINT64 time_now_us()
  **
  ** Returns          size of the queue
  *******************************************************************************/
-UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt, BD_ADDR bd_addr)
+UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt, BD_ADDR bd_addr, BOOLEAN rpt_delay)
 {
     tBT_AVK_SBC_HDR *p_msg;
 
@@ -1718,6 +1720,13 @@ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_pkt, BD_ADDR bd_addr)
         p_msg->offset = 0;
         p_msg->layer_specific = p_pkt->layer_specific;
         memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
+        if(rpt_delay)
+        {
+            struct timespec ts_now;
+            clock_gettime(CLOCK_BOOTTIME, &ts_now);
+            p_msg->enque_ms = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+            BTIF_TRACE_IMP(" %s ~~ SBC steam packet enque RxSbcQ, enque_ms = [%09llu]", __func__,p_msg->enque_ms);
+        }
 
         BTIF_TRACE_VERBOSE("btif_avk_media_sink_enque_buf %d", p_msg->num_frames_to_be_processed);
         fixed_queue_enqueue(btif_avk_media_cb.RxSbcQ, p_msg);
