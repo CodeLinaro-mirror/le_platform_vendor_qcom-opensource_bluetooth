@@ -39,15 +39,7 @@ const UINT32  bta_avk_meta_caps_co_ids[] = {
     AVRC_CO_BROADCOM
 };
 
-/* AVRCP cupported categories */
 #if (AVRC_CTLR_INCLUDED == TRUE)
-#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT1 | AVRC_SUPF_CT_CAT2)
-#else
-#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT2)
-#endif
-
-#if (AVRC_CTLR_INCLUDED == TRUE)
-#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT1)
 #define BTA_AVK_RC_SUPF_TG       (AVRC_SUPF_TG_CAT2)
 #endif
 
@@ -70,7 +62,7 @@ const UINT16  bta_avk_audio_flush_to[] = {
 /* Note: Android doesnt support AVRC_SUPF_TG_GROUP_NAVI  */
 /* Note: if AVRC_SUPF_TG_GROUP_NAVI is set, bta_avk_src_cfg.avrc_group should be TRUE */
 #ifndef ANDROID
-#define BTA_AVK_RC_SUPF_TG       (AVRC_SUPF_TG_CAT1)
+#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT1)
 #else
 #if AVRC_METADATA_INCLUDED == TRUE
 
@@ -122,36 +114,6 @@ const UINT8  bta_avk_sink_meta_caps_evt_ids[] = {
 #ifndef BTA_AVK_MAX_RC_BR_MTU
 #define BTA_AVK_MAX_RC_BR_MTU      1008
 #endif
-
-/* This configuration to be used when we are Src + TG + CT( only for abs vol) */
-const tBTA_AVK_CFG bta_avk_src_cfg =
-{
-    AVRC_CO_BROADCOM,       /* AVRCP Company ID */
-#if AVRC_METADATA_INCLUDED == TRUE
-    512,                    /* AVRCP MTU at L2CAP for control channel */
-#else
-    48,                     /* AVRCP MTU at L2CAP for control channel */
-#endif
-    BTA_AVK_MAX_RC_BR_MTU,   /* AVRCP MTU at L2CAP for browsing channel */
-    BTA_AVK_RC_SUPF_CT,      /* AVRCP controller categories */
-    BTA_AVK_RC_SUPF_TG,      /* AVRCP target categories */
-    672,                    /* AVDTP signaling channel MTU at L2CAP */
-    BTA_AVK_MAX_A2DP_MTU,    /* AVDTP audio transport channel MTU at L2CAP */
-    bta_avk_audio_flush_to,  /* AVDTP audio transport channel flush timeout */
-    6,                      /* AVDTP audio channel max data queue size */
-    BTA_AVK_MAX_VDP_MTU,     /* AVDTP video transport channel MTU at L2CAP */
-    600,                    /* AVDTP video transport channel flush timeout */
-    FALSE,                   /* TRUE, to accept AVRC 1.3 group nevigation command */
-    2,                      /* company id count in p_meta_co_ids */
-    BTA_AVK_NUM_RC_EVT_IDS, /* event id count in p_meta_evt_ids */
-    BTA_AVK_RC_PASS_RSP_CODE,/* the default response code for pass through commands */
-    bta_avk_meta_caps_co_ids,/* the metadata Get Capabilities response for company id */
-    bta_avk_src_meta_caps_evt_ids,/* the the metadata Get Capabilities response for event id */
-    NULL,                   /* the action function table for VDP stream */
-    NULL,                   /* action function to register VDP */
-    {0},                    /* Default AVRCP controller name */
-    {0},                    /* Default AVRCP target name */
-};
 
 /* This configuration to be used when we are Sink + CT + TG( only for abs vol) */
 const tBTA_AVK_CFG bta_avk_sink_cfg =
@@ -213,10 +175,14 @@ const UINT16 bta_avk_rc_id[] =
                          12=BACKWARD */
 #else
 #if (defined BTA_AVRCP_FF_RW_SUPPORT) && (BTA_AVRCP_FF_RW_SUPPORT == TRUE)
-    0x1b70, /* bit mask: 0=POWER, 1=VOL_UP, 2=VOL_DOWN, 3=MUTE,
+#ifdef ANDROID
+    0x1b70,
+#else
+    0x1b76, /* bit mask: 0=POWER, 1=VOL_UP, 2=VOL_DOWN, 3=MUTE,
                          4=PLAY, 5=STOP, 6=PAUSE, 7=RECORD,
                          8=REWIND, 9=FAST_FOR, 10=EJECT, 11=FORWARD,
                          12=BACKWARD */
+#endif
 #else
     0x1870, /* bit mask: 0=POWER, 1=VOL_UP, 2=VOL_DOWN, 3=MUTE,
                          4=PLAY, 5=STOP, 6=PAUSE, 7=RECORD,

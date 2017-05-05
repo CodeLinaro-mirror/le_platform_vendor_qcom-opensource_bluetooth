@@ -262,77 +262,54 @@ typedef struct
 } btrc_folder_list_entries_t;
 
 /** Callback for play status request */
-typedef void (* btrc_get_play_status_callback)(bt_bdaddr_t *bd_addr);
+typedef void (* btrc_get_play_status_callback)();
 
 /** Callback for list player application attributes (Shuffle, Repeat,...) */
-typedef void (* btrc_list_player_app_attr_callback)(bt_bdaddr_t *bd_addr);
+typedef void (* btrc_list_player_app_attr_callback)();
 
 /** Callback for list player application attributes (Shuffle, Repeat,...) */
-typedef void (* btrc_list_player_app_values_callback)(btrc_player_attr_t attr_id,
-        bt_bdaddr_t *bd_addr);
+typedef void (* btrc_list_player_app_values_callback)(btrc_player_attr_t attr_id);
 
 /** Callback for getting the current player application settings value
 **  num_attr: specifies the number of attribute ids contained in p_attrs
 */
-typedef void (* btrc_get_player_app_value_callback) (uint8_t num_attr, btrc_player_attr_t *p_attrs,
-        bt_bdaddr_t *bd_addr);
+typedef void (* btrc_get_player_app_value_callback) (uint8_t num_attr, btrc_player_attr_t *p_attrs);
 
 /** Callback for getting the player application settings attributes' text
 **  num_attr: specifies the number of attribute ids contained in p_attrs
 */
 typedef void (* btrc_get_player_app_attrs_text_callback) (uint8_t num_attr,
-        btrc_player_attr_t *p_attrs, bt_bdaddr_t *bd_addr);
+                                                   btrc_player_attr_t *p_attrs);
 
 /** Callback for getting the player application settings values' text
 **  num_attr: specifies the number of value ids contained in p_vals
 */
 typedef void (* btrc_get_player_app_values_text_callback) (uint8_t attr_id,
-         uint8_t num_val, uint8_t *p_vals, bt_bdaddr_t *bd_addr);
+                                              uint8_t num_val, uint8_t *p_vals);
 
 /** Callback for setting the player application settings values */
-typedef void (* btrc_set_player_app_value_callback) (btrc_player_settings_t *p_vals,
-        bt_bdaddr_t *bd_addr);
+typedef void (* btrc_set_player_app_value_callback) (btrc_player_settings_t *p_vals);
 
 /** Callback to fetch the get element attributes of the current song
 **  num_attr: specifies the number of attributes requested in p_attrs
 */
-typedef void (* btrc_get_element_attr_callback) (uint8_t num_attr, btrc_media_attr_t *p_attrs,
-        bt_bdaddr_t *bd_addr);
+typedef void (* btrc_get_element_attr_callback) (uint8_t num_attr, btrc_media_attr_t *p_attrs);
 
 /** Callback for register notification (Play state change/track change/...)
 **  param: Is only valid if event_id is BTRC_EVT_PLAY_POS_CHANGED
 */
-typedef void (* btrc_register_notification_callback) (btrc_event_id_t event_id, uint32_t param,
-        bt_bdaddr_t *bd_addr);
+typedef void (* btrc_register_notification_callback) (btrc_event_id_t event_id, uint32_t param);
 
 /* AVRCP 1.4 Enhancements */
 /** Callback for volume change on CT
 **  volume: Current volume setting on the CT (0-127)
 */
-typedef void (* btrc_volume_change_callback) (uint8_t volume, uint8_t ctype, bt_bdaddr_t *bd_addr);
+typedef void (* btrc_volume_change_callback) (uint8_t volume, uint8_t ctype);
 
 /** Callback for passthrough commands */
-typedef void (* btrc_passthrough_cmd_callback) (int id, int key_state, bt_bdaddr_t *bd_addr);
+typedef void (* btrc_passthrough_cmd_callback) (int id, int key_state);
 
 /** BT-RC Target callback structure. */
-
-typedef void (* btrc_get_folder_items_callback) (btrc_browse_folderitem_t id,
-                  btrc_getfolderitem_t *param, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_set_addressed_player_callback) (uint32_t player_id, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_set_browsed_player_callback) (uint32_t player_id, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_change_path_callback) (uint8_t direction, uint64_t uid, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_play_item_callback) (uint8_t scope, uint64_t uid, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_get_item_attr_callback) (uint8_t scope, uint64_t uid,
-        uint8_t num_attr, btrc_media_attr_t *p_attrs, uint32_t size, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_connection_state_callback) (bool state, bt_bdaddr_t *bd_addr);
-
-typedef void (* btrc_get_total_item_callback) (uint8_t scope, bt_bdaddr_t *bd_addr);
 
 typedef struct {
     /** set to sizeof(BtRcCallbacks) */
@@ -349,14 +326,6 @@ typedef struct {
     btrc_register_notification_callback         register_notification_cb;
     btrc_volume_change_callback                 volume_change_cb;
     btrc_passthrough_cmd_callback               passthrough_cmd_cb;
-    btrc_get_folder_items_callback              get_folderitems_cb;
-    btrc_set_addressed_player_callback          set_addrplayer_cb;
-    btrc_set_browsed_player_callback            set_browsed_player_cb;
-    btrc_change_path_callback                   change_path_cb;
-    btrc_play_item_callback                     play_item_cb;
-    btrc_get_item_attr_callback                 get_item_attr_cb;
-    btrc_connection_state_callback              connection_state_cb;
-    btrc_get_total_item_callback                get_tot_item_cb;
 } btrc_callbacks_t;
 
 /** Represents the standard BT-RC AVRCP Target interface. */
@@ -434,6 +403,10 @@ typedef struct {
     ** volume: Should be in the range 0-127. bit7 is reseved and cannot be set
     */
     bt_status_t (*set_volume)(uint8_t volume, bt_bdaddr_t *bd_addr);
+
+    /** send pass through command to target */
+    bt_status_t (*send_pass_through_cmd) (bt_bdaddr_t *bd_addr, uint8_t key_code,
+            uint8_t key_state );
 
     /** Closes the interface. */
     void  (*cleanup)( void );

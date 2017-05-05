@@ -266,16 +266,6 @@ typedef void (* bthf_client_last_voice_tag_number_callback) (const char *number)
  */
 typedef void (* bthf_client_ring_indication_callback) (void);
 
-/**
- * Callback for sending cgmi indication to app
- */
-typedef void (* bthf_client_cgmi_indication_callback) (const char *str);
-
-/**
- * Callback for sending cgmm indication to app
- */
-typedef void (* bthf_client_cgmm_indication_callback) (const char *str);
-
 /** BT-HF callback structure. */
 typedef struct {
     /** set to sizeof(BtHfClientCallbacks) */
