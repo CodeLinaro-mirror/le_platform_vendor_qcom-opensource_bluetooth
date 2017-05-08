@@ -417,7 +417,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             break;
 
         case BTA_AVK_ENABLE_EVT:
-            BTIF_TRACE_EVENT("AV is enabled now for index: %d", index);
+            BTIF_TRACE_EVENT("AVK is enabled now for index: %d", index);
             break;
 
         case BTA_AVK_REGISTER_EVT:
@@ -2222,7 +2222,15 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
                 break;
             }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
+            {
+                 q_bytes_left=q_bytes_left-1;
+                 p_src= p_src+1;
+            }
+            //  BTIF_TRACE_IMP("**QCOM** have q_bytes_left =%d",q_bytes_left);
             memcpy(p_curr, p_src, q_bytes_left);
+            //BTIF_TRACE_IMP("**QCOM** %hhu %hhu %hhu %hhu %hhu %hhu %hhu", 	2239
+            //p_src[0],p_src[1],p_src[2],p_src[3],p_src[4],p_src[5],p_src[6]);
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }

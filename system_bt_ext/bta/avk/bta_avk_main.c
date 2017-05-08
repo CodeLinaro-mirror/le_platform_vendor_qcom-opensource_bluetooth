@@ -403,7 +403,7 @@ void bta_avk_conn_cback(UINT8 handle, BD_ADDR bd_addr, UINT8 event, tAVDT_CTRL *
     UINT16  evt = 0;
     tBTA_AVK_SCB *p_scb = NULL;
     UNUSED(handle);
-
+    APPL_TRACE_DEBUG("%s event :%d",__func__, event);
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
     if (event == BTA_AR_AVDT_CONN_EVT ||
         event == AVDT_CONNECT_IND_EVT || event == AVDT_DISCONNECT_IND_EVT)
@@ -446,6 +446,33 @@ void bta_avk_conn_cback(UINT8 handle, BD_ADDR bd_addr, UINT8 event, tAVDT_CTRL *
         }
     }
 
+}
+
+BOOLEAN bta_avk_is_scb_available()
+{
+    tBTA_AVK_CB   *p_cb = &bta_avk_cb;
+    int     xx;
+    UINT8   mask;
+    for(xx=0; xx<BTA_AVK_NUM_LINKS; xx++)
+    {
+        mask = 1 << xx;
+        APPL_TRACE_DEBUG(" %s The current conn_lcb: 0x%x index = %d", __func__, p_cb->conn_lcb, xx);
+
+        /* look for a p_lcb with its p_scb registered */
+        if((!(mask & p_cb->conn_lcb)) && (p_cb->p_scb[xx] != NULL))
+        {
+            /* Check if the SCB is Free before using for
+             * ACP connection
+             */
+            if (p_cb->p_scb[xx]->state == BTA_AVK_INIT_ST)
+            {
+                APPL_TRACE_DEBUG(" %s SCB is free @ %d", __func__, xx);
+                return true;
+            }
+        }
+    }
+    APPL_TRACE_DEBUG(" %s SCB is not free ", __func__);
+    return false;
 }
 
 #if AVDT_REPORTING == TRUE
@@ -994,7 +1021,7 @@ void bta_avk_restore_switch (void)
         {
             if (p_cb->p_scb[i])
             {
-                bta_sys_set_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_cb->p_scb[i]->peer_addr);
+                bta_sys_set_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_cb->p_scb[i]->peer_addr);
             }
             break;
         }
@@ -1050,7 +1077,7 @@ static void bta_avk_sys_rs_cback (tBTA_SYS_CONN_STATUS status,UINT8 id, UINT8 ap
         (BTM_GetRole (peer_addr, &cur_role) == BTM_SUCCESS) &&
         (cur_role == BTM_ROLE_SLAVE) )
     {
-        bta_sys_set_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH, peer_addr);
+        bta_sys_set_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH, peer_addr);
     }
 
     /* if BTA_AvkOpen() was called for other device, which caused the role switch of the peer_addr,  */
@@ -1176,7 +1203,7 @@ BOOLEAN bta_avk_switch_if_needed(tBTA_AVK_SCB *p_scb)
             if(BTM_ROLE_MASTER != role)
             {
                 if (bta_avk_cb.features & BTA_AVK_FEAT_MASTER)
-                    bta_sys_clear_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_scbi->peer_addr);
+                    bta_sys_clear_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_scbi->peer_addr);
                 ret = BTM_SwitchRole(p_scbi->peer_addr, BTM_ROLE_MASTER, NULL);
                 if (ret == BTM_REPEATED_ATTEMPTS)
                     return FALSE;
@@ -1222,7 +1249,7 @@ BOOLEAN bta_avk_link_role_ok(tBTA_AVK_SCB *p_scb, UINT8 bits)
         if (BTM_ROLE_MASTER != role && (A2D_BitsSet(bta_avk_cb.conn_audio) > bits || (bta_avk_cb.features & BTA_AVK_FEAT_MASTER)))
         {
             if (bta_avk_cb.features & BTA_AVK_FEAT_MASTER)
-                bta_sys_clear_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_scb->peer_addr);
+                bta_sys_clear_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH, p_scb->peer_addr);
             ret = BTM_SwitchRole(p_scb->peer_addr, BTM_ROLE_MASTER, NULL);
             /* We have already reached maximum attempts,
              * If we try again it will anyways fail

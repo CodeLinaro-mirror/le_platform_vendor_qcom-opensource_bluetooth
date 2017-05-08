@@ -45,7 +45,7 @@
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
 #include "bta_ar_api.h"
 #endif
-
+#include "bta_ar_int_ext.h"
 /*****************************************************************************
 **  Constants
 *****************************************************************************/
@@ -240,6 +240,7 @@ tAVDT_CTRL_CBACK * const bta_avk_dt_cback[] =
     ,bta_avk_stream5_cback
 #endif
 };
+
 /***********************************************
 **
 ** Function         bta_get_scb_handle
@@ -760,7 +761,7 @@ static void bta_avk_a2d_sdp_cback(BOOLEAN found, tA2D_Service *p_service)
             bta_sys_sendmsg(p_msg);
             if (!found)
                 APPL_TRACE_ERROR ("bta_avk_a2d_sdp_cback, SDP record not found");
-            bta_sys_conn_close(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+            bta_sys_conn_close(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
         }
         else
         {
@@ -919,7 +920,7 @@ void bta_avk_role_res (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             if (p_data->role_res.hci_status != HCI_SUCCESS)
             {
                 p_scb->role &= ~BTA_AVK_ROLE_START_INT;
-                bta_sys_idle(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+                bta_sys_idle(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
                 /* start failed because of role switch. */
                 start.chnl   = p_scb->chnl;
                 start.status = BTA_AVK_FAIL_ROLE;
@@ -1075,7 +1076,7 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         if (bta_avk_cb.audio_open_cnt == 1)
         {
             /* there's already an A2DP connection. do not allow switch */
-            bta_sys_clear_default_policy(BTA_ID_AV, HCI_ENABLE_MASTER_SLAVE_SWITCH);
+            bta_sys_clear_default_policy(BTA_ID_AVK, HCI_ENABLE_MASTER_SLAVE_SWITCH);
         }
     }
     /* store peer addr other parameters */
@@ -1083,7 +1084,7 @@ void bta_avk_do_disc_a2d (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     p_scb->sec_mask = p_data->api_open.sec_mask;
     p_scb->use_rc = p_data->api_open.use_rc;
 
-    bta_sys_conn_open(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_conn_open(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
 
     if (p_scb->skip_sdp == TRUE)
     {
@@ -1508,7 +1509,7 @@ void bta_avk_str_opened (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     L2CA_SetTxPriority(p_scb->l2c_cid, L2CAP_CHNL_PRIORITY_HIGH);
     L2CA_SetChnlFlushability (p_scb->l2c_cid, TRUE);
 
-    bta_sys_conn_open(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_conn_open(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
     memset(&p_scb->q_info, 0, sizeof(tBTA_AVK_Q_INFO));
 
     p_scb->l2c_bufs = 0;
@@ -1701,6 +1702,7 @@ void bta_avk_connect_req (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         return;
     }
 
+    update_avdtp_connection_info(p_scb->peer_addr, AVDT_AR_EXT_CONNECT_REQ_EVT, BTA_AR_EXT_AVK_MASK);
     result = AVDT_ConnectReq(p_scb->peer_addr, p_scb->sec_mask, bta_avk_dt_cback[p_scb->hdi]);
     if(result != AVDT_SUCCESS)
     {
@@ -2173,12 +2175,12 @@ void bta_avk_do_start (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         policy |= HCI_ENABLE_MASTER_SLAVE_SWITCH;
     }
 
-    bta_sys_clear_policy(BTA_ID_AV, policy, p_scb->peer_addr);
+    bta_sys_clear_policy(BTA_ID_AVK, policy, p_scb->peer_addr);
 
     if ((p_scb->started == FALSE) && ((p_scb->role & BTA_AVK_ROLE_START_INT) == 0))
     {
         p_scb->role |= BTA_AVK_ROLE_START_INT;
-        bta_sys_busy(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+        bta_sys_busy(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
 
         AVDT_StartReq(&p_scb->avdt_handle, 1);
     }
@@ -2218,10 +2220,10 @@ void bta_avk_str_stopped (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     APPL_TRACE_ERROR("bta_avk_str_stopped:audio_open_cnt=%d, p_data %x",
             bta_avk_cb.audio_open_cnt, p_data);
 
-    bta_sys_idle(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_idle(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
     if ((bta_avk_cb.features & BTA_AVK_FEAT_MASTER) == 0 || bta_avk_cb.audio_open_cnt == 1)
         policy |= HCI_ENABLE_MASTER_SLAVE_SWITCH;
-    bta_sys_set_policy(BTA_ID_AV, policy, p_scb->peer_addr);
+    bta_sys_set_policy(BTA_ID_AVK, policy, p_scb->peer_addr);
 
     if (p_scb->co_started)
     {
@@ -2522,7 +2524,7 @@ void bta_avk_start_ok (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         p_scb->wait &= ~BTA_AVK_WAIT_ROLE_SW_BITS;
         if (p_data->hdr.offset == BTA_AVK_RS_FAIL)
         {
-            bta_sys_idle(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+            bta_sys_idle(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
             start.chnl   = p_scb->chnl;
             start.status = BTA_AVK_FAIL_ROLE;
             start.hndl   = p_scb->hndl;
@@ -2561,9 +2563,9 @@ void bta_avk_start_ok (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     }
 
     /* tell role manager to check M/S role */
-    bta_sys_conn_open(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_conn_open(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
 
-    bta_sys_busy(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_busy(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
 
     if(p_scb->media_type == AVDT_MEDIA_AUDIO)
     {
@@ -2628,7 +2630,7 @@ void bta_avk_start_ok (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
                 policy |= HCI_ENABLE_MASTER_SLAVE_SWITCH;
             }
 
-            bta_sys_clear_policy(BTA_ID_AV, policy, p_scb->peer_addr);
+            bta_sys_clear_policy(BTA_ID_AVK, policy, p_scb->peer_addr);
         }
 
         p_scb->role = new_role;
@@ -2683,11 +2685,11 @@ void bta_avk_start_failed (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
 
     if(p_scb->started == FALSE && p_scb->co_started == FALSE)
     {
-        bta_sys_idle(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+        bta_sys_idle(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
         notify_start_failed(p_scb);
     }
 
-    bta_sys_set_policy(BTA_ID_AV, (HCI_ENABLE_SNIFF_MODE|HCI_ENABLE_MASTER_SLAVE_SWITCH), p_scb->peer_addr);
+    bta_sys_set_policy(BTA_ID_AVK, (HCI_ENABLE_SNIFF_MODE|HCI_ENABLE_MASTER_SLAVE_SWITCH), p_scb->peer_addr);
     p_scb->sco_suspend = FALSE;
 }
 
@@ -2709,7 +2711,7 @@ void bta_avk_str_closed (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
 
     if ((bta_avk_cb.features & BTA_AVK_FEAT_MASTER) == 0 || bta_avk_cb.audio_open_cnt == 1)
         policy |= HCI_ENABLE_MASTER_SLAVE_SWITCH;
-    bta_sys_set_policy(BTA_ID_AV, policy, p_scb->peer_addr);
+    bta_sys_set_policy(BTA_ID_AVK, policy, p_scb->peer_addr);
     if (bta_avk_cb.audio_open_cnt <= 1)
     {
         /* last connection - restore the allow switch flag */
@@ -2732,7 +2734,7 @@ void bta_avk_str_closed (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         event = BTA_AVK_OPEN_EVT;
         p_scb->open_status = BTA_AVK_SUCCESS;
 
-        bta_sys_conn_close(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+        bta_sys_conn_close(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
         bta_avk_cleanup(p_scb, p_data);
         (*bta_avk_cb.p_cback)(event, &data);
     }
@@ -2753,7 +2755,7 @@ void bta_avk_str_closed (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
             data.close.hndl = p_scb->hndl;
             event = BTA_AVK_CLOSE_EVT;
 
-            bta_sys_conn_close(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+            bta_sys_conn_close(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
             bta_avk_cleanup(p_scb, p_data);
             (*bta_avk_cb.p_cback)(event, &data);
         }
@@ -2832,10 +2834,10 @@ void bta_avk_suspend_cfm (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         p_scb->cong = FALSE;
     }
 
-    bta_sys_idle(BTA_ID_AV, p_scb->hdi, p_scb->peer_addr);
+    bta_sys_idle(BTA_ID_AVK, p_scb->hdi, p_scb->peer_addr);
     if ((bta_avk_cb.features & BTA_AVK_FEAT_MASTER) == 0 || bta_avk_cb.audio_open_cnt == 1)
         policy |= HCI_ENABLE_MASTER_SLAVE_SWITCH;
-    bta_sys_set_policy(BTA_ID_AV, policy, p_scb->peer_addr);
+    bta_sys_set_policy(BTA_ID_AVK, policy, p_scb->peer_addr);
 
     /* in case that we received suspend_ind, we may need to call co_stop here */
     if(p_scb->co_started)
@@ -2955,7 +2957,11 @@ void bta_avk_rcfg_connect (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         bta_avk_rcfg_failed(p_scb, NULL);
     }
     else
+    {
+        update_avdtp_connection_info(p_scb->peer_addr, AVDT_AR_EXT_CONNECT_REQ_EVT, BTA_AR_EXT_AVK_MASK);
         AVDT_ConnectReq(p_scb->peer_addr, p_scb->sec_mask, bta_avk_dt_cback[p_scb->hdi]);
+    }
+
 }
 
 /*******************************************************************************
@@ -2985,7 +2991,11 @@ void bta_avk_rcfg_discntd (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         bta_avk_ssm_execute(p_scb, BTA_AVK_STR_DISC_FAIL_EVT, NULL);
     }
     else
+    {
+        update_avdtp_connection_info(p_scb->peer_addr, AVDT_AR_EXT_CONNECT_REQ_EVT, BTA_AR_EXT_AVK_MASK);
         AVDT_ConnectReq(p_scb->peer_addr, p_scb->sec_mask, bta_avk_dt_cback[p_scb->hdi]);
+    }
+
 }
 
 /*******************************************************************************
