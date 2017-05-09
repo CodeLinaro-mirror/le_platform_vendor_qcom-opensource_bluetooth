@@ -381,7 +381,6 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             /* clear the peer_bda */
             BTIF_TRACE_EVENT("IDLE state for index: %d service %d", index,
                     btif_avk_cb[index].service);
-            memset(&btif_avk_cb[index].peer_bda, 0, sizeof(bt_bdaddr_t));
             btif_avk_cb[index].flags = 0;
             btif_avk_cb[index].edr_3mbps = 0;
             btif_avk_cb[index].edr = 0;
