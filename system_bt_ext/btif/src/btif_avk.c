@@ -2281,12 +2281,12 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
     tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
     bt_bdaddr_t bda;
     int count = 0, queue_size = 0;
-    queue_size = fixed_queue_length(&RxDataQ);
+    queue_size = fixed_queue_length(RxDataQ);
     BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
-    while ((!fixed_queue_is_empty(&RxDataQ)) || count < queue_size)
+    while ((!fixed_queue_is_empty(RxDataQ)) || count < queue_size)
     {
         BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(&(RxDataQ));
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
         if (p_data_q_buf == NULL)
             break;
 
@@ -2300,7 +2300,7 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         {
             BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
                 __FUNCTION__);
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(&RxDataQ);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
             osi_free(p_data_q_buf);
         }
         count++;
