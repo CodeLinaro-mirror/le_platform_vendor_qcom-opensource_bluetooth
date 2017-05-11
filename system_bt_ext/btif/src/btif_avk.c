@@ -144,7 +144,7 @@ static BOOLEAN is_multicast_supported = FALSE;
 static BOOLEAN multicast_disabled = FALSE;
 static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
-fixed_queue_t *RxDataQ;
+fixed_queue_t *RxDataQ = NULL;
 static bt_bdaddr_t streaming_bda;
 
 /* both interface and media task needs to be ready to alloc incoming request */
@@ -2680,12 +2680,13 @@ static bt_status_t disconnect(bt_bdaddr_t *bd_addr)
 static void cleanup(int service_uuid)
 {
     int i;
-    BTIF_TRACE_IMP("AV %s", __FUNCTION__);
+    BTIF_TRACE_IMP("AVK %s", __FUNCTION__);
 
     btif_transfer_context(btif_avk_handle_event, BTIF_AVK_CLEANUP_REQ_EVT,
             (char*)&service_uuid, sizeof(int), NULL);
-
     btif_disable_service(service_uuid);
+    fixed_queue_free(RxDataQ,NULL);
+    RxDataQ = NULL;
 }
 
 static void cleanup_sink(void) {
