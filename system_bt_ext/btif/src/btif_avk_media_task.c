@@ -1078,7 +1078,7 @@ static void btif_avk_media_task_avk_handle_timer(UNUSED_ATTR void *context) {}
 static void btif_avk_media_task_aa_handle_uipc_rx_rdy(void)
 {
     /* send it */
-    LOG_VERBOSE("btif_avk_media_task_aa_handle_uipc_rx_rdy calls bta_avk_ci_src_data_ready");
+    APPL_TRACE_IMP("btif_avk_media_task_aa_handle_uipc_rx_rdy calls bta_avk_ci_src_data_ready");
     bta_avk_ci_src_data_ready(BTA_AVK_CHNL_AUDIO);
 }
 #endif
@@ -1100,6 +1100,11 @@ static void btif_avk_media_thread_init(UNUSED_ATTR void *context) {
 
 static void btif_avk_media_thread_cleanup(UNUSED_ATTR void *context) {
   APPL_TRACE_IMP(" btif_avk_media_thread_cleanup");
+
+#if (BTA_AV_INCLUDED == TRUE)
+  fixed_queue_free(btif_avk_media_cb.RxSbcQ,NULL);
+  btif_avk_media_cb.RxSbcQ = NULL;
+#endif
 
   /* this calls blocks until uipc is fully closed */
   UIPC_AVK_Close(UIPC_CH_ID_ALL);
@@ -1152,8 +1157,10 @@ static void btif_avk_media_flush_q(fixed_queue_t  *p_q)
 
 static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR void *context)
 {
-    BT_HDR *p_msg = (BT_HDR *)fixed_queue_dequeue(queue);
     UINT32 size;
+    BT_HDR *p_msg = (BT_HDR *)fixed_queue_dequeue(queue);
+    if(p_msg == NULL)
+        return;
     APPL_TRACE_IMP("btif_avk_media_thread_handle_cmd : %d %s", p_msg->event,
              dump_media_event(p_msg->event));
 
@@ -1198,7 +1205,7 @@ static void btif_avk_media_thread_handle_cmd(fixed_queue_t *queue, UNUSED_ATTR v
         APPL_TRACE_ERROR("ERROR in %s unknown event %d", __func__, p_msg->event);
     }
     osi_free(p_msg);
-    APPL_TRACE_IMP("%s: %s DONE", __func__, dump_media_event(p_msg->event));
+    APPL_TRACE_IMP("%s:DONE", __func__);
 }
 
 #if (BTA_AV_SINK_INCLUDED == TRUE)
