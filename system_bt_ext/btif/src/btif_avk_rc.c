@@ -184,7 +184,7 @@ typedef struct
 } rc_device_t;
 
 
-rc_device_t device;
+static rc_device_t device;
 
 #define MAX_UINPUT_PATHS 3
 static int btif_max_rc_clients = 1;
@@ -1173,7 +1173,7 @@ static bt_status_t init_ctrl(btrc_ctrl_callbacks_t* callbacks )
 {
     bt_status_t result = BT_STATUS_SUCCESS;
 
-    BTIF_TRACE_EVENT("## %s ##", __FUNCTION__);
+    BTIF_TRACE_EVENT("## sink side %s ##", __FUNCTION__);
 
     if (btif_avk_rc_ctrl_callbacks)
         return BT_STATUS_DONE;

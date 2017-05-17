@@ -144,7 +144,7 @@ static BOOLEAN is_multicast_supported = FALSE;
 static BOOLEAN multicast_disabled = FALSE;
 static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
-fixed_queue_t *RxDataQ;
+fixed_queue_t *RxDataQ = NULL;
 static bt_bdaddr_t streaming_bda;
 
 /* both interface and media task needs to be ready to alloc incoming request */
@@ -381,7 +381,6 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             /* clear the peer_bda */
             BTIF_TRACE_EVENT("IDLE state for index: %d service %d", index,
                     btif_avk_cb[index].service);
-            memset(&btif_avk_cb[index].peer_bda, 0, sizeof(bt_bdaddr_t));
             btif_avk_cb[index].flags = 0;
             btif_avk_cb[index].edr_3mbps = 0;
             btif_avk_cb[index].edr = 0;
@@ -417,7 +416,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             break;
 
         case BTA_AVK_ENABLE_EVT:
-            BTIF_TRACE_EVENT("AV is enabled now for index: %d", index);
+            BTIF_TRACE_EVENT("AVK is enabled now for index: %d", index);
             break;
 
         case BTA_AVK_REGISTER_EVT:
@@ -2222,7 +2221,15 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
                 break;
             }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
+            {
+                 q_bytes_left=q_bytes_left-1;
+                 p_src= p_src+1;
+            }
+            //  BTIF_TRACE_IMP("**QCOM** have q_bytes_left =%d",q_bytes_left);
             memcpy(p_curr, p_src, q_bytes_left);
+            //BTIF_TRACE_IMP("**QCOM** %hhu %hhu %hhu %hhu %hhu %hhu %hhu", 	2239
+            //p_src[0],p_src[1],p_src[2],p_src[3],p_src[4],p_src[5],p_src[6]);
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }
@@ -2273,12 +2280,12 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
     tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
     bt_bdaddr_t bda;
     int count = 0, queue_size = 0;
-    queue_size = fixed_queue_length(&RxDataQ);
+    queue_size = fixed_queue_length(RxDataQ);
     BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
-    while ((!fixed_queue_is_empty(&RxDataQ)) || count < queue_size)
+    while ((!fixed_queue_is_empty(RxDataQ)) || count < queue_size)
     {
         BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(&(RxDataQ));
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
         if (p_data_q_buf == NULL)
             break;
 
@@ -2292,7 +2299,7 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         {
             BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
                 __FUNCTION__);
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(&RxDataQ);
+            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
             osi_free(p_data_q_buf);
         }
         count++;
@@ -2672,12 +2679,13 @@ static bt_status_t disconnect(bt_bdaddr_t *bd_addr)
 static void cleanup(int service_uuid)
 {
     int i;
-    BTIF_TRACE_IMP("AV %s", __FUNCTION__);
+    BTIF_TRACE_IMP("AVK %s", __FUNCTION__);
 
     btif_transfer_context(btif_avk_handle_event, BTIF_AVK_CLEANUP_REQ_EVT,
             (char*)&service_uuid, sizeof(int), NULL);
-
     btif_disable_service(service_uuid);
+    fixed_queue_free(RxDataQ,NULL);
+    RxDataQ = NULL;
 }
 
 static void cleanup_sink(void) {
