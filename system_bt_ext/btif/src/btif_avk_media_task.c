@@ -1028,7 +1028,7 @@ static void btif_avk_media_task_avk_handle_timer(UNUSED_ATTR void *context)
 #endif
         if (btif_avk_media_cb.rx_flush == TRUE)
         {
-            btif_avk_media_flush_q(&(btif_avk_media_cb.RxSbcQ));
+            btif_avk_media_flush_q(btif_avk_media_cb.RxSbcQ);
             return;
         }
 
@@ -1381,6 +1381,7 @@ void btif_avk_media_task_decode(void)
     tBT_AVK_SBC_HDR *p_msg;
     int num_sbc_frames;
     int num_frames_to_process;
+    APPL_TRACE_DEBUG("%s: rs_flush = %d",__func__,btif_avk_media_cb.rx_flush);
 
     if(fixed_queue_is_empty(btif_avk_media_cb.RxSbcQ)) {
         APPL_TRACE_DEBUG("  QUE  EMPTY ");
@@ -1388,7 +1389,7 @@ void btif_avk_media_task_decode(void)
     }
     if (btif_avk_media_cb.rx_flush == TRUE)
     {
-        btif_avk_media_flush_q(&(btif_avk_media_cb.RxSbcQ));
+        btif_avk_media_flush_q(btif_avk_media_cb.RxSbcQ);
         return;
     }
     p_msg = (tBT_AVK_SBC_HDR *)fixed_queue_try_dequeue(btif_avk_media_cb.RxSbcQ);
@@ -1411,7 +1412,7 @@ static void btif_avk_media_task_aa_rx_flush(void)
     /* Flush all enqueued GKI SBC  buffers (encoded) */
     APPL_TRACE_DEBUG("btif_avk_media_task_aa_rx_flush");
 
-    btif_avk_media_flush_q(&(btif_avk_media_cb.RxSbcQ));
+    btif_avk_media_flush_q(btif_avk_media_cb.RxSbcQ);
 }
 
 
