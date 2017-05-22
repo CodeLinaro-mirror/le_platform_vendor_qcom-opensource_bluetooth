@@ -154,7 +154,7 @@ extern BOOLEAN btif_avk_media_task_aa_rx_flush_req(void);
  **
  ** Returns          size of the queue
  *******************************************************************************/
- UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_buf, BD_ADDR bd_addr);
+ UINT8 btif_avk_media_sink_enque_buf(BT_HDR *p_buf, BD_ADDR bd_addr, BOOLEAN rpt_delay);
 
 //#endif
 

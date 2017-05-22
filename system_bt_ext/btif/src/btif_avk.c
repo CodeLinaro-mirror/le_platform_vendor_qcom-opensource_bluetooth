@@ -83,6 +83,8 @@ typedef enum {
 
 #define MAX_A2DP_SINK_DATA_QUEUE_SZ         20
 
+#define DELAY_RECORD_COUNT                 100
+#define RENDERING_DELAY                     60      //define a fix rendering delay
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -92,6 +94,7 @@ typedef struct
     UINT16 len;
     UINT16 offset;
     BD_ADDR bd_addr;
+    UINT64 enque_ns;    //time of packet enqueue RxDataQ (nanosecond)
 } tBT_SINK_DATA_HDR;
 
 typedef struct
@@ -112,6 +115,7 @@ typedef struct
     /************ Variables used for A2DP Sink *************/
     UINT16 sink_codec_type;
     /************ Variables used for A2DP Sink *************/
+    BOOLEAN avdt_sync;    //for AVDT1.3 delay reporting
 } btif_avk_cb_t;
 
 static pthread_mutex_t sink_data_q_lock;
@@ -145,7 +149,11 @@ static BOOLEAN multicast_disabled = FALSE;
 static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
 fixed_queue_t *RxDataQ = NULL;
+static UINT16 enable_delay_reporting = 0; // by default disable it
 static bt_bdaddr_t streaming_bda;
+static UINT64 delay_record[DELAY_RECORD_COUNT] = {0};  //store latest packets delay
+static int delay_record_idx = 0;
+static UINT16 qahw_delay = 0;
 
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAVK_INIT() if (((bt_avk_callbacks == NULL)) \
@@ -388,6 +396,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             btif_avk_cb[index].is_slave = FALSE;
             btif_avk_cb[index].is_device_playing = FALSE;
             btif_avk_cb[index].sink_codec_type = 0xFF;
+            btif_avk_cb[index].avdt_sync = FALSE;
             for (int i = 0; i < btif_max_avk_clients; i++)
             {
                 btif_avk_cb[i].dual_handoff = FALSE;
@@ -654,6 +663,8 @@ static BOOLEAN btif_avk_state_opening_handler(btif_sm_event_t event, void *p_dat
                      BTIF_TRACE_DEBUG("remote supports 3 mbps");
                      btif_avk_cb[index].edr_3mbps = TRUE;
                  }
+                 btif_avk_cb[index].avdt_sync = bta_avk_is_avdt_sync(btif_avk_cb[index].bta_handle);
+                 BTIF_TRACE_DEBUG(" %s ~~ BTA_AVK_OPEN_EVT btif_avk_cb[%d].avdt_sync is [%d]",__func__,index, btif_avk_cb[index].avdt_sync);
             }
             else
             {
@@ -777,6 +788,8 @@ static BOOLEAN btif_avk_state_opening_handler(btif_sm_event_t event, void *p_dat
             {
                 btif_avk_a2dp_on_stopped(NULL);
             }
+            btif_avk_cb[index].avdt_sync = FALSE;
+            qahw_delay = 0;
             /* inform the application that we are disconnected */
             btif_report_connection_state(BTAV_CONNECTION_STATE_DISCONNECTED,
                     &(btif_avk_cb[index].peer_bda));
@@ -1278,6 +1291,11 @@ static BOOLEAN btif_avk_state_started_handler(btif_sm_event_t event, void *p_dat
 
             /* suspend completed and state changed, clear pending status */
             btif_avk_cb[index].flags &= ~BTIF_AVK_FLAG_LOCAL_SUSPEND_PENDING;
+            /* clear delay recode array when stream suspended */
+            BTIF_TRACE_DEBUG("clear delay recode array when stream suspended");
+            delay_record_idx = 0;
+            average_delay = 0;
+            memset(delay_record, 0, sizeof(UINT64) * DELAY_RECORD_COUNT);
             break;
 
 #ifdef USE_AUDIO_TRACK
@@ -1873,7 +1891,8 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                         rtp_offset = get_rtp_offset(start_ptr, BTIF_AVK_CODEC_SBC);
                         p_pkt->offset = p_pkt->offset + rtp_offset;
                         p_pkt->len = p_pkt->len - rtp_offset;
-                        que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_pkt, bd_addr);
+                        que_len = btif_avk_media_sink_enque_buf((BT_HDR *)p_pkt, bd_addr, btif_avk_cb[index].avdt_sync);
+                        BTIF_TRACE_DEBUG(" %s ~~ SBC btif_avk_media_sink_enque_buf que-len = %d, AVDT_SYNC = %d", __func__, que_len, btif_avk_cb[index].avdt_sync);
                         break;
                     }
                     if(!retreive_rtp_header) {
@@ -1885,14 +1904,16 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
+                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data1", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
-                          start_ptr, data_len, bd_addr);
+                          start_ptr, data_len, bd_addr, 0);
                     break;
                 case A2D_NON_A2DP_MEDIA_CT:
                     // APTX does not have RTP header
                     data_len = p_pkt->len;
+                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data2", __func__);
                     que_len = btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_APTX,
-                          start_ptr, data_len, bd_addr);
+                          start_ptr, data_len, bd_addr, 0);
                     break;
                 default: // for all other codecs
                     if(!retreive_rtp_header) {
@@ -1904,8 +1925,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
+                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data3", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
-                          start_ptr, data_len, bd_addr);
+                          start_ptr, data_len, bd_addr, 0);
                     break;
             }
             BTIF_TRACE_DEBUG(" Codec_Type = %d, Packets in Que %d sbc_decoding = %d",
@@ -2109,9 +2131,10 @@ static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int
 
     enable_stack_sbc_decoding = streaming_prarm & A2DP_SINK_ENABLE_SBC_DECODING;
     retreive_rtp_header = streaming_prarm & A2DP_SINK_RETREIVE_RTP_HEADER;
+    enable_delay_reporting = streaming_prarm & A2DP_SINK_ENABLE_DELAY_REPORTING;
 
-    BTIF_TRACE_IMP(" enable_sbc_decoding = %d, retreive RTP header = %d",
-            enable_stack_sbc_decoding, retreive_rtp_header);
+    BTIF_TRACE_IMP(" ~~ enable_sbc_decoding = %d, retreive RTP header = %d, enable_delay_reporting = %d",
+            enable_stack_sbc_decoding, retreive_rtp_header, enable_delay_reporting);
 
     /* initializing mutex for sink */
     pthread_mutex_init(&sink_data_q_lock, NULL);
@@ -2266,6 +2289,76 @@ void update_streaming_device_vendor(bt_bdaddr_t *bd_addr)
 
 /*******************************************************************************
 **
+** Function         update_qahw_delay_vendor
+**
+** Description      Updates decoding delay during decoding non_SBC stream in LPASS from apps
+**
+** Returns          void
+**
+*******************************************************************************/
+void update_qahw_delay_vendor(uint16_t qahwdelay)
+{
+    int index = btif_get_latest_playing_device_idx();
+    if(btif_avk_cb[index].avdt_sync != TRUE )
+    {
+        BTIF_TRACE_DEBUG(" %s ~~ delay report feature is not enabled, return .", __FUNCTION__);
+        return;
+    }
+    if(btif_avk_cb[index].sink_codec_type == BTIF_AVK_CODEC_SBC && enable_stack_sbc_decoding)
+    {
+        BTIF_TRACE_DEBUG(" %s ~~ SBC stream has been decoded in stack, no need update qahw delay, return .", __FUNCTION__);
+        return;
+    }
+    BTIF_TRACE_DEBUG(" %s ~~ qahwdelay = [%d]", __FUNCTION__, qahwdelay);
+    qahw_delay = qahwdelay;
+}
+
+/*******************************************************************************
+**
+** Function         UpdateRptDelay
+**
+** Description      Count average packet delay (include buffering, decoding, rending delay)
+**
+** Returns          delay value (nanosencond)
+**
+*******************************************************************************/
+static UINT16 UpdateRptDelay(UINT64 enque_ns)
+{
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_BOOTTIME, &ts_now);
+
+    average_delay = 0;
+
+    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+    //total delay = buffering + decoding + rending delay
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+
+    if(delay_record_idx >= DELAY_RECORD_COUNT)
+    delay_record_idx = 0;
+
+    delay_record[delay_record_idx++] = delay_ns;
+
+    UINT64 sum_dealy = 0; int i = 0;
+    for(; i < DELAY_RECORD_COUNT; i++)
+    {
+        if(delay_record[i] > 0)
+            sum_dealy += delay_record[i];
+        else
+            break;
+    }
+    if(i >= DELAY_RECORD_COUNT)
+        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
+
+    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
+                  deque_ns, enque_ns, delay_ns, average_delay);
+
+    return average_delay;
+}
+
+
+/*******************************************************************************
+**
 ** Function         update_flush_device_vendor
 **
 ** Description      Updates the current streaming device from apps
@@ -2378,6 +2471,11 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
             p_dest = data + (size - bytes_to_be_written);
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
             memcpy(p_dest, p_src, q_bytes_left);
+
+            int index = btif_get_latest_playing_device_idx();
+            if(btif_avk_cb[index].avdt_sync)
+                UpdateRptDelay(p_data_q_buf->enque_ns);
+
             osi_free(p_data_q_buf);
             bytes_to_be_written = bytes_to_be_written - q_bytes_left;
         }
@@ -2420,7 +2518,7 @@ uint32_t btif_avk_media_fetch_pcm_data(UINT16 codec_type, UINT8 *data, UINT32 si
  ** Returns          void
  **
  *******************************************************************************/
-UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr)
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr, UINT64 enque_time)
 {
     tBT_SINK_DATA_HDR* p_msg;
     bdstr_t addr1;
@@ -2440,6 +2538,30 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
         p_msg->offset = 0;
         p_msg->codec_type = codec_type;
         memcpy(p_msg->bd_addr, bd_addr, sizeof(BD_ADDR));
+
+        int index = btif_avk_idx_by_bdaddr(bd_addr);
+        if (index >= btif_max_avk_clients)
+        {
+            BTIF_TRACE_DEBUG("%s Invalid index for device", __FUNCTION__);
+            return;
+        }
+        if(btif_avk_cb[index].avdt_sync == TRUE )
+        {
+                /* non_SBC steam packet enque, fill the enqueq_ns current time */
+                if(enque_time == 0)
+                {
+                    struct timespec ts_now;
+                    memset(&ts_now, 0, sizeof(ts_now));
+                    clock_gettime(CLOCK_BOOTTIME, &ts_now);
+                    p_msg->enque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+                    BTIF_TRACE_VERBOSE(" %s ~~ non_SBC steam packet enque, enque_ns = [%09llu]", __func__,p_msg->enque_ns);
+                }
+                else	/* SBC steam decoded packet enque, set the enque_ns to SBC packet enque time */
+                {
+                    p_msg->enque_ns = enque_time;
+                    BTIF_TRACE_DEBUG(" %s ~~ SBC steam decoded packet enque, enque_ns = [%09llu]", __func__,p_msg->enque_ns);
+                }
+        }
         fixed_queue_enqueue(RxDataQ, p_msg);
         BTIF_TRACE_DEBUG("%s pkt_size %d  DATA_Q_Size %d bd_addr %s, codec_type = %d",
                   __FUNCTION__, size, fixed_queue_length(RxDataQ),
@@ -2693,6 +2815,7 @@ static void cleanup_sink(void) {
     cleanup(BTA_A2DP_SINK_SERVICE_ID);
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
+    qahw_delay = 0;
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
@@ -2727,6 +2850,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
     update_streaming_device_vendor,
     update_flushing_device_vendor,
     cleanup_sink_vendor,
+    update_qahw_delay_vendor,
 };
 
 /*******************************************************************************
@@ -2896,10 +3020,21 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
          /* Added BTA_AVK_FEAT_NO_SCO_SSPD - this ensures that the BTA does not
           * auto-suspend av streaming on AG events(SCO or Call). The suspend shall
           * be initiated by the app/audioflinger layers */
+        if(enable_delay_reporting) {
          BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
                                             BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
+                BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG|BTA_AVK_FEAT_DELAY_RPT,
+                bte_avk_callback);
+        BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
+        }
+        else
+        {
+            BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
+                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
                                             BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
                                                                         bte_avk_callback);
+            BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable NOT Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
+        }
          for (i = 0; i < btif_max_avk_clients; i++)
          {
              BTA_AvkRegister(BTA_AVK_CHNL_AUDIO, BTIF_AVK_SERVICE_NAME, 0, bte_avk_media_callback,
