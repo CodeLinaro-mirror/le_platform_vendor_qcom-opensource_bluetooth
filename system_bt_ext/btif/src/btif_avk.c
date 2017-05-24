@@ -1904,14 +1904,12 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data1", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
                           start_ptr, data_len, bd_addr, 0);
                     break;
                 case A2D_NON_A2DP_MEDIA_CT:
                     // APTX does not have RTP header
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data2", __func__);
                     que_len = btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_APTX,
                           start_ptr, data_len, bd_addr, 0);
                     break;
@@ -1925,7 +1923,6 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data3", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
                           start_ptr, data_len, bd_addr, 0);
                     break;
@@ -2522,12 +2519,14 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
 {
     tBT_SINK_DATA_HDR* p_msg;
     bdstr_t addr1;
+    BTIF_TRACE_DEBUG("%s", __FUNCTION__);
     pthread_mutex_lock(&sink_data_q_lock);
-    if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
+    if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ || (RxDataQ == NULL))
     {
-         BTIF_TRACE_DEBUG(" %s DATA Que Full, returning", __FUNCTION__);
-         pthread_mutex_unlock(&sink_data_q_lock);
-         return  fixed_queue_length(RxDataQ);
+        BTIF_TRACE_ERROR(" %s DATA Que not exit or Full size =%d, returning",
+        __FUNCTION__,fixed_queue_length(RxDataQ));
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return  fixed_queue_length(RxDataQ);
     }
     if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
     {
@@ -2806,8 +2805,6 @@ static void cleanup(int service_uuid)
     btif_transfer_context(btif_avk_handle_event, BTIF_AVK_CLEANUP_REQ_EVT,
             (char*)&service_uuid, sizeof(int), NULL);
     btif_disable_service(service_uuid);
-    fixed_queue_free(RxDataQ,NULL);
-    RxDataQ = NULL;
 }
 
 static void cleanup_sink(void) {
@@ -2816,6 +2813,8 @@ static void cleanup_sink(void) {
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
     qahw_delay = 0;
+    fixed_queue_free(RxDataQ,NULL);
+    RxDataQ = NULL;
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
