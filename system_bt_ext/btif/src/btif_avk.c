@@ -47,6 +47,7 @@
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
+#include "osi/include/list.h"
 
 /*****************************************************************************
 **  Constants & Macros
@@ -2367,18 +2368,20 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
 {
     BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
     bdstr_t addr1, addr2;
-    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    tBT_SINK_DATA_HDR* p_data_q_buf;
     bt_bdaddr_t bda;
     int count = 0, queue_size = 0;
     queue_size = fixed_queue_length(RxDataQ);
     BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
-    while ((!fixed_queue_is_empty(RxDataQ)) || count < queue_size)
-    {
-        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
-        if (p_data_q_buf == NULL)
-            break;
 
+    if(queue_size == 0)
+        return;
+
+    list_t *list = fixed_queue_get_list(RxDataQ);
+    for (const list_node_t *node = list_begin(list); node != list_end(list); )
+    {
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)list_node(node);
+        node = list_next(node);
         bdcpy(bda.address, p_data_q_buf->bd_addr);
         BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
             bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
@@ -2389,10 +2392,9 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         {
             BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
                 __FUNCTION__);
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            fixed_queue_try_remove_from_queue(RxDataQ,(void *)p_data_q_buf);
             osi_free(p_data_q_buf);
         }
-        count++;
     }
 }
 
