@@ -2036,6 +2036,50 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         }
     }
 }
+
+/*******************************************************************************
+**
+** Function         UpdateRptDelay
+**
+** Description      Count average packet delay (include buffering, decoding, rending delay)
+**
+** Returns          delay value (nanosencond)
+**
+*******************************************************************************/
+static UINT16 UpdateRptDelay(UINT64 enque_ns)
+{
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_BOOTTIME, &ts_now);
+
+    average_delay = 0;
+
+    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+    //total delay = buffering + decoding + rending delay
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+
+    if(delay_record_idx >= DELAY_RECORD_COUNT)
+    delay_record_idx = 0;
+
+    delay_record[delay_record_idx++] = delay_ns;
+
+    UINT64 sum_dealy = 0; int i = 0;
+    for(; i < DELAY_RECORD_COUNT; i++)
+    {
+        if(delay_record[i] > 0)
+            sum_dealy += delay_record[i];
+        else
+            break;
+    }
+    if(i >= DELAY_RECORD_COUNT)
+        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
+
+    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
+                  deque_ns, enque_ns, delay_ns, average_delay);
+
+    return average_delay;
+}
+
 /*******************************************************************************
 **
 ** Function         btif_avk_init
@@ -2250,6 +2294,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             memcpy(p_curr, p_src, q_bytes_left);
             //BTIF_TRACE_IMP("**QCOM** %hhu %hhu %hhu %hhu %hhu %hhu %hhu", 	2239
             //p_src[0],p_src[1],p_src[2],p_src[3],p_src[4],p_src[5],p_src[6]);
+            int index = btif_get_latest_playing_device_idx();
+            if(btif_avk_cb[index].avdt_sync)
+                UpdateRptDelay(p_data_q_buf->enque_ns);
+
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }
@@ -2309,50 +2357,6 @@ void update_qahw_delay_vendor(uint16_t qahwdelay)
     BTIF_TRACE_DEBUG(" %s ~~ qahwdelay = [%d]", __FUNCTION__, qahwdelay);
     qahw_delay = qahwdelay;
 }
-
-/*******************************************************************************
-**
-** Function         UpdateRptDelay
-**
-** Description      Count average packet delay (include buffering, decoding, rending delay)
-**
-** Returns          delay value (nanosencond)
-**
-*******************************************************************************/
-static UINT16 UpdateRptDelay(UINT64 enque_ns)
-{
-    struct timespec ts_now;
-    memset(&ts_now, 0, sizeof(ts_now));
-    clock_gettime(CLOCK_BOOTTIME, &ts_now);
-
-    average_delay = 0;
-
-    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
-    //total delay = buffering + decoding + rending delay
-    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
-
-    if(delay_record_idx >= DELAY_RECORD_COUNT)
-    delay_record_idx = 0;
-
-    delay_record[delay_record_idx++] = delay_ns;
-
-    UINT64 sum_dealy = 0; int i = 0;
-    for(; i < DELAY_RECORD_COUNT; i++)
-    {
-        if(delay_record[i] > 0)
-            sum_dealy += delay_record[i];
-        else
-            break;
-    }
-    if(i >= DELAY_RECORD_COUNT)
-        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
-
-    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
-                  deque_ns, enque_ns, delay_ns, average_delay);
-
-    return average_delay;
-}
-
 
 /*******************************************************************************
 **
