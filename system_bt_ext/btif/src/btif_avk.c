@@ -2819,8 +2819,10 @@ static void cleanup_sink(void) {
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
     qahw_delay = 0;
+    pthread_mutex_lock(&sink_data_q_lock);
     fixed_queue_free(RxDataQ,NULL);
     RxDataQ = NULL;
+    pthread_mutex_unlock(&sink_data_q_lock);
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
