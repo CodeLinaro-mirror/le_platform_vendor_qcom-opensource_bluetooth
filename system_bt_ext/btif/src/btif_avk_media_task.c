@@ -721,12 +721,14 @@ void btif_avk_a2dp_stop_media_task(void)
     avk_media_task_running = AVK_MEDIA_TASK_STATE_SHUTTING_DOWN;
 
     // remove aptX thread
+    pthread_mutex_lock(&aptx_thread_lock);
     if (A2d_aptx_thread)
     {
         A2D_aptx_sched_stop();
         thread_free(A2d_aptx_thread);
         A2d_aptx_thread = NULL;
     }
+    pthread_mutex_unlock(&aptx_thread_lock);
 
     // Stop timer
     alarm_free(btif_avk_media_cb.media_alarm);
