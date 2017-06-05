@@ -37,6 +37,8 @@ __BEGIN_DECLS
 
 #define A2DP_SINK_ENABLE_SBC_DECODING       0x01
 #define A2DP_SINK_RETREIVE_RTP_HEADER       0x02
+#define A2DP_SINK_ENABLE_DELAY_REPORTING    0X04
+#define A2DP_SRC_ENABLE_DELAY_REPORTING     0x01
 
 #define A2DP_SINK_AUDIO_CODEC_SBC       0x00
 #define A2DP_SINK_AUDIO_CODEC_MP3       0x01
@@ -218,7 +220,7 @@ typedef struct {
      * Register the BtAvVendorcallbacks
      */
     bt_status_t (*init_vendor)( btav_vendor_callbacks_t* callbacks , int max_a2dp_connections,
-                        int a2dp_multicast_state, const char *offload_cap);
+                        int a2dp_multicast_state, uint8_t streaming_prarm, const char *offload_cap);
 
     /** Send priority of device to stack*/
     void (*allow_connection_vendor)( int is_valid , bt_bdaddr_t *bd_addr);
@@ -261,6 +263,9 @@ typedef struct {
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );
+
+   /** Send decoding delay to stack during decoding non_SBC stream in LPASS */
+   void(*update_qahw_delay_vendor)(uint16_t aqhw_delay);
 } btav_sink_vendor_interface_t;
 __END_DECLS
 
