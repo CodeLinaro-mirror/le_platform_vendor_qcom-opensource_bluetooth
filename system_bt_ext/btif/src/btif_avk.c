@@ -47,6 +47,7 @@
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
+#include "osi/include/list.h"
 
 /*****************************************************************************
 **  Constants & Macros
@@ -1904,14 +1905,12 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data1", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
                           start_ptr, data_len, bd_addr, 0);
                     break;
                 case A2D_NON_A2DP_MEDIA_CT:
                     // APTX does not have RTP header
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data2", __func__);
                     que_len = btif_media_enque_sink_data(A2DP_SINK_AUDIO_CODEC_APTX,
                           start_ptr, data_len, bd_addr, 0);
                     break;
@@ -1925,7 +1924,6 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                     // adjust start and len again
                     start_ptr = (UINT8*)(p_pkt + 1) + p_pkt->offset;
                     data_len = p_pkt->len;
-                    BTIF_TRACE_DEBUG(" %s ~~ non_SBC btif_media_enque_sink_data3", __func__);
                     que_len = btif_media_enque_sink_data(btif_avk_cb[index].sink_codec_type,
                           start_ptr, data_len, bd_addr, 0);
                     break;
@@ -2370,18 +2368,20 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
 {
     BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
     bdstr_t addr1, addr2;
-    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    tBT_SINK_DATA_HDR* p_data_q_buf;
     bt_bdaddr_t bda;
     int count = 0, queue_size = 0;
     queue_size = fixed_queue_length(RxDataQ);
     BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
-    while ((!fixed_queue_is_empty(RxDataQ)) || count < queue_size)
-    {
-        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
-        if (p_data_q_buf == NULL)
-            break;
 
+    if(queue_size == 0)
+        return;
+
+    list_t *list = fixed_queue_get_list(RxDataQ);
+    for (const list_node_t *node = list_begin(list); node != list_end(list); )
+    {
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)list_node(node);
+        node = list_next(node);
         bdcpy(bda.address, p_data_q_buf->bd_addr);
         BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
             bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
@@ -2392,10 +2392,9 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         {
             BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
                 __FUNCTION__);
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            fixed_queue_try_remove_from_queue(RxDataQ,(void *)p_data_q_buf);
             osi_free(p_data_q_buf);
         }
-        count++;
     }
 }
 
@@ -2522,12 +2521,14 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
 {
     tBT_SINK_DATA_HDR* p_msg;
     bdstr_t addr1;
+    BTIF_TRACE_DEBUG("%s", __FUNCTION__);
     pthread_mutex_lock(&sink_data_q_lock);
-    if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ)
+    if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ || (RxDataQ == NULL))
     {
-         BTIF_TRACE_DEBUG(" %s DATA Que Full, returning", __FUNCTION__);
-         pthread_mutex_unlock(&sink_data_q_lock);
-         return  fixed_queue_length(RxDataQ);
+        BTIF_TRACE_ERROR(" %s DATA Que not exit or Full size =%d, returning",
+        __FUNCTION__,fixed_queue_length(RxDataQ));
+        pthread_mutex_unlock(&sink_data_q_lock);
+        return  fixed_queue_length(RxDataQ);
     }
     if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
     {
@@ -2806,8 +2807,6 @@ static void cleanup(int service_uuid)
     btif_transfer_context(btif_avk_handle_event, BTIF_AVK_CLEANUP_REQ_EVT,
             (char*)&service_uuid, sizeof(int), NULL);
     btif_disable_service(service_uuid);
-    fixed_queue_free(RxDataQ,NULL);
-    RxDataQ = NULL;
 }
 
 static void cleanup_sink(void) {
@@ -2816,6 +2815,8 @@ static void cleanup_sink(void) {
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
     qahw_delay = 0;
+    fixed_queue_free(RxDataQ,NULL);
+    RxDataQ = NULL;
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
