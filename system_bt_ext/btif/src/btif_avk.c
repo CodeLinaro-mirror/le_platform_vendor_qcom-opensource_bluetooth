@@ -47,6 +47,7 @@
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
+#include "osi/include/list.h"
 
 /*****************************************************************************
 **  Constants & Macros
@@ -2036,6 +2037,50 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         }
     }
 }
+
+/*******************************************************************************
+**
+** Function         UpdateRptDelay
+**
+** Description      Count average packet delay (include buffering, decoding, rending delay)
+**
+** Returns          delay value (nanosencond)
+**
+*******************************************************************************/
+static UINT16 UpdateRptDelay(UINT64 enque_ns)
+{
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_BOOTTIME, &ts_now);
+
+    average_delay = 0;
+
+    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+    //total delay = buffering + decoding + rending delay
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+
+    if(delay_record_idx >= DELAY_RECORD_COUNT)
+    delay_record_idx = 0;
+
+    delay_record[delay_record_idx++] = delay_ns;
+
+    UINT64 sum_dealy = 0; int i = 0;
+    for(; i < DELAY_RECORD_COUNT; i++)
+    {
+        if(delay_record[i] > 0)
+            sum_dealy += delay_record[i];
+        else
+            break;
+    }
+    if(i >= DELAY_RECORD_COUNT)
+        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
+
+    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
+                  deque_ns, enque_ns, delay_ns, average_delay);
+
+    return average_delay;
+}
+
 /*******************************************************************************
 **
 ** Function         btif_avk_init
@@ -2250,6 +2295,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             memcpy(p_curr, p_src, q_bytes_left);
             //BTIF_TRACE_IMP("**QCOM** %hhu %hhu %hhu %hhu %hhu %hhu %hhu", 	2239
             //p_src[0],p_src[1],p_src[2],p_src[3],p_src[4],p_src[5],p_src[6]);
+            int index = btif_get_latest_playing_device_idx();
+            if(btif_avk_cb[index].avdt_sync)
+                UpdateRptDelay(p_data_q_buf->enque_ns);
+
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }
@@ -2312,50 +2361,6 @@ void update_qahw_delay_vendor(uint16_t qahwdelay)
 
 /*******************************************************************************
 **
-** Function         UpdateRptDelay
-**
-** Description      Count average packet delay (include buffering, decoding, rending delay)
-**
-** Returns          delay value (nanosencond)
-**
-*******************************************************************************/
-static UINT16 UpdateRptDelay(UINT64 enque_ns)
-{
-    struct timespec ts_now;
-    memset(&ts_now, 0, sizeof(ts_now));
-    clock_gettime(CLOCK_BOOTTIME, &ts_now);
-
-    average_delay = 0;
-
-    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
-    //total delay = buffering + decoding + rending delay
-    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
-
-    if(delay_record_idx >= DELAY_RECORD_COUNT)
-    delay_record_idx = 0;
-
-    delay_record[delay_record_idx++] = delay_ns;
-
-    UINT64 sum_dealy = 0; int i = 0;
-    for(; i < DELAY_RECORD_COUNT; i++)
-    {
-        if(delay_record[i] > 0)
-            sum_dealy += delay_record[i];
-        else
-            break;
-    }
-    if(i >= DELAY_RECORD_COUNT)
-        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
-
-    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
-                  deque_ns, enque_ns, delay_ns, average_delay);
-
-    return average_delay;
-}
-
-
-/*******************************************************************************
-**
 ** Function         update_flush_device_vendor
 **
 ** Description      Updates the current streaming device from apps
@@ -2367,18 +2372,20 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
 {
     BTIF_TRACE_DEBUG(" %s ", __FUNCTION__);
     bdstr_t addr1, addr2;
-    tBT_SINK_DATA_HDR* p_data_q_buf; // pointer to first element in que;
+    tBT_SINK_DATA_HDR* p_data_q_buf;
     bt_bdaddr_t bda;
     int count = 0, queue_size = 0;
     queue_size = fixed_queue_length(RxDataQ);
     BTIF_TRACE_DEBUG(" %s queue_size = %d", __FUNCTION__, queue_size);
-    while ((!fixed_queue_is_empty(RxDataQ)) || count < queue_size)
-    {
-        BTIF_TRACE_DEBUG(" %s count = %d", __FUNCTION__, count);
-        p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
-        if (p_data_q_buf == NULL)
-            break;
 
+    if(queue_size == 0)
+        return;
+
+    list_t *list = fixed_queue_get_list(RxDataQ);
+    for (const list_node_t *node = list_begin(list); node != list_end(list); )
+    {
+        p_data_q_buf = (tBT_SINK_DATA_HDR *)list_node(node);
+        node = list_next(node);
         bdcpy(bda.address, p_data_q_buf->bd_addr);
         BTIF_TRACE_DEBUG(" %s flushing_bda %s p_data_q_buf->bd_addr %s", __FUNCTION__,
             bdaddr_to_string(bd_addr, &addr1, sizeof(addr1)),
@@ -2389,10 +2396,9 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         {
             BTIF_TRACE_DEBUG("%s flushing this dev packets, dequeue this packet",
                 __FUNCTION__);
-            p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+            fixed_queue_try_remove_from_queue(RxDataQ,(void *)p_data_q_buf);
             osi_free(p_data_q_buf);
         }
-        count++;
     }
 }
 
@@ -2813,8 +2819,10 @@ static void cleanup_sink(void) {
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
     qahw_delay = 0;
+    pthread_mutex_lock(&sink_data_q_lock);
     fixed_queue_free(RxDataQ,NULL);
     RxDataQ = NULL;
+    pthread_mutex_unlock(&sink_data_q_lock);
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
