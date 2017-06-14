@@ -863,6 +863,19 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
 *******************************************************************************/
 BOOLEAN bta_avk_is_avdt_sync(UINT16 handle);
 
+/*******************************************************************************
+**
+** Function         BTA_AvkUpdateCodecSupport
+**
+** Description      Update Avdtp Codec Support
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_AvkUpdateCodecSupport(UINT8 *p_codec_type_list, UINT8 *p_vnd_list, UINT8 *p_codec_id_list,
+                                   UINT8 codec_info[][AVDT_CODEC_SIZE], UINT8 num_codec_configs);
+
+
 
 #ifdef __cplusplus
 }

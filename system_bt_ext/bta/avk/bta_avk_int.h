@@ -114,6 +114,7 @@ enum
 #endif
     BTA_AVK_API_START_EVT,       /* the following 2 events must be in the same order as the *AP_*EVT */
     BTA_AVK_API_STOP_EVT,
+    BTA_AVK_UPDATE_SUPP_CODECS,
     BTA_AVK_ENABLE_MULTICAST_EVT, /* Event for enable and disable multicast */
 
 };
@@ -408,6 +409,16 @@ typedef struct
     UINT8               codecId;           /* codecId type */
 } tBTA_AVK_SEP;
 
+/* data type for tBTA_AVK_UPDATE_SUPP_CODECS */
+typedef struct
+{
+    BT_HDR              hdr;
+    UINT8  codec_type[BTIF_SV_AVK_AA_SEP_INDEX]; /* Codec Type*/
+    UINT8  vnd_id[BTIF_SV_AVK_AA_SEP_INDEX]; /* Vendor Id */
+    UINT8  codec_id[BTIF_SV_AVK_AA_SEP_INDEX]; /* Codec Id */
+    UINT8  codec_info[BTIF_SV_AVK_AA_SEP_INDEX][AVDT_CODEC_SIZE];
+    UINT8   num_codec_configs;          /* Number of codec configs */
+} tBTA_AVK_UPDATE_SUPP_CODECS;
 
 /* initiator/acceptor role for adaption */
 #define BTA_AVK_ROLE_AD_INT          0x00       /* initiator */
@@ -442,6 +453,7 @@ typedef union
     tBTA_AVK_ROLE_RES          role_res;
     tBTA_AVK_SDP_RES           sdp_res;
     tBTA_AVK_API_META_RSP      api_meta_rsp;
+    tBTA_AVK_UPDATE_SUPP_CODECS update_supp_codecs;
     tBTA_AVK_ENABLE_MULTICAST  multicast_state;
 } tBTA_AVK_DATA;
 

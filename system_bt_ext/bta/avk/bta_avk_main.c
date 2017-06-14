@@ -184,6 +184,7 @@ static void bta_avk_sco_chg_cback(tBTA_SYS_CONN_STATUS status, UINT8 id, UINT8
 static void bta_avk_sys_rs_cback (tBTA_SYS_CONN_STATUS status,UINT8 id, UINT8 app_id, BD_ADDR peer_addr);
 
 static void bta_avk_api_enable_multicast(tBTA_AVK_DATA *p_data);
+static void bta_avk_api_update_supp_codecs(tBTA_AVK_DATA *p_data);
 
 /* action functions */
 const tBTA_AVK_NSM_ACT bta_avk_nsm_act[] =
@@ -207,6 +208,7 @@ const tBTA_AVK_NSM_ACT bta_avk_nsm_act[] =
 #endif
     bta_avk_api_to_ssm,              /* BTA_AVK_API_START_EVT */
     bta_avk_api_to_ssm,              /* BTA_AVK_API_STOP_EVT */
+    bta_avk_api_update_supp_codecs,    /* BTA_AVK_UPDATE_SUPP_CODECS */
     bta_avk_api_enable_multicast,    /* BTA_AVK_ENABLE_MULTICAST_EVT */
 };
 
@@ -967,6 +969,26 @@ static void bta_avk_api_to_ssm(tBTA_AVK_DATA *p_data)
 
 /*******************************************************************************
 **
+** Function         bta_avk_api_update_supp_codecs
+**
+** Description      Update Avdtp supported codecs
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+static void bta_avk_api_update_supp_codecs(tBTA_AVK_DATA *p_data)
+{
+    APPL_TRACE_DEBUG("bta_avk_api_update_supp_codecs: num_codec_configs : %d",
+        p_data->update_supp_codecs.num_codec_configs);
+    avdt_scb_update_supported_codecs(p_data->update_supp_codecs.codec_type,
+        p_data->update_supp_codecs.vnd_id, p_data->update_supp_codecs.codec_id,
+        p_data->update_supp_codecs.num_codec_configs,
+        p_data->update_supp_codecs.codec_info, AVDT_TSEP_SNK);
+}
+
+/*******************************************************************************
+**
 ** Function         bta_avk_api_enable_multicast
 **
 ** Description      Enable/Disable Avdtp multicast
@@ -1607,6 +1629,7 @@ char *bta_avk_evt_code(UINT16 evt_code)
     case BTA_AVK_API_START_EVT: return "API_START";
     case BTA_AVK_API_STOP_EVT: return "API_STOP";
     case BTA_AVK_ENABLE_MULTICAST_EVT: return "MULTICAST_ENABLE";
+    case BTA_AVK_UPDATE_SUPP_CODECS: return "UPDATE_SUPPORTED_CODECS";
     default:             return "unknown";
     }
 }
