@@ -835,6 +835,18 @@ void BTA_AvkMetaRsp(UINT8 rc_handle, UINT8 label, tBTA_AVK_CODE rsp_code,
 *******************************************************************************/
 void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR *p_pkt);
 
+/*******************************************************************************
+**
+** Function         bta_avk_is_avdt_sync
+**
+** Description      If the current connection supports AVDT1.3
+**
+** Returns          true for supports AVDT1.3, false for not.
+**
+*******************************************************************************/
+BOOLEAN bta_avk_is_avdt_sync(UINT16 handle);
+
+
 #ifdef __cplusplus
 }
 #endif

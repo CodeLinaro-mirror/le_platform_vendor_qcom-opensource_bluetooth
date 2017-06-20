@@ -44,6 +44,7 @@
 #endif
 
 #include "a2d_aptx.h"
+#include "bta_avk_api.h"
 
 /*****************************************************************************
 ** Constants and types
@@ -307,6 +308,24 @@ tBTA_AVK_SCB * bta_avk_hndl_to_scb(UINT16 handle)
         p_scb = bta_avk_cb.p_scb[idx-1];
     }
     return p_scb;
+}
+
+/*******************************************************************************
+**
+** Function         bta_avk_is_avdt_sync
+**
+** Description      If the current connection supports AVDT1.3
+**
+** Returns          true for supports AVDT1.3, false for not.
+**
+*******************************************************************************/
+BOOLEAN bta_avk_is_avdt_sync(UINT16 handle)
+{
+    tBTA_AVK_SCB * p_scb = bta_avk_hndl_to_scb(handle);
+    if(p_scb->avdt_version >= AVDT_VERSION_SYNC)
+        return true;
+    else
+        return false;
 }
 
 /*******************************************************************************
@@ -683,7 +702,10 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             }
 #endif
             if(bta_avk_cb.features & BTA_AVK_FEAT_DELAY_RPT)
+            {
+                APPL_TRACE_DEBUG(" %s ~~ AVDTP v1.3 : cs.cfg.psc_mask |= AVDT_PSC_DELAY_RPT ",__func__);
                 cs.cfg.psc_mask |= AVDT_PSC_DELAY_RPT;
+            }
 
             if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK)
             {

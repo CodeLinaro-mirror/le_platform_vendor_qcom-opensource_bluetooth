@@ -53,6 +53,7 @@ typedef enum {
     BTIF_AVK_INIT_REQ_EVT,
 } btif_avk_sm_event_t;
 
+UINT64 average_delay;
 
 /*******************************************************************************
 **  BTIF AV API
@@ -182,7 +183,7 @@ void btif_avk_queue_focus_rquest(void);
  ** Returns          void
  **
  *******************************************************************************/
-UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr);
+UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, BD_ADDR bd_addr, UINT64 enque_time);
 
 /*******************************************************************************
  **
