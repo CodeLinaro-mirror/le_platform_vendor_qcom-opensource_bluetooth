@@ -2202,6 +2202,8 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
      *              p_end  - p_curr =>  space left in input buffer
      */
     UINT8 rtp_offset = 0;
+    UINT8 total_frames = 0;
+
     BTIF_TRACE_DEBUG(" %s size = %d codec_type_requested = %d ", __FUNCTION__, size, codec_type);
 
     if (p_end <= p_start) {
@@ -2231,6 +2233,7 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         return 0;
     }
     p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+
     if (retreive_rtp_header) {
         // rtp_offset will be same for all packets
         rtp_offset = get_rtp_offset(p_src, codec_type);
@@ -2286,10 +2289,14 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
                 break;
             }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            total_frames += *(p_src);
             if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
             {
-                 q_bytes_left=q_bytes_left-1;
-                 p_src= p_src+1;
+                if ((p_start + rtp_offset) < p_curr)
+                {
+                    q_bytes_left=q_bytes_left-1;
+                    p_src= p_src+1;
+                }
             }
             //  BTIF_TRACE_IMP("**QCOM** have q_bytes_left =%d",q_bytes_left);
             memcpy(p_curr, p_src, q_bytes_left);
@@ -2311,6 +2318,12 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     }
     BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
     pthread_mutex_unlock(&sink_data_q_lock);
+    if(codec_type == BTIF_AVK_CODEC_SBC)
+    {
+        // the first one byte store the total number of sbc frames
+        *(p_start + rtp_offset) = total_frames;
+    }
+
     return (p_curr - p_start);
 }
 
