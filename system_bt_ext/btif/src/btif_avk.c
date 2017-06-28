@@ -504,6 +504,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
             // copy to avoid alignment problems
             /* in this case, L2CAP connection is still up, but bt-app moved to disc state
                so lets move bt-app to connected state first */
+            memcpy(&req, p_data, sizeof(req));
             btif_report_connection_state(BTAV_CONNECTION_STATE_CONNECTED, &(req.peer_bd));
             BTIF_TRACE_WARNING("BTIF_AVK_SINK_CONFIG_REQ_EVT %d %d %s %d",
                     req.sample_rate, req.channel_count,
@@ -512,7 +513,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
 
             if (bt_av_sink_vendor_callbacks != NULL) {
                 HAL_CBACK(bt_av_sink_vendor_callbacks, audio_codec_config_vendor_cb,
-                        &(btif_avk_cb[index].peer_bda), req.codec_type, req.codec_info);
+                        &(req.peer_bd), req.codec_type, req.codec_info);
             }
         } break;
 

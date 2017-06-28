@@ -588,6 +588,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
     do
     {
         p_scb = bta_avk_alloc_scb(registr.chnl);
+        cs.registration_id = p_scb->hdi;
         if(p_scb == NULL)
         {
             APPL_TRACE_ERROR("failed to alloc SCB");
