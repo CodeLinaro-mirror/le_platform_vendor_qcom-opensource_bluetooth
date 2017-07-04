@@ -87,6 +87,7 @@ struct avk_blacklist_entry
 {
     int ver;
     char addr[3];
+    BOOLEAN is_src;
 };
 
 static void bta_avk_acp_sig_timer_cback (void *data);
@@ -1883,6 +1884,7 @@ BOOLEAN bta_avk_check_store_avrc_tg_version(BD_ADDR addr, UINT16 ver)
         {
             data.ver = ver;
             memcpy(data.addr, (const char *)addr, 3);
+            data.is_src = true;
             APPL_TRACE_DEBUG("Avrcp version to store = 0x%x", ver);
             fwrite(&data, sizeof(data), 1, fp);
             fclose(fp);
@@ -1965,30 +1967,8 @@ tBTA_AVK_FEAT bta_avk_src_check_peer_features (UINT16 service_uuid)
                     }
                 }
             }
-#if ((defined(SDP_AVRCP_1_6) && (SDP_AVRCP_1_6 == TRUE)) || \
-           (defined(SDP_AVRCP_1_5) && (SDP_AVRCP_1_5 == TRUE)))
-            property_get_bt("persist.service.bt.a2dp.sink", a2dp_role, "false");
-            if (!strncmp("false", a2dp_role, 5)) {
-                if ((peer_rc_version >= AVRC_REV_1_4) &&
-                        ((peer_features & BTA_AVK_FEAT_BROWSE) || (peer_features & BTA_AVK_FEAT_CA)))
-                {
-                    BOOLEAN ret = FALSE;
-                    APPL_TRACE_DEBUG("peer version to update: 0x%x", peer_rc_version);
-                    ret = bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
-                    if (ret == TRUE)
-                    {
-                        peer_features |= BTA_AVK_FEAT_AVRC_UI_UPDATE;
-                        APPL_TRACE_DEBUG("update UI on peer repair request: 0x%x",
-                                         peer_features);
-                    }
-                }
-                else
-                {
-                    APPL_TRACE_DEBUG("No need to store peer version: 0x%x", peer_rc_version);
-                    /*No need to update peer version as we send the default version as 1.3*/
-                }
-            }
-#endif
+            APPL_TRACE_DEBUG("peer version to update: 0x%x", peer_rc_version);
+            bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
         }
     }
     APPL_TRACE_DEBUG("peer_features:x%x", peer_features);
@@ -2045,6 +2025,7 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
             val = SDP_FindProfileVersionInRec(p_rec, UUID_SERVCLASS_AV_REMOTE_CONTROL, &peer_rc_version);
             APPL_TRACE_DEBUG("peer_rc_version for TG 0x%x, profile_found %d", peer_rc_version, val);
 
+            bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
             if (peer_rc_version >= AVRC_REV_1_3)
                 peer_features |= (BTA_AVK_FEAT_VENDOR | BTA_AVK_FEAT_METADATA);
 
