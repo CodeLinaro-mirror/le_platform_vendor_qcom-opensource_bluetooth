@@ -473,6 +473,29 @@ void btif_avk_rc_clear_priority(BD_ADDR address)
 }
 
 /***************************************************************************
+ *  Function       btif_avk_rc_handle_br_connect
+ *
+ *  - Argument:    tBTA_AV_RC_OPEN  browse RC open data structure
+ *
+ *  - Description: browse RC connection event handler
+ *
+ ***************************************************************************/
+void btif_avk_rc_handle_br_connect(tBTA_AVK_RC_BROWSE_OPEN* p_rc_br_open) {
+  BTIF_TRACE_DEBUG("%s: btif_avk_rc_handle_br_connect :rc_handle %d status %d", __func__,
+                   p_rc_br_open->rc_handle, p_rc_br_open->status);
+
+
+  if (p_rc_br_open->status == BTA_AVK_SUCCESS) {
+    bt_bdaddr_t rc_addr;
+    bdcpy(rc_addr.address, p_rc_br_open->peer_addr);
+
+    BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel connected!~", __FUNCTION__);
+    HAL_CBACK(btif_avk_rc_ctrl_callbacks, connection_state_cb, TRUE, &rc_addr);
+  }
+}
+
+
+/***************************************************************************
  *  Function       btif_avk_rc_handle_rc_connect
  *
  *  - Argument:    tBTA_AVK_RC_OPEN  RC open data structure
@@ -513,6 +536,7 @@ static void btif_avk_rc_handle_rc_connect (tBTA_AVK_RC_OPEN *p_rc_open)
         bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
 #if (AVRC_CTLR_INCLUDED == TRUE)
         if(btif_avk_rc_ctrl_callbacks != NULL) {
+            BTIF_TRACE_DEBUG("HAL_CBACK connection_state_cb: control channel connected!~ ");
             HAL_CBACK(btif_avk_rc_ctrl_callbacks, connection_state_cb, TRUE, &rc_addr);
         }
         /* report connection state if remote device is AVRCP target */
@@ -703,6 +727,11 @@ void btif_avk_rc_handler(tBTA_AVK_EVT event, tBTA_AVK *p_data)
         {
             BTIF_TRACE_DEBUG("Peer_features:%x", p_data->rc_open.peer_features);
             btif_avk_rc_handle_rc_connect( &(p_data->rc_open) );
+        }break;
+        case BTA_AVK_RC_BROWSE_OPEN_EVT:
+        {
+            BTIF_TRACE_DEBUG("btif_avk_rc_handler : BTA_AVK_RC_BROWSE_OPEN_EVT !~");
+            btif_avk_rc_handle_br_connect( &(p_data->rc_browse_open) );
         }break;
 
         case BTA_AVK_RC_CLOSE_EVT:

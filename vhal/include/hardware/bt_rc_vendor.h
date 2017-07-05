@@ -344,6 +344,9 @@ typedef void (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) (bt_bdaddr_t *bd_
 typedef void (* btavrc_ctrl_passthrough_rsp_vendor_callback) (int id, int key_state,
                                                                   bt_bdaddr_t *bd_addr);
 
+typedef bt_status_t (*btavrc_ctrl_br_connection_state_vendor_callback)( bool state, bt_bdaddr_t *bd_addr);
+
+
 /** BT-RC Controller Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtRcCtVendorCallbacks) */
@@ -356,6 +359,7 @@ typedef struct {
     btavrc_ctrl_getelementattrib_rsp_vendor_callback                getelementattrib_rsp_vendor_cb;
     btavrc_ctrl_getplaystatus_rsp_vendor_callback                   getplaystatus_rsp_vendor_cb;//need to check
     btavrc_ctrl_passthrough_rsp_vendor_callback                     passthrough_rsp_vendor_cb;
+    btavrc_ctrl_br_connection_state_vendor_callback                 browse_connection_state_cb;
 } btrc_ctrl_vendor_callbacks_t;
 
 /** Represents the standard BT-RC AVRCP Controller Vendor interface. */
