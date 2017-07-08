@@ -2037,6 +2037,50 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         }
     }
 }
+
+/*******************************************************************************
+**
+** Function         UpdateRptDelay
+**
+** Description      Count average packet delay (include buffering, decoding, rending delay)
+**
+** Returns          delay value (nanosencond)
+**
+*******************************************************************************/
+static UINT16 UpdateRptDelay(UINT64 enque_ns)
+{
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_BOOTTIME, &ts_now);
+
+    average_delay = 0;
+
+    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
+    //total delay = buffering + decoding + rending delay
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+
+    if(delay_record_idx >= DELAY_RECORD_COUNT)
+    delay_record_idx = 0;
+
+    delay_record[delay_record_idx++] = delay_ns;
+
+    UINT64 sum_dealy = 0; int i = 0;
+    for(; i < DELAY_RECORD_COUNT; i++)
+    {
+        if(delay_record[i] > 0)
+            sum_dealy += delay_record[i];
+        else
+            break;
+    }
+    if(i >= DELAY_RECORD_COUNT)
+        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
+
+    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
+                  deque_ns, enque_ns, delay_ns, average_delay);
+
+    return average_delay;
+}
+
 /*******************************************************************************
 **
 ** Function         btif_avk_init
@@ -2158,6 +2202,8 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
      *              p_end  - p_curr =>  space left in input buffer
      */
     UINT8 rtp_offset = 0;
+    UINT8 total_frames = 0;
+
     BTIF_TRACE_DEBUG(" %s size = %d codec_type_requested = %d ", __FUNCTION__, size, codec_type);
 
     if (p_end <= p_start) {
@@ -2187,6 +2233,7 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         return 0;
     }
     p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+
     if (retreive_rtp_header) {
         // rtp_offset will be same for all packets
         rtp_offset = get_rtp_offset(p_src, codec_type);
@@ -2242,15 +2289,23 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
                 break;
             }
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
+            total_frames += *(p_src);
             if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
             {
-                 q_bytes_left=q_bytes_left-1;
-                 p_src= p_src+1;
+                if ((p_start + rtp_offset) < p_curr)
+                {
+                    q_bytes_left=q_bytes_left-1;
+                    p_src= p_src+1;
+                }
             }
             //  BTIF_TRACE_IMP("**QCOM** have q_bytes_left =%d",q_bytes_left);
             memcpy(p_curr, p_src, q_bytes_left);
             //BTIF_TRACE_IMP("**QCOM** %hhu %hhu %hhu %hhu %hhu %hhu %hhu", 	2239
             //p_src[0],p_src[1],p_src[2],p_src[3],p_src[4],p_src[5],p_src[6]);
+            int index = btif_get_latest_playing_device_idx();
+            if(btif_avk_cb[index].avdt_sync)
+                UpdateRptDelay(p_data_q_buf->enque_ns);
+
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
         }
@@ -2263,6 +2318,12 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     }
     BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
     pthread_mutex_unlock(&sink_data_q_lock);
+    if(codec_type == BTIF_AVK_CODEC_SBC)
+    {
+        // the first one byte store the total number of sbc frames
+        *(p_start + rtp_offset) = total_frames;
+    }
+
     return (p_curr - p_start);
 }
 
@@ -2310,50 +2371,6 @@ void update_qahw_delay_vendor(uint16_t qahwdelay)
     BTIF_TRACE_DEBUG(" %s ~~ qahwdelay = [%d]", __FUNCTION__, qahwdelay);
     qahw_delay = qahwdelay;
 }
-
-/*******************************************************************************
-**
-** Function         UpdateRptDelay
-**
-** Description      Count average packet delay (include buffering, decoding, rending delay)
-**
-** Returns          delay value (nanosencond)
-**
-*******************************************************************************/
-static UINT16 UpdateRptDelay(UINT64 enque_ns)
-{
-    struct timespec ts_now;
-    memset(&ts_now, 0, sizeof(ts_now));
-    clock_gettime(CLOCK_BOOTTIME, &ts_now);
-
-    average_delay = 0;
-
-    UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
-    //total delay = buffering + decoding + rending delay
-    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
-
-    if(delay_record_idx >= DELAY_RECORD_COUNT)
-    delay_record_idx = 0;
-
-    delay_record[delay_record_idx++] = delay_ns;
-
-    UINT64 sum_dealy = 0; int i = 0;
-    for(; i < DELAY_RECORD_COUNT; i++)
-    {
-        if(delay_record[i] > 0)
-            sum_dealy += delay_record[i];
-        else
-            break;
-    }
-    if(i >= DELAY_RECORD_COUNT)
-        average_delay = (sum_dealy / DELAY_RECORD_COUNT);
-
-    BTIF_TRACE_DEBUG(" %s ~~ deque_ns = [%09llu], enque_ns = [%09llu] delay_ns = [%09llu] average_delay = [%09llu] ", __func__,
-                  deque_ns, enque_ns, delay_ns, average_delay);
-
-    return average_delay;
-}
-
 
 /*******************************************************************************
 **
@@ -2815,8 +2832,10 @@ static void cleanup_sink(void) {
     btif_avk_media_clear_pcm_queue();
     enable_stack_sbc_decoding = 0;
     qahw_delay = 0;
+    pthread_mutex_lock(&sink_data_q_lock);
     fixed_queue_free(RxDataQ,NULL);
     RxDataQ = NULL;
+    pthread_mutex_unlock(&sink_data_q_lock);
     pthread_mutex_destroy(&sink_data_q_lock);
 }
 
