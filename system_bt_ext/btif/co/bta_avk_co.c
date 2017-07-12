@@ -672,7 +672,7 @@ UINT8 bta_avk_co_audio_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
     tBTA_AVK_CO_PEER *p_peer;
     tBTA_AV_CO_SRC *p_src;
     UINT8 codec_cfg[AVDT_CODEC_SIZE];
-    UINT8 pref_cfg[AVDT_CODEC_SIZE];
+    UINT8 pref_cfg[AVDT_CODEC_SIZE] = {0};
     UINT8 index;
 
     FUNC_TRACE();

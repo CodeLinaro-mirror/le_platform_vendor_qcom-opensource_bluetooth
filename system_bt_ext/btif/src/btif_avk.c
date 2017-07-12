@@ -2445,6 +2445,12 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
 
     // consistency check: check codec from remote and codec info in Q
     p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
+    if (p_data_q_buf == NULL)
+    {
+       BTIF_TRACE_IMP("%s p_data_q_buf is NULl", __FUNCTION__);
+       pthread_mutex_unlock(&sink_data_q_lock);
+       return 0;
+    }
     if (codec_type != p_data_q_buf->codec_type)
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
