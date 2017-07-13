@@ -38,6 +38,7 @@ __BEGIN_DECLS
 #define A2DP_SINK_ENABLE_SBC_DECODING       0x01
 #define A2DP_SINK_RETREIVE_RTP_HEADER       0x02
 #define A2DP_SINK_ENABLE_DELAY_REPORTING    0X04
+#define A2DP_SINK_ENABLE_NOTIFICATION_CB    0x08
 #define A2DP_SRC_ENABLE_DELAY_REPORTING     0x01
 
 #define A2DP_SINK_AUDIO_CODEC_SBC       0x00
@@ -192,6 +193,9 @@ typedef void(* btav_reconfig_a2dp_trigger_callback)(int reason, bt_bdaddr_t *bd_
 typedef void (* btav_audio_focus_request_vendor_callback)(bt_bdaddr_t *bd_addr);
 
 typedef void (* btav_delay_report_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t report_delay);
+
+typedef void (* btav_audio_data_read_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t size);
+
 /** BT-AV Vendor callback structure. */
 typedef struct {
     /** set to sizeof(btav_vendor_callbacks_t) */
@@ -208,6 +212,7 @@ typedef struct {
     size_t      size;
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
     btav_audio_codec_config_vendor_callback audio_codec_config_vendor_cb;
+    btav_audio_data_read_vendor_callback audio_data_read_vendor_cb;
 } btav_sink_vendor_callbacks_t;
 
 /** Represents the standard BT-AV interface.
