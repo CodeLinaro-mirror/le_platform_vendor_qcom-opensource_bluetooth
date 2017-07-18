@@ -322,7 +322,7 @@ tBTA_AVK_SCB * bta_avk_hndl_to_scb(UINT16 handle)
 BOOLEAN bta_avk_is_avdt_sync(UINT16 handle)
 {
     tBTA_AVK_SCB * p_scb = bta_avk_hndl_to_scb(handle);
-    if(p_scb->avdt_version >= AVDT_VERSION_SYNC)
+    if(p_scb && (p_scb->avdt_version >= AVDT_VERSION_SYNC))
         return true;
     else
         return false;
@@ -598,13 +598,12 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
     do
     {
         p_scb = bta_avk_alloc_scb(registr.chnl);
-        cs.registration_id = p_scb->hdi;
         if(p_scb == NULL)
         {
             APPL_TRACE_ERROR("failed to alloc SCB");
             break;
         }
-
+        cs.registration_id = p_scb->hdi;
         registr.hndl    = p_scb->hndl;
         p_scb->app_id   = registr.app_id;
 
