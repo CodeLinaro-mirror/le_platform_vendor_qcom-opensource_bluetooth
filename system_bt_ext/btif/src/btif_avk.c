@@ -85,7 +85,9 @@ typedef enum {
 #define MAX_A2DP_SINK_DATA_QUEUE_SZ         20
 
 #define DELAY_RECORD_COUNT                 100
-#define RENDERING_DELAY                     60      //define a fix rendering delay
+#define DEFAULT_RENDERING_DELAY            60      //define a fix rendering delay
+#define APTX_RENDERING_DELAY               580
+#define AAC_RENDERING_DELAY                1480
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -155,7 +157,7 @@ static bt_bdaddr_t streaming_bda;
 static UINT64 delay_record[DELAY_RECORD_COUNT] = {0};  //store latest packets delay
 static int delay_record_idx = 0;
 static UINT16 qahw_delay = 0;
-
+int rendering_delay = DEFAULT_RENDERING_DELAY;
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAVK_INIT() if (((bt_avk_callbacks == NULL)) \
         || (btif_avk_cb[0].sm_handle == NULL))\
@@ -1945,6 +1947,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         switch(codec_type)
         {
         case BTIF_AVK_CODEC_SBC:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+
             if(enable_stack_sbc_decoding) // if SBC decoding has to be done by Stack
                 btif_avk_reset_decoder((UINT8*)(p_data->avk_config.codec_info));
             a2d_status = A2D_ParsSbcInfo(&sbc_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
@@ -1972,6 +1977,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
         case BTA_AVK_CODEC_M24:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", AAC_RENDERING_DELAY);
+            rendering_delay = AAC_RENDERING_DELAY;
+
             a2d_status = A2D_ParsAacInfo(&aac_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -1993,6 +2001,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
         case BTA_AVK_CODEC_M12:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+
             a2d_status = A2D_ParsMp3Info(&mp3_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -2016,6 +2027,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
         case A2D_NON_A2DP_MEDIA_CT:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", APTX_RENDERING_DELAY);
+            rendering_delay = APTX_RENDERING_DELAY;
+
             a2d_status = A2D_ParsAptxInfo(&aptx_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -2034,6 +2048,10 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
             }
             break;
 #endif
+            default:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+            break;
         }
     }
 }
@@ -2057,7 +2075,7 @@ static UINT16 UpdateRptDelay(UINT64 enque_ns)
 
     UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
     //total delay = buffering + decoding + rending delay
-    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + rendering_delay) * 1000000;
 
     if(delay_record_idx >= DELAY_RECORD_COUNT)
     delay_record_idx = 0;
