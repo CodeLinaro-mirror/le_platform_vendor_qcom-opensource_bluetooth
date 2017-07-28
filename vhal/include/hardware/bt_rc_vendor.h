@@ -332,14 +332,14 @@ typedef void (* btavrc_ctrl_currentplayerappsetting_rsp_vendor_callback) (bt_bda
 
 typedef void (* btavrc_ctrl_setplayerapplicationsetting_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,uint8_t rsp_type);
 
-typedef void (* btavrc_ctrl_notification_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, uint8_t rsp_type,
-                                 int rsp_len, uint8_t* notification_rsp);
+typedef bt_status_t (* btavrc_ctrl_notification_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, btrc_event_id_t event_id,
+                                               btrc_notification_type_t type,btrc_register_notification_t *p_param);
 
 typedef void (* btavrc_ctrl_getelementattrib_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, uint8_t num_attributes,
-                                                          int rsp_len, uint8_t* attrib_rsp, uint8_t rsp_type);
+                                                          btrc_element_attr_val_t* p_attrs, uint8_t rsp_type);
 
-typedef void (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, int param_len, uint8_t* play_status_rsp
-                                                                           ,uint8_t rsp_type);
+typedef bt_status_t (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) ( bt_bdaddr_t *bd_addr, btrc_play_status_t play_status,
+                                                                  uint32_t song_len, uint32_t song_pos);
 
 typedef void (* btavrc_ctrl_passthrough_rsp_vendor_callback) (int id, int key_state,
                                                                   bt_bdaddr_t *bd_addr);
@@ -369,19 +369,19 @@ typedef struct {
 
     bt_status_t (*init_vendor)(btrc_ctrl_vendor_callbacks_t* callbacks, int max_avrcp_connections);
 
-    bt_status_t (*getcapabilities_command_vendor) (uint8_t cap_id);
+    bt_status_t (*getcapabilities_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t cap_id);
 
-    bt_status_t (*list_player_app_setting_attrib_command_vendor) (void);
+    bt_status_t (*list_player_app_setting_attrib_command_vendor) (bt_bdaddr_t *bd_addr);
 
-    bt_status_t (*list_player_app_setting_value_command_vendor) (uint8_t attrib_id);
+    bt_status_t (*list_player_app_setting_value_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t attrib_id);
 
-    bt_status_t (*get_player_app_setting_command_vendor) (uint8_t num_attrib, uint8_t* attrib_ids);
+    bt_status_t (*get_player_app_setting_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t num_attrib, uint8_t* attrib_ids);
 
-    bt_status_t (*register_notification_command_vendor) (uint8_t event_id, uint32_t event_value);
+    bt_status_t (*register_notification_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t event_id, uint32_t event_value);
 
-    bt_status_t (*get_element_attribute_command_vendor) (uint8_t num_attribute, uint32_t attribute_id);
+    bt_status_t (*get_element_attribute_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t num_attribute, uint32_t* attribute_id);
 
-    bt_status_t (*get_play_status_command_vendor) (void);
+    bt_status_t (*get_play_status_command_vendor) (bt_bdaddr_t *bd_addr);
 
     void (*cleanup_vendor)(void);
 } btrc_ctrl_vendor_interface_t;
