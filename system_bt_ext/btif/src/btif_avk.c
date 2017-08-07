@@ -151,6 +151,7 @@ static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
 fixed_queue_t *RxDataQ = NULL;
 static UINT16 enable_delay_reporting = 0; // by default disable it
+static UINT16 enable_notification_cb = 0; // stack incoming data callback
 static bt_bdaddr_t streaming_bda;
 static UINT64 delay_record[DELAY_RECORD_COUNT] = {0};  //store latest packets delay
 static int delay_record_idx = 0;
@@ -1272,6 +1273,16 @@ static BOOLEAN btif_avk_state_started_handler(btif_sm_event_t event, void *p_dat
                 BTIF_TRACE_DEBUG("Other device not suspended, don't ack the suspend");
             }
 
+            /* If callback mechanism is used for streaming, remove the packets from RxDataQ
+             * when Streaming is suspended so that when streaming is started again, BT-APP
+             * will fetch correct packet from Data queue for which it received the callback.*/
+            if (enable_notification_cb) {
+                while (fixed_queue_length(RxDataQ) > 0) {
+                    if ((tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ) != NULL)
+                        BTIF_TRACE_DEBUG(" Data dequeued from RxDataQ");
+                }
+            }
+
             /* if not successful, remain in current state */
             if (p_av->suspend.status != BTA_AVK_SUCCESS)
             {
@@ -2174,6 +2185,7 @@ static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int
     enable_stack_sbc_decoding = streaming_prarm & A2DP_SINK_ENABLE_SBC_DECODING;
     retreive_rtp_header = streaming_prarm & A2DP_SINK_RETREIVE_RTP_HEADER;
     enable_delay_reporting = streaming_prarm & A2DP_SINK_ENABLE_DELAY_REPORTING;
+    enable_notification_cb = streaming_prarm & A2DP_SINK_ENABLE_NOTIFICATION_CB;
 
     BTIF_TRACE_IMP(" ~~ enable_sbc_decoding = %d, retreive RTP header = %d, enable_delay_reporting = %d",
             enable_stack_sbc_decoding, retreive_rtp_header, enable_delay_reporting);
@@ -2235,8 +2247,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
 
     if (retreive_rtp_header) {
+        // if callback mechanism is enabled, move pointer ahead by size of timestamp
+        UINT8 *rtp_start_addr = p_src + (enable_notification_cb ? sizeof(uint64_t) : 0);
         // rtp_offset will be same for all packets
-        rtp_offset = get_rtp_offset(p_src, codec_type);
+        rtp_offset = get_rtp_offset(rtp_start_addr, codec_type);
     }
     while (!fixed_queue_is_empty(RxDataQ))
     {
@@ -2259,7 +2273,17 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             continue;
         }
         q_bytes_left = p_data_q_buf->len;// this will include RTP header
-        if(retreive_rtp_header) {
+        /* Increment bytes left to cater for additional timestamp header in case
+         * streaming with callback is enabled*/
+        q_bytes_left += (enable_notification_cb ? sizeof(uint64_t): 0);
+        //write timestamp if streaming with callback is enabled
+        if (enable_notification_cb) {
+            memcpy(p_curr, p_src, sizeof(uint64_t));
+            BTIF_TRACE_DEBUG("%s timestamp = %llu", __FUNCTION__, *((uint64_t *)p_curr));
+            p_curr += sizeof(uint64_t);
+            p_data_q_buf->offset += (UINT16)sizeof(uint64_t);
+        }
+        if (retreive_rtp_header && codec_type != A2DP_SINK_AUDIO_CODEC_APTX) {
             // check if we have enough space for RTP Header and audio data
             if (((p_end - p_curr) < (q_bytes_left - rtp_offset)) ||
                 ((p_end - p_curr) < (rtp_offset))) {
@@ -2268,8 +2292,12 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             }
             // write rtp header first.
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
-            memcpy(p_start, p_src, rtp_offset);
-            if ((p_start + rtp_offset) > p_curr) {
+            memcpy(p_curr, p_src, rtp_offset); // copy p_src to p_curr to cater for timestamp
+            /* if callback mechanism for streaming is used, increment streaming data start
+             * address by extra 8 bytes */
+            UINT8 *p_data_start = p_start + rtp_offset +
+                    (enable_notification_cb ? p_data_q_buf->offset: 0);
+            if ( p_data_start> p_curr) {
                 // writing RTP header for first time
                 p_curr += rtp_offset;
             }
@@ -2292,7 +2320,11 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             total_frames += *(p_src);
             if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
             {
-                if ((p_start + rtp_offset) < p_curr)
+                /* When Callback mechanism for streaming is enabled, there is no need
+                 * to increment p_src pointer and decrement q_bytes_left by 1 byte
+                 * as we are sending only 1 media packet in callback mechanism, so
+                 * by default after rtp data it will write #frames in that address*/
+                if (((p_start + rtp_offset) < p_curr) && !enable_notification_cb)
                 {
                     q_bytes_left=q_bytes_left-1;
                     p_src= p_src+1;
@@ -2308,6 +2340,13 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
 
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
+            /* If Callbak mechanism is enabled for streaming, read one media packet
+             * from RxDataQ at a time. Following condition will break from loop after
+             * reading oe media packet*/
+            if (enable_notification_cb && p_curr >= p_end) {
+                BTIF_TRACE_DEBUG(" wait for next callback, return ");
+                break;
+            }
         }
         else
         {
@@ -2316,13 +2355,13 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         }
 
     }
-    BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
-    pthread_mutex_unlock(&sink_data_q_lock);
-    if(codec_type == BTIF_AVK_CODEC_SBC)
+    if (codec_type == BTIF_AVK_CODEC_SBC && !enable_notification_cb)
     {
         // the first one byte store the total number of sbc frames
         *(p_start + rtp_offset) = total_frames;
     }
+    BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
+    pthread_mutex_unlock(&sink_data_q_lock);
 
     return (p_curr - p_start);
 }
@@ -2414,6 +2453,27 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         }
     }
 }
+/*******************************************************************************
+ **
+ ** Function         attach_timestamp
+ **
+ ** Description      attaches current timestamp to media packet before queing
+                     it to Data Queue.
+ **
+ ** Returns          address where media data should be wriiten after attaching
+                     current timestamp.
+ **
+ *******************************************************************************/
+
+void *attach_timestamp(UINT8 *p_timestamp) {
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_REALTIME, &ts_now);
+    UINT64 timestamp = (UINT64)ts_now.tv_sec * 1000000 + ts_now.tv_nsec/1000;
+    memcpy(p_timestamp, (UINT8*)&timestamp, sizeof(UINT64));
+    BTIF_TRACE_DEBUG("%s: Attach current timestamp %llu to media data",  __FUNCTION__, timestamp);
+    return (UINT8*)(p_timestamp + sizeof(UINT64));
+}
 
 /*******************************************************************************
 **
@@ -2445,6 +2505,12 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
 
     // consistency check: check codec from remote and codec info in Q
     p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
+    if (p_data_q_buf == NULL)
+    {
+       BTIF_TRACE_IMP("%s p_data_q_buf is NULl", __FUNCTION__);
+       pthread_mutex_unlock(&sink_data_q_lock);
+       return 0;
+    }
     if (codec_type != p_data_q_buf->codec_type)
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
@@ -2474,6 +2540,8 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
             continue;
         }
         q_bytes_left = p_data_q_buf->len - p_data_q_buf->offset;
+        // if callback mechanism is enabled, update q_bytes_left by size of timestamp
+        q_bytes_left += (enable_notification_cb ? sizeof(UINT64): 0);
         BTIF_TRACE_DEBUG(" %s Q_Len %d, bytes_to_be_written %d, bytes_left_in_Q %d", __FUNCTION__,
                  fixed_queue_length(RxDataQ), bytes_to_be_written, q_bytes_left);
         if (bytes_to_be_written >= q_bytes_left)
@@ -2540,6 +2608,8 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
     bdstr_t addr1;
     BTIF_TRACE_DEBUG("%s", __FUNCTION__);
     pthread_mutex_lock(&sink_data_q_lock);
+    UINT16 alloc_packet_size = sizeof(tBT_SINK_DATA_HDR) + size;
+    alloc_packet_size += (enable_notification_cb ? sizeof(UINT64) : 0);
     if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ || (RxDataQ == NULL))
     {
         BTIF_TRACE_ERROR(" %s DATA Que not exit or Full size =%d, returning",
@@ -2547,10 +2617,15 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
         pthread_mutex_unlock(&sink_data_q_lock);
         return  fixed_queue_length(RxDataQ);
     }
-    if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
+    if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(alloc_packet_size)) != NULL)
     {
-        UINT8 *p_dest;
-        p_dest = (UINT8*)(p_msg + 1);
+        UINT8 *p_dest, *p_timestamp;;
+        if (enable_notification_cb) {
+            p_timestamp = (UINT8*)(p_msg + 1);
+            p_dest = attach_timestamp(p_timestamp);
+        } else {
+            p_dest = (UINT8*)(p_msg + 1);
+        }
         memcpy(p_dest, (UINT8*)(data), size);
         p_msg->len = size;
         p_msg->offset = 0;
@@ -2585,6 +2660,14 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
                   __FUNCTION__, size, fixed_queue_length(RxDataQ),
                   bdaddr_to_string((bt_bdaddr_t *)p_msg->bd_addr, &addr1, sizeof(addr1)),
                   p_msg->codec_type);
+    }
+
+    /* Code to give callback to BT-APP layer that Data is queued in Data Queue*/
+    if (enable_notification_cb && bt_av_sink_vendor_callbacks != NULL) {
+        bt_bdaddr_t bdAddr;
+        memcpy(bdAddr.address, &bd_addr, sizeof(BD_ADDR));
+        HAL_CBACK(bt_av_sink_vendor_callbacks, audio_data_read_vendor_cb, &bdAddr,
+                (uint16_t)size);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
     return fixed_queue_length(RxDataQ);
