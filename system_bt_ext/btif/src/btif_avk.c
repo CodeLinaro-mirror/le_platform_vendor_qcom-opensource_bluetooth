@@ -179,6 +179,7 @@ else\
     case BTA_AVK_VENDOR_CMD_EVT: \
     case BTA_AVK_META_MSG_EVT: \
     case BTA_AVK_BROWSE_MSG_EVT: \
+    case BTA_AVK_RC_BROWSE_OPEN_EVT: \
     case BTA_AVK_RC_FEAT_EVT: \
     case BTA_AVK_REMOTE_RSP_EVT: \
     { \
@@ -588,6 +589,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
         case BTA_AVK_RC_FEAT_EVT:
         case BTA_AVK_REMOTE_RSP_EVT:
         case BTA_AVK_BROWSE_MSG_EVT:
+        case BTA_AVK_RC_BROWSE_OPEN_EVT:
             btif_avk_rc_handler(event, (tBTA_AVK*)p_data);
             break;
 
@@ -1581,6 +1583,10 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
         /* Let the RC handler decide on these passthrough cmds
          * Use rc_handle to get the active AV device and use that mapping.
          */
+        case BTA_AVK_RC_BROWSE_CLOSE_EVT:
+            index = btif_avk_idx_by_bdaddr(p_bta_data->rc_browse_close.peer_addr);
+            btif_avk_rc_handler(event, p_bta_data);
+            break;
         case BTA_AVK_REMOTE_CMD_EVT:
         case BTA_AVK_VENDOR_CMD_EVT:
         case BTA_AVK_META_MSG_EVT:

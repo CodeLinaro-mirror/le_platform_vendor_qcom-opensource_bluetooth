@@ -343,6 +343,7 @@ typedef bt_status_t (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) ( bt_bdadd
 
 typedef void (* btavrc_ctrl_passthrough_rsp_vendor_callback) (int id, int key_state,
                                                                   bt_bdaddr_t *bd_addr);
+typedef bt_status_t (*btavrc_ctrl_br_connection_state_vendor_callback)( bool state, bt_bdaddr_t *bd_addr);
 
 typedef bt_status_t (*btavrc_ctrl_br_connection_state_vendor_callback)( bool state, bt_bdaddr_t *bd_addr);
 

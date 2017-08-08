@@ -53,6 +53,8 @@ enum
     BTA_AVK_API_META_RSP_EVT,
     BTA_AVK_API_RC_CLOSE_EVT,
     BTA_AVK_AVRC_OPEN_EVT,
+    BTA_AVK_AVRC_BROWSE_OPEN_EVT,
+    BTA_AVK_AVRC_BROWSE_CLOSE_EVT,
     BTA_AVK_AVRC_MSG_EVT,
     BTA_AVK_AVRC_NONE_EVT,
 
@@ -688,11 +690,13 @@ extern void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data);
 /* sm action functions */
 extern void bta_avk_disable (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
+extern void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_remote_cmd (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_vendor_cmd (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_vendor_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
+extern void bta_avk_rc_br_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_meta_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);

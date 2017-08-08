@@ -82,6 +82,7 @@ enum
 {
     BTA_AVK_DISABLE,
     BTA_AVK_RC_OPENED,
+    BTA_AVK_RC_BR_OPENED,
     BTA_AVK_RC_REMOTE_CMD,
     BTA_AVK_RC_VENDOR_CMD,
     BTA_AVK_RC_VENDOR_RSP,
@@ -90,6 +91,7 @@ enum
     BTA_AVK_RC_META_RSP,
     BTA_AVK_RC_MSG,
     BTA_AVK_RC_CLOSE,
+    BTA_AVK_RC_BR_CLOSE,
     BTA_AVK_NUM_ACTIONS
 };
 
@@ -103,6 +105,7 @@ const tBTA_AVK_ACTION bta_avk_action[] =
 {
     bta_avk_disable,
     bta_avk_rc_opened,
+    bta_avk_rc_br_opened,
     bta_avk_rc_remote_cmd,
     bta_avk_rc_vendor_cmd,
     bta_avk_rc_vendor_rsp,
@@ -111,6 +114,7 @@ const tBTA_AVK_ACTION bta_avk_action[] =
     bta_avk_rc_meta_rsp,
     bta_avk_rc_msg,
     bta_avk_rc_close,
+    bta_avk_rc_br_close,
     NULL
 };
 
@@ -130,6 +134,8 @@ static const UINT8 bta_avk_st_init[][BTA_AVK_NUM_COLS] =
 /* API_META_RSP_EVT */      {BTA_AVK_RC_FREE_RSP,    BTA_AVK_INIT_ST },
 /* API_RC_CLOSE_EVT */      {BTA_AVK_RC_CLOSE,       BTA_AVK_INIT_ST },
 /* AVRC_OPEN_EVT */         {BTA_AVK_RC_OPENED,      BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_OPEN_EVT*/   {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
+/* AVRC_BROWSE_CLOSE_EVT*/   {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 /* AVRC_MSG_EVT */          {BTA_AVK_RC_FREE_MSG,    BTA_AVK_INIT_ST },
 /* AVRC_NONE_EVT */         {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 };
@@ -145,6 +151,8 @@ static const UINT8 bta_avk_st_open[][BTA_AVK_NUM_COLS] =
 /* API_META_RSP_EVT */      {BTA_AVK_RC_META_RSP,    BTA_AVK_OPEN_ST },
 /* API_RC_CLOSE_EVT */      {BTA_AVK_RC_CLOSE,       BTA_AVK_OPEN_ST },
 /* AVRC_OPEN_EVT */         {BTA_AVK_RC_OPENED,      BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_OPEN_EVT*/   {BTA_AVK_RC_BR_OPENED,   BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_CLOSE_EVT*/   {BTA_AVK_RC_BR_CLOSE,   BTA_AVK_INIT_ST },
 /* AVRC_MSG_EVT */          {BTA_AVK_RC_MSG,         BTA_AVK_OPEN_ST },
 /* AVRC_NONE_EVT */         {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 };
@@ -813,7 +821,6 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
                     /* create an SDP record as AVRC CT. */
                     APPL_TRACE_DEBUG("bta_avk_api_register : bta_ar_reg_avrc1 %d !~", bta_avk_cb.features);
-
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REMOTE_CONTROL, NULL, NULL,
                     p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_4);
 #endif

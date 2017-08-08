@@ -278,11 +278,11 @@ static void bta_avk_rc_ctrl_cback(UINT8 handle, UINT8 event, UINT16 result, BD_A
 
         APPL_TRACE_EVENT("AVRC_OPEN_IND_EVT peer_features: %d avrc_ct_cat=%d !~", bta_avk_cb.rcb[handle].peer_features, p_bta_avk_cfg->avrc_ct_cat);
 
-/*      if (BTA_AvkIsBrowsingSupported () && bta_avk_cb.rcb[handle].peer_features & BTA_AVK_FEAT_BROWSE)
+      if (BTA_AvkIsBrowsingSupported () && bta_avk_cb.rcb[handle].peer_features & BTA_AVK_FEAT_BROWSE)
         {
             BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback AVRC_OpenBrowseChannel handle: %d !~", handle);
             AVRC_OpenBrowseChannel (handle);
-        }*/
+        }
     }
     else if (event == AVRC_CLOSE_IND_EVT)
     {
@@ -292,6 +292,11 @@ static void bta_avk_rc_ctrl_cback(UINT8 handle, UINT8 event, UINT16 result, BD_A
     {
         BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback :AVRC_BROWSE_OPEN_IND_EVT !~");
         msg_event = BTA_AVK_AVRC_BROWSE_OPEN_EVT;
+    }
+    else if (event == AVRC_BROWSE_CLOSE_IND_EVT)
+    {
+        BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback :AVRC_BROWSE_CLOSE_IND_EVT !~");
+        msg_event = BTA_AVK_AVRC_BROWSE_CLOSE_EVT;
     }
 
     if (msg_event)
@@ -671,13 +676,15 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
  * browsing channel, open the browsing channel now
  * TODO (sanketa): Some TG would not broadcast browse feature hence check
  * inter-op. */
-    if ((p_cb->features & BTA_AVK_FEAT_BROWSE) &&
+
+/*    if ((p_cb->features & BTA_AVK_FEAT_BROWSE) &&
         (rc_open.peer_features & BTA_AVK_FEAT_BROWSE) &&
         ((p_cb->rcb[i].status & BTA_AVK_RC_ROLE_MASK) == BTA_AVK_RC_ROLE_INT)) {
     APPL_TRACE_DEBUG("%s opening AVRC Browse channel!~", __func__);
     AVRC_OpenBrowseChannel(p_data->rc_conn_chg.handle);
          }
-/*  APPL_TRACE_DEBUG("bta_avk_rc_opened alarm_set_on_queue i: %d !~", i);
+
+  APPL_TRACE_DEBUG("bta_avk_rc_opened alarm_set_on_queue i: %d !~", i);
     alarm_set_on_queue(p_cb->rcb[i].br_conn_timer,
                        (period_ms_t)BTA_AVK_RC_BR_TIME_VAL,
                        bta_avk_rc_br_timer_cback,
@@ -696,8 +703,9 @@ void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     if(bta_avk_cb.rcb[br_open.rc_handle].br_conn_timer != NULL)
         alarm_cancel(bta_avk_cb.rcb[br_open.rc_handle].br_conn_timer);
 
+    br_open.status = BTA_AVK_SUCCESS;
     bdcpy(br_open.peer_addr, p_data->rc_conn_chg.peer_addr);
-    (*p_cb->p_cback)(BTA_AVK_RC_BROWSE_OPEN_EVT, (tBTA_AV *)&br_open);
+    (*p_cb->p_cback)(BTA_AVK_RC_BROWSE_OPEN_EVT, (tBTA_AVK *)&br_open);
 }
 
 BOOLEAN browsing_dev_blacklisted_for_sniff (BD_ADDR addr)
@@ -717,7 +725,6 @@ BOOLEAN browsing_dev_blacklisted_for_sniff (BD_ADDR addr)
     }
     return false;
 }
-
 
 /*******************************************************************************
 **
@@ -1292,6 +1299,20 @@ void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
         }
     }
 }
+
+void bta_avk_rc_br_close(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
+{
+    tBTA_AVK_RC_BROWSE_CLOSE br_close;
+
+    br_close.rc_handle = p_data->rc_conn_chg.handle;
+    bta_avk_cb.rcb[br_close.rc_handle].status &= ~BTA_AVK_RC_CONN_BR_MASK;
+    APPL_TRACE_DEBUG("bta_avk_rc_br_close ");
+
+    bdcpy(br_close.peer_addr, p_data->rc_conn_chg.peer_addr);
+    (*p_cb->p_cback)(BTA_AVK_RC_BROWSE_CLOSE_EVT, (tBTA_AVK *)&br_close);
+
+}
+
 
 /*******************************************************************************
 **

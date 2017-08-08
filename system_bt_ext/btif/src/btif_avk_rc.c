@@ -567,12 +567,11 @@ void btif_avk_rc_handle_br_connect(tBTA_AVK_RC_BROWSE_OPEN* p_rc_br_open) {
     bdcpy(rc_addr.address, p_rc_br_open->peer_addr);
 
     BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel connected!~", __FUNCTION__);
-    HAL_CBACK(btif_avk_rc_ctrl_callbacks, connection_state_cb, TRUE, &rc_addr);
+    HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_cb, TRUE, &rc_addr);
   }
 }
 
-
-/***************************************************************************
+ /***************************************************************************
  *  Function       btif_avk_rc_handle_rc_connect
  *
  *  - Argument:    tBTA_AVK_RC_OPEN  RC open data structure
@@ -706,6 +705,37 @@ static void btif_avk_rc_handle_rc_disconnect (tBTA_AVK_RC_CLOSE *p_rc_close)
 #endif
 }
 
+static void btif_avk_rc_handle_br_disconnect (tBTA_AVK_RC_BROWSE_CLOSE *p_rc_close)
+{
+        bt_bdaddr_t rc_addr;
+        UINT8 index;
+
+        index = btif_avk_rc_get_idx_by_rc_handle(p_rc_close->rc_handle);
+        BTIF_TRACE_IMP("%s: rc_handle: %d index %d", __FUNCTION__, p_rc_close->rc_handle, index);
+        if (index == btif_max_rc_clients)
+        {
+            BTIF_TRACE_ERROR("Got disconnect of unknown device");
+            return;
+        }
+        if ((p_rc_close->rc_handle != btif_avk_rc_cb[index].rc_handle)
+            && (bdcmp(btif_avk_rc_cb[index].rc_addr, p_rc_close->peer_addr)))
+        {
+            BTIF_TRACE_ERROR("Got disconnect of unknown device");
+            return;
+        }
+#if (AVRC_CTLR_INCLUDED == TRUE)
+        bdcpy(rc_addr.address, p_rc_close->peer_addr);
+
+//      bt_bdaddr_t rc_addr;
+//      bdcpy(rc_addr.address, p_rc_close->peer_addr);
+
+      BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel disconnected peer addr: %02x:%02x:%02x:%02x:%02x:%02x!~", __FUNCTION__,rc_addr);
+      HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_cb, FALSE, &rc_addr);
+#endif
+
+}
+
+
 /***************************************************************************
  *  Function       btif_rc_ctrl_send_pause
  *
@@ -813,7 +843,11 @@ void btif_avk_rc_handler(tBTA_AVK_EVT event, tBTA_AVK *p_data)
             BTIF_TRACE_DEBUG("btif_avk_rc_handler : BTA_AVK_RC_BROWSE_OPEN_EVT !~");
             btif_avk_rc_handle_br_connect( &(p_data->rc_browse_open) );
         }break;
-
+        case BTA_AVK_RC_BROWSE_CLOSE_EVT:
+        {
+            BTIF_TRACE_DEBUG("btif_avk_rc_handler : BTA_AVK_RC_BROWSE_CLOSE_EVT !~");
+            btif_avk_rc_handle_br_disconnect( &(p_data->rc_browse_close) );
+        }break;
         case BTA_AVK_RC_CLOSE_EVT:
         {
             btif_avk_rc_handle_rc_disconnect( &(p_data->rc_close) );

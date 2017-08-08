@@ -388,7 +388,6 @@ typedef struct {
   BD_ADDR peer_addr;
 } tBTA_AVK_RC_BROWSE_CLOSE;
 
-
 /* data associated with BTA_AVK_RC_FEAT_EVT */
 typedef struct
 {
