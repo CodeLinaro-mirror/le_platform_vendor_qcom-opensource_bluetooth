@@ -690,7 +690,6 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
                        bta_avk_rc_br_timer_cback,
                        INT_TO_PTR(i),
                        btu_bta_alarm_queue);*/
-
 }
 
 void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)

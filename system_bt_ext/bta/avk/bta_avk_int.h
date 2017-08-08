@@ -115,7 +115,7 @@ enum
     BTA_AVK_API_START_EVT,       /* the following 2 events must be in the same order as the *AP_*EVT */
     BTA_AVK_API_STOP_EVT,
     BTA_AVK_ENABLE_MULTICAST_EVT, /* Event for enable and disable multicast */
-    BTA_AVK_AVRC_BROWSE_OPEN_EVT
+
 };
 
 /* events for AV control block state machine */

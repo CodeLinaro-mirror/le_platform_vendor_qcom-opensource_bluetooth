@@ -265,7 +265,7 @@ typedef UINT8 tBTA_AVK_ERR;
 #define BTA_AVK_MEDIA_SINK_CFG_EVT    21      /* command to configure codec */
 #define BTA_AVK_MEDIA_DATA_EVT   22      /* sending data to Media Task */
 #define BTA_AVK_ROLE_CHANGED_EVT     23
-#define BTA_AVK_RC_BROWSE_OPEN_EVT   24       /* remote control browse channel open */
+#define BTA_AVK_RC_BROWSE_OPEN_EVT   24       /* remote control channel open */
 #define BTA_AVK_RC_BROWSE_CLOSE_EVT  25       /* remote control browse channel closed */
 
 /* Max BTA event */

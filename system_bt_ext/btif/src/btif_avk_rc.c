@@ -111,12 +111,23 @@
 
 #define CHECK_AVK_RC_CONNECTED_BY_IDX                                                      \
     int conn_status = BT_STATUS_NOT_READY;                                                 \
-    BTIF_TRACE_DEBUG("## %s ##", __FUNCTION__);                                            \
+    BTIF_TRACE_DEBUG("## %s CHECK_AVK_RC_CONNECTED_BY_IDX##", __FUNCTION__);                                            \
     if ((btif_avk_rc_cb[index].rc_connected == TRUE))                                      \
        conn_status = BT_STATUS_SUCCESS;                                                     \
     if(conn_status == BT_STATUS_NOT_READY)                                                  \
     {                                                                                       \
         BTIF_TRACE_WARNING("Function %s() called when RC is not connected", __FUNCTION__);  \
+        return BT_STATUS_NOT_READY;                                                         \
+    }
+
+#define CHECK_AVK_BR_CONNECTED_BY_IDX                                                      \
+    int br_conn_status = BT_STATUS_NOT_READY;                                                 \
+    BTIF_TRACE_DEBUG("## %s CHECK_AVK_BR_CONNECTED_BY_IDX##", __FUNCTION__);                                            \
+    if ((btif_avk_rc_cb[index].br_connected == TRUE))                                      \
+       br_conn_status = BT_STATUS_SUCCESS;                                                     \
+    if(br_conn_status == BT_STATUS_NOT_READY)                                                  \
+    {                                                                                       \
+        BTIF_TRACE_WARNING("Function %s() called when BR is not connected", __FUNCTION__);  \
         return BT_STATUS_NOT_READY;                                                         \
     }
 
@@ -217,6 +228,7 @@ typedef struct {
 /* TODO : Merge btif_avk_rc_reg_notifications_t and btif_avk_rc_cmd_ctxt_t to a single struct */
 typedef struct {
     BOOLEAN                     rc_connected;
+    BOOLEAN                     br_connected;
     UINT8                       rc_handle;
     tBTA_AVK_FEAT                rc_features;
     BD_ADDR                     rc_addr;
@@ -560,14 +572,22 @@ void btif_avk_rc_clear_priority(BD_ADDR address)
 void btif_avk_rc_handle_br_connect(tBTA_AVK_RC_BROWSE_OPEN* p_rc_br_open) {
   BTIF_TRACE_DEBUG("%s: btif_avk_rc_handle_br_connect :rc_handle %d status %d", __func__,
                    p_rc_br_open->rc_handle, p_rc_br_open->status);
-
+  int index = btif_avk_rc_get_idx_by_rc_handle(p_rc_br_open->rc_handle);
+  BTIF_TRACE_IMP("%s: rc_handle: %d index %d", __FUNCTION__, p_rc_br_open->rc_handle, index);
+  if (index == btif_max_rc_clients)
+  {
+      BTIF_TRACE_ERROR("Got br connect of unknown device");
+      return;
+  }
 
   if (p_rc_br_open->status == BTA_AVK_SUCCESS) {
     bt_bdaddr_t rc_addr;
     bdcpy(rc_addr.address, p_rc_br_open->peer_addr);
 
+    btif_avk_rc_cb[index].br_connected = TRUE;
+
     BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel connected!~", __FUNCTION__);
-    HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_cb, TRUE, &rc_addr);
+    HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_vendor_cb, TRUE, &rc_addr);
   }
 }
 
@@ -667,6 +687,7 @@ static void btif_avk_rc_handle_rc_disconnect (tBTA_AVK_RC_CLOSE *p_rc_close)
 #endif
     btif_avk_rc_cb[index].rc_handle = BTIF_AVK_RC_HANDLE_NONE;
     btif_avk_rc_cb[index].rc_connected = FALSE;
+    btif_avk_rc_cb[index].br_connected = FALSE;
     bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
     memset(btif_avk_rc_cb[index].rc_addr, 0, sizeof(BD_ADDR));
     memset(btif_avk_rc_cb[index].rc_notif, 0, sizeof(btif_avk_rc_cb[index].rc_notif));
@@ -707,30 +728,24 @@ static void btif_avk_rc_handle_rc_disconnect (tBTA_AVK_RC_CLOSE *p_rc_close)
 
 static void btif_avk_rc_handle_br_disconnect (tBTA_AVK_RC_BROWSE_CLOSE *p_rc_close)
 {
-        bt_bdaddr_t rc_addr;
-        UINT8 index;
+    bt_bdaddr_t rc_addr;
+    UINT8 index;
 
-        index = btif_avk_rc_get_idx_by_rc_handle(p_rc_close->rc_handle);
-        BTIF_TRACE_IMP("%s: rc_handle: %d index %d", __FUNCTION__, p_rc_close->rc_handle, index);
-        if (index == btif_max_rc_clients)
-        {
-            BTIF_TRACE_ERROR("Got disconnect of unknown device");
-            return;
-        }
-        if ((p_rc_close->rc_handle != btif_avk_rc_cb[index].rc_handle)
-            && (bdcmp(btif_avk_rc_cb[index].rc_addr, p_rc_close->peer_addr)))
-        {
-            BTIF_TRACE_ERROR("Got disconnect of unknown device");
-            return;
-        }
+    index = btif_avk_rc_get_idx_by_rc_handle(p_rc_close->rc_handle);
+    BTIF_TRACE_IMP("%s: rc_handle: %d index %d", __FUNCTION__, p_rc_close->rc_handle, index);
+    if (index == btif_max_rc_clients)
+    {
+        BTIF_TRACE_ERROR("Got disconnect of unknown device");
+        return;
+    }
+    btif_avk_rc_cb[index].br_connected = FALSE;
+
 #if (AVRC_CTLR_INCLUDED == TRUE)
-        bdcpy(rc_addr.address, p_rc_close->peer_addr);
+    bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
 
-//      bt_bdaddr_t rc_addr;
-//      bdcpy(rc_addr.address, p_rc_close->peer_addr);
-
-      BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel disconnected peer addr: %02x:%02x:%02x:%02x:%02x:%02x!~", __FUNCTION__,rc_addr);
-      HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_cb, FALSE, &rc_addr);
+    BTIF_TRACE_IMP("%s: HAL_CBACK connection_state_cb browse channel disconnected peer addr: %02x:%02x:%02x:%02x:%02x:%02x!~", __FUNCTION__,
+        rc_addr.address[0],rc_addr.address[1],rc_addr.address[2],rc_addr.address[3],rc_addr.address[4],rc_addr.address[5]);
+    HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks, browse_connection_state_vendor_cb, FALSE, &rc_addr);
 #endif
 
 }
@@ -1217,6 +1232,7 @@ static void btif_avk_rc_status_cmd_timeout_handler(UNUSED_ATTR uint16_t event,
     case AVRC_PDU_GET_PLAYER_APP_VALUE_TEXT:
     case AVRC_PDU_GET_ELEMENT_ATTR:
     case AVRC_PDU_GET_PLAY_STATUS:
+    case AVRC_PDU_SET_ADDRESSED_PLAYER:
         break;
     }
     release_transaction(p_context->rc_status_cmd.label);
@@ -1715,6 +1731,15 @@ static void btif_avk_rc_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
 
         }
             break;
+        case AVRC_PDU_SET_ADDRESSED_PLAYER:
+        {
+            btrc_status_t rsp_status;
+            rsp_status = (btrc_status_t)pavrc_resp->addr_player.status;
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,setaddressedplayer_vendor_cb, &rc_addr,
+                                    rsp_status);
+        }
+            break;
+
         default:
             return;
     }
@@ -2476,6 +2501,57 @@ static bt_status_t get_play_status_cmd_vendor(bt_bdaddr_t *bd_addr)
     return status;
 }
 
+static bt_status_t set_addressed_player_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_t player_id)
+{
+    BTIF_TRACE_DEBUG("%s: id %d", __FUNCTION__, player_id);
+    tAVRC_STS status = BT_STATUS_UNSUPPORTED;
+    rc_transaction_t *p_transaction=NULL;
+#if (AVRC_CTLR_INCLUDED == TRUE)
+    tAVRC_COMMAND avrc_cmd = {0};
+    BT_HDR *p_msg = NULL;
+    bt_status_t tran_status;
+
+    int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
+    BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
+    CHECK_AVK_RC_CONNECTED_BY_IDX
+    CHECK_AVK_BR_CONNECTED_BY_IDX
+
+    avrc_cmd.addr_player.pdu = AVRC_PDU_SET_ADDRESSED_PLAYER;
+    avrc_cmd.addr_player.status = AVRC_STS_NO_ERROR;
+    avrc_cmd.addr_player.player_id = player_id;
+
+    status = AVRC_BldCommand(&avrc_cmd, &p_msg);
+    if (status != AVRC_STS_NO_ERROR) {
+        BTIF_TRACE_ERROR("%s: failed to build command status %d", __func__, status);
+        return BT_STATUS_FAIL;
+    }
+
+    tran_status = get_transaction(&p_transaction);
+
+    if (tran_status != BT_STATUS_SUCCESS || p_transaction == NULL) {
+        osi_free(p_msg);
+        BTIF_TRACE_ERROR("%s: failed to obtain txn details. status: 0x%02x",
+                         __func__, tran_status);
+        return BT_STATUS_FAIL;
+    }
+
+    BTIF_TRACE_DEBUG("%s msgreq being sent out with label %d", __func__,
+                   p_transaction->lbl);
+    BTA_AvkMetaCmd(btif_avk_rc_cb[index].rc_handle, p_transaction->lbl, AVRC_CMD_CTRL, p_msg);
+#else
+    BTIF_TRACE_DEBUG("%s: feature not enabled", __FUNCTION__);
+#endif
+    return BT_STATUS_SUCCESS;;
+
+}
+
+
 /***************************************************************************
 **
 ** Function         send_abs_vol_rsp
@@ -2759,6 +2835,7 @@ static const btrc_ctrl_vendor_interface_t btif_avk_rc_ctrl_vendor_interface = {
     register_notification_cmd_vendor,
     get_element_attribute_cmd_vendor,
     get_play_status_cmd_vendor,
+    set_addressed_player_cmd_vendor,
     cleanup_ctrl_vendor,
 };
 
