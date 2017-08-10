@@ -236,7 +236,10 @@ static void bta_avk_api_enable(tBTA_AVK_DATA *p_data)
     memset(&bta_avk_cb, 0, sizeof(tBTA_AVK_CB));
 
     for(i=0; i<BTA_AVK_NUM_RCB; i++)
+    {
         bta_avk_cb.rcb[i].handle = BTA_AVK_RC_HANDLE_NONE;
+        bta_avk_cb.rcb[i].br_conn_timer = NULL;
+    }
 
     bta_avk_cb.rc_acp_handle = BTA_AVK_RC_HANDLE_NONE;
 
@@ -622,6 +625,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             bta_ar_reg_avdt(&reg, bta_avk_conn_cback, BTA_ID_AVK);
 #endif
             bta_sys_role_chg_register(&bta_avk_sys_rs_cback);
+            APPL_TRACE_DEBUG("bta_avk_api_register : bta_avk_cb.features %d !~", bta_avk_cb.features);
 
             /* create remote control TG service if required */
             if (bta_avk_cb.features & (BTA_AVK_FEAT_RCTG))
@@ -636,6 +640,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                                 (UINT8)(bta_avk_cb.sec_mask & (~BTA_SEC_AUTHORIZE)), BTA_ID_AVK);
 #endif
                 if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK) {
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_ar_reg_avrc %d !~", bta_avk_cb.features);
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REM_CTRL_TARGET, "AV Remote Control Target",
                         NULL, p_bta_avk_cfg->avrc_tg_cat, BTA_ID_AVK,
                         (bta_avk_cb.features & BTA_AVK_FEAT_BROWSE),AVRC_REV_1_4);
@@ -790,6 +795,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                 /* if the AV and AVK are both supported, it cannot support the CT role */
                 if (bta_avk_cb.features & (BTA_AVK_FEAT_RCCT))
                 {
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_avk_cb.features & (BTA_AVK_FEAT_RCCT)!~");
                     /* if TG is not supported, we need to register to AVCT now */
                     if ((bta_avk_cb.features & (BTA_AVK_FEAT_RCTG)) == 0)
                     {
@@ -806,8 +812,10 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                     }
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
                     /* create an SDP record as AVRC CT. */
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_ar_reg_avrc1 %d !~", bta_avk_cb.features);
+
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REMOTE_CONTROL, NULL, NULL,
-                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_0);
+                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_4);
 #endif
                 }
             }

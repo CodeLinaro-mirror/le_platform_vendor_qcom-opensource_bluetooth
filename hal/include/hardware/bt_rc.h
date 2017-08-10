@@ -160,6 +160,13 @@ typedef struct {
     uint8_t  attr_count;
 } btrc_getfolderitem_t;
 
+/* notification event parameter for AddressedPlayer change */
+typedef struct
+{
+    uint16_t              player_id;
+    uint16_t              uid_counter;
+} btrc_addr_player_t;
+
 typedef union
 {
     btrc_play_status_t play_status;
@@ -167,6 +174,8 @@ typedef union
     uint32_t song_pos;
     btrc_player_settings_t player_setting;
     uint16_t player_id;
+    btrc_addr_player_t addr_player;
+    uint8_t volume;
 } btrc_register_notification_t;
 
 typedef struct {

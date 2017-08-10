@@ -62,7 +62,7 @@ const UINT16  bta_avk_audio_flush_to[] = {
 /* Note: Android doesnt support AVRC_SUPF_TG_GROUP_NAVI  */
 /* Note: if AVRC_SUPF_TG_GROUP_NAVI is set, bta_avk_src_cfg.avrc_group should be TRUE */
 #ifndef ANDROID
-#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT1)
+#define BTA_AVK_RC_SUPF_CT       (AVRC_SUPF_CT_CAT1 | AVRC_SUPF_CT_BROWSE | AVRC_SUPF_CT_APP_SETTINGS)
 #else
 #if AVRC_METADATA_INCLUDED == TRUE
 

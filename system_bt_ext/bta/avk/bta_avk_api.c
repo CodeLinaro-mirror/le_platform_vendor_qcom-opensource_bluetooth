@@ -630,4 +630,25 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
     }
 }
 
+/*******************************************************************************
+**
+** Function         BTA_AvkIsBrowsingSupported
+**
+** Description      Check to see if browsing is supported by local device.
+**                  This API does not result in any message being posted, it just
+**                  checks the local supported features for browsing support and
+**                  returns TRUE or FALSE.
+** Returns          TRUE/FALSE based on browse support in local device
+**
+*******************************************************************************/
+BOOLEAN BTA_AvkIsBrowsingSupported (void)
+{
+    if (p_bta_avk_cfg->avrc_ct_cat & AVRC_SUPF_CT_BROWSE)
+    {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+
 #endif /* BTA_AV_INCLUDED */
