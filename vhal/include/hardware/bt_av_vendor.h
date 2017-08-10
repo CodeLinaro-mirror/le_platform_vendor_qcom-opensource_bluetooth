@@ -194,7 +194,7 @@ typedef void (* btav_audio_focus_request_vendor_callback)(bt_bdaddr_t *bd_addr);
 
 typedef void (* btav_delay_report_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t report_delay);
 
-typedef void (* btav_audio_data_read_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t size);
+typedef void (* btav_audio_data_read_vendor_callback)(bt_bdaddr_t *bd_addr);
 
 /** BT-AV Vendor callback structure. */
 typedef struct {

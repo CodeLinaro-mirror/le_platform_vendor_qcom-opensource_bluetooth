@@ -1275,16 +1275,6 @@ static BOOLEAN btif_avk_state_started_handler(btif_sm_event_t event, void *p_dat
                 BTIF_TRACE_DEBUG("Other device not suspended, don't ack the suspend");
             }
 
-            /* If callback mechanism is used for streaming, remove the packets from RxDataQ
-             * when Streaming is suspended so that when streaming is started again, BT-APP
-             * will fetch correct packet from Data queue for which it received the callback.*/
-            if (enable_notification_cb) {
-                while (fixed_queue_length(RxDataQ) > 0) {
-                    if ((tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ) != NULL)
-                        BTIF_TRACE_DEBUG(" Data dequeued from RxDataQ");
-                }
-            }
-
             /* if not successful, remain in current state */
             if (p_av->suspend.status != BTA_AVK_SUCCESS)
             {
@@ -2360,9 +2350,9 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             p_curr += q_bytes_left;
             /* If Callbak mechanism is enabled for streaming, read one media packet
              * from RxDataQ at a time. Following condition will break from loop after
-             * reading oe media packet*/
-            if (enable_notification_cb && p_curr >= p_end) {
-                BTIF_TRACE_DEBUG(" wait for next callback, return ");
+             * reading one media packet*/
+            if (enable_notification_cb) {
+                // wait for next callback, return
                 break;
             }
         }
@@ -2580,6 +2570,10 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
 
             osi_free(p_data_q_buf);
             bytes_to_be_written = bytes_to_be_written - q_bytes_left;
+            if (enable_notification_cb) {
+                // when callback mechanism is enabled, read one packet at a time and return
+                break;
+            }
         }
         else
         {
@@ -2684,8 +2678,7 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
     if (enable_notification_cb && bt_av_sink_vendor_callbacks != NULL) {
         bt_bdaddr_t bdAddr;
         memcpy(bdAddr.address, &bd_addr, sizeof(BD_ADDR));
-        HAL_CBACK(bt_av_sink_vendor_callbacks, audio_data_read_vendor_cb, &bdAddr,
-                (uint16_t)size);
+        HAL_CBACK(bt_av_sink_vendor_callbacks, audio_data_read_vendor_cb, &bdAddr);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
     return fixed_queue_length(RxDataQ);
