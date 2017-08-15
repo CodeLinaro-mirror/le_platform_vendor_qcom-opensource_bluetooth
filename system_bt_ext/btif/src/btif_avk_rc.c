@@ -1252,6 +1252,7 @@ static void btif_avk_rc_status_cmd_timeout_handler(UNUSED_ATTR uint16_t event,
     case AVRC_PDU_GET_PLAY_STATUS:
     case AVRC_PDU_SET_ADDRESSED_PLAYER:
     case AVRC_PDU_SET_BROWSED_PLAYER:
+    case AVRC_PDU_CHANGE_PATH:
         break;
     }
     release_transaction(p_context->rc_status_cmd.label);
@@ -1541,6 +1542,18 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
                                     rsp_status,num_items,charset_id,folder_depth,p_folders);
         }
         break;
+        case AVRC_PDU_CHANGE_PATH:
+        {
+            btrc_status_t rsp_status;
+            uint32_t num_items = 0;
+            rsp_status = (btrc_status_t)pavrc_resp->chg_path.status;
+            if(BTRC_STS_NO_ERROR == rsp_status)
+                num_items = pavrc_resp->chg_path.num_items;
+
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,changepath_vendor_cb, &rc_addr,
+                                    rsp_status,num_items);
+
+        }
 
     }
 
@@ -2683,7 +2696,58 @@ static bt_status_t set_browsed_player_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_t 
 #else
     BTIF_TRACE_DEBUG("%s: feature not enabled", __FUNCTION__);
 #endif
-    return BT_STATUS_SUCCESS;;
+    return BT_STATUS_SUCCESS;
+
+}
+
+static bt_status_t change_folder_path_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t direction, uint8_t * uid)
+{
+    BTIF_TRACE_DEBUG("%s: direction 0x%02x uid %d", __FUNCTION__, direction, *uid);
+    tAVRC_STS status = BT_STATUS_UNSUPPORTED;
+    rc_transaction_t *p_transaction=NULL;
+#if (AVRC_CTLR_INCLUDED == TRUE)
+    tAVRC_COMMAND avrc_cmd = {0};
+    BT_HDR *p_msg = NULL;
+    bt_status_t tran_status;
+
+    int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
+    BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
+    CHECK_AVK_RC_CONNECTED_BY_IDX
+    CHECK_AVK_BR_CONNECTED_BY_IDX
+
+    avrc_cmd.chg_path.pdu = AVRC_PDU_CHANGE_PATH;
+    avrc_cmd.chg_path.status = AVRC_STS_NO_ERROR;
+    avrc_cmd.chg_path.uid_counter = 0;
+    avrc_cmd.chg_path.direction = direction;
+    avrc_cmd.chg_path.folder_uid = *uid;
+
+    status = AVRC_BldCommand(&avrc_cmd, &p_msg);
+    if (status != AVRC_STS_NO_ERROR) {
+      BTIF_TRACE_ERROR("%s failed to build command status %d", __func__, status);
+      return BT_STATUS_FAIL;
+    }
+
+    tran_status = get_transaction(&p_transaction);
+    if (tran_status != BT_STATUS_SUCCESS || p_transaction == NULL) {
+      osi_free(p_msg);
+      BTIF_TRACE_ERROR("%s: failed to obtain transaction details. status: 0x%02x",
+                       __func__, tran_status);
+      return BT_STATUS_FAIL;
+    }
+
+    BTIF_TRACE_DEBUG("%s msgreq being sent out with label %d", __func__,
+                     p_transaction->lbl);
+    BTA_AvkMetaCmd(btif_avk_rc_cb[index].rc_handle, p_transaction->lbl, AVRC_CMD_CTRL, p_msg);
+#else
+    BTIF_TRACE_DEBUG("%s: feature not enabled", __FUNCTION__);
+#endif
+    return BT_STATUS_SUCCESS;
 
 }
 
@@ -2972,6 +3036,7 @@ static const btrc_ctrl_vendor_interface_t btif_avk_rc_ctrl_vendor_interface = {
     get_play_status_cmd_vendor,
     set_addressed_player_cmd_vendor,
     set_browsed_player_cmd_vendor,
+    change_folder_path_cmd_vendor,
     cleanup_ctrl_vendor,
 };
 

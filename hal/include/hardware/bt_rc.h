@@ -269,6 +269,22 @@ typedef struct
     uint8_t                   status;
     btrc_folder_list_item_t   *p_item_list;
 } btrc_folder_list_entries_t;
+/*
+typedef struct {
+    uint8_t item_type;
+    union
+    {
+        btrc_item_player_t player;
+        btrc_item_folder_t folder;
+        btrc_item_media_t  media;
+    };
+} btrc_folder_items_t;*/
+
+typedef struct {
+    uint16_t  str_len;
+    uint8_t   p_str[BTRC_MAX_ATTR_STR_LEN];
+} btrc_br_folder_name_t;
+
 
 typedef struct {
     uint16_t  str_len;
