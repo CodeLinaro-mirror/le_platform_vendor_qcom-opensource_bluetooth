@@ -335,11 +335,11 @@ static void bta_avk_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_
     } else if (opcode == AVRC_OP_PASS_THRU && p_msg->pass.p_pass_data != NULL) {
         p_data_src = p_msg->pass.p_pass_data;
         data_len = (UINT16) p_msg->pass.pass_len;
-    } else if (opcode == AVRC_OP_BROWSE && p_msg->browse.p_browse_data != NULL) {
+    } /*else if (opcode == AVRC_OP_BROWSE && p_msg->browse.p_browse_data != NULL) {
         APPL_TRACE_EVENT("bta_avk_rc_msg_cback Browse Data");
         p_data_src  = p_msg->browse.p_browse_data;
         data_len = (UINT16) p_msg->browse.browse_len;
-    }
+    }*/
 
 
     /* Create a copy of the message */
@@ -359,8 +359,12 @@ static void bta_avk_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_
                 p_buf->msg.vendor.p_vendor_data = p_data_dst;
             else if (opcode == AVRC_OP_PASS_THRU)
                 p_buf->msg.pass.p_pass_data = p_data_dst;
-            else if (opcode == AVRC_OP_BROWSE)
-                p_buf->msg.browse.p_browse_data = p_data_dst;
+            /*else if (opcode == AVRC_OP_BROWSE)
+                p_buf->msg.browse.p_browse_data = p_data_dst;*/
+        }
+        if (opcode == AVRC_OP_BROWSE) {
+          /* set p_pkt to NULL, so avrc would not free the buffer */
+          p_msg->browse.p_browse_pkt = NULL;
         }
         bta_sys_sendmsg(p_buf);
     }
@@ -861,6 +865,21 @@ void bta_avk_rc_free_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     UNUSED(p_data);
 }
 
+/*******************************************************************************
+ *
+ * Function         bta_av_rc_free_browse_msg
+ *
+ * Description      free an AVRCP browse message buffer.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void bta_avk_rc_free_browse_msg(UNUSED_ATTR tBTA_AVK_CB* p_cb,
+                               tBTA_AVK_DATA* p_data) {
+  if (p_data->rc_msg.opcode == AVRC_OP_BROWSE) {
+    osi_free_and_reset((void**)&p_data->rc_msg.msg.browse.p_browse_pkt);
+  }
+}
 
 
 /*******************************************************************************
@@ -1223,21 +1242,16 @@ void bta_avk_rc_msg(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 #if (AVCT_BROWSE_INCLUDED == TRUE)
     else if (p_data->rc_msg.opcode == AVRC_OP_BROWSE )
     {
-        APPL_TRACE_DEBUG("browse len PDU :%x",p_data->rc_msg.msg.browse.browse_len);
-        APPL_TRACE_DEBUG("browse  data:%x",p_data->rc_msg.msg.browse.p_browse_data[0]);
-        av.browse_msg.label = p_data->rc_msg.label;
-        av.browse_msg.p_msg = &p_data->rc_msg.msg;
-
-        evt = bta_avk_proc_browse_cmd(&rc_rsp, &p_data->rc_msg);
-        if (evt == 0)
-        {
-            APPL_TRACE_ERROR("Browse PDU not supported");
-            rc_rsp.rsp.pdu    = AVRC_PDU_GENERAL_REJECT;
-            rc_rsp.rsp.status = AVRC_STS_BAD_CMD;
-            ctype = 0;
-            AVRC_BldBrowseResponse(0, &rc_rsp, &p_pkt);
-        }
-    }
+       /* set up for callback */
+       av.meta_msg.rc_handle = p_data->rc_msg.handle;
+       av.meta_msg.company_id = p_vendor->company_id;
+       av.meta_msg.code = p_data->rc_msg.msg.hdr.ctype;
+       av.meta_msg.label = p_data->rc_msg.label;
+       av.meta_msg.p_msg = &p_data->rc_msg.msg;
+       av.meta_msg.p_data = p_data->rc_msg.msg.browse.p_browse_data;
+       av.meta_msg.len = p_data->rc_msg.msg.browse.browse_len;
+       evt = BTA_AV_META_MSG_EVT;
+     }
 #endif
 #if (AVRC_METADATA_INCLUDED == TRUE)
     if (evt == 0 && rc_rsp.rsp.status != BTA_AVK_STS_NO_RSP)
@@ -1257,6 +1271,9 @@ void bta_avk_rc_msg(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     {
         av.remote_cmd.rc_handle = p_data->rc_msg.handle;
         (*p_cb->p_cback)(evt, &av);
+        /* If browsing message, then free the browse message buffer */
+        bta_avk_rc_free_browse_msg(p_cb, p_data);
+
     }
 }
 

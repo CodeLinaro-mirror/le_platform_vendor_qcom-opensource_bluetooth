@@ -330,6 +330,9 @@ static void btif_avk_rc_ctrl_upstreams_rsp_cmd(UINT8 event, tAVRC_COMMAND *pavrc
                                            UINT8 label, UINT8 index);
 static void btif_avk_rc_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pavrc_resp,
                                            UINT8* p_buf, UINT16 buf_len, UINT8 rsp_type, UINT8 index);
+static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pavrc_resp,
+                                        UINT8 rsp_type, UINT8 index);
+
 #endif
 
 /*Added for Browsing Message Response */
@@ -572,6 +575,7 @@ void btif_avk_rc_clear_priority(BD_ADDR address)
 void btif_avk_rc_handle_br_connect(tBTA_AVK_RC_BROWSE_OPEN* p_rc_br_open) {
   BTIF_TRACE_DEBUG("%s: btif_avk_rc_handle_br_connect :rc_handle %d status %d", __func__,
                    p_rc_br_open->rc_handle, p_rc_br_open->status);
+
   int index = btif_avk_rc_get_idx_by_rc_handle(p_rc_br_open->rc_handle);
   BTIF_TRACE_IMP("%s: rc_handle: %d index %d", __FUNCTION__, p_rc_br_open->rc_handle, index);
   if (index == btif_max_rc_clients)
@@ -909,19 +913,33 @@ void btif_avk_rc_handler(tBTA_AVK_EVT event, tBTA_AVK *p_data)
                                             p_data->meta_msg.company_id,
                                             p_data->meta_msg.len,
                                             p_data->meta_msg.rc_handle);
-                if ((p_data->meta_msg.code >= AVRC_RSP_NOT_IMPL)&&
-                    (p_data->meta_msg.code <= AVRC_RSP_INTERIM))
-                {
-                    /* Its a response */
-                    handle_avk_rc_metamsg_rsp(&(p_data->meta_msg));
-                }
-                else if (p_data->meta_msg.code <= AVRC_CMD_GEN_INQ)
-                {
-                    /* Its a command  */
-                    handle_avk_rc_metamsg_cmd(&(p_data->meta_msg));
-                }
 
-            }
+                switch (p_data->meta_msg.p_msg->hdr.opcode) {
+                  case AVRC_OP_VENDOR:
+                        if ((p_data->meta_msg.code >= AVRC_RSP_NOT_IMPL)&&
+                            (p_data->meta_msg.code <= AVRC_RSP_INTERIM))
+                        {
+                            /* Its a response */
+                            handle_avk_rc_metamsg_rsp(&(p_data->meta_msg));
+                        }
+                        else if (p_data->meta_msg.code <= AVRC_CMD_GEN_INQ)
+                        {
+                            /* Its a command  */
+                            handle_avk_rc_metamsg_cmd(&(p_data->meta_msg));
+                        }
+                        break;
+
+                    case AVRC_OP_BROWSE:
+                      if (p_data->meta_msg.p_msg->hdr.ctype == AVRC_CMD) {
+                        handle_avk_rc_metamsg_cmd(&(p_data->meta_msg));
+                      } else if (p_data->meta_msg.p_msg->hdr.ctype == AVRC_RSP) {
+                        handle_avk_rc_metamsg_rsp(&(p_data->meta_msg));
+
+                        BTIF_TRACE_DEBUG("handle_avk_rc_metamsg_rsp end");
+                      }
+                      break;
+                    }
+                }
 #endif
             else
             {
@@ -1233,6 +1251,7 @@ static void btif_avk_rc_status_cmd_timeout_handler(UNUSED_ATTR uint16_t event,
     case AVRC_PDU_GET_ELEMENT_ATTR:
     case AVRC_PDU_GET_PLAY_STATUS:
     case AVRC_PDU_SET_ADDRESSED_PLAYER:
+    case AVRC_PDU_SET_BROWSED_PLAYER:
         break;
     }
     release_transaction(p_context->rc_status_cmd.label);
@@ -1470,6 +1489,65 @@ static void btif_avk_rc_ctrl_upstreams_rsp_cmd(UINT8 event, tAVRC_COMMAND *pavrc
     }
 #endif
 }
+/*******************************************************************************
+**
+** Function         btif_avk_br_ctrl_upstreams_rsp_evt
+**
+** Description      Executes AVRC UPSTREAMS response events in btif context.
+**
+** Returns          void
+**
+*******************************************************************************/
+static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pavrc_resp,
+                                        UINT8 rsp_type, UINT8 index)
+{
+    bt_bdaddr_t rc_addr;
+
+    BTIF_TRACE_IMP("%s pdu: %s handle: 0x%x rsp_type:%x", __FUNCTION__,
+        dump_rc_pdu(pavrc_resp->pdu), btif_avk_rc_cb[index].rc_handle, rsp_type);
+
+    bdcpy(rc_addr.address, btif_avk_rc_cb[index].rc_addr);
+
+#if (AVRC_CTLR_INCLUDED == TRUE)
+    switch (event)
+    {
+        case AVRC_PDU_SET_BROWSED_PLAYER:
+        {
+            btrc_status_t rsp_status;
+            rsp_status = (btrc_status_t)pavrc_resp->br_player.status;
+            uint32_t num_items = pavrc_resp->br_player.num_items;
+            uint16_t charset_id = pavrc_resp->br_player.charset_id;
+            uint8_t folder_depth = pavrc_resp->br_player.folder_depth;
+            btrc_folder_name_t *p_folders = NULL;
+            if(folder_depth > 0)
+            {
+                size_t buf_size = folder_depth * sizeof(btrc_folder_name_t);
+                p_folders = (btrc_folder_name_t*)osi_calloc(buf_size);
+                for (int i = 0; i < folder_depth; i++) {
+                    p_folders[i].str_len = 0;
+                     if (pavrc_resp->br_player.p_folders[i].str_len > 0)
+                     {
+                          memset(p_folders[i].p_str, 0, BTRC_MAX_ATTR_STR_LEN * sizeof(uint8_t));
+                          int len = BTRC_MAX_ATTR_STR_LEN - 1;
+                          if(pavrc_resp->br_player.p_folders[i].str_len < len)
+                            len = pavrc_resp->br_player.p_folders[i].str_len;
+                          p_folders[i].str_len = len;
+                          memcpy(p_folders[i].p_str, pavrc_resp->br_player.p_folders[i].p_str, len);
+                     }
+                }
+
+            }
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,setbrowsedplayer_vendor_cb, &rc_addr,
+                                    rsp_status,num_items,charset_id,folder_depth,p_folders);
+        }
+        break;
+
+    }
+
+#endif
+}
+
+
 
 /*******************************************************************************
 **
@@ -1739,7 +1817,6 @@ static void btif_avk_rc_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
                                     rsp_status);
         }
             break;
-
         default:
             return;
     }
@@ -1825,13 +1902,15 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AVK_META_MSG *pmeta_msg)
 
     BTIF_TRACE_DEBUG(" %s opcode = %d rsp_code = %d  ",__FUNCTION__,
                         pmeta_msg->p_msg->hdr.opcode,pmeta_msg->code);
+
+    status=AVRC_Ctrl_ParsResponse(pmeta_msg->p_msg, &avrc_response, scratch_buf, &buf_len);
+    BTIF_TRACE_DEBUG(" pdu = %d rsp_status = %d",avrc_response.pdu,
+                                pmeta_msg->p_msg->vendor.hdr.ctype);
+
     if((AVRC_OP_VENDOR==pmeta_msg->p_msg->hdr.opcode)&&
                 (pmeta_msg->code >= AVRC_RSP_NOT_IMPL)&&
                 (pmeta_msg->code <= AVRC_RSP_INTERIM))
     {
-        status=AVRC_Ctrl_ParsResponse(pmeta_msg->p_msg, &avrc_response, scratch_buf, &buf_len);
-        BTIF_TRACE_DEBUG(" pdu = %d rsp_status = %d",avrc_response.pdu,
-                                    pmeta_msg->p_msg->vendor.hdr.ctype);
 
         if ((avrc_response.pdu == AVRC_PDU_REGISTER_NOTIFICATION))
         {
@@ -1854,6 +1933,12 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AVK_META_MSG *pmeta_msg)
         BTIF_TRACE_DEBUG("%s: btif_avk_rc_ctrl_upstreams_rsp_evt !~", __FUNCTION__);
         btif_avk_rc_ctrl_upstreams_rsp_evt((uint16_t)avrc_response.rsp.pdu, &avrc_response,
                                scratch_buf, buf_len,pmeta_msg->p_msg->vendor.hdr.ctype, index);
+    }
+    else if(AVRC_OP_BROWSE == pmeta_msg->p_msg->hdr.opcode)
+    {
+        BTIF_TRACE_DEBUG("%s AVRC_OP_BROWSE pdu %d", __func__, avrc_response.pdu);
+        btif_avk_br_ctrl_upstreams_rsp_evt((uint16_t)avrc_response.rsp.pdu, &avrc_response,
+            pmeta_msg->p_msg->vendor.hdr.ctype, index);
     }
     else
     {
@@ -2551,6 +2636,56 @@ static bt_status_t set_addressed_player_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_
 
 }
 
+static bt_status_t set_browsed_player_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_t player_id)
+{
+    BTIF_TRACE_DEBUG("%s: id %d", __FUNCTION__, player_id);
+    tAVRC_STS status = BT_STATUS_UNSUPPORTED;
+    rc_transaction_t *p_transaction=NULL;
+#if (AVRC_CTLR_INCLUDED == TRUE)
+    tAVRC_COMMAND avrc_cmd = {0};
+    BT_HDR *p_msg = NULL;
+    bt_status_t tran_status;
+
+    int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
+    BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
+    CHECK_AVK_RC_CONNECTED_BY_IDX
+    CHECK_AVK_BR_CONNECTED_BY_IDX
+
+    avrc_cmd.br_player.pdu = AVRC_PDU_SET_BROWSED_PLAYER;
+    avrc_cmd.br_player.opcode = AVRC_OP_BROWSE;
+    avrc_cmd.br_player.status = AVRC_STS_NO_ERROR;
+    avrc_cmd.br_player.player_id = player_id;
+
+    status = AVRC_BldCommand(&avrc_cmd, &p_msg);
+    if (status != AVRC_STS_NO_ERROR) {
+        BTIF_TRACE_ERROR("%s: failed to build command status %d", __func__, status);
+        return BT_STATUS_FAIL;
+    }
+
+    tran_status = get_transaction(&p_transaction);
+
+    if (tran_status != BT_STATUS_SUCCESS || p_transaction == NULL) {
+        osi_free(p_msg);
+        BTIF_TRACE_ERROR("%s: failed to obtain txn details. status: 0x%02x",
+                         __func__, tran_status);
+        return BT_STATUS_FAIL;
+    }
+
+    BTIF_TRACE_DEBUG("%s msgreq being sent out with label %d", __func__,
+                   p_transaction->lbl);
+    BTA_AvkMetaCmd(btif_avk_rc_cb[index].rc_handle, p_transaction->lbl, AVRC_CMD_CTRL, p_msg);
+#else
+    BTIF_TRACE_DEBUG("%s: feature not enabled", __FUNCTION__);
+#endif
+    return BT_STATUS_SUCCESS;;
+
+}
 
 /***************************************************************************
 **
@@ -2836,6 +2971,7 @@ static const btrc_ctrl_vendor_interface_t btif_avk_rc_ctrl_vendor_interface = {
     get_element_attribute_cmd_vendor,
     get_play_status_cmd_vendor,
     set_addressed_player_cmd_vendor,
+    set_browsed_player_cmd_vendor,
     cleanup_ctrl_vendor,
 };
 

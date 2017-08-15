@@ -1389,7 +1389,8 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 assert(av_dest->meta_msg.p_msg);
                 memcpy(av_dest->meta_msg.p_msg, av_src->meta_msg.p_msg, sizeof(tAVRC_MSG));
 
-                if (av_src->meta_msg.p_msg->vendor.p_vendor_data &&
+                if ((av_src->meta_msg.p_msg->hdr.opcode == AVRC_OP_VENDOR) &&
+                    av_src->meta_msg.p_msg->vendor.p_vendor_data &&
                     av_src->meta_msg.p_msg->vendor.vendor_len)
                 {
                     av_dest->meta_msg.p_msg->vendor.p_vendor_data = osi_calloc(
@@ -1401,7 +1402,7 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 }
             }
             break;
-        case BTA_AVK_BROWSE_MSG_EVT:
+ /*       case BTA_AVK_BROWSE_MSG_EVT:
             if (av_src->browse_msg.p_msg)
             {
                 av_dest->browse_msg.p_msg = osi_calloc(sizeof(tAVRC_MSG));
@@ -1420,7 +1421,7 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 }
             }
             break;
-
+*/
         default:
             break;
     }
@@ -1436,15 +1437,16 @@ static void btif_avk_event_free_data(btif_sm_event_t event, void *p_data)
                 if (av->meta_msg.p_data)
                     osi_free(av->meta_msg.p_data);
 
-                if (av->meta_msg.p_msg)
-                {
-                    if (av->meta_msg.p_msg->vendor.p_vendor_data)
-                        osi_free(av->meta_msg.p_msg->vendor.p_vendor_data);
-                    osi_free(av->meta_msg.p_msg);
+                if (av->meta_msg.p_msg) {
+                  if (av->meta_msg.p_msg->hdr.opcode == AVRC_OP_VENDOR) {
+                    osi_free(av->meta_msg.p_msg->vendor.p_vendor_data);
+                  }
+                  osi_free_and_reset((void**)&av->meta_msg.p_msg);
                 }
+
             }
             break;
-        case BTA_AVK_BROWSE_MSG_EVT:
+  /*      case BTA_AVK_BROWSE_MSG_EVT:
             {
                 tBTA_AVK *av = (tBTA_AVK*)p_data;
 
@@ -1456,7 +1458,7 @@ static void btif_avk_event_free_data(btif_sm_event_t event, void *p_data)
                 }
             }
             break;
-
+*/
         default:
             break;
     }

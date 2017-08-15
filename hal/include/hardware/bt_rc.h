@@ -270,6 +270,12 @@ typedef struct
     btrc_folder_list_item_t   *p_item_list;
 } btrc_folder_list_entries_t;
 
+typedef struct {
+    uint16_t  str_len;
+    uint8_t   p_str[BTRC_MAX_ATTR_STR_LEN];
+} btrc_folder_name_t;
+
+
 /** Callback for play status request */
 typedef void (* btrc_get_play_status_callback)();
 

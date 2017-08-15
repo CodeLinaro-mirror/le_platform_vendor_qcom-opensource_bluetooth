@@ -700,7 +700,7 @@ extern void bta_avk_rc_br_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_meta_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
-
+extern void bta_avk_rc_free_browse_msg(tBTA_AVK_CB* p_cb, tBTA_AVK_DATA* p_data);
 extern tBTA_AVK_RCB * bta_avk_get_rcb_by_shdl(UINT8 shdl);
 extern void bta_avk_del_rc(tBTA_AVK_RCB *p_rcb);
 
