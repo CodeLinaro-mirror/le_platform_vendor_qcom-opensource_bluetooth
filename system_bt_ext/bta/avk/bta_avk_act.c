@@ -2146,6 +2146,7 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
     UINT16              peer_rc_version=0;
     UINT16              categories = 0;
     BOOLEAN             val;
+    char dy_version[PROPERTY_VALUE_MAX] = "false";
 
     APPL_TRACE_DEBUG("bta_avk_sink_check_peer_features service_uuid:x%x", service_uuid);
     /* loop through all records we found */
@@ -2177,7 +2178,9 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
             val = SDP_FindProfileVersionInRec(p_rec, UUID_SERVCLASS_AV_REMOTE_CONTROL, &peer_rc_version);
             APPL_TRACE_DEBUG("peer_rc_version for TG 0x%x, profile_found %d", peer_rc_version, val);
 
-            bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
+            property_get("persist.avrcp.enable.dy_version", dy_version, "false");
+            if (!strncmp("true", dy_version, 4))
+                bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
             if (peer_rc_version >= AVRC_REV_1_3)
                 peer_features |= (BTA_AVK_FEAT_VENDOR | BTA_AVK_FEAT_METADATA);
 
