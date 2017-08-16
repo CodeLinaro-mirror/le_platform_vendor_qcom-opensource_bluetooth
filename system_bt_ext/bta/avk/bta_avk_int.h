@@ -37,6 +37,7 @@
 #include "bta_avk_co.h"
 #include "osi/include/list.h"
 
+
 #define BTA_AVK_DEBUG TRUE
 /*****************************************************************************
 **  Constants
@@ -111,7 +112,8 @@ enum
 #endif
     BTA_AVK_API_START_EVT,       /* the following 2 events must be in the same order as the *AP_*EVT */
     BTA_AVK_API_STOP_EVT,
-    BTA_AVK_ENABLE_MULTICAST_EVT /* Event for enable and disable multicast */
+    BTA_AVK_ENABLE_MULTICAST_EVT, /* Event for enable and disable multicast */
+    BTA_AVK_AVRC_BROWSE_OPEN_EVT
 };
 
 /* events for AV control block state machine */
@@ -541,6 +543,8 @@ typedef struct
 #define BTA_AVK_RC_ROLE_ACP      0x10
 
 #define BTA_AVK_RC_CONN_MASK     0x20
+#define BTA_AVK_RC_CONN_BR_MASK  0x40
+
 
 /* type for AV RCP control block */
 /* index to this control block is the rc handle */
@@ -551,6 +555,7 @@ typedef struct
     UINT8   shdl;   /* stream handle (hdi + 1) */
     UINT8   lidx;   /* (index+1) to LCB */
     tBTA_AVK_FEAT        peer_features;  /* peer features mask */
+    alarm_t   *br_conn_timer; /* timer to monitor browsing connection */
 } tBTA_AVK_RCB;
 #define BTA_AVK_NUM_RCB      (BTA_AVK_NUM_STRS  + 2)
 
