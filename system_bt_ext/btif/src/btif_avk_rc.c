@@ -264,6 +264,9 @@ static rc_device_t device;
 
 alarm_t* p_cap_rsp_timer = NULL;
 
+static uint32_t startItem;
+static uint32_t endItem;
+
 
 #define MAX_UINPUT_PATHS 3
 static int btif_max_rc_clients = 1;
@@ -1253,6 +1256,7 @@ static void btif_avk_rc_status_cmd_timeout_handler(UNUSED_ATTR uint16_t event,
     case AVRC_PDU_SET_ADDRESSED_PLAYER:
     case AVRC_PDU_SET_BROWSED_PLAYER:
     case AVRC_PDU_CHANGE_PATH:
+    case AVRC_PDU_GET_FOLDER_ITEMS:
         break;
     }
     release_transaction(p_context->rc_status_cmd.label);
@@ -1553,6 +1557,85 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
             HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,changepath_vendor_cb, &rc_addr,
                                     rsp_status,num_items);
 
+        }
+        case AVRC_PDU_GET_FOLDER_ITEMS:
+        {
+            btrc_status_t rsp_status;
+            rsp_status = (btrc_status_t)pavrc_resp->get_items.status;
+            uint32_t num_items = pavrc_resp->get_items.item_count;
+            btrc_folder_items_t *p_folders = NULL;
+            if(num_items > 0)
+            {
+                size_t buf_size = num_items * sizeof(btrc_folder_items_t);
+                p_folders = (btrc_folder_items_t*)osi_calloc(buf_size);
+                for (int i = 0; i < num_items; i++) {
+                    p_folders[i].item_type = pavrc_resp->get_items.p_item_list[i].item_type;
+                     if (pavrc_resp->get_items.p_item_list[i].item_type == AVRC_ITEM_PLAYER)
+                     {
+                          p_folders[i].player.player_id = pavrc_resp->get_items.p_item_list[i].u.player.player_id;
+                          p_folders[i].player.major_type = pavrc_resp->get_items.p_item_list[i].u.player.major_type;
+                          p_folders[i].player.sub_type = pavrc_resp->get_items.p_item_list[i].u.player.sub_type;
+                          p_folders[i].player.play_status = pavrc_resp->get_items.p_item_list[i].u.player.play_status;
+                          for(int n=0; n < AVRC_FEATURE_MASK_SIZE; n++)
+                                p_folders[i].player.features[n] = pavrc_resp->get_items.p_item_list[i].u.player.features[n];
+
+                          memset(p_folders[i].player.name, 0, BTRC_MAX_ATTR_STR_LEN * sizeof(uint8_t));
+                          int len = BTRC_MAX_ATTR_STR_LEN - 1;
+                          if(pavrc_resp->get_items.p_item_list[i].u.player.name.str_len < len)
+                            len = pavrc_resp->get_items.p_item_list[i].u.player.name.str_len;
+                          memcpy(p_folders[i].player.name, pavrc_resp->get_items.p_item_list[i].u.player.name.p_str, len);
+                     }
+                     else if(pavrc_resp->get_items.p_item_list[i].item_type == AVRC_ITEM_FOLDER)
+                     {
+                         p_folders[i].folder.type = pavrc_resp->get_items.p_item_list[i].u.folder.type;
+BTIF_TRACE_IMP("%s folder.type: %d %x", __FUNCTION__,p_folders[i].folder.type,p_folders[i].folder.type);
+                         p_folders[i].folder.playable = pavrc_resp->get_items.p_item_list[i].u.folder.playable;
+BTIF_TRACE_IMP("%s folder.playable: %d %x", __FUNCTION__,p_folders[i].folder.playable,p_folders[i].folder.playable);
+                         for(int n=0; n < AVRC_UID_SIZE; n++)
+                            {
+                               p_folders[i].folder.uid[n] = pavrc_resp->get_items.p_item_list[i].u.folder.uid[n];
+                               BTIF_TRACE_IMP("%s folder.uid: %d %x",__FUNCTION__,p_folders[i].folder.uid[n],p_folders[i].folder.uid[n]);
+                            }
+
+                         memset(p_folders[i].folder.name, 0, BTRC_MAX_ATTR_STR_LEN * sizeof(uint8_t));
+                         int len = BTRC_MAX_ATTR_STR_LEN - 1;
+                         if(pavrc_resp->get_items.p_item_list[i].u.folder.name.str_len < len)
+                           len = pavrc_resp->get_items.p_item_list[i].u.folder.name.str_len;
+                         memcpy(p_folders[i].folder.name, pavrc_resp->get_items.p_item_list[i].u.folder.name.p_str, len);
+                     }
+                     else if(pavrc_resp->get_items.p_item_list[i].item_type == AVRC_ITEM_MEDIA)
+                     {
+                         int num_attrs = pavrc_resp->get_items.p_item_list[i].u.media.attr_count;
+                         p_folders[i].media.num_attrs = num_attrs;
+                         p_folders[i].media.type = pavrc_resp->get_items.p_item_list[i].u.media.type;
+
+                         for(int n=0; n < AVRC_UID_SIZE; n++)
+                               p_folders[i].media.uid[n] = pavrc_resp->get_items.p_item_list[i].u.media.uid[n];
+
+                         memset(p_folders[i].media.name, 0, BTRC_MAX_ATTR_STR_LEN * sizeof(uint8_t));
+                         int len = BTRC_MAX_ATTR_STR_LEN - 1;
+                         if(pavrc_resp->get_items.p_item_list[i].u.media.name.str_len < len)
+                           len = pavrc_resp->get_items.p_item_list[i].u.media.name.str_len;
+                         memcpy(p_folders[i].media.name, pavrc_resp->get_items.p_item_list[i].u.media.name.p_str, len);
+                         if(num_attrs > 0)
+                         {
+                             buf_size = num_attrs * sizeof(btrc_element_attr_val_t);
+                             p_folders[i].media.p_attrs = (btrc_element_attr_val_t*)osi_calloc(buf_size);
+                             for(int n =0; n < num_attrs; n++)
+                             {
+                                 p_folders[i].media.p_attrs[n].attr_id = pavrc_resp->get_items.p_item_list[i].u.media.p_attr_list[n].attr_id;
+                                 memset(p_folders[i].media.p_attrs[n].text, 0, BTRC_MAX_ATTR_STR_LEN * sizeof(uint8_t));
+                                 int len = BTRC_MAX_ATTR_STR_LEN - 1;
+                                 if(pavrc_resp->get_items.p_item_list[i].u.media.p_attr_list[n].name.str_len < len)
+                                   len = pavrc_resp->get_items.p_item_list[i].u.media.p_attr_list[n].name.str_len;
+                                 memcpy(p_folders[i].media.p_attrs[n].text, pavrc_resp->get_items.p_item_list[i].u.media.p_attr_list[n].name.p_str, len);
+                             }
+                         }
+                     }
+                }
+            }
+            HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,getfolderitems_cb, &rc_addr, startItem, endItem,
+                                    rsp_status, num_items, p_folders);
         }
 
     }
@@ -2700,6 +2783,69 @@ static bt_status_t set_browsed_player_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_t 
 
 }
 
+static bt_status_t get_folder_items_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t scope_id, uint32_t start_item,
+    uint32_t end_item, uint8_t num_attrb, uint32_t* attrib_ids)
+{
+    BTIF_TRACE_DEBUG("%s: scope_id 0x%02x start_item %d end_item %d num_attrb %d", __FUNCTION__,
+        scope_id, start_item, end_item, num_attrb);
+    tAVRC_STS status = BT_STATUS_UNSUPPORTED;
+    rc_transaction_t *p_transaction=NULL;
+#if (AVRC_CTLR_INCLUDED == TRUE)
+    tAVRC_COMMAND avrc_cmd = {0};
+    BT_HDR *p_msg = NULL;
+    bt_status_t tran_status;
+
+    int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
+    BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
+    if (index >= btif_max_rc_clients)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
+    CHECK_AVK_RC_CONNECTED_BY_IDX
+    CHECK_AVK_BR_CONNECTED_BY_IDX
+
+    /* Set the layer specific to point to browse although this should really
+     * be done by lower layers and looking at the PDU
+     */
+    avrc_cmd.get_items.pdu = AVRC_PDU_GET_FOLDER_ITEMS;
+    avrc_cmd.get_items.status = AVRC_STS_NO_ERROR;
+    avrc_cmd.get_items.scope = scope_id;
+    avrc_cmd.get_items.start_item = start_item;
+    avrc_cmd.get_items.end_item = end_item;
+    avrc_cmd.get_items.attr_count = num_attrb;
+    for(int i=0; i < num_attrb; i++)
+        avrc_cmd.get_items.attrs[i] = attrib_ids[i];
+
+    status = AVRC_BldCommand(&avrc_cmd, &p_msg);
+    if (status != AVRC_STS_NO_ERROR) {
+      BTIF_TRACE_ERROR("%s failed to build command status %d", __func__, status);
+      return BT_STATUS_FAIL;
+    }
+
+    tran_status = get_transaction(&p_transaction);
+    if (tran_status != BT_STATUS_SUCCESS || p_transaction == NULL) {
+      osi_free(p_msg);
+      BTIF_TRACE_ERROR("%s: failed to obtain transaction details. status: 0x%02x",
+                       __func__, tran_status);
+      return BT_STATUS_FAIL;
+    }
+
+    BTIF_TRACE_DEBUG("%s msgreq being sent out with label %d", __func__,
+                     p_transaction->lbl);
+    BTA_AvkMetaCmd(btif_avk_rc_cb[index].rc_handle, p_transaction->lbl, AVRC_CMD_CTRL, p_msg);
+    startItem = start_item;
+    endItem = end_item;
+#else
+    BTIF_TRACE_DEBUG("%s: feature not enabled", __FUNCTION__);
+#endif
+    return BT_STATUS_SUCCESS;
+
+
+}
+
+
 static bt_status_t change_folder_path_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t direction, uint8_t * uid)
 {
     BTIF_TRACE_DEBUG("%s: direction 0x%02x uid %d", __FUNCTION__, direction, *uid);
@@ -2725,7 +2871,7 @@ static bt_status_t change_folder_path_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t d
     avrc_cmd.chg_path.status = AVRC_STS_NO_ERROR;
     avrc_cmd.chg_path.uid_counter = 0;
     avrc_cmd.chg_path.direction = direction;
-    avrc_cmd.chg_path.folder_uid = *uid;
+    avrc_cmd.chg_path.folder_uid = *((uint64_t*)uid);
 
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
     if (status != AVRC_STS_NO_ERROR) {
@@ -3037,6 +3183,7 @@ static const btrc_ctrl_vendor_interface_t btif_avk_rc_ctrl_vendor_interface = {
     set_addressed_player_cmd_vendor,
     set_browsed_player_cmd_vendor,
     change_folder_path_cmd_vendor,
+    get_folder_items_cmd_vendor,
     cleanup_ctrl_vendor,
 };
 
