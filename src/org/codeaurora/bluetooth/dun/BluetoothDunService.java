@@ -423,6 +423,7 @@ public class BluetoothDunService extends Service {
                     }
                     Intent intent = new Intent(USER_CONFIRM_TIMEOUT_ACTION);
                     intent.putExtra(BluetoothDevice.EXTRA_DEVICE, mRemoteDevice);
+                    intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     sendBroadcast(intent);
                     removeDunNotification(DUN_NOTIFICATION_ID_ACCESS);
                     /* close the rfcomm socket and restart the listener thread */
@@ -451,6 +452,7 @@ public class BluetoothDunService extends Service {
             }
         }
         Log.d(TAG, "parseIntent: action: " + action);
+        if (action == null) return;  /* Nothing to do */
 
         boolean removeTimeoutMsg = true;
         if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
@@ -504,6 +506,7 @@ public class BluetoothDunService extends Service {
                 if (mDunHandler.hasMessages(MESSAGE_DUN_USER_TIMEOUT)) {
                     Intent timeoutIntent = new Intent(BluetoothDevice.ACTION_CONNECTION_ACCESS_CANCEL);
                     timeoutIntent.setClassName(ACCESS_AUTHORITY_PACKAGE, ACCESS_AUTHORITY_CLASS);
+                    timeoutIntent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
                     sendBroadcast(timeoutIntent, BLUETOOTH_ADMIN_PERM);
                 }
 
@@ -1566,6 +1569,7 @@ public class BluetoothDunService extends Service {
         intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
         intent.putExtra(BluetoothDun.EXTRA_PREVIOUS_STATE, prevState);
         intent.putExtra(BluetoothDun.EXTRA_STATE, state);
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         sendBroadcast(intent, BLUETOOTH_PERM);
 
     }
