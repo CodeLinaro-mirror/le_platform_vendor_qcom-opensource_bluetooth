@@ -356,6 +356,9 @@ btrc_status_t rsp_status, uint32_t num_items );
 typedef bt_status_t (* btavrc_ctrl_getfolderitems_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
 uint32_t start_item, uint32_t end_item, btrc_status_t rsp_status, uint16_t num_items, btrc_folder_items_t *p_items);
 
+typedef bt_status_t (*btavrc_ctrl_getitemattributes_rsp_vendor_callback)(bt_bdaddr_t *bd_addr, btrc_status_t rsp_status,
+uint8_t num_attr, btrc_element_attr_val_t *p_attrs);
+
 /** BT-RC Controller Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtRcCtVendorCallbacks) */
@@ -373,6 +376,8 @@ typedef struct {
     btrc_ctrl_setbrowsedplayer_rsp_vendor_callback                  setbrowsedplayer_vendor_cb;
     btrc_ctrl_changepath_rsp_vendor_callback                        changepath_vendor_cb;
     btavrc_ctrl_getfolderitems_rsp_vendor_callback                  getfolderitems_cb;
+    btavrc_ctrl_getitemattributes_rsp_vendor_callback               getitemattributes_vendor_cb;
+
 } btrc_ctrl_vendor_callbacks_t;
 
 /** Represents the standard BT-RC AVRCP Controller Vendor interface. */
@@ -403,6 +408,8 @@ typedef struct {
     bt_status_t (*change_folder_path_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t direction, uint8_t * uid);
 
     bt_status_t (*get_folder_items_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint32_t start_item, uint32_t end_item, uint8_t num_attrb, uint32_t* attrib_ids);
+
+    bt_status_t (*get_item_attributes_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint64_t UID, uint16_t uid_counter, uint8_t num_attrb, btrc_media_attr_t *p_attrs);
 
     void (*cleanup_vendor)(void);
 } btrc_ctrl_vendor_interface_t;
