@@ -29,6 +29,7 @@
 package org.codeaurora.bluetooth.bttestapp;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothA2dp;
 import android.bluetooth.BluetoothA2dpSink;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.SdpMasRecord;
@@ -46,6 +47,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcelable;
 import android.os.ParcelUuid;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -77,6 +79,10 @@ public class MainActivity extends MonkeyActivity {
     private boolean mDiscoveryInProgress = false;
 
     private ServicesFragment mServicesFragment = null;
+
+    private BluetoothAdapter mBtAdapter;
+    private Button mBtnDiscoverService,mBtnSelectDevice, mSinkButton, mSourceButton;
+    private static long current_time, switch_time;
 
     private final BroadcastReceiver mPickerReceiver = new BroadcastReceiver() {
 
@@ -126,6 +132,10 @@ public class MainActivity extends MonkeyActivity {
                             Log.v(TAG, "Adding AVRCP");
                             mServicesFragment.addService(ServicesFragment.Service.Type.AVRCP, null);
                         }
+                        if (BluetoothUuid.AvrcpController.equals(uuid)) {
+                            Log.v(TAG, "Adding AVRCP");
+                            mServicesFragment.addService(ServicesFragment.Service.Type.AVRCP, null);
+                        }
                     }
                 }
 
@@ -159,6 +169,37 @@ public class MainActivity extends MonkeyActivity {
                     mServicesFragment.persistServices();
 
                     mDiscoveryInProgress = false;
+                }
+            } if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
+                        BluetoothAdapter.ERROR);
+                Log.d(TAG, " Action " + action + " state :" + state);
+                setBTState();
+                if (state == BluetoothAdapter.STATE_OFF) {
+                    if (!mBtAdapter.isEnabled()) {
+                        Log.d(TAG, " Enabling BT... ");
+                        mBtAdapter.enable();
+                    }
+                } else if (state == BluetoothAdapter.STATE_ON) {
+                    current_time = System.currentTimeMillis();
+                    Log.d(TAG, "Time for BT OFF->ON : " + (current_time - switch_time) + " ms");
+                    mSinkButton.setEnabled(true);
+                    mSourceButton.setEnabled(true);
+                }
+
+            } else if (action.equals(BluetoothA2dpSink.ACTION_CONNECTION_STATE_CHANGED)) {
+                int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
+                Log.d(TAG, " Action " + action + ", new A2DP Sink State :" + newState);
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    Log.d(TAG, " BT-OFF to reconnection time = " +
+                        (System.currentTimeMillis() - switch_time) +"ms");
+                }
+            } else if (action.equals(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)) {
+                int newState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1);
+                Log.d(TAG, " Action " + action + ", new A2DP Source State :" + newState);
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    Log.d(TAG, " BT-OFF to reconnection time = " +
+                        (System.currentTimeMillis() - switch_time) +"ms");
                 }
             }
         }
@@ -225,15 +266,16 @@ public class MainActivity extends MonkeyActivity {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_UUID);
         filter.addAction(BluetoothDevice.ACTION_SDP_RECORD);
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothA2dpSink.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
-
-        if (BluetoothAdapter.getDefaultAdapter().isEnabled() == false) {
-            Button b = (Button) findViewById(R.id.discover_services);
-            b.setEnabled(false);
-
-            b = (Button) findViewById(R.id.select_device);
-            b.setEnabled(false);
-        }
+        mBtnDiscoverService=(Button) findViewById(R.id.discover_services);
+        mBtnSelectDevice=(Button) findViewById(R.id.select_device);
+        mSinkButton = (Button) findViewById(R.id.id_a2dp_sink);
+        mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
+        mBtAdapter = BluetoothAdapter.getDefaultAdapter();
+        setBTState();
     }
 
     @Override
@@ -294,7 +336,6 @@ public class MainActivity extends MonkeyActivity {
                 Log.v(TAG, "onServiceDisconnected ");
                 ma2dpSink = null;
             }
-
         }
 
         @Override
@@ -303,7 +344,6 @@ public class MainActivity extends MonkeyActivity {
                 Log.v(TAG, "onServiceConnected ");
                 ma2dpSink = (BluetoothA2dpSink) proxy;
             }
-
         }
     };
 
@@ -341,6 +381,52 @@ public class MainActivity extends MonkeyActivity {
 
         if (mProfileService != null) {
             mProfileService.setDevice(mDevice);
+        }
+    }
+
+    public void onRadioButtonClicked(View v) {
+        switch_time = System.currentTimeMillis();
+        boolean isA2dpSinkEnabled = SystemProperties.getBoolean("persist.service.bt.a2dp.sink",
+                false);
+
+        // Switch role to A2DP Source
+        if (v.getId() == R.id.id_a2dp_source) {
+            if (!isA2dpSinkEnabled) {
+                Log.d(TAG, "Already in Source role, ignore user action ignored");
+                return;
+            }
+            Log.d(TAG, "Switch role to A2DP Source");
+            SystemProperties.set("persist.service.bt.a2dp.sink", false + "");
+            SystemProperties.set("persist.service.bt.avrcp.controller", false + "");
+
+        // Switch role to A2DP Sink
+        } else if (v.getId() == R.id.id_a2dp_sink) {
+            if (isA2dpSinkEnabled) {
+                Log.d(TAG, "Already in A2DP Sink role, user action ignored");
+                return;
+            }
+            Log.d(TAG, "Switch role to A2DP Sink");
+            SystemProperties.set("persist.service.bt.a2dp.sink", true + "");
+            SystemProperties.set("persist.service.bt.avrcp.controller", true + "");
+        }
+        mSinkButton.setEnabled(false);
+        mSourceButton.setEnabled(false);
+
+        // Turn BT OFF and ON in order to reflect property change
+        if (mBtAdapter.isEnabled())
+            mBtAdapter.disable();
+        else
+            mBtAdapter.enable();
+    }
+
+    private void setBTState() {
+        boolean isBtEnabled = mBtAdapter.isEnabled();
+        if (isBtEnabled) {
+            mBtnDiscoverService.setEnabled(true);
+            mBtnSelectDevice.setEnabled(true);
+        } else {
+            mBtnDiscoverService.setEnabled(false);
+            mBtnSelectDevice.setEnabled(false);
         }
     }
 }

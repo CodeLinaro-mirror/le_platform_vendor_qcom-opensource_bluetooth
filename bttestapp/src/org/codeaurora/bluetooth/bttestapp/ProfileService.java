@@ -40,6 +40,7 @@ import android.bluetooth.SdpMasRecord;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -60,6 +61,14 @@ import org.codeaurora.bluetooth.bttestapp.services.IPbapServiceCallback;
 import org.codeaurora.bluetooth.bttestapp.services.PbapAuthActivity; */
 import org.codeaurora.bluetooth.bttestapp.R;
 import org.codeaurora.bluetooth.bttestapp.services.IMapServiceCallback;
+
+import android.media.browse.MediaBrowser;
+import android.media.browse.MediaBrowser.MediaItem;
+import android.media.MediaDescription;
+import android.media.session.MediaController;
+import android.media.session.MediaSession;
+import android.media.session.MediaSession.QueueItem;
+
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -126,6 +135,11 @@ public class ProfileService extends Service {
 
     private final IBinder mBinder = new LocalBinder();
 
+    /* Object used to connect to MediaBrowseService of BT-AVRCP app */
+    private MediaBrowser mMediaBrowser = null;
+    private MediaController mMediaController = null;
+
+    private Context mContext;
 /*    class PbapSessionData {
         ArrayList<VCardEntry> pullPhoneBook = null;
         ArrayList<BluetoothPbapCard> pullVcardListing = null;
@@ -729,6 +743,25 @@ public class ProfileService extends Service {
         return false;
     }
 
+    /* Browse connection state callback handler */
+    private MediaBrowser.ConnectionCallback browseMediaConnectionCallback =
+           new MediaBrowser.ConnectionCallback() {
+       @Override
+       public void onConnected() {
+           Log.d(TAG, "mediaBrowser CONNECTED");
+           mMediaController = new MediaController(mContext, mMediaBrowser.getSessionToken());
+       }
+
+       @Override
+       public void onConnectionFailed() {
+           Log.e(TAG, "mediaBrowser Connection failed");
+       }
+       @Override
+       public void onConnectionSuspended() {
+           Log.e(TAG, "mediaBrowser SUSPENDED");
+       }
+    };
+
     @Override
     public void onCreate() {
         Log.v(TAG, "onCreate");
@@ -751,6 +784,11 @@ public class ProfileService extends Service {
                 BluetoothProfile.HEADSET_CLIENT);
         mAdapter.getProfileProxy(getApplicationContext(), mAvrcpControllerServiceListener,
                 BluetoothProfile.AVRCP_CONTROLLER);
+        mContext = getApplicationContext();
+        mMediaBrowser = new MediaBrowser(mContext, new ComponentName("com.android.bluetooth",
+                        "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService"),
+                        browseMediaConnectionCallback, null);
+        mMediaBrowser.connect();
 
     }
 
@@ -822,6 +860,21 @@ public class ProfileService extends Service {
         return mAvrcpController;
     }
 
+    public void sendPlay() {
+        Log.d(TAG, "sendPlay");
+        if (mMediaController != null) {
+            Log.d(TAG, "calling play()");
+            mMediaController.getTransportControls().play();
+        }
+    }
+
+    public void sendPause() {
+        Log.d(TAG, "sendPause");
+        if (mMediaController != null) {
+            Log.d(TAG, "calling pause()");
+            mMediaController.getTransportControls().pause();
+        }
+    }
 /*    public BluetoothPbapClient getPbapClient() {
         if (mDevice == null) {
             return null;
