@@ -347,10 +347,10 @@ typedef bt_status_t (*btavrc_ctrl_br_connection_state_vendor_callback)( bool sta
 
 typedef bt_status_t (* btavrc_ctrl_setaddressedplayer_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status);
 
-typedef bt_status_t (* btrc_ctrl_setbrowsedplayer_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
+typedef bt_status_t (* btavrc_ctrl_setbrowsedplayer_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
 btrc_status_t rsp_status, uint32_t num_items, uint16_t charset_id , uint8_t folder_depth, btrc_folder_name_t *p_folders);
 
-typedef bt_status_t (* btrc_ctrl_changepath_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
+typedef bt_status_t (* btavrc_ctrl_changepath_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
 btrc_status_t rsp_status, uint32_t num_items );
 
 typedef bt_status_t (* btavrc_ctrl_getfolderitems_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
@@ -358,6 +358,10 @@ uint32_t start_item, uint32_t end_item, btrc_status_t rsp_status, uint16_t num_i
 
 typedef bt_status_t (*btavrc_ctrl_getitemattributes_rsp_vendor_callback)(bt_bdaddr_t *bd_addr, btrc_status_t rsp_status,
 uint8_t num_attr, btrc_element_attr_val_t *p_attrs);
+
+typedef bt_status_t (* btavrc_ctrl_playitem_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status );
+
+typedef bt_status_t (* btavrc_ctrl_addtonowplaying_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status );
 
 /** BT-RC Controller Vendor callback structure. */
 typedef struct {
@@ -373,10 +377,12 @@ typedef struct {
     btavrc_ctrl_passthrough_rsp_vendor_callback                     passthrough_rsp_vendor_cb;
     btavrc_ctrl_br_connection_state_vendor_callback                 browse_connection_state_vendor_cb;
     btavrc_ctrl_setaddressedplayer_rsp_vendor_callback              setaddressedplayer_vendor_cb;
-    btrc_ctrl_setbrowsedplayer_rsp_vendor_callback                  setbrowsedplayer_vendor_cb;
-    btrc_ctrl_changepath_rsp_vendor_callback                        changepath_vendor_cb;
+    btavrc_ctrl_setbrowsedplayer_rsp_vendor_callback                setbrowsedplayer_vendor_cb;
+    btavrc_ctrl_changepath_rsp_vendor_callback                      changepath_vendor_cb;
     btavrc_ctrl_getfolderitems_rsp_vendor_callback                  getfolderitems_cb;
     btavrc_ctrl_getitemattributes_rsp_vendor_callback               getitemattributes_vendor_cb;
+    btavrc_ctrl_playitem_rsp_callback                               playitem_vendor_cb;
+    btavrc_ctrl_addtonowplaying_rsp_callback                        addtonowplaying_vendor_cb;
 
 } btrc_ctrl_vendor_callbacks_t;
 
@@ -410,6 +416,10 @@ typedef struct {
     bt_status_t (*get_folder_items_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint32_t start_item, uint32_t end_item, uint8_t num_attrb, uint32_t* attrib_ids);
 
     bt_status_t (*get_item_attributes_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint64_t UID, uint16_t uid_counter, uint8_t num_attrb, btrc_media_attr_t *p_attrs);
+
+    bt_status_t (*play_item_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint8_t *uid, uint16_t uid_counter);
+
+    bt_status_t (*addto_now_playing_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint64_t UID, uint16_t uid_counter);
 
     void (*cleanup_vendor)(void);
 } btrc_ctrl_vendor_interface_t;
