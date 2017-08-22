@@ -524,6 +524,14 @@ public class ServicesFragment extends ListFragment {
                 }
                 break;
 
+            case AVRCP:
+                if (mActivity.mProfileService.getAvrcpController() != null) {
+                    intent = new Intent(getActivity(), AvrcpTestActivity.class);
+                } else {
+                    Log.d(TAG, "BluetoothAvrcpController is null");
+                    return;
+                }
+                break;
             case MAP:
                 intent = new Intent(getActivity(), MapTestActivity.class);
                 intent.putExtra(ProfileService.EXTRA_MAP_INSTANCE_ID, srv.mSdpMasRecord.getMasInstanceId());
