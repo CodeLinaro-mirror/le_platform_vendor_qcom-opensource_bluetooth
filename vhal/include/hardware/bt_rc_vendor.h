@@ -363,6 +363,9 @@ typedef bt_status_t (* btavrc_ctrl_playitem_rsp_callback) (bt_bdaddr_t *bd_addr,
 
 typedef bt_status_t (* btavrc_ctrl_addtonowplaying_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status );
 
+typedef bt_status_t (* btavrc_ctrl_search_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status, uint16_t uid_counter, uint32_t num_item);
+
+
 /** BT-RC Controller Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtRcCtVendorCallbacks) */
@@ -383,6 +386,7 @@ typedef struct {
     btavrc_ctrl_getitemattributes_rsp_vendor_callback               getitemattributes_vendor_cb;
     btavrc_ctrl_playitem_rsp_callback                               playitem_vendor_cb;
     btavrc_ctrl_addtonowplaying_rsp_callback                        addtonowplaying_vendor_cb;
+    btavrc_ctrl_search_rsp_callback                                 search_vendor_cb;
 
 } btrc_ctrl_vendor_callbacks_t;
 
@@ -420,6 +424,8 @@ typedef struct {
     bt_status_t (*play_item_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint8_t *uid, uint16_t uid_counter);
 
     bt_status_t (*addto_now_playing_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint64_t UID, uint16_t uid_counter);
+
+    bt_status_t (*search_command_vendor) (bt_bdaddr_t *bd_addr, uint16_t length, uint8_t* string);
 
     void (*cleanup_vendor)(void);
 } btrc_ctrl_vendor_interface_t;
