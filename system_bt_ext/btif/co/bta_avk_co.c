@@ -249,8 +249,13 @@ UINT8 codec_pref[BTIF_SV_AVK_AA_SEP_INDEX] = {
                                                     BTA_AVK_CODEC_SBC
 };
 
-static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UINT8 *p_src_index);
+static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer,
+            UINT8 *p_src_index, UINT8 *p_snk_index);
 static BOOLEAN bta_avk_co_audio_supports_config(UINT8 codec_type, const UINT8 *p_codec_cfg);
+tBTA_AVK_CO_CODEC_CAP_LIST *p_bta_avk_codec_pri_list = NULL;
+tBTA_AVK_CO_CODEC_CAP_LIST bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SEP_INDEX];
+UINT8 bta_avk_num_codec_configs;
+extern pthread_mutex_t sink_codec_q_lock;
 
 UINT8 bta_avk_get_current_codec()
 {
@@ -448,14 +453,17 @@ void bta_avk_co_audio_disc_res(tBTA_AVK_HNDL hndl, UINT8 num_seps, UINT8 num_snk
  ** Returns          Pass or Fail for current getconfig.
  **
  *******************************************************************************/
-void bta_avk_build_sbc_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
+void bta_avk_build_sbc_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index)
 {
     tA2D_SBC_CIE    src_cap;
     tA2D_SBC_CIE    pref_cap;
     UINT8           status = 0;
+    pthread_mutex_lock(&sink_codec_q_lock);
+    tA2D_SBC_CIE    *local_cap = &p_bta_avk_codec_pri_list[index].codec_cap.sbc_caps;
+    pthread_mutex_unlock(&sink_codec_q_lock);
 
     /* initialize it to default SBC configuration */
-    A2D_BldSbcInfo(AVDT_MEDIA_AUDIO, (tA2D_SBC_CIE *) &btif_avk_sbc_default_config, p_pref_cfg);
+    A2D_BldSbcInfo(AVDT_MEDIA_AUDIO, local_cap, p_pref_cfg);
     /* now try to build a preferred one */
     /* parse configuration */
     if ((status = A2D_ParsSbcInfo(&src_cap, p_src_cap, TRUE)) != 0)
@@ -464,10 +472,18 @@ void bta_avk_build_sbc_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
          return ;
     }
 
-    if (src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_48)
+    if ((src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_48) &&
+        (local_cap->samp_freq & A2D_SBC_IE_SAMP_FREQ_48))
         pref_cap.samp_freq = A2D_SBC_IE_SAMP_FREQ_48;
-    else if (src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_44)
+    else if ((src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_44) &&
+        (local_cap->samp_freq & A2D_SBC_IE_SAMP_FREQ_44))
         pref_cap.samp_freq = A2D_SBC_IE_SAMP_FREQ_44;
+    else if ((src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_32) &&
+        (local_cap->samp_freq & A2D_SBC_IE_SAMP_FREQ_32))
+        pref_cap.samp_freq = A2D_SBC_IE_SAMP_FREQ_32;
+    else if ((src_cap.samp_freq & A2D_SBC_IE_SAMP_FREQ_16) &&
+        (local_cap->samp_freq & A2D_SBC_IE_SAMP_FREQ_16))
+        pref_cap.samp_freq = A2D_SBC_IE_SAMP_FREQ_16;
 
     if (src_cap.ch_mode & A2D_SBC_IE_CH_MD_JOINT)
         pref_cap.ch_mode = A2D_SBC_IE_CH_MD_JOINT;
@@ -513,14 +529,17 @@ void bta_avk_build_sbc_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
  ** Returns          Pass or Fail for current getconfig.
  **
  *******************************************************************************/
-void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
+void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index)
 {
     tA2D_AAC_CIE    src_cap;
     tA2D_AAC_CIE    pref_cap;
     UINT8           status = 0;
+    pthread_mutex_lock(&sink_codec_q_lock);
+    tA2D_AAC_CIE    *local_cap = &p_bta_avk_codec_pri_list[index].codec_cap.aac_caps;
+    pthread_mutex_unlock(&sink_codec_q_lock);
 
     /* initialize it to default SBC configuration */
-    A2D_BldAacInfo(AVDT_MEDIA_AUDIO, (tA2D_AAC_CIE *) &btif_avk_aac_default_config, p_pref_cfg);
+    A2D_BldAacInfo(AVDT_MEDIA_AUDIO, local_cap, p_pref_cfg);
     /* now try to build a preferred one */
     /* parse configuration */
     if ((status = A2D_ParsAacInfo(&src_cap, p_src_cap, TRUE)) != 0)
@@ -530,13 +549,49 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
     }
 
     /* add support here, if we add new capability */
-    if (src_cap.object_type & A2D_AAC_IE_OBJ_TYPE_MPEG_2_AAC_LC)
+    if ((src_cap.object_type & A2D_AAC_IE_OBJ_TYPE_MPEG_2_AAC_LC) &&
+        (local_cap->object_type & A2D_AAC_IE_OBJ_TYPE_MPEG_2_AAC_LC))
         pref_cap.object_type = A2D_AAC_IE_OBJ_TYPE_MPEG_2_AAC_LC;
+    else if ((src_cap.object_type & A2D_AAC_IE_OBJ_TYPE_MPEG_4_AAC_LC) &&
+        (local_cap->object_type & A2D_AAC_IE_OBJ_TYPE_MPEG_4_AAC_LC))
+        pref_cap.object_type = A2D_AAC_IE_OBJ_TYPE_MPEG_4_AAC_LC;
 
-    if (src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_48000)
+    if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_96000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_96000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_88200) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_88200;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_64000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_64000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_48000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_48000;
-    else if (src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_44100)
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_44100) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_44100;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_32000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_32000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_24000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_24000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_22050) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_22050;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_16000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_16000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_12000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_12000;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_11025) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_11025;
+    else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_8000) &&
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_8000;
 
     if (src_cap.channels & A2D_AAC_IE_CHANNELS_2)
         pref_cap.channels = A2D_AAC_IE_CHANNELS_2;
@@ -560,14 +615,17 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
  ** Returns          Pass or Fail for current getconfig.
  **
  *******************************************************************************/
-void bta_avk_build_mp3_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
+void bta_avk_build_mp3_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index)
 {
     tA2D_MP3_CIE    src_cap;
     tA2D_MP3_CIE    pref_cap;
     UINT8           status = 0;
+    pthread_mutex_lock(&sink_codec_q_lock);
+    tA2D_MP3_CIE    *local_cap = &p_bta_avk_codec_pri_list[index].codec_cap.mp3_caps;
+    pthread_mutex_unlock(&sink_codec_q_lock);
 
     /* initialize it to default SBC configuration */
-    A2D_BldMp3Info(AVDT_MEDIA_AUDIO, (tA2D_MP3_CIE *) &btif_avk_mp3_default_config, p_pref_cfg);
+    A2D_BldMp3Info(AVDT_MEDIA_AUDIO, local_cap, p_pref_cfg);
     /* now try to build a preferred one */
     /* parse configuration */
     if ((status = A2D_ParsMp3Info(&src_cap, p_src_cap, TRUE)) != 0)
@@ -593,12 +651,26 @@ void bta_avk_build_mp3_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
     else if(src_cap.channels & A2D_MP3_IE_CHANNEL_MONO)
         pref_cap.channels = A2D_MP3_IE_CHANNEL_MONO;
 
-        pref_cap.mpf = 0;
+    pref_cap.mpf = 0;
 
-    if (src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_48000)
+    if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_48000) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_48000))
         pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_48000;
-    else if (src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_44100)
+    else if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_44100) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_44100))
         pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_44100;
+    else if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_32000) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_32000))
+        pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_32000;
+    else if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_24000) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_24000))
+        pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_24000;
+    else if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_22050) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_22050))
+        pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_22050;
+    else if ((src_cap.samp_freq & A2D_MP3_IE_SAMP_FREQ_16000) &&
+        (local_cap->samp_freq & A2D_MP3_IE_SAMP_FREQ_16000))
+        pref_cap.samp_freq = A2D_MP3_IE_SAMP_FREQ_16000;
 
     pref_cap.bit_rate = src_cap.bit_rate;
     pref_cap.vbr = src_cap.vbr;
@@ -617,14 +689,17 @@ void bta_avk_build_mp3_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
  ** Returns          Pass or Fail for current getconfig.
  **
  *******************************************************************************/
-void bta_avk_build_aptx_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
+void bta_avk_build_aptx_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index)
 {
     tA2D_APTX_CIE    src_cap;
     tA2D_APTX_CIE    pref_cap;
     UINT8           status = 0;
+    pthread_mutex_lock(&sink_codec_q_lock);
+    tA2D_APTX_CIE    *local_cap = &p_bta_avk_codec_pri_list[index].codec_cap.aptx_caps;
+    pthread_mutex_unlock(&sink_codec_q_lock);
 
     /* initialize it to default APTX configuration */
-    A2D_BldAptxInfo(AVDT_MEDIA_AUDIO, (tA2D_APTX_CIE*) &btif_avk_aptx_default_config, p_pref_cfg);
+    A2D_BldAptxInfo(AVDT_MEDIA_AUDIO, local_cap, p_pref_cfg);
     /* now try to build a preferred one */
     /* parse configuration */
     if ((status = A2D_ParsAptxInfo(&src_cap, p_src_cap, TRUE)) != 0)
@@ -637,9 +712,11 @@ void bta_avk_build_aptx_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap)
     pref_cap.codecId = A2D_APTX_CODEC_ID_BLUETOOTH;
     pref_cap.vendorId = A2D_APTX_VENDOR_ID;
     /* add support here, if we add new capability */
-    if (src_cap.sampleRate & A2D_APTX_SAMPLERATE_48000)
+    if ((src_cap.sampleRate & A2D_APTX_SAMPLERATE_48000) &&
+        (local_cap->sampleRate & A2D_APTX_SAMPLERATE_48000))
         pref_cap.sampleRate = A2D_APTX_SAMPLERATE_48000;
-    else if(src_cap.sampleRate & A2D_APTX_SAMPLERATE_44100)
+    else if ((src_cap.sampleRate & A2D_APTX_SAMPLERATE_44100) &&
+        (local_cap->sampleRate & A2D_APTX_SAMPLERATE_44100))
         pref_cap.sampleRate = A2D_APTX_SAMPLERATE_44100;
 
     if (src_cap.channelMode & A2D_APTX_CHANNELS_STEREO)
@@ -673,7 +750,7 @@ UINT8 bta_avk_co_audio_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
     tBTA_AV_CO_SRC *p_src;
     UINT8 codec_cfg[AVDT_CODEC_SIZE];
     UINT8 pref_cfg[AVDT_CODEC_SIZE] = {0};
-    UINT8 index;
+    UINT8 index, snk_index;
 
     FUNC_TRACE();
 
@@ -749,9 +826,9 @@ UINT8 bta_avk_co_audio_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
         mutex_global_lock();
 
         /* Find a src that matches the codec config */
-        if (bta_avk_co_audio_peer_supports_codec(p_peer, &index))
+        if (bta_avk_co_audio_peer_supports_codec(p_peer, &index, &snk_index))
         {
-            APPL_TRACE_DEBUG(" Codec Supported ");
+            APPL_TRACE_DEBUG(" Codec Supported at index %d", snk_index);
             p_src = &p_peer->srcs[index];
 
             /* Build the codec configuration for this src */
@@ -762,21 +839,21 @@ UINT8 bta_avk_co_audio_getconfig(tBTA_AVK_HNDL hndl, tBTA_AVK_CODEC codec_type,
                 switch(bta_avk_co_cb.codec_cfg_setconfig.id)
                 {
                     case BTA_AVK_CODEC_SBC:
-                        bta_avk_build_sbc_src_cfg(pref_cfg, p_src->codec_caps);
+                        bta_avk_build_sbc_src_cfg(pref_cfg, p_src->codec_caps, snk_index);
                         break;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
                     case BTA_AVK_CODEC_M24:
-                        bta_avk_build_aac_src_cfg(pref_cfg, p_src->codec_caps);
+                        bta_avk_build_aac_src_cfg(pref_cfg, p_src->codec_caps, snk_index);
                         break;
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
                     case BTA_AVK_CODEC_M12:
-                        bta_avk_build_mp3_src_cfg(pref_cfg, p_src->codec_caps);
+                        bta_avk_build_mp3_src_cfg(pref_cfg, p_src->codec_caps, snk_index);
                         break;
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
                     case A2D_NON_A2DP_MEDIA_CT:
-                        bta_avk_build_aptx_src_cfg(pref_cfg, p_src->codec_caps);
+                        bta_avk_build_aptx_src_cfg(pref_cfg, p_src->codec_caps, snk_index);
                         break;
 #endif
                 }
@@ -1245,21 +1322,23 @@ static BOOLEAN bta_avk_co_audio_codec_cfg_matches_caps(UINT8 codec_id, const UIN
  ** Returns          TRUE if the connection supports this codec, FALSE otherwise
  **
  *******************************************************************************/
-static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UINT8 *p_src_index)
+static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer,
+            UINT8 *p_src_index, UINT8 *p_snk_index)
 {
     int index;
     UINT8 codec_type;
     FUNC_TRACE();
     int preference_index = 0;
 
+    pthread_mutex_lock(&sink_codec_q_lock);
     do
     {
         /* Configure the codec type to look for */
-        codec_type = codec_pref[preference_index++];
+        codec_type = p_bta_avk_codec_pri_list[preference_index].codec_type;
 
         for (index = 0; index < p_peer->num_sup_srcs; index++)
         {
-            APPL_TRACE_DEBUG(" sink preferred_type = %d  src_codec = %d",
+            APPL_TRACE_DEBUG(" sink preferred_type = %d  src_codec_type = %d",
                                           codec_type, p_peer->srcs[index].codec_type);
             if (p_peer->srcs[index].codec_type == codec_type)
             {
@@ -1275,10 +1354,14 @@ static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UI
                         break;
                     }
                     if (bta_avk_co_audio_codec_cfg_matches_caps(codec_type,
-                                        (UINT8*)&src_sbc_cap, (UINT8*)&bta_avk_co_sbc_caps))
+                                        (UINT8*)&src_sbc_cap,
+                                        (UINT8*)&p_bta_avk_codec_pri_list[preference_index]
+                                        .codec_cap.sbc_caps))
                     {
                         if (p_src_index) *p_src_index = index;
+                        if (p_snk_index) *p_snk_index = preference_index;
                         bta_avk_co_cb.codec_cfg_setconfig.id = codec_type;
+                        pthread_mutex_unlock(&sink_codec_q_lock);
                         return TRUE;
                     }
                 }
@@ -1295,10 +1378,14 @@ static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UI
                         break;
                     }
                     if (bta_avk_co_audio_codec_cfg_matches_caps(codec_type,
-                                        (UINT8*)&src_aac_cap, (UINT8*)&bta_avk_co_aac_caps))
+                                        (UINT8*)&src_aac_cap,
+                                        (UINT8*)&p_bta_avk_codec_pri_list[preference_index]
+                                        .codec_cap.aac_caps))
                     {
                         if (p_src_index) *p_src_index = index;
+                        if (p_snk_index) *p_snk_index = preference_index;
                         bta_avk_co_cb.codec_cfg_setconfig.id = codec_type;
+                        pthread_mutex_unlock(&sink_codec_q_lock);
                         return TRUE;
                     }
                 }
@@ -1315,10 +1402,14 @@ static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UI
                         break;
                     }
                     if (bta_avk_co_audio_codec_cfg_matches_caps(codec_type,
-                                        (UINT8*)&src_mp3_cap, (UINT8*)&bta_avk_co_mp3_caps))
+                                        (UINT8*)&src_mp3_cap,
+                                        (UINT8*)&p_bta_avk_codec_pri_list[preference_index]
+                                        .codec_cap.mp3_caps))
                     {
                         if (p_src_index) *p_src_index = index;
+                        if (p_snk_index) *p_snk_index = preference_index;
                         bta_avk_co_cb.codec_cfg_setconfig.id = codec_type;
+                        pthread_mutex_unlock(&sink_codec_q_lock);
                         return TRUE;
                     }
                 }
@@ -1335,10 +1426,14 @@ static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UI
                         break;
                     }
                     if (bta_avk_co_audio_codec_cfg_matches_caps(codec_type,
-                                        (UINT8*)&src_aptx_cap, (UINT8*)&bta_avk_co_aptx_caps))
+                                        (UINT8*)&src_aptx_cap,
+                                        (UINT8*)&p_bta_avk_codec_pri_list[preference_index]
+                                        .codec_cap.aptx_caps))
                     {
                         if (p_src_index) *p_src_index = index;
+                        if (p_snk_index) *p_snk_index = preference_index;
                         bta_avk_co_cb.codec_cfg_setconfig.id = codec_type;
+                        pthread_mutex_unlock(&sink_codec_q_lock);
                         return TRUE;
                     }
                 }
@@ -1346,13 +1441,16 @@ static BOOLEAN bta_avk_co_audio_peer_supports_codec(tBTA_AVK_CO_PEER *p_peer, UI
 #endif
                 default:
                     APPL_TRACE_ERROR("bta_avk_co_audio_peer_supports_codec: unsupported codec id %d", codec_type);
+                    pthread_mutex_unlock(&sink_codec_q_lock);
                     return FALSE;
                     break;
                 }
             }
         }
+        preference_index ++;
         APPL_TRACE_DEBUG(" preferred codec index = %d ", preference_index);
-    }while(preference_index < BTIF_SV_AVK_AA_SEP_INDEX);
+    }while (preference_index < bta_avk_num_codec_configs);
+    pthread_mutex_unlock(&sink_codec_q_lock);
     return FALSE;
 }
 
@@ -1373,33 +1471,53 @@ static BOOLEAN bta_avk_co_audio_supports_config(UINT8 codec_type, const UINT8 *p
     switch (codec_type)
     {
     case BTA_AVK_CODEC_SBC:
-        if (bta_avk_sbc_cfg_in_cap((UINT8 *)p_codec_cfg, (tA2D_SBC_CIE *)&bta_avk_co_sbc_caps))
+        pthread_mutex_lock(&sink_codec_q_lock);
+        if (bta_avk_sbc_cfg_in_cap((UINT8 *)p_codec_cfg,
+            (tA2D_SBC_CIE *)&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SBC_INDEX]
+            .codec_cap.aac_caps))
         {
+            pthread_mutex_unlock(&sink_codec_q_lock);
             return FALSE;
         }
+        pthread_mutex_unlock(&sink_codec_q_lock);
         break;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M24:
-        if (bta_avk_aac_cfg_in_cap((UINT8 *)p_codec_cfg, (tA2D_AAC_CIE *)&bta_avk_co_aac_caps))
+        pthread_mutex_lock(&sink_codec_q_lock);
+        if (bta_avk_aac_cfg_in_cap((UINT8 *)p_codec_cfg,
+            (tA2D_AAC_CIE *)&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_AAC_INDEX]
+            .codec_cap.aac_caps))
         {
+            pthread_mutex_unlock(&sink_codec_q_lock);
             return FALSE;
         }
+        pthread_mutex_unlock(&sink_codec_q_lock);
         break;
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M12:
-        if (bta_avk_mp3_cfg_in_cap((UINT8 *)p_codec_cfg, (tA2D_MP3_CIE *)&bta_avk_co_mp3_caps))
+        pthread_mutex_lock(&sink_codec_q_lock);
+        if (bta_avk_mp3_cfg_in_cap((UINT8 *)p_codec_cfg,
+            (tA2D_MP3_CIE *)&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_MP3_INDEX]
+            .codec_cap.mp3_caps))
         {
+            pthread_mutex_unlock(&sink_codec_q_lock);
             return FALSE;
         }
+        pthread_mutex_unlock(&sink_codec_q_lock);
         break;
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
     case A2D_NON_A2DP_MEDIA_CT:
-        if (a2d_av_aptx_cfg_in_cap((UINT8 *)p_codec_cfg, (tA2D_APTX_CIE *)&bta_avk_co_aptx_caps))
+        pthread_mutex_lock(&sink_codec_q_lock);
+        if (a2d_av_aptx_cfg_in_cap((UINT8 *)p_codec_cfg,
+            (tA2D_APTX_CIE *)&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_APTX_INDEX]
+            .codec_cap.aptx_caps))
         {
+            pthread_mutex_unlock(&sink_codec_q_lock);
             return FALSE;
         }
+        pthread_mutex_unlock(&sink_codec_q_lock);
         break;
 #endif
     default:
@@ -1425,20 +1543,23 @@ void bta_avk_co_audio_codec_reset(void)
     FUNC_TRACE();
 
     /* Reset the preferred  configuration */
-    bta_avk_co_cb.codec_cfg_setconfig.id = codec_pref[0];
+    pthread_mutex_lock(&sink_codec_q_lock);
+    bta_avk_co_cb.codec_cfg_setconfig.id = p_bta_avk_codec_pri_list[0].codec_type;
     switch(bta_avk_co_cb.codec_cfg_setconfig.id)
     {
     case BTA_AVK_CODEC_SBC:
-        if (A2D_BldSbcInfo(A2D_MEDIA_TYPE_AUDIO, (tA2D_SBC_CIE *)&btif_avk_sbc_default_config,
-                                                 bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
+        if (A2D_BldSbcInfo(A2D_MEDIA_TYPE_AUDIO,
+                    &p_bta_avk_codec_pri_list[0].codec_cap.sbc_caps,
+                    bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
         {
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldSbcInfo failed");
         }
         break;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M24:
-        if (A2D_BldAacInfo(A2D_MEDIA_TYPE_AUDIO, (tA2D_AAC_CIE *)&btif_avk_aac_default_config,
-                                                 bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
+        if (A2D_BldAacInfo(A2D_MEDIA_TYPE_AUDIO,
+                    &p_bta_avk_codec_pri_list[0].codec_cap.aac_caps,
+                    bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
         {
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldAacInfo failed");
         }
@@ -1446,8 +1567,9 @@ void bta_avk_co_audio_codec_reset(void)
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
     case BTA_AVK_CODEC_M12:
-        if (A2D_BldMp3Info(A2D_MEDIA_TYPE_AUDIO, (tA2D_MP3_CIE *)&btif_avk_mp3_default_config,
-                                                 bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
+        if (A2D_BldMp3Info(A2D_MEDIA_TYPE_AUDIO,
+                    &p_bta_avk_codec_pri_list[0].codec_cap.mp3_caps,
+                    bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
         {
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldMp3Info failed");
         }
@@ -1455,14 +1577,16 @@ void bta_avk_co_audio_codec_reset(void)
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
     case A2D_NON_A2DP_MEDIA_CT:
-        if (A2D_BldAptxInfo(A2D_MEDIA_TYPE_AUDIO, (tA2D_APTX_CIE *)&btif_avk_aptx_default_config,
-                                                 bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
+        if (A2D_BldAptxInfo(A2D_MEDIA_TYPE_AUDIO,
+                    &p_bta_avk_codec_pri_list[0].codec_cap.aptx_caps,
+                    bta_avk_co_cb.codec_cfg.info) != A2D_SUCCESS)
         {
             APPL_TRACE_ERROR("bta_avk_co_audio_codec_reset A2D_BldAptxInfo failed");
         }
         break;
 #endif
     }
+    pthread_mutex_unlock(&sink_codec_q_lock);
     mutex_global_unlock();
 }
 
