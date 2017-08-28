@@ -2623,6 +2623,11 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
     }
 
     pthread_mutex_lock(&sink_codec_q_lock);
+    if (p_bta_avk_codec_pri_list == NULL) {
+        BTIF_TRACE_ERROR(" %s p_bta_avk_codec_pri_list is NULL returning!!", __func__);
+        pthread_mutex_unlock(&sink_codec_q_lock);
+        return BT_STATUS_NOT_READY;
+    }
 
     tA2D_SBC_CIE sbc_supported_cap;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
@@ -2638,87 +2643,90 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
 
     /* Copy the codec parameters passed from application layer to create a pointer to
      * preferred codec list for outgoing connection */
-    if (p_bta_avk_codec_pri_list != NULL) {
-        /* Free the memory already allocated and reallocate fresh memory */
-        osi_free(p_bta_avk_codec_pri_list);
-        p_bta_avk_codec_pri_list = osi_calloc((num_codec_configs +
-            BTIF_SV_AVK_AA_SEP_INDEX) * sizeof(tBTA_AVK_CO_CODEC_CAP_LIST));
-        /* Set codec supported capabilities to mandatory capabilities for each codec */
-        memcpy(&sbc_supported_cap, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+    /* Free the memory already allocated and reallocate fresh memory */
+    osi_free(p_bta_avk_codec_pri_list);
+    p_bta_avk_codec_pri_list = osi_calloc((num_codec_configs +
+        BTIF_SV_AVK_AA_SEP_INDEX) * sizeof(tBTA_AVK_CO_CODEC_CAP_LIST));
+    if (p_bta_avk_codec_pri_list == NULL) {
+        BTIF_TRACE_ERROR(" %s p_bta_avk_codec_pri_list is NULL returning!!", __func__);
+        pthread_mutex_unlock(&sink_codec_q_lock);
+        return BT_STATUS_NOMEM;
+    }
+    /* Set codec supported capabilities to mandatory capabilities for each codec */
+    memcpy(&sbc_supported_cap, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
-        memcpy(&aac_supported_cap, &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+    memcpy(&aac_supported_cap, &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
-        memcpy(&mp3_supported_cap, &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+    memcpy(&mp3_supported_cap, &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
-        memcpy(&aptx_supported_cap, &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+    memcpy(&aptx_supported_cap, &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
 #endif
-        for (i = 0; i < num_codec_configs; i ++) {
-            p_bta_avk_codec_pri_list[i].codec_type =
-                p_codec_config_list[i].codec_type;
-            switch (p_codec_config_list[i].codec_type) {
-                case A2DP_SINK_AUDIO_CODEC_SBC:
-                    /* Copy Mandatory SBC codec parameters */
-                    memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps,
-                        &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
-                    /* Update sampling frequency as per Application layer */
-                    p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps.samp_freq =
-                    p_codec_config_list[i].codec_config.sbc_config.samp_freq;
-                    /* Check if supported capability needs to be updated */
-                    is_value_to_be_updated(&sbc_supported_cap.samp_freq,
-                        &p_codec_config_list[i].codec_config.sbc_config.samp_freq);
-                    break;
+    for (i = 0; i < num_codec_configs; i ++) {
+        p_bta_avk_codec_pri_list[i].codec_type =
+            p_codec_config_list[i].codec_type;
+        switch (p_codec_config_list[i].codec_type) {
+            case A2DP_SINK_AUDIO_CODEC_SBC:
+                /* Copy Mandatory SBC codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps,
+                    &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+                /* Update sampling frequency as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps.samp_freq =
+                p_codec_config_list[i].codec_config.sbc_config.samp_freq;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&sbc_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.sbc_config.samp_freq);
+                break;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
-                case A2DP_SINK_AUDIO_CODEC_AAC:
-                    /* Copy Mandatory AAC codec parameters */
-                    memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aac_caps,
-                        &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
-                    /* Update sampling frequency and object type as per Application layer */
-                    p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.samp_freq =
-                    p_codec_config_list[i].codec_config.aac_config.sampling_freq;
-                    p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.object_type =
-                    p_codec_config_list[i].codec_config.aac_config.obj_type;
-                    /* Check if supported capability needs to be updated */
-                    is_value_to_be_updated(&aac_supported_cap.samp_freq,
-                        &p_codec_config_list[i].codec_config.aac_config.sampling_freq);
-                    is_value_to_be_updated(&aac_supported_cap.object_type,
-                        &p_codec_config_list[i].codec_config.aac_config.obj_type);
-                    break;
+            case A2DP_SINK_AUDIO_CODEC_AAC:
+                /* Copy Mandatory AAC codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aac_caps,
+                    &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+                /* Update sampling frequency and object type as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.samp_freq =
+                p_codec_config_list[i].codec_config.aac_config.sampling_freq;
+                p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.object_type =
+                p_codec_config_list[i].codec_config.aac_config.obj_type;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&aac_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.aac_config.sampling_freq);
+                is_value_to_be_updated(&aac_supported_cap.object_type,
+                    &p_codec_config_list[i].codec_config.aac_config.obj_type);
+                break;
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
-                case A2DP_SINK_AUDIO_CODEC_MP3:
-                    /* Copy Mandatory MP3 codec parameters */
-                    memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps,
-                        &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
-                    /* Update sampling frequency and layer as per Application layer */
-                    p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.samp_freq =
-                    p_codec_config_list[i].codec_config.mp3_config.sampling_freq;
-                    p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.layer =
-                    p_codec_config_list[i].codec_config.mp3_config.layer;
-                    /* Check if supported capability needs to be updated */
-                    is_value_to_be_updated(&mp3_supported_cap.samp_freq,
-                        &p_codec_config_list[i].codec_config.mp3_config.sampling_freq);
-                    is_value_to_be_updated(&mp3_supported_cap.layer,
-                        & p_codec_config_list[i].codec_config.mp3_config.layer);
-                    break;
+            case A2DP_SINK_AUDIO_CODEC_MP3:
+                /* Copy Mandatory MP3 codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps,
+                    &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+                /* Update sampling frequency and layer as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.samp_freq =
+                p_codec_config_list[i].codec_config.mp3_config.sampling_freq;
+                p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.layer =
+                p_codec_config_list[i].codec_config.mp3_config.layer;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&mp3_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.mp3_config.sampling_freq);
+                is_value_to_be_updated(&mp3_supported_cap.layer,
+                    & p_codec_config_list[i].codec_config.mp3_config.layer);
+                break;
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
-                case A2DP_SINK_AUDIO_CODEC_APTX:
-                    /* Update Codec Type for APTX */
-                    p_bta_avk_codec_pri_list[i].codec_type = A2D_NON_A2DP_MEDIA_CT;
-                    /* Copy Mandatory APTX codec parameters */
-                    memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps,
-                        &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
-                    /* Update sampling frequency as per Application layer */
-                    p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps.sampleRate =
-                    p_codec_config_list[i].codec_config.aptx_config.sampling_freq;
-                    /* Check if supported capability needs to be updated */
-                    is_value_to_be_updated(&aptx_supported_cap.sampleRate,
-                        &p_codec_config_list[i].codec_config.aptx_config.sampling_freq);
-                    break;
+            case A2DP_SINK_AUDIO_CODEC_APTX:
+                /* Update Codec Type for APTX */
+                p_bta_avk_codec_pri_list[i].codec_type = A2D_NON_A2DP_MEDIA_CT;
+                /* Copy Mandatory APTX codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps,
+                    &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+                /* Update sampling frequency as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps.sampleRate =
+                p_codec_config_list[i].codec_config.aptx_config.sampling_freq;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&aptx_supported_cap.sampleRate,
+                    &p_codec_config_list[i].codec_config.aptx_config.sampling_freq);
+                break;
 #endif
-            }
         }
     }
 
@@ -2750,6 +2758,11 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
             }
             codec_type_added[p_codec_config_list[i].codec_type] = 1;
             j ++;
+            if (j >= BTIF_SV_AVK_AA_SEP_INDEX) {
+                BTIF_TRACE_ERROR(" %s num of different codecs(%d) exceeds max limit",
+                    __func__, j);
+                break;
+            }
         }
     }
 
@@ -2757,51 +2770,49 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
          * case if the codec parameters sent by upper layers are not capable of creating connection.
          * In that case, use the below parameters to create connection. in order of priority of
          * APTX > AAC > MP3 > SBC */
-        if (p_bta_avk_codec_pri_list != NULL) {
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
-            if (codec_type_added[A2DP_SINK_AUDIO_CODEC_APTX]) {
-                p_bta_avk_codec_pri_list[num_codec_configs].codec_type
-                    = A2D_NON_A2DP_MEDIA_CT;
-                /* Copy Mandatory APTX codec parameters */
-                memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
-                    .codec_cap.aptx_caps, &bta_avk_co_aptx_caps,
-                    sizeof(tA2D_APTX_CIE));
-                BTIF_TRACE_DEBUG(" %s Added Mandatory APTX codec at index %d",
-                    __func__, num_codec_configs - 1);
-            }
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_APTX]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2D_NON_A2DP_MEDIA_CT;
+        /* Copy Mandatory APTX codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.aptx_caps, &bta_avk_co_aptx_caps,
+            sizeof(tA2D_APTX_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory APTX codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
 #endif
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
-            if (codec_type_added[A2DP_SINK_AUDIO_CODEC_AAC]) {
-                p_bta_avk_codec_pri_list[num_codec_configs].codec_type
-                    = A2DP_SINK_AUDIO_CODEC_AAC;
-                /* Copy Mandatory AAC codec parameters */
-                memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
-                    .codec_cap.aac_caps, &bta_avk_co_aac_caps,
-                    sizeof(tA2D_AAC_CIE));
-                BTIF_TRACE_DEBUG(" %s Added Mandatory AAC codec at index %d",
-                    __func__, num_codec_configs - 1);
-            }
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_AAC]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2DP_SINK_AUDIO_CODEC_AAC;
+        /* Copy Mandatory AAC codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.aac_caps, &bta_avk_co_aac_caps,
+            sizeof(tA2D_AAC_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory AAC codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
-            if (codec_type_added[A2DP_SINK_AUDIO_CODEC_MP3]) {
-                p_bta_avk_codec_pri_list[num_codec_configs].codec_type
-                    = A2DP_SINK_AUDIO_CODEC_MP3;
-                /* Copy Mandatory MP3 codec parameters */
-                memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
-                    .codec_cap.mp3_caps, &bta_avk_co_mp3_caps,
-                    sizeof(tA2D_MP3_CIE));
-                BTIF_TRACE_DEBUG(" %s Added Mandatory MP3 codec at index %d",
-                    __func__, num_codec_configs - 1);
-            }
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_MP3]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2DP_SINK_AUDIO_CODEC_MP3;
+        /* Copy Mandatory MP3 codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.mp3_caps, &bta_avk_co_mp3_caps,
+            sizeof(tA2D_MP3_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory MP3 codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
 #endif
-            p_bta_avk_codec_pri_list[num_codec_configs].codec_type
-                = A2DP_SINK_AUDIO_CODEC_SBC;
-            /* Copy Mandatory SBC codec parameters */
-            memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
-                .codec_cap.sbc_caps, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
-            BTIF_TRACE_DEBUG(" %s Added Mandatory SBC codec at index %d",
-                __func__, num_codec_configs - 1);
-        }
+    p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+        = A2DP_SINK_AUDIO_CODEC_SBC;
+    /* Copy Mandatory SBC codec parameters */
+    memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+        .codec_cap.sbc_caps, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+    BTIF_TRACE_DEBUG(" %s Added Mandatory SBC codec at index %d",
+        __func__, num_codec_configs - 1);
 
     j = 0;
     /* Create Codec Config array for supported types as per application layer */
