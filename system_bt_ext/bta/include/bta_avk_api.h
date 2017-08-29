@@ -265,7 +265,7 @@ typedef UINT8 tBTA_AVK_ERR;
 #define BTA_AVK_MEDIA_SINK_CFG_EVT    21      /* command to configure codec */
 #define BTA_AVK_MEDIA_DATA_EVT   22      /* sending data to Media Task */
 #define BTA_AVK_ROLE_CHANGED_EVT     23
-#define BTA_AVK_RC_BROWSE_OPEN_EVT   24       /* remote control browse channel open */
+#define BTA_AVK_RC_BROWSE_OPEN_EVT   24       /* remote control channel open */
 #define BTA_AVK_RC_BROWSE_CLOSE_EVT  25       /* remote control browse channel closed */
 
 /* Max BTA event */
@@ -387,7 +387,6 @@ typedef struct {
   UINT8 rc_handle;
   BD_ADDR peer_addr;
 } tBTA_AVK_RC_BROWSE_CLOSE;
-
 
 /* data associated with BTA_AVK_RC_FEAT_EVT */
 typedef struct
@@ -863,6 +862,19 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
 **
 *******************************************************************************/
 BOOLEAN bta_avk_is_avdt_sync(UINT16 handle);
+
+/*******************************************************************************
+**
+** Function         BTA_AvkUpdateCodecSupport
+**
+** Description      Update Avdtp Codec Support
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_AvkUpdateCodecSupport(UINT8 *p_codec_type_list, UINT8 *p_vnd_list, UINT8 *p_codec_id_list,
+                                   UINT8 codec_info[][AVDT_CODEC_SIZE], UINT8 num_codec_configs);
+
 
 
 #ifdef __cplusplus

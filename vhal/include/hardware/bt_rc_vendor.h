@@ -343,8 +343,27 @@ typedef bt_status_t (* btavrc_ctrl_getplaystatus_rsp_vendor_callback) ( bt_bdadd
 
 typedef void (* btavrc_ctrl_passthrough_rsp_vendor_callback) (int id, int key_state,
                                                                   bt_bdaddr_t *bd_addr);
-
 typedef bt_status_t (*btavrc_ctrl_br_connection_state_vendor_callback)( bool state, bt_bdaddr_t *bd_addr);
+
+typedef bt_status_t (* btavrc_ctrl_setaddressedplayer_rsp_vendor_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status);
+
+typedef bt_status_t (* btavrc_ctrl_setbrowsedplayer_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
+btrc_status_t rsp_status, uint32_t num_items, uint16_t charset_id , uint8_t folder_depth, btrc_folder_name_t *p_folders);
+
+typedef bt_status_t (* btavrc_ctrl_changepath_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
+btrc_status_t rsp_status, uint32_t num_items );
+
+typedef bt_status_t (* btavrc_ctrl_getfolderitems_rsp_vendor_callback) (bt_bdaddr_t *bd_addr,
+uint32_t start_item, uint32_t end_item, btrc_status_t rsp_status, uint16_t num_items, btrc_folder_items_t *p_items);
+
+typedef bt_status_t (*btavrc_ctrl_getitemattributes_rsp_vendor_callback)(bt_bdaddr_t *bd_addr, btrc_status_t rsp_status,
+uint8_t num_attr, btrc_element_attr_val_t *p_attrs);
+
+typedef bt_status_t (* btavrc_ctrl_playitem_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status );
+
+typedef bt_status_t (* btavrc_ctrl_addtonowplaying_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status );
+
+typedef bt_status_t (* btavrc_ctrl_search_rsp_callback) (bt_bdaddr_t *bd_addr, btrc_status_t rsp_status, uint16_t uid_counter, uint32_t num_item);
 
 
 /** BT-RC Controller Vendor callback structure. */
@@ -359,7 +378,16 @@ typedef struct {
     btavrc_ctrl_getelementattrib_rsp_vendor_callback                getelementattrib_rsp_vendor_cb;
     btavrc_ctrl_getplaystatus_rsp_vendor_callback                   getplaystatus_rsp_vendor_cb;//need to check
     btavrc_ctrl_passthrough_rsp_vendor_callback                     passthrough_rsp_vendor_cb;
-    btavrc_ctrl_br_connection_state_vendor_callback                 browse_connection_state_cb;
+    btavrc_ctrl_br_connection_state_vendor_callback                 browse_connection_state_vendor_cb;
+    btavrc_ctrl_setaddressedplayer_rsp_vendor_callback              setaddressedplayer_vendor_cb;
+    btavrc_ctrl_setbrowsedplayer_rsp_vendor_callback                setbrowsedplayer_vendor_cb;
+    btavrc_ctrl_changepath_rsp_vendor_callback                      changepath_vendor_cb;
+    btavrc_ctrl_getfolderitems_rsp_vendor_callback                  getfolderitems_cb;
+    btavrc_ctrl_getitemattributes_rsp_vendor_callback               getitemattributes_vendor_cb;
+    btavrc_ctrl_playitem_rsp_callback                               playitem_vendor_cb;
+    btavrc_ctrl_addtonowplaying_rsp_callback                        addtonowplaying_vendor_cb;
+    btavrc_ctrl_search_rsp_callback                                 search_vendor_cb;
+
 } btrc_ctrl_vendor_callbacks_t;
 
 /** Represents the standard BT-RC AVRCP Controller Vendor interface. */
@@ -382,6 +410,22 @@ typedef struct {
     bt_status_t (*get_element_attribute_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t num_attribute, uint32_t* attribute_id);
 
     bt_status_t (*get_play_status_command_vendor) (bt_bdaddr_t *bd_addr);
+
+    bt_status_t (*set_addressed_player_command_vendor) (bt_bdaddr_t *bd_addr, uint16_t player_id);
+
+    bt_status_t (*set_browsed_player_command_vendor) (bt_bdaddr_t *bd_addr, uint16_t player_id);
+
+    bt_status_t (*change_folder_path_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t direction, uint8_t * uid);
+
+    bt_status_t (*get_folder_items_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint32_t start_item, uint32_t end_item, uint8_t num_attrb, uint32_t* attrib_ids);
+
+    bt_status_t (*get_item_attributes_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope_id, uint64_t UID, uint16_t uid_counter, uint8_t num_attrb, btrc_media_attr_t *p_attrs);
+
+    bt_status_t (*play_item_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint8_t *uid, uint16_t uid_counter);
+
+    bt_status_t (*addto_now_playing_command_vendor) (bt_bdaddr_t *bd_addr, uint8_t scope, uint64_t UID, uint16_t uid_counter);
+
+    bt_status_t (*search_command_vendor) (bt_bdaddr_t *bd_addr, uint16_t length, uint8_t* string);
 
     void (*cleanup_vendor)(void);
 } btrc_ctrl_vendor_interface_t;
