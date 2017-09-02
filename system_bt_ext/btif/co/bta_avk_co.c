@@ -560,37 +560,37 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index
         (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_96000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_88200) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_88200))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_88200;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_64000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_64000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_64000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_48000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_48000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_48000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_44100) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_44100))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_44100;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_32000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_32000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_32000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_24000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_24000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_24000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_22050) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_22050))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_22050;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_16000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_16000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_16000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_12000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_12000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_12000;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_11025) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_11025))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_11025;
     else if ((src_cap.samp_freq & A2D_AAC_IE_SAMP_FREQ_8000) &&
-        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_96000))
+        (local_cap->samp_freq & A2D_AAC_IE_SAMP_FREQ_8000))
         pref_cap.samp_freq = A2D_AAC_IE_SAMP_FREQ_8000;
 
     if (src_cap.channels & A2D_AAC_IE_CHANNELS_2)
@@ -601,6 +601,8 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index
     pref_cap.bit_rate = src_cap.bit_rate;
     pref_cap.vbr = src_cap.vbr;
 
+    APPL_TRACE_DEBUG("%s: obj type %x freq %x channel %x", __func__,
+        pref_cap.object_type, pref_cap.samp_freq, pref_cap.channels);
     A2D_BldAacInfo(AVDT_MEDIA_AUDIO, (tA2D_AAC_CIE *) &pref_cap, p_pref_cfg);
 }
 #endif
@@ -636,7 +638,8 @@ void bta_avk_build_mp3_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index
 
     memset(&pref_cap, 0, sizeof(tA2D_MP3_CIE));
     /* add support here, if we add new capability */
-    if (src_cap.layer & A2D_MP3_IE_LAYER_3)
+    if ((src_cap.layer & A2D_MP3_IE_LAYER_3) &&
+        (local_cap->layer & A2D_MP3_IE_LAYER_3))
         pref_cap.layer = A2D_MP3_IE_LAYER_3;
 
     if (src_cap.crc & A2D_MP3_IE_CRC)

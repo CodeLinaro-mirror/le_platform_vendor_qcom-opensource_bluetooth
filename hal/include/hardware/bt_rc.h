@@ -100,6 +100,11 @@ typedef enum {
 } btrc_media_attr_t;
 
 typedef enum {
+    BTRC_PLAYER_VAL_OFF_EQUALIZER = 0x01,
+    BTRC_PLAYER_VAL_ON_EQUALIZER = 0x02,
+} btrc_player_equalizer_val_t;
+
+typedef enum {
     BTRC_PLAYER_VAL_OFF_REPEAT = 0x01,
     BTRC_PLAYER_VAL_SINGLE_REPEAT = 0x02,
     BTRC_PLAYER_VAL_ALL_REPEAT = 0x03,
@@ -111,6 +116,12 @@ typedef enum {
     BTRC_PLAYER_VAL_ALL_SHUFFLE = 0x02,
     BTRC_PLAYER_VAL_GROUP_SHUFFLE = 0x03
 } btrc_player_shuffle_val_t;
+
+typedef enum {
+    BTRC_PLAYER_VAL_OFF_SCAN = 0x01,
+    BTRC_PLAYER_VAL_ON_SCAN = 0x02,
+    BTRC_PLAYER_VAL_GRP_SCAN = 0x03,
+} btrc_player_scan_val_t;
 
 typedef enum {
     BTRC_STS_BAD_CMD        = 0x00, /* Invalid command */
