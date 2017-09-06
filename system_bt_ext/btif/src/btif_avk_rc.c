@@ -1563,6 +1563,8 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
             rsp_status = (btrc_status_t)pavrc_resp->chg_path.status;
             if(BTRC_STS_NO_ERROR == rsp_status)
                 num_items = pavrc_resp->chg_path.num_items;
+            else
+                BTIF_TRACE_IMP("%s AVRC_PDU_CHANGE_PATH error: rsp_status:%x", __FUNCTION__, rsp_status);
 
             HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,changepath_vendor_cb, &rc_addr,
                                     rsp_status,num_items);
@@ -1580,6 +1582,8 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
                 uid_counter = pavrc_resp->search.uid_counter;
                 num_items = pavrc_resp->search.num_items;
             }
+            else
+                BTIF_TRACE_IMP("%s AVRC_PDU_SEARCH error: rsp_status:%x", __FUNCTION__, rsp_status);
 
             HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,search_vendor_cb, &rc_addr,
                                     rsp_status, uid_counter, num_items);
@@ -1612,6 +1616,8 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
 
                 }
             }
+            else
+                BTIF_TRACE_IMP("%s AVRC_PDU_GET_ITEM_ATTRIBUTES error: rsp_status:%x", __FUNCTION__, rsp_status);
             HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,getitemattributes_vendor_cb, &rc_addr,
                                     rsp_status, num_attr, p_attrs);
         }
@@ -1691,6 +1697,9 @@ static void btif_avk_br_ctrl_upstreams_rsp_evt(UINT16 event, tAVRC_RESPONSE *pav
                         }
                 }
             }
+            else
+                BTIF_TRACE_IMP("%s AVRC_PDU_GET_FOLDER_ITEMS error: rsp_status:%x", __FUNCTION__, rsp_status);
+
             HAL_CBACK(btif_avk_rc_ctrl_vendor_callbacks,getfolderitems_cb, &rc_addr, startItem, endItem,
                                     rsp_status, num_items, p_folders);
         }
@@ -2903,8 +2912,9 @@ uint8_t scope_id, uint64_t UID, uint16_t uid_counter, uint8_t num_attrb, btrc_me
     avrc_cmd.get_attrs.uid = UID;
     avrc_cmd.get_attrs.uid_counter= uid_counter;
     avrc_cmd.get_attrs.attr_count = num_attrb;
-    for(int i=0; i < num_attrb; i++)
-        avrc_cmd.get_attrs.attrs[i] = p_attrs[i];
+    if(num_attrb != 255)
+        for(int i=0; i < num_attrb; i++)
+            avrc_cmd.get_attrs.attrs[i] = p_attrs[i];
 
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
     if (status != AVRC_STS_NO_ERROR) {
@@ -2962,8 +2972,9 @@ static bt_status_t get_folder_items_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t sco
     avrc_cmd.get_items.start_item = start_item;
     avrc_cmd.get_items.end_item = end_item;
     avrc_cmd.get_items.attr_count = num_attrb;
-    for(int i=0; i < num_attrb; i++)
-        avrc_cmd.get_items.attrs[i] = attrib_ids[i];
+    if(num_attrb != 255)
+        for(int i=0; i < num_attrb; i++)
+            avrc_cmd.get_items.attrs[i] = attrib_ids[i];
 
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
     if (status != AVRC_STS_NO_ERROR) {
