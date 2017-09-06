@@ -2485,13 +2485,23 @@ void update_qahw_delay_vendor(uint16_t qahwdelay)
     qahw_delay = qahwdelay;
 }
 
-static void is_value_to_be_updated(void *ptr1, void *ptr2)
+static void is_value_to_be_updated(void *ptr1, void *ptr2, UINT8 num_of_bytes)
 {
-    char *p1 = (char*)ptr1;
-    char *p2 = (char*)ptr2;
-    if (!(*p1 & *p2)) {
-        *p1 |= *p2;
-    }
+    UINT8 *p1 = (UINT8*)ptr1;
+    UINT8 *p2 = (UINT8*)ptr2;
+    int i;
+
+    if (p1 == NULL || p2 == NULL)
+        return;
+    for (i = 0; i < num_of_bytes; i ++) {
+        if (!(*p1 & *p2)) {
+            *p1 |= *p2;
+        }
+        p1 ++;
+        p2 ++;
+        if (p1 == NULL || p2 == NULL)
+            return;
+   }
 }
 
 /*******************************************************************************
@@ -2676,7 +2686,7 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
                 p_codec_config_list[i].codec_config.sbc_config.samp_freq;
                 /* Check if supported capability needs to be updated */
                 is_value_to_be_updated(&sbc_supported_cap.samp_freq,
-                    &p_codec_config_list[i].codec_config.sbc_config.samp_freq);
+                    &p_codec_config_list[i].codec_config.sbc_config.samp_freq, 1);
                 break;
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
             case A2DP_SINK_AUDIO_CODEC_AAC:
@@ -2690,9 +2700,9 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
                 p_codec_config_list[i].codec_config.aac_config.obj_type;
                 /* Check if supported capability needs to be updated */
                 is_value_to_be_updated(&aac_supported_cap.samp_freq,
-                    &p_codec_config_list[i].codec_config.aac_config.sampling_freq);
+                    &p_codec_config_list[i].codec_config.aac_config.sampling_freq, 2);
                 is_value_to_be_updated(&aac_supported_cap.object_type,
-                    &p_codec_config_list[i].codec_config.aac_config.obj_type);
+                    &p_codec_config_list[i].codec_config.aac_config.obj_type, 1);
                 break;
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
@@ -2707,9 +2717,9 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
                 p_codec_config_list[i].codec_config.mp3_config.layer;
                 /* Check if supported capability needs to be updated */
                 is_value_to_be_updated(&mp3_supported_cap.samp_freq,
-                    &p_codec_config_list[i].codec_config.mp3_config.sampling_freq);
+                    &p_codec_config_list[i].codec_config.mp3_config.sampling_freq, 1);
                 is_value_to_be_updated(&mp3_supported_cap.layer,
-                    & p_codec_config_list[i].codec_config.mp3_config.layer);
+                    & p_codec_config_list[i].codec_config.mp3_config.layer, 1);
                 break;
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
@@ -2724,7 +2734,7 @@ static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration
                 p_codec_config_list[i].codec_config.aptx_config.sampling_freq;
                 /* Check if supported capability needs to be updated */
                 is_value_to_be_updated(&aptx_supported_cap.sampleRate,
-                    &p_codec_config_list[i].codec_config.aptx_config.sampling_freq);
+                    &p_codec_config_list[i].codec_config.aptx_config.sampling_freq, 1);
                 break;
 #endif
         }
