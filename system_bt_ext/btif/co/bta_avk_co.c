@@ -1275,9 +1275,11 @@ static BOOLEAN bta_avk_co_audio_codec_cfg_matches_caps(UINT8 codec_id, const UIN
                          p_src_mp3_caps->bit_rate, p_local_mp3_caps->bit_rate);
         APPL_TRACE_EVENT("MP3 vbr: src %d local %d",
                          p_src_mp3_caps->vbr, p_local_mp3_caps->vbr);
+        APPL_TRACE_EVENT("MP3 mpf: src %d local %d",
+                         p_src_mp3_caps->mpf, p_local_mp3_caps->mpf);
         return (((p_src_mp3_caps->layer)&(p_local_mp3_caps->layer))&&
                ((p_src_mp3_caps->samp_freq)&(p_local_mp3_caps->samp_freq))&&
-               ((p_src_mp3_caps->mpf)&(p_local_mp3_caps->mpf))&&
+               ((p_src_mp3_caps->mpf) == (p_local_mp3_caps->mpf)) &&
                ((p_src_mp3_caps->channels)&(p_local_mp3_caps->channels)));
     }
         break;
