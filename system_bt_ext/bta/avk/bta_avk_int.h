@@ -37,6 +37,7 @@
 #include "bta_avk_co.h"
 #include "osi/include/list.h"
 
+
 #define BTA_AVK_DEBUG TRUE
 /*****************************************************************************
 **  Constants
@@ -52,6 +53,8 @@ enum
     BTA_AVK_API_META_RSP_EVT,
     BTA_AVK_API_RC_CLOSE_EVT,
     BTA_AVK_AVRC_OPEN_EVT,
+    BTA_AVK_AVRC_BROWSE_OPEN_EVT,
+    BTA_AVK_AVRC_BROWSE_CLOSE_EVT,
     BTA_AVK_AVRC_MSG_EVT,
     BTA_AVK_AVRC_NONE_EVT,
 
@@ -111,7 +114,9 @@ enum
 #endif
     BTA_AVK_API_START_EVT,       /* the following 2 events must be in the same order as the *AP_*EVT */
     BTA_AVK_API_STOP_EVT,
-    BTA_AVK_ENABLE_MULTICAST_EVT /* Event for enable and disable multicast */
+    BTA_AVK_UPDATE_SUPP_CODECS,
+    BTA_AVK_ENABLE_MULTICAST_EVT, /* Event for enable and disable multicast */
+
 };
 
 /* events for AV control block state machine */
@@ -404,6 +409,16 @@ typedef struct
     UINT8               codecId;           /* codecId type */
 } tBTA_AVK_SEP;
 
+/* data type for tBTA_AVK_UPDATE_SUPP_CODECS */
+typedef struct
+{
+    BT_HDR              hdr;
+    UINT8  codec_type[BTIF_SV_AVK_AA_SEP_INDEX]; /* Codec Type*/
+    UINT8  vnd_id[BTIF_SV_AVK_AA_SEP_INDEX]; /* Vendor Id */
+    UINT8  codec_id[BTIF_SV_AVK_AA_SEP_INDEX]; /* Codec Id */
+    UINT8  codec_info[BTIF_SV_AVK_AA_SEP_INDEX][AVDT_CODEC_SIZE];
+    UINT8   num_codec_configs;          /* Number of codec configs */
+} tBTA_AVK_UPDATE_SUPP_CODECS;
 
 /* initiator/acceptor role for adaption */
 #define BTA_AVK_ROLE_AD_INT          0x00       /* initiator */
@@ -438,6 +453,7 @@ typedef union
     tBTA_AVK_ROLE_RES          role_res;
     tBTA_AVK_SDP_RES           sdp_res;
     tBTA_AVK_API_META_RSP      api_meta_rsp;
+    tBTA_AVK_UPDATE_SUPP_CODECS update_supp_codecs;
     tBTA_AVK_ENABLE_MULTICAST  multicast_state;
 } tBTA_AVK_DATA;
 
@@ -541,6 +557,8 @@ typedef struct
 #define BTA_AVK_RC_ROLE_ACP      0x10
 
 #define BTA_AVK_RC_CONN_MASK     0x20
+#define BTA_AVK_RC_CONN_BR_MASK  0x40
+
 
 /* type for AV RCP control block */
 /* index to this control block is the rc handle */
@@ -551,6 +569,7 @@ typedef struct
     UINT8   shdl;   /* stream handle (hdi + 1) */
     UINT8   lidx;   /* (index+1) to LCB */
     tBTA_AVK_FEAT        peer_features;  /* peer features mask */
+    alarm_t   *br_conn_timer; /* timer to monitor browsing connection */
 } tBTA_AVK_RCB;
 #define BTA_AVK_NUM_RCB      (BTA_AVK_NUM_STRS  + 2)
 
@@ -683,15 +702,17 @@ extern void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data);
 /* sm action functions */
 extern void bta_avk_disable (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
+extern void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_remote_cmd (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_vendor_cmd (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_vendor_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
+extern void bta_avk_rc_br_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_meta_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
 extern void bta_avk_rc_free_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data);
-
+extern void bta_avk_rc_free_browse_msg(tBTA_AVK_CB* p_cb, tBTA_AVK_DATA* p_data);
 extern tBTA_AVK_RCB * bta_avk_get_rcb_by_shdl(UINT8 shdl);
 extern void bta_avk_del_rc(tBTA_AVK_RCB *p_rcb);
 

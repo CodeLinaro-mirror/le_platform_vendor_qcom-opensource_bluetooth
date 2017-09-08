@@ -26,6 +26,19 @@
 
 #include "l2c_api.h"
 #include "bta_avk_api.h"
+#include "a2d_sbc.h"
+#include "bt_utils.h"
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+#include "a2d_aac.h"
+#include "bta_avk_aac.h"
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+#include "a2d_mp3.h"
+#include "bta_avk_mp3.h"
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+#include "a2d_aptx.h"
+#endif
 
 /*****************************************************************************
 **  Constants and data types
@@ -64,6 +77,17 @@ enum
 #endif
     BTIF_SV_AVK_AA_SEP_INDEX,  /* Last index */
 };
+
+typedef struct
+{
+    UINT8 codec_type;                   /* peer SEP codec type */
+    union {
+        tA2D_SBC_CIE sbc_caps;
+        tA2D_AAC_CIE aac_caps;
+        tA2D_MP3_CIE mp3_caps;
+        tA2D_APTX_CIE aptx_caps;
+    } codec_cap;
+} tBTA_AVK_CO_CODEC_CAP_LIST;
 
 /*******************************************************************************
 **

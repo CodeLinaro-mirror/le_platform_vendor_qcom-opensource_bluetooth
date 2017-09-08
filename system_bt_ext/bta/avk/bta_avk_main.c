@@ -82,6 +82,7 @@ enum
 {
     BTA_AVK_DISABLE,
     BTA_AVK_RC_OPENED,
+    BTA_AVK_RC_BR_OPENED,
     BTA_AVK_RC_REMOTE_CMD,
     BTA_AVK_RC_VENDOR_CMD,
     BTA_AVK_RC_VENDOR_RSP,
@@ -90,6 +91,7 @@ enum
     BTA_AVK_RC_META_RSP,
     BTA_AVK_RC_MSG,
     BTA_AVK_RC_CLOSE,
+    BTA_AVK_RC_BR_CLOSE,
     BTA_AVK_NUM_ACTIONS
 };
 
@@ -103,6 +105,7 @@ const tBTA_AVK_ACTION bta_avk_action[] =
 {
     bta_avk_disable,
     bta_avk_rc_opened,
+    bta_avk_rc_br_opened,
     bta_avk_rc_remote_cmd,
     bta_avk_rc_vendor_cmd,
     bta_avk_rc_vendor_rsp,
@@ -111,6 +114,7 @@ const tBTA_AVK_ACTION bta_avk_action[] =
     bta_avk_rc_meta_rsp,
     bta_avk_rc_msg,
     bta_avk_rc_close,
+    bta_avk_rc_br_close,
     NULL
 };
 
@@ -130,6 +134,8 @@ static const UINT8 bta_avk_st_init[][BTA_AVK_NUM_COLS] =
 /* API_META_RSP_EVT */      {BTA_AVK_RC_FREE_RSP,    BTA_AVK_INIT_ST },
 /* API_RC_CLOSE_EVT */      {BTA_AVK_RC_CLOSE,       BTA_AVK_INIT_ST },
 /* AVRC_OPEN_EVT */         {BTA_AVK_RC_OPENED,      BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_OPEN_EVT*/   {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
+/* AVRC_BROWSE_CLOSE_EVT*/   {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 /* AVRC_MSG_EVT */          {BTA_AVK_RC_FREE_MSG,    BTA_AVK_INIT_ST },
 /* AVRC_NONE_EVT */         {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 };
@@ -145,6 +151,8 @@ static const UINT8 bta_avk_st_open[][BTA_AVK_NUM_COLS] =
 /* API_META_RSP_EVT */      {BTA_AVK_RC_META_RSP,    BTA_AVK_OPEN_ST },
 /* API_RC_CLOSE_EVT */      {BTA_AVK_RC_CLOSE,       BTA_AVK_OPEN_ST },
 /* AVRC_OPEN_EVT */         {BTA_AVK_RC_OPENED,      BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_OPEN_EVT*/   {BTA_AVK_RC_BR_OPENED,   BTA_AVK_OPEN_ST },
+/* AVRC_BROWSE_CLOSE_EVT*/   {BTA_AVK_RC_BR_CLOSE,   BTA_AVK_INIT_ST },
 /* AVRC_MSG_EVT */          {BTA_AVK_RC_MSG,         BTA_AVK_OPEN_ST },
 /* AVRC_NONE_EVT */         {BTA_AVK_IGNORE,         BTA_AVK_INIT_ST },
 };
@@ -176,6 +184,7 @@ static void bta_avk_sco_chg_cback(tBTA_SYS_CONN_STATUS status, UINT8 id, UINT8
 static void bta_avk_sys_rs_cback (tBTA_SYS_CONN_STATUS status,UINT8 id, UINT8 app_id, BD_ADDR peer_addr);
 
 static void bta_avk_api_enable_multicast(tBTA_AVK_DATA *p_data);
+static void bta_avk_api_update_supp_codecs(tBTA_AVK_DATA *p_data);
 
 /* action functions */
 const tBTA_AVK_NSM_ACT bta_avk_nsm_act[] =
@@ -199,6 +208,7 @@ const tBTA_AVK_NSM_ACT bta_avk_nsm_act[] =
 #endif
     bta_avk_api_to_ssm,              /* BTA_AVK_API_START_EVT */
     bta_avk_api_to_ssm,              /* BTA_AVK_API_STOP_EVT */
+    bta_avk_api_update_supp_codecs,    /* BTA_AVK_UPDATE_SUPP_CODECS */
     bta_avk_api_enable_multicast,    /* BTA_AVK_ENABLE_MULTICAST_EVT */
 };
 
@@ -236,7 +246,10 @@ static void bta_avk_api_enable(tBTA_AVK_DATA *p_data)
     memset(&bta_avk_cb, 0, sizeof(tBTA_AVK_CB));
 
     for(i=0; i<BTA_AVK_NUM_RCB; i++)
+    {
         bta_avk_cb.rcb[i].handle = BTA_AVK_RC_HANDLE_NONE;
+        bta_avk_cb.rcb[i].br_conn_timer = NULL;
+    }
 
     bta_avk_cb.rc_acp_handle = BTA_AVK_RC_HANDLE_NONE;
 
@@ -322,7 +335,7 @@ tBTA_AVK_SCB * bta_avk_hndl_to_scb(UINT16 handle)
 BOOLEAN bta_avk_is_avdt_sync(UINT16 handle)
 {
     tBTA_AVK_SCB * p_scb = bta_avk_hndl_to_scb(handle);
-    if(p_scb->avdt_version >= AVDT_VERSION_SYNC)
+    if(p_scb && (p_scb->avdt_version >= AVDT_VERSION_SYNC))
         return true;
     else
         return false;
@@ -598,13 +611,12 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
     do
     {
         p_scb = bta_avk_alloc_scb(registr.chnl);
-        cs.registration_id = p_scb->hdi;
         if(p_scb == NULL)
         {
             APPL_TRACE_ERROR("failed to alloc SCB");
             break;
         }
-
+        cs.registration_id = p_scb->hdi;
         registr.hndl    = p_scb->hndl;
         p_scb->app_id   = registr.app_id;
 
@@ -623,6 +635,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             bta_ar_reg_avdt(&reg, bta_avk_conn_cback, BTA_ID_AVK);
 #endif
             bta_sys_role_chg_register(&bta_avk_sys_rs_cback);
+            APPL_TRACE_DEBUG("bta_avk_api_register : bta_avk_cb.features %d !~", bta_avk_cb.features);
 
             /* create remote control TG service if required */
             if (bta_avk_cb.features & (BTA_AVK_FEAT_RCTG))
@@ -637,6 +650,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                                 (UINT8)(bta_avk_cb.sec_mask & (~BTA_SEC_AUTHORIZE)), BTA_ID_AVK);
 #endif
                 if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK) {
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_ar_reg_avrc %d !~", bta_avk_cb.features);
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REM_CTRL_TARGET, "AV Remote Control Target",
                         NULL, p_bta_avk_cfg->avrc_tg_cat, BTA_ID_AVK,
                         (bta_avk_cb.features & BTA_AVK_FEAT_BROWSE),AVRC_REV_1_4);
@@ -791,6 +805,7 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                 /* if the AV and AVK are both supported, it cannot support the CT role */
                 if (bta_avk_cb.features & (BTA_AVK_FEAT_RCCT))
                 {
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_avk_cb.features & (BTA_AVK_FEAT_RCCT)!~");
                     /* if TG is not supported, we need to register to AVCT now */
                     if ((bta_avk_cb.features & (BTA_AVK_FEAT_RCTG)) == 0)
                     {
@@ -807,8 +822,9 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
                     }
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
                     /* create an SDP record as AVRC CT. */
+                    APPL_TRACE_DEBUG("bta_avk_api_register : bta_ar_reg_avrc1 %d !~", bta_avk_cb.features);
                     bta_ar_reg_avrc(UUID_SERVCLASS_AV_REMOTE_CONTROL, NULL, NULL,
-                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_0);
+                    p_bta_avk_cfg->avrc_ct_cat, BTA_ID_AVK,(bta_avk_cb.features & BTA_AVK_FEAT_BROWSE), AVRC_REV_1_4);
 #endif
                 }
             }
@@ -949,6 +965,26 @@ static void bta_avk_api_to_ssm(tBTA_AVK_DATA *p_data)
         APPL_TRACE_DEBUG("bta_avk_api_to_ssm: on Handle 0x%x",p_data->hdr.layer_specific);
         bta_avk_ssm_execute(bta_avk_hndl_to_scb(p_data->hdr.layer_specific), event, p_data);
     }
+}
+
+/*******************************************************************************
+**
+** Function         bta_avk_api_update_supp_codecs
+**
+** Description      Update Avdtp supported codecs
+**
+**
+** Returns          void
+**
+*******************************************************************************/
+static void bta_avk_api_update_supp_codecs(tBTA_AVK_DATA *p_data)
+{
+    APPL_TRACE_DEBUG("bta_avk_api_update_supp_codecs: num_codec_configs : %d",
+        p_data->update_supp_codecs.num_codec_configs);
+    avdt_scb_update_supported_codecs(p_data->update_supp_codecs.codec_type,
+        p_data->update_supp_codecs.vnd_id, p_data->update_supp_codecs.codec_id,
+        p_data->update_supp_codecs.num_codec_configs,
+        p_data->update_supp_codecs.codec_info, AVDT_TSEP_SNK);
 }
 
 /*******************************************************************************
@@ -1593,6 +1629,7 @@ char *bta_avk_evt_code(UINT16 evt_code)
     case BTA_AVK_API_START_EVT: return "API_START";
     case BTA_AVK_API_STOP_EVT: return "API_STOP";
     case BTA_AVK_ENABLE_MULTICAST_EVT: return "MULTICAST_ENABLE";
+    case BTA_AVK_UPDATE_SUPP_CODECS: return "UPDATE_SUPPORTED_CODECS";
     default:             return "unknown";
     }
 }

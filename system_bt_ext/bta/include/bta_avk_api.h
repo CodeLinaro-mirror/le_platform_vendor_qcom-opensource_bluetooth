@@ -265,9 +265,11 @@ typedef UINT8 tBTA_AVK_ERR;
 #define BTA_AVK_MEDIA_SINK_CFG_EVT    21      /* command to configure codec */
 #define BTA_AVK_MEDIA_DATA_EVT   22      /* sending data to Media Task */
 #define BTA_AVK_ROLE_CHANGED_EVT     23
+#define BTA_AVK_RC_BROWSE_OPEN_EVT   24       /* remote control channel open */
+#define BTA_AVK_RC_BROWSE_CLOSE_EVT  25       /* remote control browse channel closed */
 
 /* Max BTA event */
-#define BTA_AVK_MAX_EVT          24
+#define BTA_AVK_MAX_EVT          26
 
 typedef UINT8 tBTA_AVK_EVT;
 
@@ -373,6 +375,19 @@ typedef struct
     BD_ADDR         peer_addr;
 } tBTA_AVK_RC_CLOSE;
 
+/* data associated with BTA_AV_RC_BROWSE_OPEN_EVT */
+typedef struct {
+  UINT8 rc_handle;
+  BD_ADDR peer_addr;
+  tBTA_AVK_STATUS status;
+} tBTA_AVK_RC_BROWSE_OPEN;
+
+/* data associated with BTA_AV_RC_BROWSE_CLOSE_EVT */
+typedef struct {
+  UINT8 rc_handle;
+  BD_ADDR peer_addr;
+} tBTA_AVK_RC_BROWSE_CLOSE;
+
 /* data associated with BTA_AVK_RC_FEAT_EVT */
 typedef struct
 {
@@ -471,6 +486,8 @@ typedef union
     tBTA_AVK_PROTECT_RSP protect_rsp;
     tBTA_AVK_RC_OPEN     rc_open;
     tBTA_AVK_RC_CLOSE    rc_close;
+    tBTA_AVK_RC_BROWSE_OPEN rc_browse_open;
+    tBTA_AVK_RC_BROWSE_CLOSE rc_browse_close;
     tBTA_AVK_REMOTE_CMD  remote_cmd;
     tBTA_AVK_REMOTE_RSP  remote_rsp;
     tBTA_AVK_VENDOR      vendor_cmd;
@@ -845,6 +862,19 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
 **
 *******************************************************************************/
 BOOLEAN bta_avk_is_avdt_sync(UINT16 handle);
+
+/*******************************************************************************
+**
+** Function         BTA_AvkUpdateCodecSupport
+**
+** Description      Update Avdtp Codec Support
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_AvkUpdateCodecSupport(UINT8 *p_codec_type_list, UINT8 *p_vnd_list, UINT8 *p_codec_id_list,
+                                   UINT8 codec_info[][AVDT_CODEC_SIZE], UINT8 num_codec_configs);
+
 
 
 #ifdef __cplusplus

@@ -630,4 +630,54 @@ void BTA_AvkMetaCmd(UINT8 rc_handle, UINT8 label, tBTA_AVK_CMD cmd_code, BT_HDR 
     }
 }
 
+/*******************************************************************************
+**
+** Function         BTA_AvkIsBrowsingSupported
+**
+** Description      Check to see if browsing is supported by local device.
+**                  This API does not result in any message being posted, it just
+**                  checks the local supported features for browsing support and
+**                  returns TRUE or FALSE.
+** Returns          TRUE/FALSE based on browse support in local device
+**
+*******************************************************************************/
+BOOLEAN BTA_AvkIsBrowsingSupported (void)
+{
+    if (p_bta_avk_cfg->avrc_ct_cat & AVRC_SUPF_CT_BROWSE)
+    {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+
+/*******************************************************************************
+**
+** Function         BTA_AvkUpdateCodecSupport
+**
+** Description      Update Avdtp Codec Support
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTA_AvkUpdateCodecSupport(UINT8 *p_codec_type_list, UINT8 *p_vnd_list, UINT8 *p_codec_id_list,
+                                        UINT8 codec_info[][AVDT_CODEC_SIZE], UINT8 num_codec_configs)
+{
+    tBTA_AVK_UPDATE_SUPP_CODECS  *p_buf;
+
+    if (p_codec_type_list == NULL || p_vnd_list == NULL || p_codec_id_list == NULL)
+        return;
+
+    if ((p_buf = (tBTA_AVK_UPDATE_SUPP_CODECS *) osi_calloc((UINT8) (sizeof
+        (tBTA_AVK_UPDATE_SUPP_CODECS)))) != NULL)
+    {
+        p_buf->hdr.event = BTA_AVK_UPDATE_SUPP_CODECS;
+        p_buf->num_codec_configs = num_codec_configs;
+        memcpy(p_buf->codec_type, p_codec_type_list, num_codec_configs);
+        memcpy(p_buf->vnd_id, p_vnd_list, num_codec_configs);
+        memcpy(p_buf->codec_id, p_codec_id_list, num_codec_configs);
+        memcpy(p_buf->codec_info, codec_info, num_codec_configs * AVDT_CODEC_SIZE);
+        bta_sys_sendmsg(p_buf);
+    }
+}
 #endif /* BTA_AV_INCLUDED */

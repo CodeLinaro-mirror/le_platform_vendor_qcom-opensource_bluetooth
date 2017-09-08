@@ -38,6 +38,7 @@ __BEGIN_DECLS
 #define A2DP_SINK_ENABLE_SBC_DECODING       0x01
 #define A2DP_SINK_RETREIVE_RTP_HEADER       0x02
 #define A2DP_SINK_ENABLE_DELAY_REPORTING    0X04
+#define A2DP_SINK_ENABLE_NOTIFICATION_CB    0x08
 #define A2DP_SRC_ENABLE_DELAY_REPORTING     0x01
 
 #define A2DP_SINK_AUDIO_CODEC_SBC       0x00
@@ -46,6 +47,9 @@ __BEGIN_DECLS
 #define A2DP_SINK_AUDIO_CODEC_ATRAC     0x04
 #define A2DP_SINK_AUDIO_CODEC_APTX      0x08
 #define A2DP_SINK_AUDIO_CODEC_PCM       0x40
+
+#define A2DP_SOURCE_AUDIO_CODEC_SBC       0x00
+#define A2DP_SOURCE_AUDIO_CODEC_APTX      0x08
 
 /* SBC Codec Macros */
 #define SBC_SAMP_FREQ_16     0x80    /* 16 Khz */
@@ -69,6 +73,9 @@ __BEGIN_DECLS
 #define SBC_ALLOC_SNR        0x02    /* ALLOCATION_MODE: SNR */
 #define SBC_ALLOC_LOUDNESS   0x01    /* ALLOCATION_MODE: LOUDNESS */
 
+#define SBC_MAX_BITPOOL      250
+#define SBC_MIN_BITPOOL      2
+
 /* AAC Codec Macros */
 #define AAC_OBJ_TYPE_MPEG_2_AAC_LC      0x80      /* b7:MPEG-2 AAC LC */
 #define AAC_OBJ_TYPE_MPEG_4_AAC_LC      0x40      /* b7:MPEG-4 AAC LC */
@@ -82,7 +89,7 @@ __BEGIN_DECLS
 #define AAC_SAMP_FREQ_22050             0x0800    /* b15: 22050 */
 #define AAC_SAMP_FREQ_24000             0x0400    /* b15: 24000 */
 #define AAC_SAMP_FREQ_32000             0x0200    /* b15: 32000 */
-#define AAC_SAMP_FREQ_44100             0x0100    /* b15: 441000 */
+#define AAC_SAMP_FREQ_44100             0x0100    /* b15: 44100 */
 #define AAC_SAMP_FREQ_48000             0x0080    /* b15: 48000 */
 #define AAC_SAMP_FREQ_64000             0x0040    /* b15: 64000 */
 #define AAC_SAMP_FREQ_88200             0x0020    /* b15: 88200 */
@@ -120,36 +127,39 @@ __BEGIN_DECLS
 #define APTX_CHANNELS_STEREO        0x02
 #define APTX_CHANNELS_MONO          0x01
 
-typedef struct
-{
+#define MAX_NUM_CODEC_CONFIGS       20
+
+typedef struct {
     uint8_t   samp_freq;
     uint8_t   ch_mode;
     uint8_t   block_len;
     uint8_t   num_subbands;
     uint8_t   alloc_mthd;
-    uint8_t   min_bitpool;
     uint8_t   max_bitpool;
-} btav_sbc_codec_config_t;
+    uint8_t   min_bitpool;
+}btav_sbc_codec_config_t;
 
 typedef struct {
-    uint32_t bit_rate;
-    uint16_t sampling_freq;
     uint8_t  obj_type;
+    uint16_t sampling_freq;
     uint8_t  channel_count;
+    uint32_t bit_rate;
     uint8_t  vbr; // variable bit rate
 }btav_aac_codec_config_t;
 
 typedef struct {
-    uint16_t bit_rate;
     uint8_t  layer;
     uint8_t  crc;
     uint8_t  channel_count;
     uint8_t  mpf;
     uint8_t  sampling_freq;
     uint8_t  vbr; // variable bit rate
+    uint16_t bit_rate;
 }btav_mp3_codec_config_t;
 
 typedef struct {
+    uint32_t vendor_id;
+    uint16_t codec_id;
     uint8_t  channel_count;
     uint8_t  sampling_freq;
 }btav_aptx_codec_config_t;
@@ -162,6 +172,11 @@ typedef union
     btav_aptx_codec_config_t aptx_config;
 } btav_codec_config_t;
 
+typedef struct
+{
+    uint8_t codec_type;
+    btav_codec_config_t codec_config;
+} btav_codec_configuration_t;
 
 /** Callback for audio codec configuration change.
  *  Used only for the A2DP sink interface.
@@ -192,6 +207,9 @@ typedef void(* btav_reconfig_a2dp_trigger_callback)(int reason, bt_bdaddr_t *bd_
 typedef void (* btav_audio_focus_request_vendor_callback)(bt_bdaddr_t *bd_addr);
 
 typedef void (* btav_delay_report_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_t report_delay);
+
+typedef void (* btav_audio_data_read_vendor_callback)(bt_bdaddr_t *bd_addr);
+
 /** BT-AV Vendor callback structure. */
 typedef struct {
     /** set to sizeof(btav_vendor_callbacks_t) */
@@ -201,6 +219,7 @@ typedef struct {
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
     btav_reconfig_a2dp_trigger_callback reconfig_a2dp_trigger_cb;
     btav_delay_report_vendor_callback delay_report_vendor_cb;
+    btav_audio_codec_config_vendor_callback audio_codec_config_vendor_cb;
 } btav_vendor_callbacks_t;
 
 typedef struct {
@@ -208,6 +227,7 @@ typedef struct {
     size_t      size;
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
     btav_audio_codec_config_vendor_callback audio_codec_config_vendor_cb;
+    btav_audio_data_read_vendor_callback audio_data_read_vendor_cb;
 } btav_sink_vendor_callbacks_t;
 
 /** Represents the standard BT-AV interface.
@@ -235,6 +255,10 @@ typedef struct {
 
    /** Closes the av vendor interface. */
    void  (*cleanup_vendor)( void );
+
+   /** Updates the supported codec by A2DP Source  */
+   bt_status_t (*update_supported_codecs_param_vendor)( btav_codec_configuration_t
+                        *p_codec_config_list, uint8_t num_codec_configs);
 } btav_vendor_interface_t;
 
 /** Represents the standard BT-AV interface.
@@ -266,6 +290,10 @@ typedef struct {
 
    /** Send decoding delay to stack during decoding non_SBC stream in LPASS */
    void(*update_qahw_delay_vendor)(uint16_t aqhw_delay);
+
+   /** Updates the supported codec by A2DP Sink  */
+   bt_status_t (*update_supported_codecs_param_vendor)( btav_codec_configuration_t
+                        *p_codec_config_list, uint8_t num_codec_configs);
 } btav_sink_vendor_interface_t;
 __END_DECLS
 

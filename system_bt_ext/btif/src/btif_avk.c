@@ -43,7 +43,7 @@
 #include "bta_api.h"
 #include "btif_avk_media.h"
 #include "bta_avk_api.h"
-#include "bta_avk_api.h"
+#include "bta_avk_co.h"
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
@@ -85,7 +85,9 @@ typedef enum {
 #define MAX_A2DP_SINK_DATA_QUEUE_SZ         20
 
 #define DELAY_RECORD_COUNT                 100
-#define RENDERING_DELAY                     60      //define a fix rendering delay
+#define DEFAULT_RENDERING_DELAY            60      //define a fix rendering delay
+#define APTX_RENDERING_DELAY               580
+#define AAC_RENDERING_DELAY                1480
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -120,6 +122,7 @@ typedef struct
 } btif_avk_cb_t;
 
 static pthread_mutex_t sink_data_q_lock;
+pthread_mutex_t sink_codec_q_lock;
 
 typedef struct
 {
@@ -151,10 +154,26 @@ static UINT16 enable_stack_sbc_decoding = 1; // by default enable it
 static UINT16 retreive_rtp_header = 0; // by default disable it
 fixed_queue_t *RxDataQ = NULL;
 static UINT16 enable_delay_reporting = 0; // by default disable it
+static UINT16 enable_notification_cb = 0; // stack incoming data callback
 static bt_bdaddr_t streaming_bda;
 static UINT64 delay_record[DELAY_RECORD_COUNT] = {0};  //store latest packets delay
 static int delay_record_idx = 0;
 static UINT16 qahw_delay = 0;
+int rendering_delay = DEFAULT_RENDERING_DELAY;
+extern tBTA_AVK_CO_CODEC_CAP_LIST *p_bta_avk_codec_pri_list;
+extern tBTA_AVK_CO_CODEC_CAP_LIST bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SEP_INDEX];
+extern UINT8 bta_avk_num_codec_configs;
+extern const tA2D_SBC_CIE bta_avk_co_sbc_caps;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+extern const tA2D_AAC_CIE bta_avk_co_aac_caps;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+const tA2D_MP3_CIE bta_avk_co_mp3_caps;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+extern const tA2D_APTX_CIE bta_avk_co_aptx_caps;
+#endif
+
 
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAVK_INIT() if (((bt_avk_callbacks == NULL)) \
@@ -176,6 +195,7 @@ else\
     case BTA_AVK_VENDOR_CMD_EVT: \
     case BTA_AVK_META_MSG_EVT: \
     case BTA_AVK_BROWSE_MSG_EVT: \
+    case BTA_AVK_RC_BROWSE_OPEN_EVT: \
     case BTA_AVK_RC_FEAT_EVT: \
     case BTA_AVK_REMOTE_RSP_EVT: \
     { \
@@ -585,6 +605,7 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
         case BTA_AVK_RC_FEAT_EVT:
         case BTA_AVK_REMOTE_RSP_EVT:
         case BTA_AVK_BROWSE_MSG_EVT:
+        case BTA_AVK_RC_BROWSE_OPEN_EVT:
             btif_avk_rc_handler(event, (tBTA_AVK*)p_data);
             break;
 
@@ -1384,7 +1405,8 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 assert(av_dest->meta_msg.p_msg);
                 memcpy(av_dest->meta_msg.p_msg, av_src->meta_msg.p_msg, sizeof(tAVRC_MSG));
 
-                if (av_src->meta_msg.p_msg->vendor.p_vendor_data &&
+                if ((av_src->meta_msg.p_msg->hdr.opcode == AVRC_OP_VENDOR) &&
+                    av_src->meta_msg.p_msg->vendor.p_vendor_data &&
                     av_src->meta_msg.p_msg->vendor.vendor_len)
                 {
                     av_dest->meta_msg.p_msg->vendor.p_vendor_data = osi_calloc(
@@ -1396,7 +1418,7 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 }
             }
             break;
-        case BTA_AVK_BROWSE_MSG_EVT:
+ /*       case BTA_AVK_BROWSE_MSG_EVT:
             if (av_src->browse_msg.p_msg)
             {
                 av_dest->browse_msg.p_msg = osi_calloc(sizeof(tAVRC_MSG));
@@ -1415,7 +1437,7 @@ void btif_avk_event_deep_copy(UINT16 event, char *p_dest, char *p_src)
                 }
             }
             break;
-
+*/
         default:
             break;
     }
@@ -1431,15 +1453,16 @@ static void btif_avk_event_free_data(btif_sm_event_t event, void *p_data)
                 if (av->meta_msg.p_data)
                     osi_free(av->meta_msg.p_data);
 
-                if (av->meta_msg.p_msg)
-                {
-                    if (av->meta_msg.p_msg->vendor.p_vendor_data)
-                        osi_free(av->meta_msg.p_msg->vendor.p_vendor_data);
-                    osi_free(av->meta_msg.p_msg);
+                if (av->meta_msg.p_msg) {
+                  if (av->meta_msg.p_msg->hdr.opcode == AVRC_OP_VENDOR) {
+                    osi_free(av->meta_msg.p_msg->vendor.p_vendor_data);
+                  }
+                  osi_free_and_reset((void**)&av->meta_msg.p_msg);
                 }
+
             }
             break;
-        case BTA_AVK_BROWSE_MSG_EVT:
+  /*      case BTA_AVK_BROWSE_MSG_EVT:
             {
                 tBTA_AVK *av = (tBTA_AVK*)p_data;
 
@@ -1451,7 +1474,7 @@ static void btif_avk_event_free_data(btif_sm_event_t event, void *p_data)
                 }
             }
             break;
-
+*/
         default:
             break;
     }
@@ -1568,6 +1591,10 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
         /* Let the RC handler decide on these passthrough cmds
          * Use rc_handle to get the active AV device and use that mapping.
          */
+        case BTA_AVK_RC_BROWSE_CLOSE_EVT:
+            index = btif_avk_idx_by_bdaddr(p_bta_data->rc_browse_close.peer_addr);
+            btif_avk_rc_handler(event, p_bta_data);
+            break;
         case BTA_AVK_REMOTE_CMD_EVT:
         case BTA_AVK_VENDOR_CMD_EVT:
         case BTA_AVK_META_MSG_EVT:
@@ -1945,6 +1972,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         switch(codec_type)
         {
         case BTIF_AVK_CODEC_SBC:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+
             if(enable_stack_sbc_decoding) // if SBC decoding has to be done by Stack
                 btif_avk_reset_decoder((UINT8*)(p_data->avk_config.codec_info));
             a2d_status = A2D_ParsSbcInfo(&sbc_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
@@ -1972,6 +2002,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 
 #if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
         case BTA_AVK_CODEC_M24:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", AAC_RENDERING_DELAY);
+            rendering_delay = AAC_RENDERING_DELAY;
+
             a2d_status = A2D_ParsAacInfo(&aac_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -1993,6 +2026,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 #endif
 #if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
         case BTA_AVK_CODEC_M12:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+
             a2d_status = A2D_ParsMp3Info(&mp3_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -2016,6 +2052,9 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
 #endif
 #if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
         case A2D_NON_A2DP_MEDIA_CT:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", APTX_RENDERING_DELAY);
+            rendering_delay = APTX_RENDERING_DELAY;
+
             a2d_status = A2D_ParsAptxInfo(&aptx_cie, (UINT8 *)(p_data->avk_config.codec_info), FALSE);
             if (a2d_status == A2D_SUCCESS) {
                 /* Switch to BTIF context */
@@ -2023,6 +2062,8 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
                 config_req.codec_type = A2DP_SINK_AUDIO_CODEC_APTX;
                 config_req.sample_rate = btif_a2dp_get_aptx_track_frequency(aptx_cie.sampleRate);
                 config_req.channel_count = btif_a2dp_get_aptx_track_channel_count(aptx_cie.channelMode);
+                config_req.codec_info.aptx_config.vendor_id = aptx_cie.vendorId;
+                config_req.codec_info.aptx_config.codec_id = aptx_cie.codecId;
                 config_req.codec_info.aptx_config.sampling_freq = aptx_cie.sampleRate;
                 config_req.codec_info.aptx_config.channel_count = aptx_cie.channelMode;
                 memcpy(&config_req.peer_bd,(UINT8*)(p_data->avk_config.bd_addr),
@@ -2034,6 +2075,10 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
             }
             break;
 #endif
+            default:
+            BTIF_TRACE_DEBUG("rendering_delay has been inited as :%d", DEFAULT_RENDERING_DELAY);
+            rendering_delay = DEFAULT_RENDERING_DELAY;
+            break;
         }
     }
 }
@@ -2057,7 +2102,7 @@ static UINT16 UpdateRptDelay(UINT64 enque_ns)
 
     UINT64 deque_ns = (UINT64)ts_now.tv_sec * 1000000000 + ts_now.tv_nsec;
     //total delay = buffering + decoding + rending delay
-    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + RENDERING_DELAY) * 1000000;
+    UINT64 delay_ns = deque_ns - enque_ns + (qahw_delay + rendering_delay) * 1000000;
 
     if(delay_record_idx >= DELAY_RECORD_COUNT)
     delay_record_idx = 0;
@@ -2141,6 +2186,46 @@ static bt_status_t init_sink(btav_callbacks_t* callbacks)
     if (status == BT_STATUS_SUCCESS) {
         bt_avk_callbacks = callbacks;
     }
+    pthread_mutex_init(&sink_codec_q_lock, NULL);
+    pthread_mutex_lock(&sink_codec_q_lock);
+    if (p_bta_avk_codec_pri_list == NULL) {
+        int i = 0;
+        bta_avk_num_codec_configs = BTIF_SV_AVK_AA_SEP_INDEX;
+        p_bta_avk_codec_pri_list = osi_calloc(bta_avk_num_codec_configs *
+            sizeof(tBTA_AVK_CO_CODEC_CAP_LIST));
+        if (p_bta_avk_codec_pri_list != NULL) {
+            /* Set default priorty order as APTX (Classic) > AAC > MP3 > SBC */
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+            p_bta_avk_codec_pri_list[i].codec_type = A2D_NON_A2DP_MEDIA_CT;
+            memcpy(&p_bta_avk_codec_pri_list[i++].codec_cap.aptx_caps,
+                &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+            memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_APTX_INDEX]
+                .codec_cap.aptx_caps, &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+#endif
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+            p_bta_avk_codec_pri_list[i].codec_type = A2D_MEDIA_CT_M24;
+            memcpy(&p_bta_avk_codec_pri_list[i++].codec_cap.aac_caps,
+                &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+            memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_AAC_INDEX]
+                .codec_cap.aac_caps, &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+            p_bta_avk_codec_pri_list[i].codec_type = A2D_MEDIA_CT_M12;
+            memcpy(&p_bta_avk_codec_pri_list[i++].codec_cap.mp3_caps,
+                &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+            memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_MP3_INDEX]
+                .codec_cap.mp3_caps, &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+#endif
+            p_bta_avk_codec_pri_list[i].codec_type = A2D_MEDIA_CT_SBC;
+            memcpy(&p_bta_avk_codec_pri_list[i++].codec_cap.sbc_caps,
+                &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+            memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SBC_INDEX]
+                .codec_cap.sbc_caps, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+        }
+        BTIF_TRACE_DEBUG(" %s: initialized codec list with default %d number of codecs",
+            __FUNCTION__, i + 1);
+    }
+    pthread_mutex_unlock(&sink_codec_q_lock);
 
    return status;
 }
@@ -2174,6 +2259,7 @@ static bt_status_t init_sink_vendor(btav_sink_vendor_callbacks_t* callbacks, int
     enable_stack_sbc_decoding = streaming_prarm & A2DP_SINK_ENABLE_SBC_DECODING;
     retreive_rtp_header = streaming_prarm & A2DP_SINK_RETREIVE_RTP_HEADER;
     enable_delay_reporting = streaming_prarm & A2DP_SINK_ENABLE_DELAY_REPORTING;
+    enable_notification_cb = streaming_prarm & A2DP_SINK_ENABLE_NOTIFICATION_CB;
 
     BTIF_TRACE_IMP(" ~~ enable_sbc_decoding = %d, retreive RTP header = %d, enable_delay_reporting = %d",
             enable_stack_sbc_decoding, retreive_rtp_header, enable_delay_reporting);
@@ -2235,8 +2321,10 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
     p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
 
     if (retreive_rtp_header) {
+        // if callback mechanism is enabled, move pointer ahead by size of timestamp
+        UINT8 *rtp_start_addr = p_src + (enable_notification_cb ? sizeof(uint64_t) : 0);
         // rtp_offset will be same for all packets
-        rtp_offset = get_rtp_offset(p_src, codec_type);
+        rtp_offset = get_rtp_offset(rtp_start_addr, codec_type);
     }
     while (!fixed_queue_is_empty(RxDataQ))
     {
@@ -2259,7 +2347,17 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             continue;
         }
         q_bytes_left = p_data_q_buf->len;// this will include RTP header
-        if(retreive_rtp_header) {
+        /* Increment bytes left to cater for additional timestamp header in case
+         * streaming with callback is enabled*/
+        q_bytes_left += (enable_notification_cb ? sizeof(uint64_t): 0);
+        //write timestamp if streaming with callback is enabled
+        if (enable_notification_cb) {
+            memcpy(p_curr, p_src, sizeof(uint64_t));
+            BTIF_TRACE_DEBUG("%s timestamp = %llu", __FUNCTION__, *((uint64_t *)p_curr));
+            p_curr += sizeof(uint64_t);
+            p_data_q_buf->offset += (UINT16)sizeof(uint64_t);
+        }
+        if (retreive_rtp_header && codec_type != A2DP_SINK_AUDIO_CODEC_APTX) {
             // check if we have enough space for RTP Header and audio data
             if (((p_end - p_curr) < (q_bytes_left - rtp_offset)) ||
                 ((p_end - p_curr) < (rtp_offset))) {
@@ -2268,8 +2366,12 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             }
             // write rtp header first.
             p_src = (UINT8*)(p_data_q_buf + 1) + p_data_q_buf->offset;
-            memcpy(p_start, p_src, rtp_offset);
-            if ((p_start + rtp_offset) > p_curr) {
+            memcpy(p_curr, p_src, rtp_offset); // copy p_src to p_curr to cater for timestamp
+            /* if callback mechanism for streaming is used, increment streaming data start
+             * address by extra 8 bytes */
+            UINT8 *p_data_start = p_start + rtp_offset +
+                    (enable_notification_cb ? p_data_q_buf->offset: 0);
+            if ( p_data_start> p_curr) {
                 // writing RTP header for first time
                 p_curr += rtp_offset;
             }
@@ -2292,7 +2394,11 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
             total_frames += *(p_src);
             if(p_data_q_buf->codec_type == BTIF_AVK_CODEC_SBC)
             {
-                if ((p_start + rtp_offset) < p_curr)
+                /* When Callback mechanism for streaming is enabled, there is no need
+                 * to increment p_src pointer and decrement q_bytes_left by 1 byte
+                 * as we are sending only 1 media packet in callback mechanism, so
+                 * by default after rtp data it will write #frames in that address*/
+                if (((p_start + rtp_offset) < p_curr) && !enable_notification_cb)
                 {
                     q_bytes_left=q_bytes_left-1;
                     p_src= p_src+1;
@@ -2308,6 +2414,13 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
 
             osi_free(p_data_q_buf);
             p_curr += q_bytes_left;
+            /* If Callbak mechanism is enabled for streaming, read one media packet
+             * from RxDataQ at a time. Following condition will break from loop after
+             * reading one media packet*/
+            if (enable_notification_cb) {
+                // wait for next callback, return
+                break;
+            }
         }
         else
         {
@@ -2316,13 +2429,13 @@ static uint32_t get_frame_aligned_data (UINT16 codec_type, UINT8* data, uint32_t
         }
 
     }
-    BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
-    pthread_mutex_unlock(&sink_data_q_lock);
-    if(codec_type == BTIF_AVK_CODEC_SBC)
+    if (codec_type == BTIF_AVK_CODEC_SBC && !enable_notification_cb)
     {
         // the first one byte store the total number of sbc frames
         *(p_start + rtp_offset) = total_frames;
     }
+    BTIF_TRACE_DEBUG(" %s Wrote %d bytes",__FUNCTION__, (p_curr - p_start));
+    pthread_mutex_unlock(&sink_data_q_lock);
 
     return (p_curr - p_start);
 }
@@ -2372,6 +2485,388 @@ void update_qahw_delay_vendor(uint16_t qahwdelay)
     qahw_delay = qahwdelay;
 }
 
+static void is_value_to_be_updated(void *ptr1, void *ptr2, UINT8 num_of_bytes)
+{
+    UINT8 *p1 = (UINT8*)ptr1;
+    UINT8 *p2 = (UINT8*)ptr2;
+    int i;
+
+    if (p1 == NULL || p2 == NULL)
+        return;
+    for (i = 0; i < num_of_bytes; i ++) {
+        if (!(*p1 & *p2)) {
+            *p1 |= *p2;
+        }
+        p1 ++;
+        p2 ++;
+        if (p1 == NULL || p2 == NULL)
+            return;
+   }
+}
+
+/*******************************************************************************
+**
+** Function         update_supported_codecs_param
+**
+** Description      Updates the codecs supported by Sink as requested by Application Layer
+**
+** Returns          bt_status_t
+**
+*******************************************************************************/
+static bt_status_t update_supported_codecs_param_vendor(btav_codec_configuration_t
+        *p_codec_config_list, uint8_t num_codec_configs)
+{
+    int i, j;
+
+    if (num_codec_configs == 0 || num_codec_configs > MAX_NUM_CODEC_CONFIGS) {
+        BTIF_TRACE_ERROR(" %s Invalid num_codec_configs = %d",
+            __func__, num_codec_configs);
+        return BT_STATUS_PARM_INVALID;
+    }
+
+    if (!p_codec_config_list) {
+        BTIF_TRACE_ERROR(" %s codec list is NULL", __func__);
+        return BT_STATUS_PARM_INVALID;
+    }
+
+    // Check if the codec params sent by upper layers are valid or not.
+    for (i = 0; i < num_codec_configs; i ++) {
+        switch (p_codec_config_list[i].codec_type) {
+            case A2DP_SINK_AUDIO_CODEC_SBC:
+                switch (p_codec_config_list[i].codec_config.sbc_config.samp_freq) {
+                    case SBC_SAMP_FREQ_16:
+                    case SBC_SAMP_FREQ_32:
+                    case SBC_SAMP_FREQ_44:
+                    case SBC_SAMP_FREQ_48:
+                        break;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid SBC freq = %d",
+                            __func__, p_codec_config_list[i].codec_config.sbc_config.samp_freq);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                break;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_AAC:
+                switch (p_codec_config_list[i].codec_config.aac_config.sampling_freq) {
+                    case AAC_SAMP_FREQ_8000:
+                    case AAC_SAMP_FREQ_11025:
+                    case AAC_SAMP_FREQ_12000:
+                    case AAC_SAMP_FREQ_16000:
+                    case AAC_SAMP_FREQ_22050:
+                    case AAC_SAMP_FREQ_24000:
+                    case AAC_SAMP_FREQ_32000:
+                    case AAC_SAMP_FREQ_44100:
+                    case AAC_SAMP_FREQ_48000:
+                    case AAC_SAMP_FREQ_64000:
+                    case AAC_SAMP_FREQ_88200:
+                    case AAC_SAMP_FREQ_96000:
+                        break;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid AAC freq = %d",
+                            __func__, p_codec_config_list[i].codec_config.aac_config.sampling_freq);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                switch (p_codec_config_list[i].codec_config.aac_config.obj_type) {
+                    case AAC_OBJ_TYPE_MPEG_2_AAC_LC:
+                    case AAC_OBJ_TYPE_MPEG_4_AAC_LC:
+                        break;
+                    case AAC_OBJ_TYPE_MPEG_4_AAC_LTP:
+                    case AAC_OBJ_TYPE_MPEG_4_AAC_SCA:
+                        BTIF_TRACE_ERROR(" %s AAC Object Type = %d currently not supported",
+                            __func__, p_codec_config_list[i].codec_config.aac_config.obj_type);
+                        return BT_STATUS_UNSUPPORTED;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid AAC Object Type = %d",
+                            __func__, p_codec_config_list[i].codec_config.aac_config.obj_type);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                break;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_MP3:
+                switch (p_codec_config_list[i].codec_config.mp3_config.sampling_freq) {
+                    case MP3_SAMP_FREQ_16000:
+                    case MP3_SAMP_FREQ_22050:
+                    case MP3_SAMP_FREQ_24000:
+                    case MP3_SAMP_FREQ_32000:
+                    case MP3_SAMP_FREQ_44100:
+                    case MP3_SAMP_FREQ_48000:
+                        break;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid MP3 freq = %d",
+                            __func__, p_codec_config_list[i].codec_config.mp3_config.sampling_freq);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                switch (p_codec_config_list[i].codec_config.mp3_config.layer) {
+                    case MP3_LAYER_3:
+                        break;
+                    case MP3_LAYER_1:
+                    case MP3_LAYER_2:
+                        BTIF_TRACE_ERROR(" %s MP3 layer = %d currently not supported",
+                            __func__, p_codec_config_list[i].codec_config.mp3_config.layer);
+                        return BT_STATUS_UNSUPPORTED;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid MP3 layer = %d",
+                            __func__, p_codec_config_list[i].codec_config.mp3_config.layer);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                break;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_APTX:
+                switch (p_codec_config_list[i].codec_config.aptx_config.sampling_freq) {
+                    case APTX_SAMPLERATE_44100:
+                    case APTX_SAMPLERATE_48000:
+                        break;
+                    default:
+                        BTIF_TRACE_ERROR(" %s Invalid APTX freq = %d",
+                            __func__, p_codec_config_list[i].codec_config.aptx_config.sampling_freq);
+                        return BT_STATUS_PARM_INVALID;
+                }
+                break;
+#endif
+            default:
+                BTIF_TRACE_ERROR(" %s Invalid codec type = %d",
+                    __func__, p_codec_config_list[i].codec_type);
+                return BT_STATUS_PARM_INVALID;
+        }
+    }
+
+    pthread_mutex_lock(&sink_codec_q_lock);
+    if (p_bta_avk_codec_pri_list == NULL) {
+        BTIF_TRACE_ERROR(" %s p_bta_avk_codec_pri_list is NULL returning!!", __func__);
+        pthread_mutex_unlock(&sink_codec_q_lock);
+        return BT_STATUS_NOT_READY;
+    }
+
+    tA2D_SBC_CIE sbc_supported_cap;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    tA2D_AAC_CIE aac_supported_cap;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+    tA2D_MP3_CIE mp3_supported_cap;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+    tA2D_APTX_CIE aptx_supported_cap;
+#endif
+    UINT8 codec_info[BTIF_SV_AVK_AA_SEP_INDEX][AVDT_CODEC_SIZE];
+
+    /* Copy the codec parameters passed from application layer to create a pointer to
+     * preferred codec list for outgoing connection */
+    /* Free the memory already allocated and reallocate fresh memory */
+    osi_free(p_bta_avk_codec_pri_list);
+    p_bta_avk_codec_pri_list = osi_calloc((num_codec_configs +
+        BTIF_SV_AVK_AA_SEP_INDEX) * sizeof(tBTA_AVK_CO_CODEC_CAP_LIST));
+    if (p_bta_avk_codec_pri_list == NULL) {
+        BTIF_TRACE_ERROR(" %s p_bta_avk_codec_pri_list is NULL returning!!", __func__);
+        pthread_mutex_unlock(&sink_codec_q_lock);
+        return BT_STATUS_NOMEM;
+    }
+    /* Set codec supported capabilities to mandatory capabilities for each codec */
+    memcpy(&sbc_supported_cap, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    memcpy(&aac_supported_cap, &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+    memcpy(&mp3_supported_cap, &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+    memcpy(&aptx_supported_cap, &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+#endif
+    for (i = 0; i < num_codec_configs; i ++) {
+        p_bta_avk_codec_pri_list[i].codec_type =
+            p_codec_config_list[i].codec_type;
+        switch (p_codec_config_list[i].codec_type) {
+            case A2DP_SINK_AUDIO_CODEC_SBC:
+                /* Copy Mandatory SBC codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps,
+                    &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+                /* Update sampling frequency as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.sbc_caps.samp_freq =
+                p_codec_config_list[i].codec_config.sbc_config.samp_freq;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&sbc_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.sbc_config.samp_freq, 1);
+                break;
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_AAC:
+                /* Copy Mandatory AAC codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aac_caps,
+                    &bta_avk_co_aac_caps, sizeof(tA2D_AAC_CIE));
+                /* Update sampling frequency and object type as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.samp_freq =
+                p_codec_config_list[i].codec_config.aac_config.sampling_freq;
+                p_bta_avk_codec_pri_list[i].codec_cap.aac_caps.object_type =
+                p_codec_config_list[i].codec_config.aac_config.obj_type;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&aac_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.aac_config.sampling_freq, 2);
+                is_value_to_be_updated(&aac_supported_cap.object_type,
+                    &p_codec_config_list[i].codec_config.aac_config.obj_type, 1);
+                break;
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_MP3:
+                /* Copy Mandatory MP3 codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps,
+                    &bta_avk_co_mp3_caps, sizeof(tA2D_MP3_CIE));
+                /* Update sampling frequency and layer as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.samp_freq =
+                p_codec_config_list[i].codec_config.mp3_config.sampling_freq;
+                p_bta_avk_codec_pri_list[i].codec_cap.mp3_caps.layer =
+                p_codec_config_list[i].codec_config.mp3_config.layer;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&mp3_supported_cap.samp_freq,
+                    &p_codec_config_list[i].codec_config.mp3_config.sampling_freq, 1);
+                is_value_to_be_updated(&mp3_supported_cap.layer,
+                    & p_codec_config_list[i].codec_config.mp3_config.layer, 1);
+                break;
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+            case A2DP_SINK_AUDIO_CODEC_APTX:
+                /* Update Codec Type for APTX */
+                p_bta_avk_codec_pri_list[i].codec_type = A2D_NON_A2DP_MEDIA_CT;
+                /* Copy Mandatory APTX codec parameters */
+                memcpy(&p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps,
+                    &bta_avk_co_aptx_caps, sizeof(tA2D_APTX_CIE));
+                /* Update sampling frequency as per Application layer */
+                p_bta_avk_codec_pri_list[i].codec_cap.aptx_caps.sampleRate =
+                p_codec_config_list[i].codec_config.aptx_config.sampling_freq;
+                /* Check if supported capability needs to be updated */
+                is_value_to_be_updated(&aptx_supported_cap.sampleRate,
+                    &p_codec_config_list[i].codec_config.aptx_config.sampling_freq, 1);
+                break;
+#endif
+        }
+    }
+
+    uint8_t codec_type_list[BTIF_SV_AVK_AA_SEP_INDEX];
+    uint8_t vnd_id_list[BTIF_SV_AVK_AA_SEP_INDEX];
+    uint8_t codec_id_list[BTIF_SV_AVK_AA_SEP_INDEX];
+    uint8_t codec_type_added[MAX_NUM_CODEC_CONFIGS];
+    memset(codec_type_list, A2DP_SINK_AUDIO_CODEC_SBC, BTIF_SV_AVK_AA_SEP_INDEX);
+    memset(vnd_id_list, 0, BTIF_SV_AVK_AA_SEP_INDEX);
+    memset(codec_id_list, 0, BTIF_SV_AVK_AA_SEP_INDEX);
+    memset(codec_type_added, 0, MAX_NUM_CODEC_CONFIGS);
+
+    /* Remove duplicate codecs from list. This will be used for hiding/showing codecs
+     * for response to AVDTP discover command */
+    j = 0;
+    for (i = 0; i < num_codec_configs; i ++) {
+        if (!codec_type_added[p_codec_config_list[i].codec_type]) {
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+            if (p_codec_config_list[i].codec_type ==
+                A2DP_SINK_AUDIO_CODEC_APTX) {
+                codec_type_list[j] = A2D_NON_A2DP_MEDIA_CT;
+                vnd_id_list[j] = A2D_APTX_VENDOR_ID;
+                codec_id_list[j] = A2D_APTX_CODEC_ID_BLUETOOTH;
+            }
+            else
+#endif
+            {
+                codec_type_list[j] = p_codec_config_list[i].codec_type;
+            }
+            codec_type_added[p_codec_config_list[i].codec_type] = 1;
+            j ++;
+            if (j >= BTIF_SV_AVK_AA_SEP_INDEX) {
+                BTIF_TRACE_ERROR(" %s num of different codecs(%d) exceeds max limit",
+                    __func__, j);
+                break;
+            }
+        }
+    }
+
+    /* Add mandatory codec for all supported codec in the end of priority list to handle
+         * case if the codec parameters sent by upper layers are not capable of creating connection.
+         * In that case, use the below parameters to create connection. in order of priority of
+         * APTX > AAC > MP3 > SBC */
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_APTX]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2D_NON_A2DP_MEDIA_CT;
+        /* Copy Mandatory APTX codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.aptx_caps, &bta_avk_co_aptx_caps,
+            sizeof(tA2D_APTX_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory APTX codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
+#endif
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_AAC]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2DP_SINK_AUDIO_CODEC_AAC;
+        /* Copy Mandatory AAC codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.aac_caps, &bta_avk_co_aac_caps,
+            sizeof(tA2D_AAC_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory AAC codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_MP3]) {
+        p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+            = A2DP_SINK_AUDIO_CODEC_MP3;
+        /* Copy Mandatory MP3 codec parameters */
+        memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+            .codec_cap.mp3_caps, &bta_avk_co_mp3_caps,
+            sizeof(tA2D_MP3_CIE));
+        BTIF_TRACE_DEBUG(" %s Added Mandatory MP3 codec at index %d",
+            __func__, num_codec_configs - 1);
+    }
+#endif
+    p_bta_avk_codec_pri_list[num_codec_configs].codec_type
+        = A2DP_SINK_AUDIO_CODEC_SBC;
+    /* Copy Mandatory SBC codec parameters */
+    memcpy(&p_bta_avk_codec_pri_list[num_codec_configs ++]
+        .codec_cap.sbc_caps, &bta_avk_co_sbc_caps, sizeof(tA2D_SBC_CIE));
+    BTIF_TRACE_DEBUG(" %s Added Mandatory SBC codec at index %d",
+        __func__, num_codec_configs - 1);
+
+    j = 0;
+    /* Create Codec Config array for supported types as per application layer */
+    memset(codec_info, 0, BTIF_SV_AVK_AA_SEP_INDEX * AVDT_CODEC_SIZE);
+    A2D_BldSbcInfo(AVDT_MEDIA_AUDIO, &sbc_supported_cap, codec_info[j ++]);
+    memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SBC_INDEX]
+        .codec_cap.sbc_caps, &sbc_supported_cap, sizeof(tA2D_SBC_CIE));
+#if defined(AAC_DECODER_INCLUDED) && (AAC_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_AAC]) {
+        A2D_BldAacInfo(AVDT_MEDIA_AUDIO, &aac_supported_cap, codec_info[j ++]);
+        memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_AAC_INDEX]
+            .codec_cap.aac_caps, &aac_supported_cap, sizeof(tA2D_AAC_CIE));
+    }
+#endif
+#if defined(MP3_DECODER_INCLUDED) && (MP3_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_MP3]) {
+        A2D_BldMp3Info(AVDT_MEDIA_AUDIO, &mp3_supported_cap, codec_info[j ++]);
+        memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_MP3_INDEX]
+            .codec_cap.mp3_caps, &mp3_supported_cap, sizeof(tA2D_MP3_CIE));
+    }
+#endif
+#if defined(APTX_CLASSIC_DECODER_INCLUDED) && (APTX_CLASSIC_DECODER_INCLUDED == TRUE)
+    if (codec_type_added[A2DP_SINK_AUDIO_CODEC_APTX]) {
+        A2D_BldAptxInfo(AVDT_MEDIA_AUDIO, &aptx_supported_cap, codec_info[j ++]);
+        memcpy(&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_APTX_INDEX]
+            .codec_cap.aptx_caps, &aptx_supported_cap, sizeof(tA2D_APTX_CIE));
+    }
+#endif
+    bta_avk_num_codec_configs = num_codec_configs;
+    BTIF_TRACE_DEBUG(" %s Num_codec_configs = %d", __func__, num_codec_configs);
+    for (i = 0; i < j; i ++) {
+        BTIF_TRACE_VERBOSE(" %s %d %d %d %d %d %d %d %d %d", __func__,
+            codec_info[i][0], codec_info[i][1], codec_info[i][2], codec_info[i][3],
+            codec_info[i][4], codec_info[i][5], codec_info[i][6], codec_info[i][7],
+            codec_info[i][8]);
+    }
+    /* Update the codec config supported paratmers so that correct response can be
+     * sent for AVDTP discover and get capabilities command from remote device */
+    BTA_AvkUpdateCodecSupport(codec_type_list, vnd_id_list, codec_id_list,
+        codec_info, j);
+    pthread_mutex_unlock(&sink_codec_q_lock);
+    return BT_STATUS_SUCCESS;
+}
+
 /*******************************************************************************
 **
 ** Function         update_flush_device_vendor
@@ -2414,6 +2909,27 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
         }
     }
 }
+/*******************************************************************************
+ **
+ ** Function         attach_timestamp
+ **
+ ** Description      attaches current timestamp to media packet before queing
+                     it to Data Queue.
+ **
+ ** Returns          address where media data should be wriiten after attaching
+                     current timestamp.
+ **
+ *******************************************************************************/
+
+void *attach_timestamp(UINT8 *p_timestamp) {
+    struct timespec ts_now;
+    memset(&ts_now, 0, sizeof(ts_now));
+    clock_gettime(CLOCK_REALTIME, &ts_now);
+    UINT64 timestamp = (UINT64)ts_now.tv_sec * 1000000 + ts_now.tv_nsec/1000;
+    memcpy(p_timestamp, (UINT8*)&timestamp, sizeof(UINT64));
+    BTIF_TRACE_DEBUG("%s: Attach current timestamp %llu to media data",  __FUNCTION__, timestamp);
+    return (UINT8*)(p_timestamp + sizeof(UINT64));
+}
 
 /*******************************************************************************
 **
@@ -2445,6 +2961,12 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
 
     // consistency check: check codec from remote and codec info in Q
     p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_peek_first(RxDataQ);
+    if (p_data_q_buf == NULL)
+    {
+       BTIF_TRACE_IMP("%s p_data_q_buf is NULl", __FUNCTION__);
+       pthread_mutex_unlock(&sink_data_q_lock);
+       return 0;
+    }
     if (codec_type != p_data_q_buf->codec_type)
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
@@ -2474,6 +2996,8 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
             continue;
         }
         q_bytes_left = p_data_q_buf->len - p_data_q_buf->offset;
+        // if callback mechanism is enabled, update q_bytes_left by size of timestamp
+        q_bytes_left += (enable_notification_cb ? sizeof(UINT64): 0);
         BTIF_TRACE_DEBUG(" %s Q_Len %d, bytes_to_be_written %d, bytes_left_in_Q %d", __FUNCTION__,
                  fixed_queue_length(RxDataQ), bytes_to_be_written, q_bytes_left);
         if (bytes_to_be_written >= q_bytes_left)
@@ -2494,6 +3018,10 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
 
             osi_free(p_data_q_buf);
             bytes_to_be_written = bytes_to_be_written - q_bytes_left;
+            if (enable_notification_cb) {
+                // when callback mechanism is enabled, read one packet at a time and return
+                break;
+            }
         }
         else
         {
@@ -2540,6 +3068,8 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
     bdstr_t addr1;
     BTIF_TRACE_DEBUG("%s", __FUNCTION__);
     pthread_mutex_lock(&sink_data_q_lock);
+    UINT16 alloc_packet_size = sizeof(tBT_SINK_DATA_HDR) + size;
+    alloc_packet_size += (enable_notification_cb ? sizeof(UINT64) : 0);
     if(fixed_queue_length(RxDataQ) >= MAX_A2DP_SINK_DATA_QUEUE_SZ || (RxDataQ == NULL))
     {
         BTIF_TRACE_ERROR(" %s DATA Que not exit or Full size =%d, returning",
@@ -2547,10 +3077,15 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
         pthread_mutex_unlock(&sink_data_q_lock);
         return  fixed_queue_length(RxDataQ);
     }
-    if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(sizeof(tBT_SINK_DATA_HDR) + size)) != NULL)
+    if ((p_msg = (tBT_SINK_DATA_HDR *) osi_malloc(alloc_packet_size)) != NULL)
     {
-        UINT8 *p_dest;
-        p_dest = (UINT8*)(p_msg + 1);
+        UINT8 *p_dest, *p_timestamp;;
+        if (enable_notification_cb) {
+            p_timestamp = (UINT8*)(p_msg + 1);
+            p_dest = attach_timestamp(p_timestamp);
+        } else {
+            p_dest = (UINT8*)(p_msg + 1);
+        }
         memcpy(p_dest, (UINT8*)(data), size);
         p_msg->len = size;
         p_msg->offset = 0;
@@ -2585,6 +3120,13 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
                   __FUNCTION__, size, fixed_queue_length(RxDataQ),
                   bdaddr_to_string((bt_bdaddr_t *)p_msg->bd_addr, &addr1, sizeof(addr1)),
                   p_msg->codec_type);
+    }
+
+    /* Code to give callback to BT-APP layer that Data is queued in Data Queue*/
+    if (enable_notification_cb && bt_av_sink_vendor_callbacks != NULL) {
+        bt_bdaddr_t bdAddr;
+        memcpy(bdAddr.address, &bd_addr, sizeof(BD_ADDR));
+        HAL_CBACK(bt_av_sink_vendor_callbacks, audio_data_read_vendor_cb, &bdAddr);
     }
     pthread_mutex_unlock(&sink_data_q_lock);
     return fixed_queue_length(RxDataQ);
@@ -2845,6 +3387,13 @@ static void cleanup_sink_vendor(void) {
     {
         bt_av_sink_vendor_callbacks = NULL;
     }
+    pthread_mutex_lock(&sink_codec_q_lock);
+    if (p_bta_avk_codec_pri_list != NULL) {
+        osi_free(p_bta_avk_codec_pri_list);
+        p_bta_avk_codec_pri_list = NULL;
+    }
+    pthread_mutex_unlock(&sink_codec_q_lock);
+    pthread_mutex_destroy(&sink_codec_q_lock);
     BTIF_TRACE_EVENT("%s completed", __FUNCTION__);
 }
 
@@ -2871,6 +3420,7 @@ static const btav_sink_vendor_interface_t bt_avk_sink_vendor_interface = {
     update_flushing_device_vendor,
     cleanup_sink_vendor,
     update_qahw_delay_vendor,
+    update_supported_codecs_param_vendor,
 };
 
 /*******************************************************************************
@@ -3042,7 +3592,7 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
           * be initiated by the app/audioflinger layers */
         if(enable_delay_reporting) {
          BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
-                                            BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
+                                            BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|BTA_AVK_FEAT_BROWSE|
                 BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG|BTA_AVK_FEAT_DELAY_RPT,
                 bte_avk_callback);
         BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
@@ -3050,7 +3600,7 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
         else
         {
             BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
-                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
+                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|BTA_AVK_FEAT_BROWSE|
                                             BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
                                                                         bte_avk_callback);
             BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable NOT Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);

@@ -52,6 +52,9 @@
 #include <cutils/properties.h>
 #endif
 #include "bta_ar_int_ext.h"
+
+static const UINT8 browsing_sniff_black_list_prefix[][3] = {{0x34, 0xc0, 0x59}};
+
 /*****************************************************************************
 **  Constants
 *****************************************************************************/
@@ -64,6 +67,10 @@
 /* If not, we will start signalling from SRC.                                   */
 #ifndef BTA_AVK_ACP_SIG_TIME_VAL
 #define BTA_AVK_ACP_SIG_TIME_VAL 2000
+#endif
+
+#ifndef BTA_AVK_RC_BR_TIME_VAL
+#define BTA_AVK_RC_BR_TIME_VAL 5000
 #endif
 
 #ifndef AVRC_MIN_META_CMD_LEN
@@ -91,6 +98,8 @@ struct avk_blacklist_entry
 };
 
 static void bta_avk_acp_sig_timer_cback (void *data);
+static void bta_avk_rc_br_timer_cback (void *data);
+
 
 /*******************************************************************************
 **
@@ -266,10 +275,28 @@ static void bta_avk_rc_ctrl_cback(UINT8 handle, UINT8 event, UINT16 result, BD_A
         bta_avk_cb.rc_handle = handle;*/
 
         msg_event = BTA_AVK_AVRC_OPEN_EVT;
+
+        APPL_TRACE_EVENT("AVRC_OPEN_IND_EVT peer_features: %d avrc_ct_cat=%d !~", bta_avk_cb.rcb[handle].peer_features, p_bta_avk_cfg->avrc_ct_cat);
+
+      if (BTA_AvkIsBrowsingSupported () && bta_avk_cb.rcb[handle].peer_features & BTA_AVK_FEAT_BROWSE)
+        {
+            BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback AVRC_OpenBrowseChannel handle: %d !~", handle);
+            AVRC_OpenBrowseChannel (handle);
+        }
     }
     else if (event == AVRC_CLOSE_IND_EVT)
     {
         msg_event = BTA_AVK_AVRC_CLOSE_EVT;
+    }
+    else if (event == AVRC_BROWSE_OPEN_IND_EVT)
+    {
+        BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback :AVRC_BROWSE_OPEN_IND_EVT !~");
+        msg_event = BTA_AVK_AVRC_BROWSE_OPEN_EVT;
+    }
+    else if (event == AVRC_BROWSE_CLOSE_IND_EVT)
+    {
+        BTIF_TRACE_IMP("bta_avk_rc_ctrl_cback :AVRC_BROWSE_CLOSE_IND_EVT !~");
+        msg_event = BTA_AVK_AVRC_BROWSE_CLOSE_EVT;
     }
 
     if (msg_event)
@@ -308,11 +335,11 @@ static void bta_avk_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_
     } else if (opcode == AVRC_OP_PASS_THRU && p_msg->pass.p_pass_data != NULL) {
         p_data_src = p_msg->pass.p_pass_data;
         data_len = (UINT16) p_msg->pass.pass_len;
-    } else if (opcode == AVRC_OP_BROWSE && p_msg->browse.p_browse_data != NULL) {
+    } /*else if (opcode == AVRC_OP_BROWSE && p_msg->browse.p_browse_data != NULL) {
         APPL_TRACE_EVENT("bta_avk_rc_msg_cback Browse Data");
         p_data_src  = p_msg->browse.p_browse_data;
         data_len = (UINT16) p_msg->browse.browse_len;
-    }
+    }*/
 
 
     /* Create a copy of the message */
@@ -332,8 +359,12 @@ static void bta_avk_rc_msg_cback(UINT8 handle, UINT8 label, UINT8 opcode, tAVRC_
                 p_buf->msg.vendor.p_vendor_data = p_data_dst;
             else if (opcode == AVRC_OP_PASS_THRU)
                 p_buf->msg.pass.p_pass_data = p_data_dst;
-            else if (opcode == AVRC_OP_BROWSE)
-                p_buf->msg.browse.p_browse_data = p_data_dst;
+            /*else if (opcode == AVRC_OP_BROWSE)
+                p_buf->msg.browse.p_browse_data = p_data_dst;*/
+        }
+        if (opcode == AVRC_OP_BROWSE) {
+          /* set p_pkt to NULL, so avrc would not free the buffer */
+          p_msg->browse.p_browse_pkt = NULL;
         }
         bta_sys_sendmsg(p_buf);
     }
@@ -381,7 +412,7 @@ UINT8 bta_avk_rc_create(tBTA_AVK_CB *p_cb, UINT8 role, UINT8 shdl, UINT8 lidx)
     /* note: BTA_AVK_FEAT_RCTG = AVRC_CT_TARGET, BTA_AVK_FEAT_RCCT = AVRC_CT_CONTROL */
     ccb.control = p_cb->features & (BTA_AVK_FEAT_RCTG | BTA_AVK_FEAT_RCCT | AVRC_CT_PASSIVE);
 
-
+    BTIF_TRACE_IMP("bta_avk_rc_create - AVRC_Open !!c~~");
     if (AVRC_Open(&rc_handle, &ccb, bda) != AVRC_SUCCESS)
         return BTA_AVK_RC_HANDLE_NONE;
 
@@ -398,6 +429,8 @@ UINT8 bta_avk_rc_create(tBTA_AVK_CB *p_cb, UINT8 role, UINT8 shdl, UINT8 lidx)
     p_rcb->shdl = shdl;
     p_rcb->lidx = lidx;
     p_rcb->peer_features = 0;
+//  p_rcb->cover_art_psm = 0;
+    p_rcb->br_conn_timer = alarm_new("bta_avk.br_conn_timer");
     if(lidx == (BTA_AVK_NUM_LINKS + 1))
     {
         /* this LIDX is reserved for the AVRCP ACP connection */
@@ -546,6 +579,8 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     UINT8       tmp;
     UINT8       disc = 0;
 
+	APPL_TRACE_DEBUG("%s ========================!~", __func__);
+
     /* find the SCB & stop the timer */
     for(i=0; i<BTA_AVK_NUM_STRS; i++)
     {
@@ -593,6 +628,17 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     APPL_TRACE_ERROR("bta_avk_rc_opened rcb[%d] shdl:%d lidx:%d/%d",
             i, shdl, p_cb->rcb[i].lidx, p_cb->lcb[BTA_AVK_NUM_LINKS].lidx);
     p_cb->rcb[i].status |= BTA_AVK_RC_CONN_MASK;
+    APPL_TRACE_DEBUG(" RC role ACP = %d",
+                                p_cb->rcb[i].status & BTA_AVK_RC_ROLE_MASK);
+ /*   if((p_cb->rcb[i].status & BTA_AVK_RC_ROLE_MASK) != 0)
+    {
+        APPL_TRACE_DEBUG("bta_avk_rc_opened alarm_set_on_queue i: %d !~", i);
+        alarm_set_on_queue(p_cb->rcb[i].br_conn_timer,
+                           (period_ms_t)BTA_AVK_RC_BR_TIME_VAL,
+                           bta_avk_rc_br_timer_cback,
+                           INT_TO_PTR(i),
+                           btu_bta_alarm_queue);
+    }*/
 
     if(!shdl && 0 == p_cb->lcb[BTA_AVK_NUM_LINKS].lidx)
     {
@@ -630,8 +676,58 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     }
     (*p_cb->p_cback)(BTA_AVK_RC_OPEN_EVT, (tBTA_AVK *) &rc_open);
 
+/* if local initiated AVRCP connection and both peer and locals device support
+ * browsing channel, open the browsing channel now
+ * TODO (sanketa): Some TG would not broadcast browse feature hence check
+ * inter-op. */
+
+/*    if ((p_cb->features & BTA_AVK_FEAT_BROWSE) &&
+        (rc_open.peer_features & BTA_AVK_FEAT_BROWSE) &&
+        ((p_cb->rcb[i].status & BTA_AVK_RC_ROLE_MASK) == BTA_AVK_RC_ROLE_INT)) {
+    APPL_TRACE_DEBUG("%s opening AVRC Browse channel!~", __func__);
+    AVRC_OpenBrowseChannel(p_data->rc_conn_chg.handle);
+         }
+
+  APPL_TRACE_DEBUG("bta_avk_rc_opened alarm_set_on_queue i: %d !~", i);
+    alarm_set_on_queue(p_cb->rcb[i].br_conn_timer,
+                       (period_ms_t)BTA_AVK_RC_BR_TIME_VAL,
+                       bta_avk_rc_br_timer_cback,
+                       INT_TO_PTR(i),
+                       btu_bta_alarm_queue);*/
 }
 
+void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
+{
+    tBTA_AVK_RC_BROWSE_OPEN br_open;
+
+    br_open.rc_handle = p_data->rc_conn_chg.handle;
+    bta_avk_cb.rcb[br_open.rc_handle].status |= BTA_AVK_RC_CONN_BR_MASK;
+    APPL_TRACE_DEBUG("bta_avk_rc_br_opened ");
+    if(bta_avk_cb.rcb[br_open.rc_handle].br_conn_timer != NULL)
+        alarm_cancel(bta_avk_cb.rcb[br_open.rc_handle].br_conn_timer);
+
+    br_open.status = BTA_AVK_SUCCESS;
+    bdcpy(br_open.peer_addr, p_data->rc_conn_chg.peer_addr);
+    (*p_cb->p_cback)(BTA_AVK_RC_BROWSE_OPEN_EVT, (tBTA_AVK *)&br_open);
+}
+
+BOOLEAN browsing_dev_blacklisted_for_sniff (BD_ADDR addr)
+{
+    int blacklistsize = 0;
+    int i =0;
+
+    blacklistsize = sizeof(browsing_sniff_black_list_prefix)/
+                    sizeof(browsing_sniff_black_list_prefix[0]);
+    for (i = 0; i < blacklistsize; i++)
+    {
+        if (0 == memcmp(browsing_sniff_black_list_prefix[i], addr, 3))
+        {
+            APPL_TRACE_DEBUG(" Device Blacklisted for Sniff ");
+            return true;
+        }
+    }
+    return false;
+}
 
 /*******************************************************************************
 **
@@ -769,6 +865,21 @@ void bta_avk_rc_free_msg (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     UNUSED(p_data);
 }
 
+/*******************************************************************************
+ *
+ * Function         bta_av_rc_free_browse_msg
+ *
+ * Description      free an AVRCP browse message buffer.
+ *
+ * Returns          void
+ *
+ ******************************************************************************/
+void bta_avk_rc_free_browse_msg(UNUSED_ATTR tBTA_AVK_CB* p_cb,
+                               tBTA_AVK_DATA* p_data) {
+  if (p_data->rc_msg.opcode == AVRC_OP_BROWSE) {
+    osi_free_and_reset((void**)&p_data->rc_msg.msg.browse.p_browse_pkt);
+  }
+}
 
 
 /*******************************************************************************
@@ -1131,21 +1242,16 @@ void bta_avk_rc_msg(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 #if (AVCT_BROWSE_INCLUDED == TRUE)
     else if (p_data->rc_msg.opcode == AVRC_OP_BROWSE )
     {
-        APPL_TRACE_DEBUG("browse len PDU :%x",p_data->rc_msg.msg.browse.browse_len);
-        APPL_TRACE_DEBUG("browse  data:%x",p_data->rc_msg.msg.browse.p_browse_data[0]);
-        av.browse_msg.label = p_data->rc_msg.label;
-        av.browse_msg.p_msg = &p_data->rc_msg.msg;
-
-        evt = bta_avk_proc_browse_cmd(&rc_rsp, &p_data->rc_msg);
-        if (evt == 0)
-        {
-            APPL_TRACE_ERROR("Browse PDU not supported");
-            rc_rsp.rsp.pdu    = AVRC_PDU_GENERAL_REJECT;
-            rc_rsp.rsp.status = AVRC_STS_BAD_CMD;
-            ctype = 0;
-            AVRC_BldBrowseResponse(0, &rc_rsp, &p_pkt);
-        }
-    }
+       /* set up for callback */
+       av.meta_msg.rc_handle = p_data->rc_msg.handle;
+       av.meta_msg.company_id = p_vendor->company_id;
+       av.meta_msg.code = p_data->rc_msg.msg.hdr.ctype;
+       av.meta_msg.label = p_data->rc_msg.label;
+       av.meta_msg.p_msg = &p_data->rc_msg.msg;
+       av.meta_msg.p_data = p_data->rc_msg.msg.browse.p_browse_data;
+       av.meta_msg.len = p_data->rc_msg.msg.browse.browse_len;
+       evt = BTA_AV_META_MSG_EVT;
+     }
 #endif
 #if (AVRC_METADATA_INCLUDED == TRUE)
     if (evt == 0 && rc_rsp.rsp.status != BTA_AVK_STS_NO_RSP)
@@ -1165,6 +1271,9 @@ void bta_avk_rc_msg(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
     {
         av.remote_cmd.rc_handle = p_data->rc_msg.handle;
         (*p_cb->p_cback)(evt, &av);
+        /* If browsing message, then free the browse message buffer */
+        bta_avk_rc_free_browse_msg(p_cb, p_data);
+
     }
 }
 
@@ -1206,6 +1315,20 @@ void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
         }
     }
 }
+
+void bta_avk_rc_br_close(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
+{
+    tBTA_AVK_RC_BROWSE_CLOSE br_close;
+
+    br_close.rc_handle = p_data->rc_conn_chg.handle;
+    bta_avk_cb.rcb[br_close.rc_handle].status &= ~BTA_AVK_RC_CONN_BR_MASK;
+    APPL_TRACE_DEBUG("bta_avk_rc_br_close ");
+
+    bdcpy(br_close.peer_addr, p_data->rc_conn_chg.peer_addr);
+    (*p_cb->p_cback)(BTA_AVK_RC_BROWSE_CLOSE_EVT, (tBTA_AVK *)&br_close);
+
+}
+
 
 /*******************************************************************************
 **
@@ -1548,6 +1671,15 @@ void bta_avk_disable(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
         hdr.layer_specific = xx + 1;
         bta_avk_api_deregister((tBTA_AVK_DATA *)&hdr);
     }
+    for(xx=0; xx<BTA_AVK_NUM_RCB; xx++)
+    {
+        tBTA_AVK_RCB    *p_rcb = &p_cb->rcb[xx];
+        if(p_rcb->br_conn_timer != NULL)
+        {
+            alarm_free(p_rcb->br_conn_timer);
+            p_rcb->br_conn_timer = NULL;
+        }
+    }
     alarm_free(p_cb->link_signalling_timer);
     p_cb->link_signalling_timer = NULL;
     alarm_free(p_cb->accept_signalling_timer);
@@ -1584,6 +1716,7 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
     tBTA_AVK_CB   *p_cb = &bta_avk_cb;
     int     xx;
     UINT8   mask;
+    UINT8   sep_type;
     tBTA_AVK_LCB *p_lcb = NULL;
 
     BTIF_TRACE_IMP("%s bta_avk_sig_chg event: %d",
@@ -1700,7 +1833,9 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
         /* disconnected. */
         int is_lcb_used = bta_avk_cb.conn_lcb;
         APPL_TRACE_DEBUG(" is_lcb_used is %d",is_lcb_used);
-        dealloc_ar_device_info(p_data->str_msg.bd_addr);
+        sep_type = get_remote_sep_type(p_data->str_msg.bd_addr);
+        if(!(sep_type & BTA_AR_EXT_AV_MASK))
+            dealloc_ar_device_info(p_data->str_msg.bd_addr);
         p_lcb = bta_avk_find_lcb(p_data->str_msg.bd_addr, BTA_AVK_LCB_FREE);
         if (p_lcb && (p_lcb->conn_msk || is_lcb_used))
         {
@@ -1770,6 +1905,23 @@ void bta_avk_sig_timer(tBTA_AVK_DATA *p_data)
         }
     }
 }
+
+static void bta_avk_rc_br_timer_cback (void* data)
+{
+ /*   UINT8 handle = (UINT8)data;
+    APPL_TRACE_DEBUG(" bta_avk_rc_br_timer_cback handle %d ", handle);
+    if(!(bta_avk_cb.rcb[handle].status & BTA_AVK_RC_CONN_MASK))
+    {
+        APPL_TRACE_DEBUG(" Control channel disconnected, returning");
+        return;
+    }
+    if (BTA_AvkIsBrowsingSupported () && bta_avk_cb.rcb[handle].peer_features & BTA_AVK_FEAT_BROWSE)
+    {
+        BTIF_TRACE_IMP("bta_avk_rc_br_timer_cback AVRC_OpenBrowseChannel handle: %d !~", handle);
+        AVRC_OpenBrowseChannel (handle);
+    }*/
+}
+
 
 /*******************************************************************************
 **
@@ -1994,6 +2146,7 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
     UINT16              peer_rc_version=0;
     UINT16              categories = 0;
     BOOLEAN             val;
+    char dy_version[PROPERTY_VALUE_MAX] = "false";
 
     APPL_TRACE_DEBUG("bta_avk_sink_check_peer_features service_uuid:x%x", service_uuid);
     /* loop through all records we found */
@@ -2025,7 +2178,9 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
             val = SDP_FindProfileVersionInRec(p_rec, UUID_SERVCLASS_AV_REMOTE_CONTROL, &peer_rc_version);
             APPL_TRACE_DEBUG("peer_rc_version for TG 0x%x, profile_found %d", peer_rc_version, val);
 
-            bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
+            property_get("persist.avrcp.enable.dy_version", dy_version, "false");
+            if (!strncmp("true", dy_version, 4))
+                bta_avk_check_store_avrc_tg_version(p_rec->remote_bd_addr, peer_rc_version);
             if (peer_rc_version >= AVRC_REV_1_3)
                 peer_features |= (BTA_AVK_FEAT_VENDOR | BTA_AVK_FEAT_METADATA);
 
@@ -2036,6 +2191,7 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
              */
             if (peer_rc_version >= AVRC_REV_1_3)
             {
+                APPL_TRACE_DEBUG("peer_rc_version >= AVRC_REV_1_3 !~");
                 /* get supported categories */
                 if ((p_attr = SDP_FindAttributeInRec(p_rec,
                                 ATTR_ID_SUPPORTED_FEATURES)) != NULL)
@@ -2043,6 +2199,14 @@ tBTA_AVK_FEAT bta_avk_sink_check_peer_features (UINT16 service_uuid)
                     categories = p_attr->attr_value.v.u16;
                     if (categories & AVRC_SUPF_CT_CAT2)
                         peer_features |= (BTA_AVK_FEAT_ADV_CTRL);
+                    if(peer_rc_version >= AVRC_REV_1_4)
+                    {
+                        if (categories & AVRC_SUPF_CT_BROWSE)
+                        {
+                            peer_features |= (BTA_AVK_FEAT_BROWSE);
+                            APPL_TRACE_DEBUG("peer supports browsing !~");
+                        }
+                    }
                 }
             }
         }
@@ -2141,6 +2305,7 @@ void bta_avk_rc_disc_done(tBTA_AVK_DATA *p_data)
                 p_lcb = bta_avk_find_lcb(p_scb->peer_addr, BTA_AVK_LCB_FIND);
                 if(p_lcb)
                 {
+                    APPL_TRACE_DEBUG("bta_avk_rc_disc_done - bta_avk_rc_create !~");
                     rc_handle = bta_avk_rc_create(p_cb, AVCT_INT, (UINT8)(p_scb->hdi + 1), p_lcb->lidx);
                     if((rc_handle != BTA_AVK_RC_HANDLE_NONE) && (rc_handle < BTA_AVK_NUM_RCB))
                     {
@@ -2226,6 +2391,11 @@ void bta_avk_rc_closed(tBTA_AVK_DATA *p_data)
         {
             rc_close.rc_handle = i;
             p_rcb->status &= ~BTA_AVK_RC_CONN_MASK;
+
+            if(p_rcb->br_conn_timer != NULL)
+                alarm_cancel(p_rcb->br_conn_timer);
+
+
             p_rcb->peer_features = 0;
             APPL_TRACE_DEBUG("       shdl:%d, lidx:%d", p_rcb->shdl, p_rcb->lidx);
             if(p_rcb->shdl)
