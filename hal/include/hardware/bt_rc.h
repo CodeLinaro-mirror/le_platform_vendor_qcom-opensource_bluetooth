@@ -33,6 +33,8 @@ __BEGIN_DECLS
 #define BTRC_FOLDER_ITEM_HEADER     14
 #define BTRC_ITEM_ATTRIBUTE_HEADER  8
 #define BTRC_ITEM_TYPE_N_LEN_OCT    3
+#define BTRC_FEATURE_BIT_MASK_SIZE 16
+
 
 typedef uint8_t btrc_uid_t[BTRC_UID_SIZE];
 
@@ -98,6 +100,11 @@ typedef enum {
 } btrc_media_attr_t;
 
 typedef enum {
+    BTRC_PLAYER_VAL_OFF_EQUALIZER = 0x01,
+    BTRC_PLAYER_VAL_ON_EQUALIZER = 0x02,
+} btrc_player_equalizer_val_t;
+
+typedef enum {
     BTRC_PLAYER_VAL_OFF_REPEAT = 0x01,
     BTRC_PLAYER_VAL_SINGLE_REPEAT = 0x02,
     BTRC_PLAYER_VAL_ALL_REPEAT = 0x03,
@@ -109,6 +116,12 @@ typedef enum {
     BTRC_PLAYER_VAL_ALL_SHUFFLE = 0x02,
     BTRC_PLAYER_VAL_GROUP_SHUFFLE = 0x03
 } btrc_player_shuffle_val_t;
+
+typedef enum {
+    BTRC_PLAYER_VAL_OFF_SCAN = 0x01,
+    BTRC_PLAYER_VAL_ON_SCAN = 0x02,
+    BTRC_PLAYER_VAL_GRP_SCAN = 0x03,
+} btrc_player_scan_val_t;
 
 typedef enum {
     BTRC_STS_BAD_CMD        = 0x00, /* Invalid command */
@@ -201,23 +214,25 @@ typedef struct {
     uint8_t               *p_str;
 } btrc_player_full_name_t;
 
-typedef struct
-{
-    uint32_t              sub_type;
-    uint16_t              player_id;
-    uint8_t               major_type;
-    uint8_t               play_status;
-    btrc_feature_mask_t   features;       /* Supported feature bit mask*/
-    btrc_player_full_name_t     name;           /* The player name, name length and character set id.*/
-} btrc_folder_list_item_player_t;
+typedef struct {
+    uint16_t  player_id;
+    uint8_t   major_type;
+    uint32_t  sub_type;
+    uint8_t   play_status;
+    uint8_t   features[BTRC_FEATURE_BIT_MASK_SIZE];
+    uint16_t  charset_id;
+    uint8_t   name[BTRC_MAX_ATTR_STR_LEN];
+} btrc_item_player_t;
 
-typedef struct
-{
-    uint64_t                    uid;
-    uint8_t                     type;
-    uint8_t                     playable;
-    btrc_player_full_name_t     name;
-} btrc_folder_list_item_folder_t;
+
+typedef struct {
+    uint8_t   uid[BTRC_UID_SIZE];
+    uint8_t   type;
+    uint8_t   playable;
+    uint16_t  charset_id;
+    uint8_t   name[BTRC_MAX_ATTR_STR_LEN];
+} btrc_item_folder_t;
+
 
 typedef struct
 {
@@ -225,14 +240,15 @@ typedef struct
     btrc_player_full_name_t     name;
 } btrc_attr_entry_t;
 
-typedef struct
-{
-    uint64_t                    uid;
-    uint8_t                     type;
-    uint8_t                     attr_count;
-    btrc_player_full_name_t     name;
-    btrc_attr_entry_t*          p_attr_list;
-} btrc_folder_list_item_media_t;
+typedef struct {
+    uint8_t  uid[BTRC_UID_SIZE];
+    uint8_t  type;
+    uint16_t charset_id;
+    uint8_t  name[BTRC_MAX_ATTR_STR_LEN];
+    int      num_attrs;
+    btrc_element_attr_val_t* p_attrs;
+} btrc_item_media_t;
+
 
 typedef struct {
     uint16_t              str_len;
@@ -250,25 +266,32 @@ typedef struct
     btrc_name_t           *p_folders;
 } btrc_set_browsed_player_rsp_t;
 
-typedef struct
-{
-    uint8_t                          item_type;
+typedef struct {
+    uint8_t item_type;
     union
     {
-        btrc_folder_list_item_player_t   player;
-        btrc_folder_list_item_folder_t   folder;
-        btrc_folder_list_item_media_t    media;
-    } u;
-} btrc_folder_list_item_t;
+        btrc_item_player_t player;
+        btrc_item_folder_t folder;
+        btrc_item_media_t  media;
+    };
+} btrc_folder_items_t;
 
-/* GetFolderItems */
+
+/* GetFolderItems 
 typedef struct
 {
     uint16_t                  uid_counter;
     uint16_t                  item_count;
     uint8_t                   status;
     btrc_folder_list_item_t   *p_item_list;
-} btrc_folder_list_entries_t;
+} btrc_folder_list_entries_t;*/
+
+
+typedef struct {
+    uint16_t  str_len;
+    uint8_t   p_str[BTRC_MAX_ATTR_STR_LEN];
+} btrc_folder_name_t;
+
 
 /** Callback for play status request */
 typedef void (* btrc_get_play_status_callback)();
