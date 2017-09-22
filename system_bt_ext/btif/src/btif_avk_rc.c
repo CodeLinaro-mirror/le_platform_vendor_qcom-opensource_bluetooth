@@ -2995,7 +2995,6 @@ static bt_status_t get_folder_items_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t sco
 
 static bt_status_t change_folder_path_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t direction, uint8_t * uid)
 {
-    BTIF_TRACE_DEBUG("%s: direction 0x%02x uid %d", __FUNCTION__, direction, *uid);
     tAVRC_STS status = BT_STATUS_UNSUPPORTED;
     rc_transaction_t *p_transaction=NULL;
 #if (AVRC_CTLR_INCLUDED == TRUE)
@@ -3008,7 +3007,7 @@ static bt_status_t change_folder_path_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t d
         BTIF_TRACE_DEBUG("%s: uid is NULL", __FUNCTION__);
         return BT_STATUS_FAIL;
     }
-
+    BTIF_TRACE_DEBUG("%s: direction 0x%02x uid %d", __FUNCTION__, direction, *uid);
     int index = btif_avk_rc_idx_by_bdaddr(bd_addr->address);
     BTIF_TRACE_DEBUG("%s: index = %d ", __FUNCTION__, index);
     if (index >= btif_max_rc_clients)
