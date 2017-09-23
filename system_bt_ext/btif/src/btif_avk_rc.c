@@ -1327,6 +1327,8 @@ static bt_status_t register_notification_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_
     avrc_cmd.reg_notif.status = AVRC_STS_NO_ERROR;
     avrc_cmd.reg_notif.event_id = event_id;
     avrc_cmd.reg_notif.pdu = AVRC_PDU_REGISTER_NOTIFICATION;
+    if(AVRC_EVT_PLAY_POS_CHANGED == event_id && event_value == 0)
+        event_value = 10;
     avrc_cmd.reg_notif.param = event_value;
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
     if (status == AVRC_STS_NO_ERROR)
@@ -1380,6 +1382,8 @@ static bt_status_t register_notification_cmd(UINT8 rc_handle, UINT8 label, uint8
     avrc_cmd.reg_notif.status = AVRC_STS_NO_ERROR;
     avrc_cmd.reg_notif.event_id = event_id;
     avrc_cmd.reg_notif.pdu = AVRC_PDU_REGISTER_NOTIFICATION;
+    if(AVRC_EVT_PLAY_POS_CHANGED == event_id && event_value == 0)
+        event_value = 10;
     avrc_cmd.reg_notif.param = event_value;
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
     if (status == AVRC_STS_NO_ERROR)
