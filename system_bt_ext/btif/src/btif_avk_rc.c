@@ -2111,6 +2111,11 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AVK_META_MSG *pmeta_msg)
                 register_notification_cmd(pmeta_msg->rc_handle, pmeta_msg->label, avrc_response.reg_notif.event_id, 0);
             }
         }
+        else
+        {
+            BTIF_TRACE_DEBUG(" Releasing label = %d",pmeta_msg->label);
+            release_transaction(pmeta_msg->label);
+        }
         BTIF_TRACE_DEBUG("%s: btif_avk_rc_ctrl_upstreams_rsp_evt !~", __FUNCTION__);
         btif_avk_rc_ctrl_upstreams_rsp_evt((uint16_t)avrc_response.rsp.pdu, &avrc_response,
                                scratch_buf, buf_len,pmeta_msg->p_msg->vendor.hdr.ctype, index);
@@ -2120,6 +2125,8 @@ static void handle_avk_rc_metamsg_rsp(tBTA_AVK_META_MSG *pmeta_msg)
         BTIF_TRACE_DEBUG("%s AVRC_OP_BROWSE pdu %d", __func__, avrc_response.pdu);
         btif_avk_br_ctrl_upstreams_rsp_evt((uint16_t)avrc_response.rsp.pdu, &avrc_response,
             pmeta_msg->p_msg->vendor.hdr.ctype, index);
+        BTIF_TRACE_DEBUG(" Releasing label = %d",pmeta_msg->label);
+        release_transaction(pmeta_msg->label);
     }
     else
     {
