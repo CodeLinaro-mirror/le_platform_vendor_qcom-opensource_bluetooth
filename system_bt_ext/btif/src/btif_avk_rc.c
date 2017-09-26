@@ -2907,6 +2907,11 @@ uint8_t scope_id, uint64_t UID, uint16_t uid_counter, uint8_t num_attrb, btrc_me
         return BT_STATUS_FAIL;
     }
 
+    if (num_attrb > AVRC_MAX_ELEM_ATTR_SIZE)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid number of attributes = 0x%02x", __FUNCTION__, num_attrb);
+        return BT_STATUS_FAIL;
+    }
     CHECK_AVK_RC_CONNECTED_BY_IDX
     CHECK_AVK_BR_CONNECTED_BY_IDX
 
@@ -2968,6 +2973,12 @@ static bt_status_t get_folder_items_cmd_vendor(bt_bdaddr_t *bd_addr, uint8_t sco
     if (index >= btif_max_rc_clients)
     {
         BTIF_TRACE_DEBUG("%s: invalid index", __FUNCTION__);
+        return BT_STATUS_FAIL;
+    }
+
+    if (num_attrb > AVRC_MAX_ELEM_ATTR_SIZE)
+    {
+        BTIF_TRACE_DEBUG("%s: invalid number of attributes = 0x%02x", __FUNCTION__, num_attrb);
         return BT_STATUS_FAIL;
     }
 
