@@ -337,9 +337,9 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
     public void onClickAudioState(boolean state) {
         if (state) {
-            mActivity.mBluetoothHeadsetClient.disconnectAudio();
+         //   mActivity.mBluetoothHeadsetClient.disconnectAudio();
         } else {
-            mActivity.mBluetoothHeadsetClient.connectAudio();
+          //  mActivity.mBluetoothHeadsetClient.connectAudio();
         }
     }
 
