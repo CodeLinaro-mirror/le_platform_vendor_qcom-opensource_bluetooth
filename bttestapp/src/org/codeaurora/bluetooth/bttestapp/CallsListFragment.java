@@ -335,7 +335,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
                 break;
 
             case R.id.call_action_terminate:
-                result = cli.terminateCall(device, selectedCall == null ? 0 : selectedCall.getId());
+               // result = cli.terminateCall(device, selectedCall == null ? 0 : selectedCall.getId());
                 break;
 
             case R.id.call_action_hold:
