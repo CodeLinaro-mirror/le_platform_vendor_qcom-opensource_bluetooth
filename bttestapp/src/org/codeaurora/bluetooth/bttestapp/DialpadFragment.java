@@ -263,17 +263,17 @@ public class DialpadFragment extends Fragment implements OnClickListener, OnLong
         String number = mNumberEdit.getText().toString().trim();
 
         if (number.isEmpty()) {
-            mActivity.mBluetoothHeadsetClient.redial(mActivity.mDevice);
+           // mActivity.mBluetoothHeadsetClient.redial(mActivity.mDevice);
         } else {
-            mActivity.mBluetoothHeadsetClient.dial(mActivity.mDevice, mNumberEdit.getText()
-                    .toString());
+           // mActivity.mBluetoothHeadsetClient.dial(mActivity.mDevice, mNumberEdit.getText()
+           //         .toString());
         }
     }
 
     private void onClickMemDial() {
         try {
-            mActivity.mBluetoothHeadsetClient.dialMemory(mActivity.mDevice,
-                    Integer.valueOf(mNumberEdit.getText().toString()));
+           // mActivity.mBluetoothHeadsetClient.dialMemory(mActivity.mDevice,
+           //         Integer.valueOf(mNumberEdit.getText().toString()));
         } catch (NumberFormatException e) {
             // just ignore
         }
