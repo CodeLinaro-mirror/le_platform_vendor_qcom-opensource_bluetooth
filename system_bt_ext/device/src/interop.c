@@ -46,7 +46,7 @@
 #if defined(OS_GENERIC)
 static const char *INTEROP_FILE_PATH = "interop_database.conf";
 #else  // !defined(OS_GENERIC)
-static const char *INTEROP_FILE_PATH = "/data/misc/bluedroid/interop_database.conf";
+static const char *INTEROP_FILE_PATH = "/etc/bluedroid/interop_database.conf";
 static const char *INTEROP_BASE_FILE_PATH = "/etc/bluetooth/interop_database.conf";
 #endif  // defined(OS_GENERIC)
 
