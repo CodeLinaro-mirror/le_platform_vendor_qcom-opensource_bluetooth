@@ -216,6 +216,9 @@ typedef void (* btav_delay_report_vendor_callback)(bt_bdaddr_t *bd_addr, uint16_
 typedef void (* btav_audio_data_read_vendor_callback)(bt_bdaddr_t *bd_addr);
 
 typedef void (*btav_mtu_packettype_config_vendor_callback)(uint16_t mtu,uint8_t packettype, bt_bdaddr_t *bd_addr);
+
+typedef void (*btav_audio_registration_vendor_callback)(bool state);
+
 /** BT-AV Vendor callback structure. */
 typedef struct {
     /** set to sizeof(btav_vendor_callbacks_t) */
@@ -227,6 +230,7 @@ typedef struct {
     btav_delay_report_vendor_callback delay_report_vendor_cb;
     btav_audio_codec_config_vendor_callback audio_codec_config_vendor_cb;
     btav_mtu_packettype_config_vendor_callback mtu_packettype_cb;
+    btav_audio_registration_vendor_callback registration_vendor_cb;
 } btav_vendor_callbacks_t;
 
 typedef struct {
@@ -235,6 +239,7 @@ typedef struct {
     btav_audio_focus_request_vendor_callback audio_focus_request_vendor_cb;
     btav_audio_codec_config_vendor_callback audio_codec_config_vendor_cb;
     btav_audio_data_read_vendor_callback audio_data_read_vendor_cb;
+    btav_audio_registration_vendor_callback registration_vendor_cb;
 } btav_sink_vendor_callbacks_t;
 
 /** Represents the standard BT-AV interface.

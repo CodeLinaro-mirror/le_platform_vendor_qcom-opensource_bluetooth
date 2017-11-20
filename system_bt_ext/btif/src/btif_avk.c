@@ -452,6 +452,11 @@ static BOOLEAN btif_avk_state_idle_handler(btif_sm_event_t event, void *p_data, 
         case BTA_AVK_REGISTER_EVT:
             BTIF_TRACE_EVENT("The AV Handle:%d", ((tBTA_AVK*)p_data)->registr.hndl);
             btif_avk_cb[index].bta_handle = ((tBTA_AVK*)p_data)->registr.hndl;
+            if (btif_max_avk_clients == index + 1) {
+                if (bt_av_sink_vendor_callbacks != NULL) {
+                    HAL_CBACK(bt_av_sink_vendor_callbacks, registration_vendor_cb, TRUE);
+                }
+            }
             break;
 
         case BTIF_AVK_CONNECT_REQ_EVT:
