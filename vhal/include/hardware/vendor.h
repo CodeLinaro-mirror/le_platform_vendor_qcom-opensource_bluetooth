@@ -28,6 +28,7 @@ __BEGIN_DECLS
 /** Callback when bredr cleanup is done.
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
+typedef void (*  btvendor_snooplog_status_callback)(bool status);
 
 /** Callback to notify ssr cleanup to app.
  */
@@ -40,6 +41,7 @@ typedef struct {
     size_t      size;
     btvendor_bredr_cleanup_callback  bredr_cleanup_cb;
     btvendor_ssr_cleanup_callback    ssr_cleanup_cb;
+    btvendor_snooplog_status_callback  update_snooplog_status_cb;
 } btvendor_callbacks_t;
 
 /** Represents the standard BT-Vendor interface.
@@ -60,8 +62,13 @@ typedef struct {
     /** Does BREDR cleanup */
     void (*bredrcleanup)(void);
 
+    /** Generate level 6 logs */
+    void (*capture_vnd_logs)(void);
+
     /** Closes the interface. */
     void  (*cleanup)( void );
+
+    bool (*interop_db_match)( int feature, int type, void *value);
 
 } btvendor_interface_t;
 
