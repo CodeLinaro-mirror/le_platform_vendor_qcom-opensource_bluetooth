@@ -25,6 +25,16 @@ __BEGIN_DECLS
 #define BT_PROFILE_VENDOR_ID "vendor"
 #define BT_PROFILE_WIPOWER_VENDOR_ID "wipower"
 
+/** Bluetooth Device Name */
+typedef struct {
+    uint8_t name[249];
+} __attribute__((packed))bt_lename_t;
+
+typedef struct{
+    int len;
+    void *val;
+}btvendor_lename_t;
+
 /** Callback when bredr cleanup is done.
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
@@ -69,6 +79,8 @@ typedef struct {
     void  (*cleanup)( void );
 
     bool (*interop_db_match)( int feature, int type, void *value);
+
+    void (*setLeBtName)(btvendor_lename_t* name);
 
 } btvendor_interface_t;
 
