@@ -55,7 +55,6 @@ import android.widget.ToggleButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.codeaurora.bluetooth.bttestapp.R;
 import java.util.ArrayList;
 
 public class MainActivity extends MonkeyActivity {
@@ -325,6 +324,11 @@ public class MainActivity extends MonkeyActivity {
             Log.v(TAG, "fetching UUIDs");
             mDiscoveryInProgress = mDevice.fetchUuidsWithSdp();
         }
+    }
+
+    public void showCoveArtActivity(View v) {
+        Log.i(TAG," showCoveArtActivity");
+        startActivity(new Intent(this,AvrcpCoverArtActivity.class));
     }
 
     private BluetoothProfile.ServiceListener ma2dpSinkServiceListener =

@@ -112,6 +112,15 @@
                 android:text="@string/select_device" />
 
         </LinearLayout>
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="showCoveArtActivity"
+            android:text="@string/showCoverArt"
+            android:layout_below="@id/linearLayout1"
+            android:layout_alignEnd="@+id/linearLayout1"
+            android:layout_margin="@dimen/activity_base_margin"
+            />
 
         <ToggleButton
             android:id="@+id/toggleButton1"
@@ -120,7 +129,7 @@
             android:layout_alignRight="@+id/linearLayout1"
             android:layout_below="@+id/linearLayout1"
             android:layout_marginRight="36dp"
-            android:onClick="onToggleClicked" />
+            android:onClick="onToggleClicked" android:visibility="gone" />
 
     </RelativeLayout>
 
