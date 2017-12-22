@@ -34,6 +34,7 @@
 #include "hardware/bt_av.h"
 #include "osi/include/allocator.h"
 #include <cutils/properties.h>
+#include "btcore/include/bdaddr.h"
 
 #define LOG_TAG "bt_btif_avk"
 
@@ -47,6 +48,7 @@
 #include "btu.h"
 #include "bt_utils.h"
 #include "hardware/bt_av_vendor.h"
+#include "osi/include/fixed_queue.h"
 #include "osi/include/list.h"
 
 /*****************************************************************************
@@ -3829,7 +3831,7 @@ static BOOLEAN btif_avk_any_br_peer(void)
             {
                 BTIF_TRACE_WARNING("%s : Connected to BR device : %s",
                     __FUNCTION__, bdaddr_to_string(&btif_avk_cb[index].peer_bda,
-                    &addr_string), sizeof(addr_string));
+                    &addr_string, sizeof(addr_string)));
                 return TRUE;
             }
         }
