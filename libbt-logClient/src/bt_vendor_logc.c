@@ -73,6 +73,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 **  Variables
 ******************************************************************************/
 int client_sock;
+uint16_t logging_level;
+uint16_t logcat_capture_enabled;
 
 /******************************************************************************
 **  Local type definitions
@@ -82,6 +84,8 @@ int client_sock;
 /******************************************************************************
 **  Functions
 ******************************************************************************/
+static int cleanup(void);
+
 void lib_log(const char *fmt_str, ...)
 {
     if (DBG) {
@@ -100,6 +104,7 @@ void lib_log(const char *fmt_str, ...)
 int connect_to_logger_server(void)
 {
     struct sockaddr_un serv_addr;
+    struct timeval sock_timeout;
     int sock, ret = -1, i, addr_len;
 
     BTLOG_NO_INTR(sock = socket(AF_LOCAL, SOCK_STREAM, 0));
@@ -121,6 +126,12 @@ int connect_to_logger_server(void)
             usleep(100000);
         }
     }
+    sock_timeout.tv_sec = 0;
+    sock_timeout.tv_usec = 50000;
+    if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &sock_timeout, sizeof(sock_timeout)) < 0) {
+        lib_log("%s, failed to set timeout value: %s\n", __func__, strerror(errno));
+        ret = -1;
+    }
 
     if (ret < 0) {
         close(sock);
@@ -134,6 +145,7 @@ int connect_to_logger_server(void)
 static void send_log(char *buff, int buff_size)
 {
     int ret = 0;
+    static int send_retry = 0;
 
     if (client_sock < 0) {
         return;
@@ -144,8 +156,17 @@ static void send_log(char *buff, int buff_size)
         lib_log("%s, Connection closed", __func__);
         close(client_sock);
         return;
+    } else if( ret < 0 && errno == EAGAIN ) {
+        lib_log("%s, Socket write error: %s\n", __func__, strerror(errno));
+        send_retry++;
+        if(send_retry == 20) {
+            lib_log("%s, Closing socket", __func__);
+            cleanup();
+        }
+        return;
     }
 
+    send_retry = 0;
     return;
 }
 
@@ -197,17 +218,20 @@ unsigned short int create_log_info(const char *tag, char *buff)
 **
 ** Parameters:      Void
 
-** Returns          true if socket connection is successful, false otherwise.
+** Returns          Bluetooth logging level set in the device.
 **
 *******************************************************************************/
 static int init(void)
 {
     lib_log("%s", __func__);
+    logging_level = property_get_int32("persist.bt_logger.log_mask", 0xFFFF);
 
     client_sock = connect_to_logger_server();
     if (client_sock < 0)
         return -1;
-    return true;
+
+    logcat_capture_enabled = logging_level&DYNAMIC_LOGCAT_CAPTURE;
+    return logging_level;
 }
 
 /*******************************************************************************
@@ -227,6 +251,9 @@ static void send_log_msg(const char *tag, const char *fmt_str, va_list ap)
 {
     int info_size, log_size = 0;
     char buffer[VND_LOG_BUFF_SIZE];
+
+    if(!logcat_capture_enabled)
+        return;
 
     buffer[0] = VENDOR_LOGGER_LOGS;
 
