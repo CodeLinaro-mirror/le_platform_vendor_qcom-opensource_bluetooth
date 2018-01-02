@@ -37,7 +37,8 @@ typedef void (*  btvendor_ssr_cleanup_callback)(void);
 typedef void (*btvendor_acl_state_changed_with_reason_callback)(bt_status_t status,
                                                        bt_bdaddr_t *remote_bd_addr,
                                                        bt_acl_state_t state,
-                                                       uint8_t reason);
+                                                       uint8_t reason,
+                                                       uint8_t transport_type);
 /** BT-Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtVendorCallbacks) */
