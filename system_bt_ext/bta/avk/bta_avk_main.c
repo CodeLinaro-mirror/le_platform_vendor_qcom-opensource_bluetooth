@@ -859,8 +859,6 @@ void bta_avk_api_deregister(tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_SCB *p_scb = bta_avk_hndl_to_scb(p_data->hdr.layer_specific);
 
-    // de-initialize aptX
-    A2D_deinit_aptX();
 
     if(p_scb)
     {
