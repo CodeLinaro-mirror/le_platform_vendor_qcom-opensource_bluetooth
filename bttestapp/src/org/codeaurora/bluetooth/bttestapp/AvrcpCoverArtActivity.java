@@ -29,6 +29,7 @@
 package org.codeaurora.bluetooth.bttestapp;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -36,6 +37,7 @@ import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadata;
+import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.os.SystemProperties;
 import android.text.TextUtils;
@@ -56,9 +58,19 @@ public class AvrcpCoverArtActivity extends Activity
             "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
     private final String EXTRA_METADATA =
             "android.bluetooth.avrcp-controller.profile.extra.METADATA";
+    private final String EXTRA_PLAYBACK =
+            "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
+    private final String EXTRA_METADATA_IS_INVALID_HANDLE = "is_invalid_handle";
+
+    private String mAlbumTitle = "";
+
+    private boolean isCoverArtSet = false;
+
     private ImageView mIvCoverArt, mIvThumbNail;
     private Spinner mSpImgType, mSpImgEncode, mSpImgWidth, mSpImgSize, mSpImgheight;
     private Button mBtnConfig, mBtnConfigBase;
+
+    private BluetoothAdapter mAdapter;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
@@ -68,9 +80,16 @@ public class AvrcpCoverArtActivity extends Activity
             Log.i(TAG, "action " + action);
             if (action.equals(ACTION_TRACK_EVENT)) {
                 MediaMetadata metaData = intent.getParcelableExtra(EXTRA_METADATA);
-                if (metaData != null) {
-                    setCoverArt(metaData);
+                PlaybackState state = intent.getParcelableExtra(EXTRA_PLAYBACK);
+                boolean isInvalid = intent.getBooleanExtra
+                        (EXTRA_METADATA_IS_INVALID_HANDLE, false);
+                if (metaData != null && state == null) {
+                    setCoverArt(metaData, isInvalid);
                 }
+            } else if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)
+                    && (mAdapter.getState() == BluetoothAdapter.STATE_OFF
+                      || mAdapter.getState() == BluetoothAdapter.STATE_TURNING_OFF )) {
+                setCoverArt(new MediaMetadata.Builder().build(), true);
             }
         }
     };
@@ -95,43 +114,60 @@ public class AvrcpCoverArtActivity extends Activity
         mIvCoverArt.setVisibility(ImageView.GONE);
         mIvThumbNail.setVisibility(ImageView.GONE);
         setSpinners();
+        Log.i(TAG, " onCreate");
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        mAdapter = BluetoothAdapter.getDefaultAdapter();
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TRACK_EVENT);
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
+        Log.i(TAG, " onResume");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         unregisterReceiver(mReceiver);
+        Log.i(TAG, " onPause");
     }
 
-    private void setCoverArt(MediaMetadata metaData) {
+    private void setCoverArt(MediaMetadata metaData, boolean isInvalid) {
         String path = metaData.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
         Bitmap bitMapThumbNail = metaData
                 .getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
-        Log.i(TAG, "bitMapThumbNail :" + bitMapThumbNail + " Cover art path :" + path);
+        String albumTitle = metaData.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        Log.i(TAG, "bitMapThumbNail :" + bitMapThumbNail + " Cover art path :" + path
+                +" isInvalid :" + isInvalid +" Album title :" + albumTitle
+                +" mAlbumTitle :" + mAlbumTitle + " isCoverArtSet :" + isCoverArtSet);
+        if (mAlbumTitle.equalsIgnoreCase(albumTitle) && isCoverArtSet) {
+            Log.v(TAG, " Already set Ignore "); return;
+        }
 
         if (bitMapThumbNail != null) {
             mIvThumbNail.setVisibility(ImageView.VISIBLE);
             mIvCoverArt.setVisibility(ImageView.GONE);
             mIvThumbNail.setImageBitmap(bitMapThumbNail);
-            return;
+            isCoverArtSet = true;
+            mAlbumTitle = albumTitle;
+            Log.i(TAG, " BitMap");
+        } else if (!TextUtils.isEmpty(path)) {
+            mIvThumbNail.setVisibility(ImageView.GONE);
+            mIvCoverArt.setVisibility(ImageView.VISIBLE);
+            Bitmap bitMap = BitmapFactory.decodeFile(path);
+            Log.i(TAG, "CoverArt :");
+            mIvCoverArt.setImageBitmap(bitMap);
+            isCoverArtSet = true;
+            mAlbumTitle = albumTitle;
+        } else if (isInvalid) {
+            mIvCoverArt.setVisibility(ImageView.GONE);
+            mIvThumbNail.setVisibility(ImageView.GONE);
+            isCoverArtSet = false;
+            mAlbumTitle = "";
         }
-        if (path == null || path.trim().length() == 0) {
-            return;
-        }
-
-        mIvThumbNail.setVisibility(ImageView.GONE);
-        mIvCoverArt.setVisibility(ImageView.VISIBLE);
-        Bitmap bitMap = BitmapFactory.decodeFile(path);
-        Log.i(TAG, "setCoverArt path :" + path + " bitMap :" + bitMap);
-        mIvCoverArt.setImageBitmap(bitMap);
     }
 
     @Override
