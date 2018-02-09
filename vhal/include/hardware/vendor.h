@@ -82,6 +82,9 @@ typedef struct {
 
     void (*setLeBtName)(btvendor_lename_t* name);
 
+    /** Sets the Scan Mode with parameter to ignore LE Scan mode*/
+    void (*setScanMode)(bt_scan_mode_t mode, bool ignoreLeScanModes);
+
 } btvendor_interface_t;
 
 __END_DECLS
