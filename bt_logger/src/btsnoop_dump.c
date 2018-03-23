@@ -48,22 +48,41 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <android/log.h>
 
 #include <cutils/log.h>
-
-#define MAX_FILE_SIZE 1024*1024*20
-#define MAX_SNOOP_LOG_FILES 2
+#include <cutils/properties.h>
 
 #define LOGD0(t,s) __android_log_write(ANDROID_LOG_DEBUG, t, s)
+
+#define BTSNOOP_FILENAME_LEN 256
+#define BTSNOOP_MAX_FILE_SIZE 1024*1024*20
+#define BTSNOOP_READ_BUF_SIZE 1200
+
+#define BTSNOOP_PATH_PROPERTY "persist.bluetooth.btsnooppath"
+#define BTSNOOP_PATH_DEFAULT "/data/misc/bluetooth/logs/hci.cfa"
+
+#define BTSOOP_SOCKET_NAME "bthcitraffic"
+#define BTSOOP_PORT 8872
 
 static int file_descriptor = -1;
 uint32_t file_size = 0;
 pthread_t snoop_client_tid = -1;
 int btsnoop_socket = -1;
+static unsigned char read_buf[BTSNOOP_READ_BUF_SIZE];
 
-#define LOCAL_SOCKET_NAME "bthcitraffic"
-#define BTSNOOP_PATH "/data/misc/bluetooth/logs"
-#define BTSOOP_PORT 8872
 
-//#define __SNOOP_DUMP_DBG__
+static char* snoop_get_log_path(char* btsnoop_path) {
+  property_get(BTSNOOP_PATH_PROPERTY, btsnoop_path, BTSNOOP_PATH_DEFAULT);
+
+  return btsnoop_path;
+}
+
+static char* snoop_get_last_log_path(char* last_log_path,
+                                       char* btsnoop_path) {
+  snprintf(last_log_path, PROPERTY_VALUE_MAX + sizeof(".last"), "%s.last",
+           btsnoop_path);
+
+  return last_log_path;
+}
+
 
 static void snoop_log(const char *fmt_str, ...)
 {
@@ -77,94 +96,24 @@ static void snoop_log(const char *fmt_str, ...)
     LOGD0("btsnoop_dump: ", buffer);
 }
 
-int btsnoop_file_name (char file_name[256])
-{
-    struct tm *tmp;
-    time_t t;
-    char time_string[64];
-
-    t = time(NULL);
-    tmp = localtime(&t);
-    if (tmp == NULL)
-    {
-        snoop_log("Error : get localtime");
-        return -1;
-    }
-
-    if (strftime(time_string, 64, "%Y%m%d%H%M%S", tmp) == 0)
-    {
-        snoop_log("Error : strftime :");
-        return -1;
-    }
-    snprintf(file_name, 256, BTSNOOP_PATH"/hci_snoop%s.cfa", time_string);
-    return 0;
-}
-
 int snoop_open_file (void)
 {
-    char file_name[MAX_SNOOP_LOG_FILES][256];
-    int snoop_files_found = 0, old_file_index = 0;
+    char new_file[BTSNOOP_FILENAME_LEN];
+    char del_file[BTSNOOP_FILENAME_LEN];
     struct DIR* p_dir;
     struct dirent* p_dirent;
 
-    p_dir = opendir(BTSNOOP_PATH);
-    if(p_dir == NULL)
-    {
-        snoop_log("snoop_log_open: Unable to open the Dir entry\n");
-        file_descriptor = -1;
-        return -1;
-    }
-    while ((p_dirent = readdir(p_dir)) != NULL)
-    {
-        int ret;
+    snoop_get_log_path(new_file);
+    snoop_get_last_log_path(del_file, new_file);
 
-        if ((ret = strncmp(p_dirent->d_name, "hci_snoop", strlen("hci_snoop"))) == 0)
-        {
-            snoop_files_found++;
-        }
-        else
-        {
-            continue;
-        }
-        if (snoop_files_found > MAX_SNOOP_LOG_FILES)
-        {
-            snoop_log("snoop_log_open: Error : More than two snoop files : Abort");
-            file_descriptor = -1;
-            closedir(p_dir);
-            return -1;
-        }
-        else if (ret == 0)
-        {
-            strlcpy(file_name[snoop_files_found - 1], p_dirent->d_name, 256);
-            if(old_file_index != (snoop_files_found-1) && strncmp(file_name[snoop_files_found-1], file_name[old_file_index], 256) < 0) {
-                old_file_index = snoop_files_found - 1;
-            }
+    if (!rename(new_file, del_file))
+        snoop_log("%s unable to rename '%s' to '%s': %s", __func__,
+              new_file, del_file, strerror(errno));
+
 #ifdef __SNOOP_DUMP_DBG__
-            snoop_log("snoop_log_open: snoop file found : %s", file_name[snoop_files_found - 1]);
-#endif //__SNOOP_DUMP_DBG__
-        }
-    }
-    closedir(p_dir);
-    if (snoop_files_found == MAX_SNOOP_LOG_FILES)
-    {
-        char del_file[256];
-
-        /* Delete the oldest File */
-        snprintf(del_file, 256, BTSNOOP_PATH"/%s", file_name[old_file_index]);
-#ifdef __SNOOP_DUMP_DBG__
-            snoop_log("snoop_log_open: old file to delete : %s", del_file);
-#endif //__SNOOP_DUMP_DBG__
-        unlink(del_file);
-    }
-
-    if (btsnoop_file_name(file_name[old_file_index]) != 0)
-    {
-        snoop_log("snoop_log_open: error : could not get snoop file name !!");
-        return -1;
-    }
-
-    snoop_log("snoop_log_open: new file : %s", file_name[0]);
-    file_descriptor = open(file_name[old_file_index], \
+    snoop_log("snoop_log_open: new file : %s", new_file);
+#endif
+    file_descriptor = open(new_file, \
                               O_WRONLY|O_CREAT|O_TRUNC, \
                               S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH);
     if (file_descriptor == -1)
@@ -175,7 +124,9 @@ int snoop_open_file (void)
     }
 
     file_size = 0;
+
     write(file_descriptor, "btsnoop\0\0\0\0\1\0\0\x3\xea", 16);
+
     return 0;
 }
 
@@ -197,8 +148,8 @@ int snoop_connect_to_source (void)
     {
         memset(&serv_addr, 0, sizeof(serv_addr));
         serv_addr.sun_family = AF_LOCAL;
-        strlcpy(&serv_addr.sun_path[1], LOCAL_SOCKET_NAME, strlen(LOCAL_SOCKET_NAME) + 1);
-        addr_len =  strlen(LOCAL_SOCKET_NAME) + 1;
+        strlcpy(&serv_addr.sun_path[1], BTSOOP_SOCKET_NAME, strlen(BTSOOP_SOCKET_NAME) + 1);
+        addr_len =  strlen(BTSOOP_SOCKET_NAME) + 1;
         addr_len += sizeof(serv_addr.sun_family);
         do
         {
@@ -256,8 +207,6 @@ int read_block (int sock, unsigned char *pBuf, int len)
     return bytes_recv;
 }
 
-static unsigned char read_buf[1200];
-
 int snoop_process (int sk)
 {
     int bytes_recv = 0;
@@ -286,7 +235,6 @@ int snoop_process (int sk)
 
     length = read_buf[0] << 24 | read_buf[1] << 16 | read_buf[2] << 8 | read_buf[3];
 
-#if 1
 #ifdef __SNOOP_DUMP_DBG__
     snoop_log("Length of Frame %ld : byte %0x %0x %0x %0x", length,
         read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
@@ -294,7 +242,7 @@ int snoop_process (int sk)
     snoop_log("File Size = %d", file_size);
 #endif //__SNOOP_DUMP_DBG__
 
-    if (file_size > MAX_FILE_SIZE)
+    if (file_size > BTSNOOP_MAX_FILE_SIZE)
     {
         if (file_descriptor != -1)
         {
@@ -306,7 +254,6 @@ int snoop_process (int sk)
             }
         }
     }
-#endif
 
 /*
     Read rest of snoop header(16 Bytes) and HCI Packet
@@ -334,7 +281,7 @@ void *snoop_dump_thread( void *context)
     sk = snoop_connect_to_source();
 
 /*
-       16 Bytes : Read and discard snoop file header
+    16 Bytes : Read and discard snoop file header
 */
     if(sk < 0)
     {
