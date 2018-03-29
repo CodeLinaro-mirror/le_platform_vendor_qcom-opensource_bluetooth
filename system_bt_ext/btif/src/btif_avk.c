@@ -2894,6 +2894,7 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
     if(queue_size == 0)
         return;
 
+    pthread_mutex_lock(&sink_data_q_lock);
     list_t *list = fixed_queue_get_list(RxDataQ);
     for (const list_node_t *node = list_begin(list); node != list_end(list); )
     {
@@ -2913,6 +2914,7 @@ void update_flushing_device_vendor(bt_bdaddr_t *bd_addr)
             osi_free(p_data_q_buf);
         }
     }
+    pthread_mutex_unlock(&sink_data_q_lock);
 }
 /*******************************************************************************
  **
@@ -2976,8 +2978,8 @@ static uint32_t get_a2dp_sink_streaming_data_vendor (UINT16 codec_type, UINT8* d
     {
         BTIF_TRACE_IMP("%s codec mismatch, returning, requested_codec_type %d, codec_present %d",
             __FUNCTION__, codec_type, p_data_q_buf->codec_type);
-        pthread_mutex_unlock(&sink_data_q_lock);
         p_data_q_buf = (tBT_SINK_DATA_HDR *)fixed_queue_try_dequeue(RxDataQ);
+        pthread_mutex_unlock(&sink_data_q_lock);
         osi_free(p_data_q_buf);
         return 0;
     }
@@ -3079,6 +3081,14 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
     {
         BTIF_TRACE_ERROR(" %s DATA Que not exit or Full size =%d, returning",
         __FUNCTION__,fixed_queue_length(RxDataQ));
+
+        /* Code to give callback to BT-APP layer that Data is queued in Data Queue*/
+        if (enable_notification_cb && bt_av_sink_vendor_callbacks != NULL) {
+            bt_bdaddr_t bdAddr;
+            memcpy(bdAddr.address, &bd_addr, sizeof(BD_ADDR));
+            HAL_CBACK(bt_av_sink_vendor_callbacks, audio_data_read_vendor_cb, &bdAddr);
+        }
+
         pthread_mutex_unlock(&sink_data_q_lock);
         return  fixed_queue_length(RxDataQ);
     }
@@ -3101,7 +3111,9 @@ UINT32 btif_media_enque_sink_data(UINT16 codec_type, UINT8 *data, UINT16 size, B
         if (index >= btif_max_avk_clients)
         {
             BTIF_TRACE_DEBUG("%s Invalid index for device", __FUNCTION__);
-            return;
+            osi_free(p_msg);
+            pthread_mutex_unlock(&sink_data_q_lock);
+            return fixed_queue_length(RxDataQ);
         }
         if(btif_avk_cb[index].avdt_sync == TRUE )
         {
