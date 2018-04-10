@@ -2614,7 +2614,11 @@ void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data)
         }
 
         /* make sure that the timer is not active */
-        alarm_cancel(p_scb->avrc_ct_timer);
+        if (p_scb->avrc_ct_timer) {
+            alarm_free(p_scb->avrc_ct_timer);
+            p_scb->avrc_ct_timer = NULL;
+        }
+        list_free(p_scb->a2d_list);
         osi_free_and_reset((void **)&p_cb->p_scb[p_scb->hdi]);
     }
 

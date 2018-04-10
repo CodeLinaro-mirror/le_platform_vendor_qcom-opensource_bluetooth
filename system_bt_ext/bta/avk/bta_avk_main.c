@@ -422,7 +422,10 @@ static void bta_avk_free_scb(tBTA_AVK_SCB *p_scb)
 {
     // NOTE(google) This free currently is not called
     assert(p_scb != NULL);
-
+    if (p_scb->avrc_ct_timer) {
+        alarm_free(p_scb->avrc_ct_timer);
+        p_scb->avrc_ct_timer = NULL;
+    }
     list_free(p_scb->a2d_list);
     osi_free(p_scb);
 }

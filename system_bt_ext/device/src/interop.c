@@ -287,7 +287,7 @@ static int interop_config_init(void)
   return 0;
 
 error:
-  config_free(config);
+  bt_config_free(config);
   pthread_mutex_unlock(&file_lock);
   pthread_mutex_destroy(&file_lock);
   config = NULL;
@@ -766,7 +766,7 @@ static void interop_config_cleanup(void)
   interop_config_flush();
 
   pthread_mutex_lock(&file_lock);
-  config_free(config);
+  bt_config_free(config);
   config = NULL;
   pthread_mutex_unlock(&file_lock);
   pthread_mutex_destroy(&file_lock);
