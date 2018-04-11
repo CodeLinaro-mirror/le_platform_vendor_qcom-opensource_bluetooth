@@ -18,6 +18,7 @@
  *
  ******************************************************************************/
 
+#ifdef ANDROID
 #include "android/hardware/bluetooth/1.0/IBluetoothHci.h"
 #include <android/hardware/bluetooth/1.0/IBluetoothHciCallbacks.h>
 #include <android/hardware/bluetooth/1.0/types.h>
@@ -31,6 +32,15 @@
 #include <vendor/qti/hardware/fm/1.0/IFmHci.h>
 #include <vendor/qti/hardware/fm/1.0/IFmHciCallbacks.h>
 #include <vendor/qti/hardware/fm/1.0/types.h>
+#else
+#include <fcntl.h>
+#include <dlfcn.h>
+#include <string.h>
+#include "bt_transport_hal.h"
+#include "HidlSupport.h"
+#include "assert.h"
+#define CHECK(x) assert(x)
+#endif
 
 #include <sys/un.h>
 #include <netinet/in.h>
@@ -41,9 +51,11 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "hidl_client.h"
 #include "hci_internals.h"
 
+#ifdef ANDROID
 using android::hardware::bluetooth::V1_0::IBluetoothHci;
 using android::hardware::bluetooth::V1_0::IBluetoothHciCallbacks;
 using android::hardware::bluetooth::V1_0::HciPacket;
@@ -59,6 +71,18 @@ using android::hardware::ProcessState;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hardware::hidl_vec;
+#else
+static void *lib_handle;
+static const char TRANSPORT_LIBRARY_NAME[] = "bttransport.so";
+static const char TRANSPORT_LIBRARY_SYMBOL_NAME[] = "BLUETOOTH_VENDOR_HCI_INTERFACE";
+
+using android::hardware::hidl_vec;
+
+using android::hardware::bluetooth::V1_0::HciPacket;
+using android::hardware::bluetooth::V1_0::Status;
+using android::hardware::bluetooth::V1_0::implementation::BluetoothHci;
+using android::hardware::bluetooth::V1_0::implementation::BluetoothHciCallbacks;
+#endif
 
 extern void initialization_complete();
 extern void *process_tool_data(void *arg);
@@ -85,10 +109,18 @@ static volatile bool hidl_init = false;
 int server_fd = -1;
 int client_fd = -1;
 
+#ifdef ANDROID
 android::sp<IBluetoothHci> btHci;
 android::sp<IAntHci> antHci;
 android::sp<IFmHci> fmHci;
+#else
+void vnd_interface_open(void);
 
+bt_vnd_interface_t* btHci;
+BluetoothHciCallbacks* callbacks;
+#endif
+
+#ifdef ANDROID
 class BluetoothHciCallbacks : public IBluetoothHciCallbacks {
 
     public:
@@ -239,7 +271,85 @@ namespace
 };
 }
 }
+#else
 
+static bool init_cb(android::hardware::bluetooth::V1_0::implementation::Status status) {
+    callbacks = new BluetoothHciCallbacks();
+    callbacks->initializationComplete(status);
+}
+static bool hci_evt_rcvd_cb(const hidl_vec<uint8_t>& data) {
+    callbacks->hciEventReceived(data);
+}
+static bool acl_cmd_rcvd_cb(const hidl_vec<uint8_t>& data) {
+    callbacks->aclDataReceived(data);
+}
+static bool sco_data_rcvd_cb(const hidl_vec<uint8_t>& data) {
+    callbacks->scoDataReceived(data);
+}
+
+static const bt_vnd_cb_t hci_callbacks = {
+  sizeof(hci_callbacks),
+  init_cb,
+  hci_evt_rcvd_cb,
+  acl_cmd_rcvd_cb,
+  sco_data_rcvd_cb
+};
+
+BluetoothHciCallbacks::BluetoothHciCallbacks() {}
+
+void BluetoothHciCallbacks::initializationComplete(Status status) {
+        if (status == Status::SUCCESS) {
+            hidl_init = true;
+        } else {
+            ALOGE("Error in HIDL initialization");
+        }
+        sem_post(&s_cond);
+        return;
+}
+
+void BluetoothHciCallbacks::hciEventReceived(const hidl_vec<uint8_t>& event) {
+        int len = static_cast<int>(event.size());
+        unsigned char val = BT_EVT_PACKET_TYPE;
+        if (safe_write(server_fd, &val, 1) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+
+        if (safe_write(server_fd, const_cast<unsigned char*>(event.data()), len) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+}
+
+void BluetoothHciCallbacks::aclDataReceived(const hidl_vec<uint8_t>& data) {
+        int len = static_cast<int>(data.size());
+        unsigned char val = BT_ACL_PACKET_TYPE;
+        if (safe_write(server_fd, &val, 1) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+
+        if (safe_write(server_fd, const_cast<unsigned char*>(data.data()), len) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+}
+
+void BluetoothHciCallbacks::scoDataReceived(const hidl_vec<uint8_t>& data) {
+        int len = static_cast<int>(data.size());
+        unsigned char val = BT_SCO_PACKET_TYPE;
+        if (safe_write(server_fd, &val, 1) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+
+        if (safe_write(server_fd, const_cast<unsigned char*>(data.data()), len) == -1) {
+            ALOGE("%s: failed to write event to tool socket", __func__);
+            return;
+        }
+            return;
+}
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -257,6 +367,7 @@ bool hidl_client_initialize(int mode, int *tool_fd) {
     switch (mode) {
         case MODE_BT:
             ALOGI("%s: Initialize the HIDL with Mode BT", __func__);
+#ifdef ANDROID
             btHci = IBluetoothHci::getService();
             // If android.hardware.bluetooth* is not found, Bluetooth can not continue.
             if (btHci != nullptr) {
@@ -274,6 +385,16 @@ bool hidl_client_initialize(int mode, int *tool_fd) {
                 // waiting for initialisation callback
                 sem_wait(&s_cond);
             }
+#else
+            ALOGI("bt_hci_le: %s", __func__);
+            vnd_interface_open();
+            CHECK(btHci != nullptr);
+            hidl_init = false;
+            sem_init(&s_cond, 0, 0);
+            btHci->init(&hci_callbacks);
+            // waiting for initialisation callback
+            sem_wait(&s_cond);
+#endif
 
             if (hidl_init == true) {
                 break;
@@ -282,6 +403,7 @@ bool hidl_client_initialize(int mode, int *tool_fd) {
                 return false;
             }
 
+#ifdef ANDROID
         case MODE_ANT:
             ALOGI("%s: Initialize the HIDL with Mode ANT", __func__);
             antHci = IAntHci::getService();
@@ -338,6 +460,7 @@ bool hidl_client_initialize(int mode, int *tool_fd) {
                 return false;
             }
             break;
+#endif
         default:
             ALOGE("Unsupported mode");
             return false;
@@ -379,11 +502,19 @@ void hidl_client_close() {
 
     switch (mode_type) {
         case MODE_BT:
+#ifdef ANDROID
             ALOGI("%s: Close HIDL with Mode BT", __func__);
             btHci->close();
             btHci = nullptr;
             break;
+#else
+            if (btHci != nullptr) {
+                 btHci->cleanup();
 
+            btHci = nullptr;
+#endif
+
+#ifdef ANDROID
         case MODE_ANT:
             ALOGI("%s: Close HIDL with Mode ANT", __func__);
             antHci->close();
@@ -395,6 +526,7 @@ void hidl_client_close() {
             fmHci->close();
             fmHci = nullptr;
             break;
+#endif
 
         default:
             ALOGE("Unsupported mode");
@@ -403,6 +535,7 @@ void hidl_client_close() {
     return;
 }
 
+}
 #ifdef __cplusplus
 }
 #endif
@@ -438,3 +571,27 @@ static int safe_write(int server_fd, unsigned char* buf, int write_len) {
     }
     return bytes_written;
 }
+
+#ifndef ANDROID
+void vnd_interface_open(void)
+{
+  if(btHci != NULL)
+  {
+    ALOGE("bt_hci_le: %s, Vendor Interface is already initialized",  __func__);
+    return;
+  }
+
+  lib_handle = dlopen(TRANSPORT_LIBRARY_NAME, RTLD_LAZY);
+
+  if (!lib_handle) {
+    ALOGE("bt_hci_le: %s unable to open %s: %s", __func__, TRANSPORT_LIBRARY_NAME, dlerror());
+    return;
+  }
+
+  btHci = (bt_vnd_interface_t *)dlsym(lib_handle, TRANSPORT_LIBRARY_SYMBOL_NAME);
+  if (btHci == NULL) {
+    ALOGE("bt_hci_le: %s unable to find symbol %s in %s: %s", __func__, TRANSPORT_LIBRARY_SYMBOL_NAME, TRANSPORT_LIBRARY_NAME, dlerror());
+    return;
+  }
+}
+#endif

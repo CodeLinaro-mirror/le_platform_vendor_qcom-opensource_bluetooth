@@ -26,6 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef ANDROID
 #include <android/hardware/bluetooth/1.0/IBluetoothHci.h>
 
 #include <com/qualcomm/qti/ant/1.0/IAntHci.h>
@@ -35,6 +36,10 @@
 #include <vendor/qti/hardware/fm/1.0/IFmHci.h>
 #include <vendor/qti/hardware/fm/1.0/IFmHciCallbacks.h>
 #include <vendor/qti/hardware/fm/1.0/types.h>
+#else
+#include "bt_transport_hal.h"
+#include "HidlSupport.h"
+#endif
 
 #include <sys/socket.h>
 #include <cutils/sockets.h>
@@ -48,6 +53,7 @@
 #include <sys/select.h>
 #include "hci_internals.h"
 
+#ifdef ANDROID
 using android::hardware::bluetooth::V1_0::IBluetoothHci;
 using ::android::hardware::hidl_vec;
 using com::qualcomm::qti::ant::V1_0::IAntHci;
@@ -56,6 +62,16 @@ using vendor::qti::hardware::fm::V1_0::IFmHci;
 extern android::sp<IBluetoothHci> btHci;
 extern android::sp<IAntHci> antHci;
 extern android::sp<IFmHci> fmHci;
+#else
+using android::hardware::hidl_vec;
+
+using android::hardware::bluetooth::V1_0::HciPacket;
+using android::hardware::bluetooth::V1_0::Status;
+using android::hardware::bluetooth::V1_0::implementation::BluetoothHci;
+using android::hardware::bluetooth::V1_0::implementation::BluetoothHciCallbacks;
+
+extern bt_vnd_interface_t* btHci;
+#endif
 
 extern int server_fd;
 
@@ -109,6 +125,8 @@ void *process_tool_data(void *arg) {
             break;
         }
         switch (packet_type) {
+
+#ifdef ANDROID
             case BT_PACKET_TYPE_COMMAND:
                 btHci->sendHciCommand(*data);
                 break;
@@ -133,6 +151,20 @@ void *process_tool_data(void *arg) {
                 ALOGI("%s: Send FM Cmd ", __func__);
                 fmHci->sendHciCommand(*data);
                 break;
+#else
+            case BT_PACKET_TYPE_COMMAND:
+                btHci->send_hci_cmd(*data);
+                break;
+
+            case BT_PACKET_TYPE_ACL_DATA:
+                btHci->send_acl_cmd(*data);
+                break;
+
+            case BT_PACKET_TYPE_SCO_DATA:
+                btHci->send_sco_data(*data);
+                break;
+#endif
+
             default:
                 ALOGE("%s: Unsupported packet type: %d", __func__, packet_type);
         }
@@ -161,6 +193,7 @@ static int get_preamble_length(char packet_type) {
             preamble_len = BT_EVENT_PREAMBLE_SIZE;
             break;
 
+#ifdef ANDROID
         case ANT_PACKET_TYPE_CTRL:
             preamble_len = ANT_COMMAND_PREAMBLE_SIZE;
             break;
@@ -176,6 +209,7 @@ static int get_preamble_length(char packet_type) {
         case FM_PACKET_TYPE_EVENT:
             preamble_len = FM_EVENT_PREAMBLE_SIZE;
             break;
+#endif
 
         default:
             break;
@@ -203,6 +237,7 @@ static int get_pkt_len_offset(char packet_type) {
             len_offset = BT_LENGTH_OFFSET_EVT;
             break;
 
+#ifdef ANDROID
         case ANT_PACKET_TYPE_CTRL:
             len_offset = ANT_LENGTH_OFFSET_CMD;
             break;
@@ -218,6 +253,7 @@ static int get_pkt_len_offset(char packet_type) {
         case FM_PACKET_TYPE_EVENT:
             len_offset = FM_LENGTH_OFFSET_EVT;
             break;
+#endif
 
         default:
             break;
