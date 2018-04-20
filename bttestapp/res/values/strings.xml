@@ -53,6 +53,7 @@
     <string name="a2dp_source">A2DP Source</string>
     <string name="a2dp_sink">A2DP Sink</string>
     <string name="a2dp_role">A2DP Role</string>
+    <string name="dip_test">Dip Test</string>
 
     <!-- Dialogs -->
     <string name="dialog_title_create_msg_filter">Create message filter:</string>
@@ -65,6 +66,20 @@
     <string name="title_avrcp_test">AVRCP Test</string>
     <string name="title_vcard_filter">Filter Attributes</string>
     <string name="title_message_filter">Select Message Parameters</string>
+
+    <!-- DIP -->
+    <string name="dip_start_test">Start Test</string>
+    <string name="dip_test_label">Dip</string>
+    <string name="dip_clear">Clear</string>
+    <string name="dip_specification_id_title">Specification Id:</string>
+    <string name="dip_vendor_id_title">Vendor Id:</string>
+    <string name="dip_vendor_id_source_title">Vendor Id Source:</string>
+    <string name="dip_product_id_title">Product Id:</string>
+    <string name="dip_version_title">Version:</string>
+    <string name="dip_primary_record_title">Primary Record:</string>
+    <string name="dip_client_executable_url_title">Client Executable Url:</string>
+    <string name="dip_service_description_title">Service Description:</string>
+    <string name="dip_documentation_url_title">Documentation Url:</string>
 
     <!-- PBAP -->
     <string name="phonebook_prompt">Choose a phonebook:</string>

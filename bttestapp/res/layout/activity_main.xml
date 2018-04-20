@@ -133,6 +133,13 @@
 
     </RelativeLayout>
 
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:onClick="showDipTestActivity"
+        android:text="@string/dip_test"
+        android:layout_margin="25dp"/>
+
     <TextView
             android:layout_height="wrap_content"
             android:layout_width="match_parent"

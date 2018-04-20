@@ -331,6 +331,11 @@ public class MainActivity extends MonkeyActivity {
         startActivity(new Intent(this,AvrcpCoverArtActivity.class));
     }
 
+    public void showDipTestActivity(View v) {
+        Log.i(TAG," showDipTestActivity");
+        startActivity(new Intent(this, DipTestActivity.class));
+    }
+
     private BluetoothProfile.ServiceListener ma2dpSinkServiceListener =
                               new BluetoothProfile.ServiceListener() {
 
