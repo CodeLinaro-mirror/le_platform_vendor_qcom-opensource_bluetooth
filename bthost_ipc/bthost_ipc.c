@@ -54,7 +54,7 @@ static int bt_split_a2dp_enabled = 0;
 #define STREAM_START_MAX_RETRY_COUNT 10
 #define STREAM_START_MAX_RETRY_LOOPER 8
 #define CTRL_CHAN_RETRY_COUNT 3
-#define CHECK_A2DP_READY_MAX_COUNT 15
+#define CHECK_A2DP_READY_MAX_COUNT 20
 
 #define CASE_RETURN_STR(const) case const: return #const;
 
@@ -1209,7 +1209,7 @@ int audio_check_a2dp_ready()
     {
         ALOGW("audio_check_a2dp_ready = NOT ready - callbacks not registered");
         pthread_mutex_unlock(&audio_stream.lock);
-        return A2DP_CTRL_SKT_DISCONNECTED;
+        return 0;
     }
     pthread_mutex_unlock(&audio_stream.lock);
     return status == A2DP_CTRL_ACK_SUCCESS;
