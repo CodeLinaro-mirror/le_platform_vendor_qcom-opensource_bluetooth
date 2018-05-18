@@ -315,6 +315,8 @@
     <string name="ind_battery_level">battery</string>
     <string name="ind_operator_unknown">no operator info</string>
     <string name="ind_subscriber_unknown">no subscriber info</string>
+    <string name="ind_manfid_unknown">no manufacturer identification info</string>
+    <string name="ind_manfmodel_unknown">no manufacturer model info</string>
     <string name="ind_bar">&#x258c;&#x258c;&#x258c;&#x258c;&#x258c;</string>
     <string name="call_state_active">ACTIVE</string>
     <string name="call_state_held">HELD</string>

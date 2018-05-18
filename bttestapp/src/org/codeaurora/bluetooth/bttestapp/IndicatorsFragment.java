@@ -69,6 +69,10 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
     private TextView mIndSubscriber;
 
+    private TextView mIndManfId;
+
+    private TextView mIndManfModel;
+
     private int mDefaultColor;
 
     @Override
@@ -91,6 +95,9 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
         mIndOperator = (TextView) view.findViewById(R.id.ind_operator);
         mIndSubscriber = (TextView) view.findViewById(R.id.ind_subscriber);
+
+        mIndManfId = (TextView) view.findViewById(R.id.ind_manfid);
+        mIndManfModel = (TextView) view.findViewById(R.id.ind_manfmodel);
 
         mDefaultColor = mIndOperator.getTextColors().getDefaultColor();
 
@@ -211,6 +218,14 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
                 setSubscriber(params.getString(param));
 
+            } else if (param.equals(BluetoothHeadsetClient.EXTRA_MANF_ID)) {
+
+                setManfId(params.getString(param));
+
+            } else if (param.equals(BluetoothHeadsetClient.EXTRA_MANF_MODEL)) {
+
+                setManfModel(params.getString(param));
+
             }
 
             if (colorInd != null) {
@@ -281,6 +296,8 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
         setOperator(null);
         setSubscriber(null);
+        setManfId(null);
+        setManfModel(null);
     }
 
     private void setOperator(String text) {
@@ -302,6 +319,27 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
             mIndSubscriber.setTextColor(getColor(R.color.ind_text_unknown));
         }
     }
+
+    private void setManfId(String text) {
+        if (text != null) {
+            mIndManfId.setText(text);
+            mIndManfId.setTextColor(mDefaultColor);
+        } else {
+            mIndManfId.setText(R.string.ind_manfid_unknown);
+            mIndManfId.setTextColor(getColor(R.color.ind_text_unknown));
+        }
+    }
+
+    private void setManfModel(String text) {
+        if (text != null) {
+            mIndManfModel.setText(text);
+            mIndManfModel.setTextColor(mDefaultColor);
+        } else {
+            mIndManfModel.setText(R.string.ind_manfmodel_unknown);
+            mIndManfModel.setTextColor(getColor(R.color.ind_text_unknown));
+        }
+    }
+
 
     @Override
     public void onClick(View view) {
