@@ -1,6 +1,27 @@
-/* Copyright (C) 2016-2017, The Linux Foundation. All rights reserved.
+/*  Copyright (C) 2016-2017, The Linux Foundation. All rights reserved.
  *
  *  Not a Contribution
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted (subject to the limitations in the
+ *  disclaimer below) provided that the following conditions are met:
+
+      * Redistributions of source code must retain the above copyright
+        notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above
+        copyright notice, this list of conditions and the following
+        disclaimer in the documentation and/or other materials provided
+        with the distribution.
+
+      * Neither the name of The Linux Foundation nor the names of its
+        contributors may be used to endorse or promote products derived
+        from this software without specific prior written permission.
+
+ *  NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ *  GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ *  HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  *****************************************************************************/
 /*****************************************************************************
  *  Copyright (C) 2009-2012 Broadcom Corporation
@@ -26,6 +47,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "ldac_level_bit_rate_lookup.h"
 #include "bthost_ipc.h"
 #include <errno.h>
 #include <inttypes.h>
@@ -38,7 +60,7 @@
 #include <hardware/audio.h>
 
 #include <hardware/hardware.h>
-#include <utils/Log.h>
+#include <log/log.h>
 #include <cutils/properties.h>
 
 #ifdef LOG_TAG
@@ -54,6 +76,7 @@ static int bt_split_a2dp_enabled = 0;
 #define STREAM_START_MAX_RETRY_COUNT 10
 #define STREAM_START_MAX_RETRY_LOOPER 8
 #define CTRL_CHAN_RETRY_COUNT 3
+#define CHECK_A2DP_READY_MAX_COUNT 20
 
 #define CASE_RETURN_STR(const) case const: return #const;
 
@@ -84,8 +107,10 @@ static char a2dp_hal_imp[PROPERTY_VALUE_MAX] = "false";
 
 audio_sbc_encoder_config_t sbc_codec;
 audio_aptx_encoder_config_t aptx_codec;
+audio_aptx_tws_encoder_config_t aptx_tws_codec;
 audio_aac_encoder_config_t aac_codec;
 audio_ldac_encoder_config_t ldac_codec;
+audio_celt_encoder_config_t celt_codec;
 /*****************************************************************************
 **  Functions
 ******************************************************************************/
@@ -385,7 +410,6 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type,
             ALOGW("AptX-HD codec");
             *codec_type = AUDIO_FORMAT_APTX_HD;
         }
-
         if (vendor_ldac_id == VENDOR_LDAC &&
             codec_cfg[CODEC_ID_OFFSET] == LDAC_CODEC_ID)
         {
@@ -394,6 +418,13 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type,
             ldac_codec_parser(codec_cfg);
             if (sample_freq) *sample_freq = ldac_codec.sampling_rate;
             return ((void *)&ldac_codec);
+        }
+        if (codec_cfg[VENDOR_ID_OFFSET] == VENDOR_APTX_HD &&
+            codec_cfg[CODEC_ID_OFFSET] == APTX_TWS_CODEC_ID)
+        {
+            ALOGW("AptX-TWS codec");
+            *codec_type = ENC_CODEC_TYPE_APTX_DUAL_MONO;
+            //aptx_codec.sync_mode = 0x01;
         }
         memset(&aptx_codec,0,sizeof(audio_aptx_encoder_config_t));
         p_cfg++; //skip dev_idx
@@ -422,6 +453,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type,
         switch (byte & A2D_APTX_CHAN_MASK)
         {
             case A2D_APTX_CHAN_STEREO:
+            case A2D_APTX_TWS_CHAN_MODE:
                  aptx_codec.channels = 2;
                  break;
             case A2D_APTX_CHAN_MONO:
@@ -447,7 +479,85 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type,
 
         if(sample_freq) *sample_freq = aptx_codec.sampling_rate;
         ALOGW("APTx: Done copying full codec config");
+        if (*codec_type == ENC_CODEC_TYPE_APTX_DUAL_MONO)
+        {
+            memset(&aptx_tws_codec, 0, sizeof(audio_aptx_tws_encoder_config_t));
+            memcpy(&aptx_tws_codec, &aptx_codec, sizeof(aptx_codec));
+            aptx_tws_codec.sync_mode = 0x02;
+            return ((void *)&aptx_tws_codec);
+        }
         return ((void *)&aptx_codec);
+    }
+    else if (codec_cfg[CODEC_OFFSET] == CODEC_TYPE_CELT)
+    {
+        uint8_t celt_samp_freq = 0;
+        uint32_t celt_bit_rate = 0;
+        memset(&celt_codec,0,sizeof(audio_celt_encoder_config_t));
+        switch(codec_cfg[4] & A2D_CELT_SAMP_FREQ_MASK)
+        {
+        case A2D_CELT_SAMP_FREQ_48:
+            celt_codec.sampling_rate = 48000;
+            break;
+        case A2D_CELT_SAMP_FREQ_44:
+            celt_codec.sampling_rate = 44100;
+            break;
+        case A2D_CELT_SAMP_FREQ_32:
+            celt_codec.sampling_rate = 32000;
+            break;
+        default:
+            ALOGE("CELT: unknown sampl freq");
+        }
+        switch(codec_cfg[4] & A2D_CELT_CHANNEL_MASK)
+        {
+        case A2D_CELT_CH_MONO:
+            celt_codec.channels = 1;
+            break;
+        case A2D_CELT_CH_STEREO:
+            celt_codec.channels = 2;
+            break;
+        default:
+            ALOGE("CELT: unknown channel");
+        }
+        switch(codec_cfg[5] & A2D_CELT_FRAME_SIZE_MASK)
+        {
+        case A2D_CELT_FRAME_SIZE_64:
+            celt_codec.frame_size = 64;
+            break;
+        case A2D_CELT_FRAME_SIZE_128:
+            celt_codec.frame_size = 128;
+            break;
+        case A2D_CELT_FRAME_SIZE_256:
+            celt_codec.frame_size = 256;
+            break;
+        case A2D_CELT_FRAME_SIZE_512:
+            celt_codec.frame_size = 512;
+            break;
+        default:
+            ALOGE("CELT: unknown frame size");
+        }
+        celt_codec.complexity = codec_cfg[5] & A2D_CELT_COMPLEXITY_MASK;
+        celt_codec.prediction_mode =
+                (codec_cfg[6] & A2D_CELT_PREDICTION_MODE_MASK) >> 4;
+        celt_codec.vbr_flag = codec_cfg[6] & A2D_CELT_VBR_MASK;
+
+        celt_codec.bitrate |= codec_cfg[7];
+        celt_codec.bitrate = celt_codec.bitrate << 8;
+        celt_codec.bitrate |= codec_cfg[8];
+        celt_codec.bitrate = celt_codec.bitrate << 8;
+        celt_codec.bitrate |= codec_cfg[9];
+        celt_codec.bitrate = celt_codec.bitrate << 8;
+        celt_codec.bitrate |= codec_cfg[10];
+        *codec_type = AUDIO_CODEC_TYPE_CELT;
+
+        ALOGE("CELT Bitrate: 0%x", celt_codec.bitrate);
+        ALOGE("CELT channel: 0%x", celt_codec.channels);
+        ALOGE("CELT complexity: 0%x", celt_codec.complexity);
+        ALOGE("CELT frame_size: 0%x", celt_codec.frame_size);
+        ALOGE("CELT prediction_mode: 0%x", celt_codec.prediction_mode);
+        ALOGE("CELT sampl_freq: 0%x", celt_codec.sampling_rate);
+        ALOGE("CELT vbr_flag: 0%x", celt_codec.vbr_flag);
+        ALOGE("CELT codec_type: 0%x", codec_type);
+        return ((void *)(&celt_codec));
     }
     return NULL;
 }
@@ -551,6 +661,14 @@ int wait_for_stack_response(uint8_t time_to_wait)
         pthread_mutex_unlock(&audio_stream.ack_lock);
         return retry;
     }
+    // in race condition, ack_status is updated as SUCCESS
+    // without ack_recvd made 0.
+    if (audio_stream.ack_status == A2DP_CTRL_ACK_SUCCESS)
+    {
+        ALOGE("ACK Success, no need to wait");
+        pthread_mutex_unlock(&audio_stream.ack_lock);
+        return retry;
+    }
     while (retry < CTRL_CHAN_RETRY_COUNT &&
               ack_recvd == 0)
     {
@@ -603,7 +721,12 @@ void bt_stack_on_stream_started(tA2DP_CTRL_ACK status)
 {
     ALOGW("bt_stack_on_stream_started: status = %d",status);
     pthread_mutex_lock(&audio_stream.ack_lock);
-    audio_stream.ack_status = status;
+    if ((audio_stream.ack_status != A2DP_CTRL_ACK_UNKNOWN) && (status == A2DP_CTRL_ACK_PENDING)) {
+        ALOGW("status already changed to = %d, don't update pending",audio_stream.ack_status);
+    }
+    else {
+        audio_stream.ack_status = status;
+    }
     resp_received = true;
     if (!ack_recvd)
     {
@@ -615,23 +738,36 @@ void bt_stack_on_stream_started(tA2DP_CTRL_ACK status)
 
 void bt_stack_on_stream_suspended(tA2DP_CTRL_ACK status)
 {
-    ALOGW("bt_stack_on_stream_suspended");
+    ALOGW("bt_stack_on_stream_suspended status = %d, ack_status = %d ", status, audio_stream.ack_status);
     pthread_mutex_lock(&audio_stream.ack_lock);
-    audio_stream.ack_status = status;
+    if ((audio_stream.ack_status != A2DP_CTRL_ACK_UNKNOWN) && (status == A2DP_CTRL_ACK_PENDING)) {
+        ALOGW("status already changed to = %d, don't update pending",audio_stream.ack_status);
+    }
+    else {
+        audio_stream.ack_status = status;
+        ALOGW("bt_stack_on_stream_suspended updating  ack_status = %d ", audio_stream.ack_status);
+    }
     resp_received = true;
     if (!ack_recvd)
     {
         ack_recvd = 1;
+        ALOGW("bt_stack_on_stream_suspended signalling pthread ");
         pthread_cond_signal(&ack_cond);
     }
     pthread_mutex_unlock(&audio_stream.ack_lock);
+    ALOGW("bt_stack_on_stream_suspended mutex unlocked ");
 }
 
 void bt_stack_on_stream_stopped(tA2DP_CTRL_ACK status)
 {
     ALOGW("bt_stack_on_stream_stopped");
     pthread_mutex_lock(&audio_stream.ack_lock);
-    audio_stream.ack_status = status;
+    if ((audio_stream.ack_status != A2DP_CTRL_ACK_UNKNOWN) && (status == A2DP_CTRL_ACK_PENDING)) {
+        ALOGW("status already changed to = %d, don't update pending",audio_stream.ack_status);
+    }
+    else {
+        audio_stream.ack_status = status;
+    }
     resp_received = true;
     if (!ack_recvd)
     {
@@ -756,7 +892,7 @@ int audio_start_stream()
         pthread_mutex_unlock(&audio_stream.lock);
         return -1;
     }
-    if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+    if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
             !strcmp(a2dp_hal_imp, "true"))
     {
       if (audio_stream.state == AUDIO_A2DP_STATE_STARTED)
@@ -792,7 +928,7 @@ int audio_start_stream()
                 {
                     ALOGW("waiting in pending");
                     ack_recvd = 0;
-                    if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+                    if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                             !strcmp(a2dp_hal_imp, "true"))
                     {
                         wait_for_stack_response(1);
@@ -830,7 +966,7 @@ int audio_start_stream()
                     audio_stream.state = AUDIO_A2DP_STATE_STOPPED;
                     goto end;
                 }
-                else if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+                else if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                         !strcmp(a2dp_hal_imp, "true") &&
                         status == A2DP_CTRL_ACK_PREVIOUS_COMMAND_PENDING)
                 {
@@ -969,7 +1105,7 @@ int audio_stop_stream()
             if (status == A2DP_CTRL_ACK_PENDING)
             {
                 ack_recvd = 0;
-                if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+                if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                         !strcmp(a2dp_hal_imp, "true"))
                 {
                     wait_for_stack_response(1);
@@ -989,7 +1125,7 @@ int audio_stop_stream()
                 pthread_mutex_unlock(&audio_stream.lock);
                 return 0;
             }
-            else if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+            else if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                     !strcmp(a2dp_hal_imp, "true") &&
                     status == A2DP_CTRL_ACK_PREVIOUS_COMMAND_PENDING)
             {
@@ -1046,7 +1182,7 @@ int audio_suspend_stream()
             {
                 //TODO wait for the response;
                 ack_recvd = 0;
-                if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+                if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                         !strcmp(a2dp_hal_imp, "true"))
                 {
                     wait_for_stack_response(1);
@@ -1065,7 +1201,7 @@ int audio_suspend_stream()
                 audio_stream.state = AUDIO_A2DP_STATE_SUSPENDED;
                 return 0;
             }
-            else if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+            else if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
                     !strcmp(a2dp_hal_imp, "true") &&
                     status == A2DP_CTRL_ACK_PREVIOUS_COMMAND_PENDING)
             {
@@ -1167,10 +1303,11 @@ void* audio_get_next_codec_config(uint8_t idx, audio_format_t *codec_type)
 
 int audio_check_a2dp_ready()
 {
+    int i;
     ALOGW("audio_check_a2dp_ready: state %s", dump_a2dp_hal_state(audio_stream.state));
     tA2DP_CTRL_ACK status;
     pthread_mutex_lock(&audio_stream.lock);
-    if (property_get("persist.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
+    if (property_get("persist.vendor.bt.a2dp.hal.implementation", a2dp_hal_imp, "false") &&
             !strcmp(a2dp_hal_imp, "true") &&
             audio_stream.state == AUDIO_A2DP_STATE_SUSPENDED)
     {
@@ -1186,8 +1323,19 @@ int audio_check_a2dp_ready()
         status = audio_stream.ack_status;
         if (status == A2DP_CTRL_ACK_UNKNOWN)
         {
-            wait_for_stack_response(1);
-            status = audio_stream.ack_status;
+            for (i = 0; i < CHECK_A2DP_READY_MAX_COUNT; i++)
+            {
+                 wait_for_stack_response(1);
+                 status = audio_stream.ack_status;
+                 if (status == A2DP_CTRL_ACK_SUCCESS)
+                 {
+                     ALOGW("audio_check_a2dp_ready : %s",dump_a2dp_ctrl_ack(status));
+                     pthread_mutex_unlock(&audio_stream.lock);
+                     return 1;
+                 }
+                 ALOGW("audio_check_a2dp_ready(): a2dp stream not ready, wait 200msec & retry");
+                 usleep(200000);
+            }
         }
         audio_stream.ack_status = A2DP_CTRL_ACK_UNKNOWN;
         ALOGW("audio_check_a2dp_ready = %s",dump_a2dp_ctrl_ack(status));
@@ -1196,7 +1344,7 @@ int audio_check_a2dp_ready()
     {
         ALOGW("audio_check_a2dp_ready = NOT ready - callbacks not registered");
         pthread_mutex_unlock(&audio_stream.lock);
-        return A2DP_CTRL_SKT_DISCONNECTED;
+        return 0;
     }
     pthread_mutex_unlock(&audio_stream.lock);
     return status == A2DP_CTRL_ACK_SUCCESS;
@@ -1284,7 +1432,19 @@ bool audio_is_scrambling_enabled(void)
         INFO("%s: a2dp stream not configured,wait 100mse & retry", __func__);
         usleep(100000);
     }
+    if (codec_type == ENC_CODEC_TYPE_APTX_DUAL_MONO) {
+        INFO("%s:TWSP codec, return false",__func__);
+        pthread_mutex_unlock(&audio_stream.lock);
+        return false;
+    }
     if(status == A2DP_CTRL_ACK_SUCCESS) {
+
+        if (codec_type == CODEC_TYPE_CELT) {
+           INFO("%s: BA going on,return false", __func__);
+           pthread_mutex_unlock(&audio_stream.lock);
+           return false;
+        }
+
         ALOGW("audio_is_scrambling_enabled sample_freq %ld",sample_freq);
         switch (sample_freq) {
             case 44100:
@@ -1372,6 +1532,48 @@ void ldac_codec_parser(uint8_t *codec_cfg)
     ldac_codec.bitrate |= (*p_cfg++ << 16);
     ldac_codec.bitrate |= (*p_cfg++ << 24);
 
+    ldac_codec.is_abr_enabled = (ldac_codec.bitrate == 0);
+
+    ALOGW("Create Lookup for %d with ABR %d", ldac_codec.sampling_rate, ldac_codec.is_abr_enabled);
+    if (ldac_codec.sampling_rate == 44100 ||
+            ldac_codec.sampling_rate == 88200) {
+        int num_of_level_entries =
+            sizeof(bit_rate_level_44_1k_88_2k_database)/sizeof(bit_rate_level_44_1k_88_2k_table_t);
+        ldac_codec.level_to_bitrate_map.num_levels = num_of_level_entries;
+        if (ldac_codec.is_abr_enabled) {
+         ldac_codec.bitrate = bit_rate_level_44_1k_88_2k_database[0].bit_rate_value;
+         ALOGW("Send start highest bit-rate value %d", ldac_codec.bitrate);
+        }
+        for (int i = 0; i < num_of_level_entries; i++) {
+            ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].link_quality_level =
+                bit_rate_level_44_1k_88_2k_database[i].level_value;
+            ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].bitrate =
+                bit_rate_level_44_1k_88_2k_database[i].bit_rate_value;
+            ALOGW("Level: %d, bit-rate: %d",
+                ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].link_quality_level,
+                ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].bitrate);
+        }
+    } else if (ldac_codec.sampling_rate == 48000 ||
+            ldac_codec.sampling_rate == 96000) {
+        int num_of_level_entries =
+            sizeof(bit_rate_level_48k_96k_database)/sizeof(bit_rate_level_48k_96k_table_t);
+        ldac_codec.level_to_bitrate_map.num_levels = num_of_level_entries;
+        if (ldac_codec.is_abr_enabled) {
+         ldac_codec.bitrate = bit_rate_level_48k_96k_database[0].bit_rate_value;
+         ALOGW("Send start highest bit-rate value %d", ldac_codec.bitrate);
+        }
+        for (int i = 0; i < num_of_level_entries; i++) {
+            ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].link_quality_level =
+                bit_rate_level_48k_96k_database[i].level_value;
+            ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].bitrate =
+                bit_rate_level_48k_96k_database[i].bit_rate_value;
+            ALOGW("Level: %d, bit-rate: %d",
+                ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].link_quality_level,
+                ldac_codec.level_to_bitrate_map.bit_rate_level_map[i].bitrate);
+        }
+    } else {
+        ALOGW("Unsupported Invalid frequency");
+    }
     ALOGW("%s: LDAC: bitrate: %lu", __func__, ldac_codec.bitrate);
     ALOGW("LDAC: Done copying full codec config");
 }
