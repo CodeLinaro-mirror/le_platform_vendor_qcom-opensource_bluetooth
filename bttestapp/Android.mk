@@ -17,7 +17,7 @@ LOCAL_MODULE_OWNER := qti
 LOCAL_STATIC_JAVA_LIBRARIES := com.android.vcard
 
 LOCAL_PROGUARD_ENABLED := disabled
-
+LOCAL_PRIVATE_PLATFORM_APIS := true
 include $(BUILD_PACKAGE)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
