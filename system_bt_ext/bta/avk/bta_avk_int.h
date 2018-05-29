@@ -571,7 +571,7 @@ typedef struct
     tBTA_AVK_FEAT        peer_features;  /* peer features mask */
     alarm_t   *br_conn_timer; /* timer to monitor browsing connection */
 } tBTA_AVK_RCB;
-#define BTA_AVK_NUM_RCB      (BTA_AVK_NUM_STRS  + 2)
+#define BTA_AVK_NUM_RCB      (BTA_AVK_NUM_STRS  + 2 + 1)
 
 enum
 {
