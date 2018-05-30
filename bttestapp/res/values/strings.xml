@@ -435,6 +435,7 @@
         <item>All</item>
         <item>Group</item>
     </string-array>
+    <string name="getCoveArtImage">Get CoveArt Image</string>
     <string-array name="array_image_type">
         <item>Image</item>
         <item>Thumbnail</item>
