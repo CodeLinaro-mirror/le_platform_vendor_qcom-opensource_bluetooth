@@ -29,6 +29,10 @@
 package org.codeaurora.bluetooth.bttestapp;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -60,6 +64,9 @@ public class AvrcpCoverArtActivity extends Activity
     private Spinner mSpImgType, mSpImgEncode, mSpImgWidth, mSpImgSize, mSpImgheight;
     private Button mBtnConfig, mBtnConfigBase;
 
+    private final BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    BluetoothAvrcpController mAvrcpController;
+
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
         @Override
@@ -74,6 +81,25 @@ public class AvrcpCoverArtActivity extends Activity
             }
         }
     };
+
+    private final ServiceListener mAvrcpControllerServiceListener = new ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            Log.v(TAG, "onServiceConnected() profile = " + profile);
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = (BluetoothAvrcpController) proxy;
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            Log.v(TAG, "onServiceDisconnected() profile = " + profile);
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = null;
+            }
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,6 +121,8 @@ public class AvrcpCoverArtActivity extends Activity
         mIvCoverArt.setVisibility(ImageView.GONE);
         mIvThumbNail.setVisibility(ImageView.GONE);
         setSpinners();
+        mBluetoothAdapter.getProfileProxy(this, mAvrcpControllerServiceListener,
+                BluetoothProfile.AVRCP_CONTROLLER);
     }
 
     @Override
@@ -155,6 +183,11 @@ public class AvrcpCoverArtActivity extends Activity
             SystemProperties.set("persist.service.bt.avrcpct.imgsize", "200000");
             setSpinners();
         }
+    }
+
+    public void getCoveArtImage(View v) {
+        Log.i(TAG, "Start Fetching Album art");
+        mAvrcpController.startFetchingAlbumArt("JPEG", 500, 500, 2000000);
     }
 
     private void setSpinners() {
