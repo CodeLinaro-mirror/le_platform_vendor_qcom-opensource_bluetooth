@@ -48,6 +48,7 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.Bundle;
 import android.util.Log;
 
 import com.android.vcard.VCardEntry;
@@ -66,9 +67,9 @@ import android.media.browse.MediaBrowser;
 import android.media.browse.MediaBrowser.MediaItem;
 import android.media.MediaDescription;
 import android.media.session.MediaController;
+import android.media.session.MediaController.TransportControls;
 import android.media.session.MediaSession;
 import android.media.session.MediaSession.QueueItem;
-
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -108,6 +109,12 @@ public class ProfileService extends Service {
     public static final String EXTRA_MAP_INSTANCE_ID = "org.codeaurora.bluetooth.extra.MAP_INSTANCE_ID";
 
     public static final String EXTRA_MAP_MESSAGE_HANDLE = "org.codeaurora.bluetooth.extra.MAP_MESSAGE_HANDLE";
+
+    private static final String CUSTOM_ACTION_FASTFORWARD = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_FASTFORWARD";
+
+    private static final String CUSTOM_ACTION_REWIND = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_REWIND";
+
+    private static final String KEY_STATE = "key_state";
 
     private BluetoothDevice mDevice = null;
 
@@ -875,6 +882,37 @@ public class ProfileService extends Service {
             mMediaController.getTransportControls().pause();
         }
     }
+
+    public void sendFastForward(boolean pressed) {
+        Log.d(TAG, "sendFastForward, pressed: " + pressed);
+        sendCustomAction(CUSTOM_ACTION_FASTFORWARD, pressed);
+    }
+
+    public void sendRewind(boolean pressed) {
+        Log.d(TAG, "sendRewind, pressed: " + pressed);
+        sendCustomAction(CUSTOM_ACTION_REWIND, pressed);
+    }
+
+    private void sendCustomAction(String action, boolean pressed) {
+        Bundle extras = new Bundle();
+        extras.putBoolean(KEY_STATE, pressed);
+
+        sendCustomAction(action, extras);
+    }
+
+    private void sendCustomAction(String action, Bundle extras) {
+        if (mMediaController != null) {
+            TransportControls transportControls = mMediaController.getTransportControls();
+
+            if (transportControls != null) {
+                Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
+                transportControls.sendCustomAction(action, extras);
+            } else {
+                Log.e(TAG, "Invalid TransportControls");
+            }
+        }
+    }
+
 /*    public BluetoothPbapClient getPbapClient() {
         if (mDevice == null) {
             return null;

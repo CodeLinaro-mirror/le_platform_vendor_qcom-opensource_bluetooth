@@ -38,19 +38,27 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.session.PlaybackState;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.View.OnTouchListener;
+import android.view.MotionEvent;
 import android.widget.Button;
 
 public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener {
 
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
+    private Button mBtnFastforward;
+    private Button mBtnRewind;
     private final String STATUS_PLAY = "play";
     private final String STATUS_PAUSE = "pause";
+    private final String FASTFORWARD = "fastforward";
+    private final String REWIND = "rewind";
     private ProfileService mProfileService = null;
 
     public static final String ACTION_TRACK_EVENT =
@@ -58,6 +66,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
 
     public static final String EXTRA_PLAYBACK =
         "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
+
+    private static final int FASTFORWARD_PRESSED = 0;
+    private static final int REWIND_PRESSED = 1;
+
+    private static final int TIMEOUT_IN_MS = 1000;
 
     private final ServiceConnection mAvrcpConnection = new ServiceConnection() {
 
@@ -95,6 +108,21 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
         }
     };
 
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == FASTFORWARD_PRESSED) {
+                sendFastForward(true);
+                sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
+            } else if (msg.what == REWIND_PRESSED) {
+                sendRewind(true);
+                sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
+            } else {
+                Log.e(TAG, "Unknown msg: " + msg.what);
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -102,6 +130,60 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
         mBtnPlayPause = (Button) findViewById(R.id.id_btn_play_pause);
         mBtnPlayPause.setText(STATUS_PLAY);
         mBtnPlayPause.setOnClickListener(this);
+
+        mBtnFastforward = (Button) findViewById(R.id.id_btn_fast_forward);
+        mBtnFastforward.setText(FASTFORWARD);
+        mBtnFastforward.setOnTouchListener(new OnTouchListener() {
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        Log.d(TAG, "BtnFastforward, key pressed");
+                        sendFastForward(true);
+                        mHandler.sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                        Log.d(TAG, "BtnFastforward, key released");
+                        mHandler.removeMessages(FASTFORWARD_PRESSED);
+                        sendFastForward(false);
+                        break;
+
+                    default:
+                        break;
+                }
+
+                return false;
+            }
+        });
+
+        mBtnRewind = (Button) findViewById(R.id.id_btn_rewind);
+        mBtnRewind.setText(REWIND);
+        mBtnRewind.setOnTouchListener(new OnTouchListener() {
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        Log.d(TAG, "BtnRewind, key pressed");
+                        sendRewind(true);
+                        mHandler.sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                        Log.d(TAG, "BtnRewind, key released");
+                        mHandler.removeMessages(REWIND_PRESSED);
+                        sendRewind(false);
+                        break;
+
+                    default:
+                        break;
+                }
+
+                return false;
+            }
+        });
 
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
@@ -148,4 +230,31 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
         }
     }
 
+    private void sendFastForward(boolean pressed) {
+        if (mProfileService == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mProfileService.sendFastForward(pressed);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendRewind(boolean pressed) {
+        if (mProfileService == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mProfileService.sendRewind(pressed);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
 }
