@@ -970,7 +970,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             mAttributesTextView.setVisibility(View.GONE);
             mAttributes.clearCheck();
             mAttributesTextView.setVisibility(View.GONE);
-            for (int i = 0; i < mScopes.getChildCount(); i++) {
+            for (int i = 0; i < mAttributes.getChildCount(); i++) {
                 mAttributes.getChildAt(i).setEnabled(false);
                 mAttributes.getChildAt(i).setVisibility(View.GONE);
             }
