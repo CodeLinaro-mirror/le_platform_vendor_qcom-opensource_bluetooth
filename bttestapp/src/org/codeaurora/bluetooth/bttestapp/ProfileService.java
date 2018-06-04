@@ -110,11 +110,22 @@ public class ProfileService extends Service {
 
     public static final String EXTRA_MAP_MESSAGE_HANDLE = "org.codeaurora.bluetooth.extra.MAP_MESSAGE_HANDLE";
 
-    private static final String CUSTOM_ACTION_FASTFORWARD = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_FASTFORWARD";
+    // [TODO] Move the common defintion for customer action into framework
+    // +++ Custom action definition for AVRCP controller
 
-    private static final String CUSTOM_ACTION_REWIND = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_REWIND";
+    // Send pass through command (with key state)
+    public static final String CUSTOM_ACTION_SEND_PASS_THRU_CMD =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEND_PASS_THRU_CMD";
+    public static final String KEY_CMD = "cmd";
+    public static final String KEY_STATE = "state";
 
-    private static final String KEY_STATE = "key_state";
+    // --- Custom action definition for AVRCP controller
+
+    public static final int PASS_THRU_CMD_ID_FF = 0x49;
+    public static final int PASS_THRU_CMD_ID_REWIND = 0x48;
+
+    public static final int KEY_STATE_PRESSED = 0;
+    public static final int KEY_STATE_RELEASED = 1;
 
     private BluetoothDevice mDevice = null;
 
@@ -883,21 +894,22 @@ public class ProfileService extends Service {
         }
     }
 
+    public void sendPassThruCmd(int cmd, boolean pressed) {
+        Log.d(TAG, "sendPassThruCmd, cmd: " + cmd + ", pressed: " + pressed);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_CMD, cmd);
+        extras.putInt(KEY_STATE, pressed ? KEY_STATE_PRESSED : KEY_STATE_RELEASED);
+        sendCustomAction(CUSTOM_ACTION_SEND_PASS_THRU_CMD, extras);
+    }
+
     public void sendFastForward(boolean pressed) {
         Log.d(TAG, "sendFastForward, pressed: " + pressed);
-        sendCustomAction(CUSTOM_ACTION_FASTFORWARD, pressed);
+        sendPassThruCmd(PASS_THRU_CMD_ID_FF, pressed);
     }
 
     public void sendRewind(boolean pressed) {
         Log.d(TAG, "sendRewind, pressed: " + pressed);
-        sendCustomAction(CUSTOM_ACTION_REWIND, pressed);
-    }
-
-    private void sendCustomAction(String action, boolean pressed) {
-        Bundle extras = new Bundle();
-        extras.putBoolean(KEY_STATE, pressed);
-
-        sendCustomAction(action, extras);
+        sendPassThruCmd(PASS_THRU_CMD_ID_REWIND, pressed);
     }
 
     private void sendCustomAction(String action, Bundle extras) {
