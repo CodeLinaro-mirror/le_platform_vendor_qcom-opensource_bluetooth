@@ -48,6 +48,7 @@ import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.MotionEvent;
 import android.widget.Button;
+import android.widget.EditText;
 
 public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener {
 
@@ -55,10 +56,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
     private Button mBtnPlayPause;
     private Button mBtnFastforward;
     private Button mBtnRewind;
+    private Button mBtnSearch;
+    private EditText mEditTextSearch;
+
     private final String STATUS_PLAY = "play";
     private final String STATUS_PAUSE = "pause";
     private final String FASTFORWARD = "fastforward";
     private final String REWIND = "rewind";
+    private final String SEARCH = "search";
     private ProfileService mProfileService = null;
 
     public static final String ACTION_TRACK_EVENT =
@@ -185,6 +190,25 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
             }
         });
 
+        mEditTextSearch = (EditText) findViewById(R.id.id_edit_search);
+        mEditTextSearch.setText("You");  // Sample search string for test
+        mEditTextSearch.setVisibility(View.VISIBLE);
+
+        mBtnSearch = (Button) findViewById(R.id.id_btn_search);
+        mBtnSearch.setText(SEARCH);
+        mBtnSearch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String searchQuery = mEditTextSearch.getText().toString();
+                if ((searchQuery != null) && !searchQuery.isEmpty()) {
+                    Log.d(TAG, "BtnSearch clicked, search: " + searchQuery);
+                    sendSearch(searchQuery);
+                } else {
+                    Log.w(TAG, "BtnSearch clicked, but search string empty");
+                }
+            }
+        });
+
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
@@ -252,6 +276,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
 
         try {
             mProfileService.sendRewind(pressed);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendSearch(String searchQuery) {
+        if (mProfileService == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mProfileService.sendSearch(searchQuery);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

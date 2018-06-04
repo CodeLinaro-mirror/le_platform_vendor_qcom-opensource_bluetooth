@@ -119,6 +119,11 @@ public class ProfileService extends Service {
     public static final String KEY_CMD = "cmd";
     public static final String KEY_STATE = "state";
 
+    // Search
+    public static final String CUSTOM_ACTION_SEARCH =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
+    public static final String KEY_SEARCH = "search";
+
     // --- Custom action definition for AVRCP controller
 
     public static final int PASS_THRU_CMD_ID_FF = 0x49;
@@ -910,6 +915,13 @@ public class ProfileService extends Service {
     public void sendRewind(boolean pressed) {
         Log.d(TAG, "sendRewind, pressed: " + pressed);
         sendPassThruCmd(PASS_THRU_CMD_ID_REWIND, pressed);
+    }
+
+    public void sendSearch(String searchQuery) {
+        Log.d(TAG, "sendSearch, search: " + searchQuery);
+        Bundle extras = new Bundle();
+        extras.putString(KEY_SEARCH, searchQuery);
+        sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {
