@@ -385,6 +385,31 @@
     <string name="type">Type</string>
     <string name="width">Width</string>
     <string name="height">Height</string>
+    <string name="avrcp_get_current_pas">GetCurrentPas</string>
+    <string name="avrcp_equalizer_title">Equalizer:</string>
+    <string name="avrcp_repeat_title">Repeat:</string>
+    <string name="avrcp_shuffle_title">Shuffle:</string>
+    <string name="avrcp_scan_title">Scan:</string>
+    <string-array name="array_equalizer">
+        <item>Off</item>
+        <item>On</item>
+    </string-array>
+    <string-array name="array_repeat">
+        <item>Off</item>
+        <item>Single</item>
+        <item>All</item>
+        <item>Group</item>
+    </string-array>
+    <string-array name="array_shuffle">
+        <item>Off</item>
+        <item>All</item>
+        <item>Group</item>
+    </string-array>
+    <string-array name="array_scan">
+        <item>Off</item>
+        <item>All</item>
+        <item>Group</item>
+    </string-array>
     <string-array name="array_image_type">
         <item>Image</item>
         <item>Thumbnail</item>

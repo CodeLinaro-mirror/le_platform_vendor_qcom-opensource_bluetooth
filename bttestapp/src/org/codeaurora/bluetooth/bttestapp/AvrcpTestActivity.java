@@ -31,6 +31,8 @@ package org.codeaurora.bluetooth.bttestapp;
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
 import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -47,15 +49,24 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
 import android.view.MotionEvent;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.SpinnerAdapter;
+import android.widget.TextView;
+import java.util.HashMap;
+import java.util.Map;
 
-public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener {
+public class AvrcpTestActivity extends MonkeyActivity implements
+    OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener{
 
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
     private Button mBtnFastforward;
     private Button mBtnRewind;
+    private Button mBtnGetCurrentPas;
     private Button mBtnSearch;
     private EditText mEditTextSearch;
 
@@ -65,6 +76,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
     private final String REWIND = "rewind";
     private final String SEARCH = "search";
     private ProfileService mProfileService = null;
+    private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
+    private BluetoothDevice mDevice;
+    private Spinner mSpEqualizer;
+    private Spinner mSpRepeat;
+    private Spinner mSpShuffle;
+    private Spinner mSpScan;
+    /*
+     * Hash map. key: pas attribute value, value: pas attribute value in string
+     */
+    private Map<Integer, String> mPasText = new HashMap<Integer, String>();
+    /*
+     * Hash map. key: pas attribute value in string, value: pas attribute value
+     */
+    private Map<String, Integer> mPasValue = new HashMap<String, Integer>();
 
     public static final String ACTION_TRACK_EVENT =
         "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
@@ -109,6 +134,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
                         && ps.getState() == PlaybackState.STATE_PLAYING) {
                     mBtnPlayPause.setText(STATUS_PAUSE);
                 }
+            } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
+                mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
+                updatePlayerAppSettingUI(mPlayerAppSetting);
             }
         }
     };
@@ -131,10 +159,27 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        ActivityHelper.initialize(this, R.layout.layout_avrcp);
+        ActivityHelper.initialize(this, R.layout.layout_avrcp);//use layout_avrcp.xml
+        initPasMaps();
         mBtnPlayPause = (Button) findViewById(R.id.id_btn_play_pause);
         mBtnPlayPause.setText(STATUS_PLAY);
         mBtnPlayPause.setOnClickListener(this);
+        mBtnGetCurrentPas = (Button) findViewById(R.id.id_btn_get_current_pas);
+        mBtnGetCurrentPas.setOnClickListener(this);
+
+        mSpEqualizer = (Spinner) findViewById(R.id.id_sp_equalizer);
+        mSpEqualizer.setOnItemSelectedListener(this);
+
+        mSpRepeat = (Spinner) findViewById(R.id.id_sp_repeat);
+        mSpRepeat.setOnItemSelectedListener(this);
+
+        mSpShuffle = (Spinner) findViewById(R.id.id_sp_shuffle);
+        mSpShuffle.setOnItemSelectedListener(this);
+
+        mSpScan = (Spinner) findViewById(R.id.id_sp_scan);
+        mSpScan.setOnItemSelectedListener(this);
+
+        BluetoothConnectionReceiver.registerObserver(this);
 
         mBtnFastforward = (Button) findViewById(R.id.id_btn_fast_forward);
         mBtnFastforward.setText(FASTFORWARD);
@@ -216,6 +261,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
         // receive playback state change
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TRACK_EVENT);
+        filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         registerReceiver(mReceiver, filter);
     }
 
@@ -227,8 +273,166 @@ public class AvrcpTestActivity extends MonkeyActivity implements OnClickListener
     }
 
     @Override
+    public void onDeviceChanged(BluetoothDevice device) {
+        Logger.d(TAG, "onDeviceChanged()");
+
+        mDevice = device;
+    }
+
+    @Override
+    public void onDeviceDisconected() {
+        Logger.v(TAG, "onDeviceDisconected");
+
+        invalidateOptionsMenu();
+    }
+
+    @Override
     public void onClick(View v) {
-        sendCommand();
+        if ( v == mBtnPlayPause) {
+            Log.d(TAG, "onClick mBtnPlayPause");
+            sendCommand();
+        } else if (v == mBtnGetCurrentPas) {
+            Log.d(TAG, "onClick mBtnGetCurrentPas");
+            if (mDevice == null || mProfileService == null ||
+                mProfileService.getAvrcpController() == null ||
+                mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null) {
+                Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService
+                    + " getAvrcpController() " + mProfileService.getAvrcpController()
+                    + " getPlayerSettings" + mProfileService.getAvrcpController().getPlayerSettings(mDevice));
+            } else {
+                mPlayerAppSetting = mProfileService.getAvrcpController().getPlayerSettings(mDevice);
+                updatePlayerAppSettingUI(mPlayerAppSetting);
+            }
+        }
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        Log.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id + mSpEqualizer.getSelectedItem().toString());
+        if (mDevice == null || mProfileService == null ||
+            mProfileService.getAvrcpController() == null ||
+            mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null ||
+            mPlayerAppSetting == null) {
+            Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService + " mPlayerAppSetting" + mPlayerAppSetting);
+            return;
+        }
+
+        boolean result = true;
+        if(parent == mSpEqualizer) {
+            Log.d(TAG, "mSpEqualizer, set to " + mSpEqualizer.getSelectedItem().toString() +
+                " " + mPasValue.get(mSpEqualizer.getSelectedItem().toString()));
+            if (mPlayerAppSetting != null) {
+                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
+                    mPasValue.get(mSpEqualizer.getSelectedItem().toString()));
+            }
+
+        } else if (parent == mSpRepeat) {
+            Log.d(TAG, "mSpRepeat, set to " + mSpRepeat.getSelectedItem().toString() +
+                " " + mPasValue.get(mSpRepeat.getSelectedItem().toString()));
+            if (mPlayerAppSetting != null) {
+                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT,
+                    mPasValue.get(mSpRepeat.getSelectedItem().toString()));
+            }
+
+        } else if (parent == mSpShuffle) {
+            Log.d(TAG, "mSpShuffle, set to " + mSpShuffle.getSelectedItem().toString() +
+                mPasValue.get(mSpShuffle.getSelectedItem().toString()));
+            if (mPlayerAppSetting != null) {
+                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE,
+                    mPasValue.get(mSpShuffle.getSelectedItem().toString()));
+            }
+
+        } else if (parent == mSpScan) {
+            Log.d(TAG, "mSpScan, set to " + mSpScan.getSelectedItem().toString() +
+                " " + mPasValue.get(mSpScan.getSelectedItem().toString()));
+            if (mPlayerAppSetting != null) {
+                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN,
+                    mPasValue.get(mSpScan.getSelectedItem().toString()));
+            }
+
+        } else {
+            Log.e(TAG, "Unknown item");
+            result = false;
+        }
+        if (result) {
+            Log.d(TAG, "setPlayerApplicationSetting");
+            mProfileService.getAvrcpController().setPlayerApplicationSetting(mPlayerAppSetting);
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+
+    }
+
+    private void initPasMaps() {
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_OFF, "Off");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_ON, "On");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK, "Single");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK, "All");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_GROUP, "Group");
+
+        mPasValue.put("Off", BluetoothAvrcpPlayerSettings.STATE_OFF);
+        mPasValue.put("On", BluetoothAvrcpPlayerSettings.STATE_ON);
+        mPasValue.put("Single", BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK);
+        mPasValue.put("All", BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK);
+        mPasValue.put("Group", BluetoothAvrcpPlayerSettings.STATE_GROUP);
+    }
+
+    private void setSelectionByString(Spinner spinner, String setting) {
+        Log.d(TAG," set " + setting);
+        SpinnerAdapter adapter = spinner.getAdapter();
+        int count= adapter.getCount();
+        for(int i = 0; i < count; i++) {
+            if(setting.equals(adapter.getItem(i).toString())) {
+                Log.d(TAG," set " + i);
+                spinner.setSelection(i);
+                break;
+            }
+        }
+    }
+
+    private void updatePlayerAppSettingUI(BluetoothAvrcpPlayerSettings mPlayerAppSetting) {
+        String text;
+        if (mPlayerAppSetting == null) {
+            Log.e(TAG,"mPlayerAppSetting is null");
+            return;
+        }
+        int supportedSetting = mPlayerAppSetting.getSettings();
+        Log.d(TAG," setting: " + supportedSetting);
+        mSpEqualizer.setEnabled(false);
+        mSpRepeat.setEnabled(false);
+        mSpShuffle.setEnabled(false);
+        mSpScan.setEnabled(false);
+        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER) != 0) {
+            TextView avrcp_equalizer_value = (TextView) findViewById(R.id.id_avrcp_equalizer_value);
+            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
+                                                             SETTING_EQUALIZER));
+            avrcp_equalizer_value.setText(text);
+            mSpEqualizer.setEnabled(true);
+        }
+        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_REPEAT) != 0) {
+            TextView avrcp_repeat_value = (TextView) findViewById(R.id.id_avrcp_repeat_value);
+            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
+                                                             SETTING_REPEAT));
+            avrcp_repeat_value.setText(text);
+            mSpRepeat.setEnabled(true);
+        }
+        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE) != 0) {
+            TextView avrcp_shuffle_value = (TextView) findViewById(R.id.id_avrcp_shuffle_value);
+            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
+                                                             SETTING_SHUFFLE));
+            avrcp_shuffle_value.setText(text);
+            mSpShuffle.setEnabled(true);
+        }
+        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_SCAN) != 0) {
+            TextView avrcp_scan_value = (TextView) findViewById(R.id.id_avrcp_scan_value);
+            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
+                                                             SETTING_SCAN));
+            avrcp_scan_value.setText(text);
+            mSpScan.setEnabled(true);
+        }
+
     }
 
     private void sendCommand() {
