@@ -60,7 +60,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class AvrcpTestActivity extends MonkeyActivity implements
-    OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener{
+    OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener,
+    OnTouchListener {
 
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
@@ -71,8 +72,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private EditText mEditTextSearch;
     private Button mBtnGetSupportedFeatures;
 
-    private final String STATUS_PLAY = "play";
-    private final String STATUS_PAUSE = "pause";
+    private final String STATUS_PLAY = "Play";
+    private final String STATUS_PAUSE = "Pause";
 
     private ProfileService mProfileService = null;
     private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
@@ -195,83 +196,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         BluetoothConnectionReceiver.registerObserver(this);
 
         mBtnFastforward = (Button) findViewById(R.id.id_btn_fast_forward);
-        mBtnFastforward.setOnTouchListener(new OnTouchListener() {
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        Log.d(TAG, "BtnFastforward, key pressed");
-                        sendFastForward(true);
-                        mHandler.sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
-                        break;
-
-                    case MotionEvent.ACTION_UP:
-                        Log.d(TAG, "BtnFastforward, key released");
-                        mHandler.removeMessages(FASTFORWARD_PRESSED);
-                        sendFastForward(false);
-                        break;
-
-                    default:
-                        break;
-                }
-
-                return false;
-            }
-        });
+        mBtnFastforward.setOnTouchListener(this);
 
         mBtnRewind = (Button) findViewById(R.id.id_btn_rewind);
-        mBtnRewind.setOnTouchListener(new OnTouchListener() {
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        Log.d(TAG, "BtnRewind, key pressed");
-                        sendRewind(true);
-                        mHandler.sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
-                        break;
-
-                    case MotionEvent.ACTION_UP:
-                        Log.d(TAG, "BtnRewind, key released");
-                        mHandler.removeMessages(REWIND_PRESSED);
-                        sendRewind(false);
-                        break;
-
-                    default:
-                        break;
-                }
-
-                return false;
-            }
-        });
+        mBtnRewind.setOnTouchListener(this);
 
         mEditTextSearch = (EditText) findViewById(R.id.id_edit_search);
         mEditTextSearch.setText("You");  // Sample search string for test
         mEditTextSearch.setVisibility(View.VISIBLE);
 
         mBtnSearch = (Button) findViewById(R.id.id_btn_search);
-        mBtnSearch.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String searchQuery = mEditTextSearch.getText().toString();
-                if ((searchQuery != null) && !searchQuery.isEmpty()) {
-                    Log.d(TAG, "BtnSearch clicked, search: " + searchQuery);
-                    sendSearch(searchQuery);
-                } else {
-                    Log.w(TAG, "BtnSearch clicked, but search string empty");
-                }
-            }
-        });
+        mBtnSearch.setOnClickListener(this);
 
         mBtnGetSupportedFeatures = (Button) findViewById(R.id.id_btn_get_supported_features);
-        mBtnGetSupportedFeatures.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Log.d(TAG, "BtnGetSupportedFeatures clicked");
-                sendGetSupportedFeatures(mDevice);
-            }
-        });
+        mBtnGetSupportedFeatures.setOnClickListener(this);
 
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
@@ -308,21 +246,93 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     @Override
     public void onClick(View v) {
-        if ( v == mBtnPlayPause) {
+        if (v == mBtnPlayPause) {
             Log.d(TAG, "onClick mBtnPlayPause");
             sendCommand();
+        } else if (v == mBtnSearch) {
+            Log.d(TAG, "onClick mBtnSearch");
+            handleClickBtnSearch();
+        } else if (v == mBtnGetSupportedFeatures) {
+            Log.d(TAG, "onClick mBtnGetSupportedFeatures");
+            handleClickBtnGetSupportedFeatures();
         } else if (v == mBtnGetCurrentPas) {
             Log.d(TAG, "onClick mBtnGetCurrentPas");
-            if (mDevice == null || mProfileService == null ||
-                mProfileService.getAvrcpController() == null ||
-                mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null) {
-                Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService
-                    + " getAvrcpController() " + mProfileService.getAvrcpController()
-                    + " getPlayerSettings" + mProfileService.getAvrcpController().getPlayerSettings(mDevice));
-            } else {
-                mPlayerAppSetting = mProfileService.getAvrcpController().getPlayerSettings(mDevice);
-                updatePlayerAppSettingUI(mPlayerAppSetting);
-            }
+            handleClickBtnGetCurrentPas();
+        }
+    }
+
+    private void handleClickBtnSearch() {
+        String searchQuery = mEditTextSearch.getText().toString();
+        if ((searchQuery != null) && !searchQuery.isEmpty()) {
+            Log.d(TAG, "BtnSearch clicked, search: " + searchQuery);
+            sendSearch(searchQuery);
+        } else {
+            Log.w(TAG, "BtnSearch clicked, but search string empty");
+        }
+    }
+
+    private void handleClickBtnGetSupportedFeatures() {
+        sendGetSupportedFeatures(mDevice);
+    }
+
+    private void handleClickBtnGetCurrentPas() {
+        if (mDevice == null || mProfileService == null ||
+            mProfileService.getAvrcpController() == null ||
+            mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null) {
+            Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService
+                + " getAvrcpController() " + mProfileService.getAvrcpController()
+                + " getPlayerSettings" + mProfileService.getAvrcpController().getPlayerSettings(mDevice));
+        } else {
+            mPlayerAppSetting = mProfileService.getAvrcpController().getPlayerSettings(mDevice);
+            updatePlayerAppSettingUI(mPlayerAppSetting);
+        }
+    }
+
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        if (v == mBtnFastforward) {
+            handleTouchBtnFastforward(event);
+        } else if (v == mBtnRewind) {
+            handleTouchBtnRewind(event);
+        }
+        return false;
+    }
+
+    private void handleTouchBtnFastforward(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                Log.d(TAG, "BtnFastforward, key pressed");
+                sendFastForward(true);
+                mHandler.sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
+                break;
+
+            case MotionEvent.ACTION_UP:
+                Log.d(TAG, "BtnFastforward, key released");
+                mHandler.removeMessages(FASTFORWARD_PRESSED);
+                sendFastForward(false);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    private void handleTouchBtnRewind(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                Log.d(TAG, "BtnRewind, key pressed");
+                sendRewind(true);
+                mHandler.sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
+                break;
+
+            case MotionEvent.ACTION_UP:
+                Log.d(TAG, "BtnRewind, key released");
+                mHandler.removeMessages(REWIND_PRESSED);
+                sendRewind(false);
+                break;
+
+            default:
+                break;
         }
     }
 

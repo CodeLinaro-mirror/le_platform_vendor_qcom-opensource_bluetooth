@@ -39,6 +39,7 @@
         style="@style/textview_normal"
         android:layout_width="match_parent"
         android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
         />
     <Button
         android:id="@+id/id_btn_fast_forward"
