@@ -124,6 +124,10 @@ public class ProfileService extends Service {
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
     public static final String KEY_SEARCH = "search";
 
+    // Get remote AVRCP supported features
+    public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
+
     // --- Custom action definition for AVRCP controller
 
     public static final int PASS_THRU_CMD_ID_FF = 0x49;
@@ -922,6 +926,13 @@ public class ProfileService extends Service {
         Bundle extras = new Bundle();
         extras.putString(KEY_SEARCH, searchQuery);
         sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
+    }
+
+    public void sendGetSupportedFeatures(BluetoothDevice device) {
+        Log.d(TAG, "sendGetSupportedFeatures, device: " + device);
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        sendCustomAction(CUSTOM_ACTION_GET_SUPPORTED_FEATURES, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {

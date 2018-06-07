@@ -69,12 +69,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnGetCurrentPas;
     private Button mBtnSearch;
     private EditText mEditTextSearch;
+    private Button mBtnGetSupportedFeatures;
 
     private final String STATUS_PLAY = "play";
     private final String STATUS_PAUSE = "pause";
-    private final String FASTFORWARD = "fastforward";
-    private final String REWIND = "rewind";
-    private final String SEARCH = "search";
+
     private ProfileService mProfileService = null;
     private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
     private BluetoothDevice mDevice;
@@ -96,6 +95,18 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     public static final String EXTRA_PLAYBACK =
         "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
+
+    public static final String ACTION_SUPPORTED_FEATURES =
+        "android.bluetooth.avrcp-controller.profile.action.SUPPORTED_FEATURES";
+
+    public static final String EXTRA_SUPPORTED_FEATURES =
+        "android.bluetooth.avrcp-controller.profile.extra.SUPPORTED_FEATURES";
+
+    public static final int BTRC_FEAT_NONE = 0x00;
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int BTRC_FEAT_COVER_ART = 0x08;
 
     private static final int FASTFORWARD_PRESSED = 0;
     private static final int REWIND_PRESSED = 1;
@@ -137,6 +148,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
                 mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
                 updatePlayerAppSettingUI(mPlayerAppSetting);
+            } else if (action.equals(ACTION_SUPPORTED_FEATURES)) {
+                handleActionSupportedFeatures(intent);
             }
         }
     };
@@ -182,7 +195,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         BluetoothConnectionReceiver.registerObserver(this);
 
         mBtnFastforward = (Button) findViewById(R.id.id_btn_fast_forward);
-        mBtnFastforward.setText(FASTFORWARD);
         mBtnFastforward.setOnTouchListener(new OnTouchListener() {
 
             @Override
@@ -209,7 +221,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         });
 
         mBtnRewind = (Button) findViewById(R.id.id_btn_rewind);
-        mBtnRewind.setText(REWIND);
         mBtnRewind.setOnTouchListener(new OnTouchListener() {
 
             @Override
@@ -240,7 +251,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mEditTextSearch.setVisibility(View.VISIBLE);
 
         mBtnSearch = (Button) findViewById(R.id.id_btn_search);
-        mBtnSearch.setText(SEARCH);
         mBtnSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -254,6 +264,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             }
         });
 
+        mBtnGetSupportedFeatures = (Button) findViewById(R.id.id_btn_get_supported_features);
+        mBtnGetSupportedFeatures.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, "BtnGetSupportedFeatures clicked");
+                sendGetSupportedFeatures(mDevice);
+            }
+        });
+
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
@@ -262,6 +281,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TRACK_EVENT);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
+        filter.addAction(ACTION_SUPPORTED_FEATURES);
         registerReceiver(mReceiver, filter);
     }
 
@@ -498,5 +518,52 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
+    }
+
+    private void sendGetSupportedFeatures(BluetoothDevice device) {
+        if (mProfileService == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mProfileService.sendGetSupportedFeatures(device);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void handleActionSupportedFeatures(Intent intent) {
+        BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int features = (int) intent.getExtra(EXTRA_SUPPORTED_FEATURES);
+        Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
+
+        String val = "AVRCP Features: " + features + " (";
+
+        if (features != 0) {
+            if ((features & BTRC_FEAT_METADATA) != 0) {
+                val += " metadata, ";
+            }
+
+            if ((features & BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+                val += " absolute_volume, ";
+            }
+
+            if ((features & BTRC_FEAT_BROWSE) != 0) {
+                val += " browse, ";
+            }
+
+            if ((features & BTRC_FEAT_COVER_ART) != 0) {
+                val += " cover_art, ";
+            }
+        } else {
+            val += "none";
+        }
+
+        val += ")";
+
+        TextView avrcpSupportedFeatures = (TextView) findViewById(R.id.id_supported_features);
+        avrcpSupportedFeatures.setText(val);
     }
 }

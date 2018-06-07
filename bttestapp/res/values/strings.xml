@@ -385,6 +385,10 @@
     <string name="type">Type</string>
     <string name="width">Width</string>
     <string name="height">Height</string>
+    <string name="avrcp_fastforward">Fastforward</string>
+    <string name="avrcp_rewind">Rewind</string>
+    <string name="avrcp_search">Search</string>
+    <string name="avrcp_get_supported_features">GetSupportedFeatures</string>
     <string name="avrcp_get_current_pas">GetCurrentPas</string>
     <string name="avrcp_equalizer_title">Equalizer:</string>
     <string name="avrcp_repeat_title">Repeat:</string>

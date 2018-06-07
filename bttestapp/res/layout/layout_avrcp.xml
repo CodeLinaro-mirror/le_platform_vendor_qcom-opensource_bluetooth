@@ -45,24 +45,46 @@
         style="@style/textview_normal"
         android:layout_width="match_parent"
         android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
+        android:text="@string/avrcp_fastforward"
         />
     <Button
         android:id="@+id/id_btn_rewind"
         style="@style/textview_normal"
         android:layout_width="match_parent"
         android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
+        android:text="@string/avrcp_rewind"
         />
     <Button
         android:id="@+id/id_btn_search"
         style="@style/textview_normal"
         android:layout_width="match_parent"
         android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
+        android:text="@string/avrcp_search"
         />
     <EditText
         android:id="@+id/id_edit_search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:ems="10" />
+        android:paddingLeft="5dp"
+        android:ems="20" />
+    <Button
+        android:id="@+id/id_btn_get_supported_features"
+        style="@style/textview_normal"
+        android:layout_width="match_parent"
+        android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
+        android:text="@string/avrcp_get_supported_features"
+        />
+    <TextView
+        android:id="@+id/id_supported_features"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textAppearance="?android:attr/textAppearanceLarge"
+    />
     <Button
         android:id="@+id/id_btn_get_current_pas"
         style="@style/textview_normal"
