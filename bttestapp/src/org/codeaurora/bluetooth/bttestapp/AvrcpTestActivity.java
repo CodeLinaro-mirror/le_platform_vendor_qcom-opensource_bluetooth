@@ -33,6 +33,9 @@ import org.codeaurora.bluetooth.bttestapp.util.Logger;
 import android.bluetooth.BluetoothAvrcpController;
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothA2dpSink;
+import android.bluetooth.BluetoothCodecConfig;
+import android.bluetooth.BluetoothAudioConfig;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -40,6 +43,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.session.PlaybackState;
+import android.media.AudioFormat;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
@@ -71,6 +75,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnSearch;
     private EditText mEditTextSearch;
     private Button mBtnGetSupportedFeatures;
+    private Button mBtnGetAudioConfig;
 
     private final String STATUS_PLAY = "Play";
     private final String STATUS_PAUSE = "Pause";
@@ -82,6 +87,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Spinner mSpRepeat;
     private Spinner mSpShuffle;
     private Spinner mSpScan;
+    // Hash for storing A2DP codec type
+    private HashMap<BluetoothDevice, Integer> mA2dpCodecType = new HashMap<BluetoothDevice, Integer>();
+
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
      */
@@ -102,6 +110,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     public static final String EXTRA_SUPPORTED_FEATURES =
         "android.bluetooth.avrcp-controller.profile.extra.SUPPORTED_FEATURES";
+
+    public static int UNKNOWN_A2DP_CODEC_TYPE = -1;
+
+    // [TODO] Unify EXTRA_CODEC_TYPE into BluetoothA2dpSink
+    /**
+     * Extra for the {@link #ACTION_AUDIO_CONFIG_CHANGED} intent.
+     *
+     * This extra represents the current codec type of the A2DP source device.
+     */
+    public static final String EXTRA_CODEC_TYPE =
+        "android.bluetooth.a2dp-sink.profile.extra.CODEC_TYPE";
 
     public static final int BTRC_FEAT_NONE = 0x00;
     public static final int BTRC_FEAT_METADATA = 0x01;
@@ -151,6 +170,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 updatePlayerAppSettingUI(mPlayerAppSetting);
             } else if (action.equals(ACTION_SUPPORTED_FEATURES)) {
                 handleActionSupportedFeatures(intent);
+            } else if (action.equals(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED)) {
+                handleActionAudioConfigChanged(intent);
             }
         }
     };
@@ -211,6 +232,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mBtnGetSupportedFeatures = (Button) findViewById(R.id.id_btn_get_supported_features);
         mBtnGetSupportedFeatures.setOnClickListener(this);
 
+        mBtnGetAudioConfig = (Button) findViewById(R.id.id_btn_get_audio_config);
+        mBtnGetAudioConfig.setOnClickListener(this);
+
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
@@ -220,6 +244,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         filter.addAction(ACTION_TRACK_EVENT);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         filter.addAction(ACTION_SUPPORTED_FEATURES);
+        filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
         registerReceiver(mReceiver, filter);
     }
 
@@ -235,6 +260,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         Logger.d(TAG, "onDeviceChanged()");
 
         mDevice = device;
+
+        // Initialize A2DP codec type
+        mA2dpCodecType.put(device, UNKNOWN_A2DP_CODEC_TYPE);
     }
 
     @Override
@@ -255,6 +283,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetSupportedFeatures) {
             Log.d(TAG, "onClick mBtnGetSupportedFeatures");
             handleClickBtnGetSupportedFeatures();
+        } else if (v == mBtnGetAudioConfig) {
+            Log.d(TAG, "onClick mBtnGetAudioConfig");
+            handleClickBtnGetAudioConfig();
         } else if (v == mBtnGetCurrentPas) {
             Log.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
@@ -273,6 +304,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void handleClickBtnGetSupportedFeatures() {
         sendGetSupportedFeatures(mDevice);
+    }
+
+    private void handleClickBtnGetAudioConfig() {
+        BluetoothAudioConfig audioConfig = getAudioConfig(mDevice);
+        Log.d(TAG, "handleClickBtnGetAudioConfig audioConfig: " + audioConfig);
+        showA2dpCodec(audioConfig);
     }
 
     private void handleClickBtnGetCurrentPas() {
@@ -544,6 +581,22 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+        if (mProfileService == null) {
+            Log.e(TAG, " Service not connected ");
+            return null;
+        }
+
+        try {
+            return mProfileService.getAudioConfig(device);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     private void handleActionSupportedFeatures(Intent intent) {
         BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         int features = (int) intent.getExtra(EXTRA_SUPPORTED_FEATURES);
@@ -575,5 +628,84 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         TextView avrcpSupportedFeatures = (TextView) findViewById(R.id.id_supported_features);
         avrcpSupportedFeatures.setText(val);
+    }
+
+    private void handleActionAudioConfigChanged(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        BluetoothAudioConfig audioConfig = intent.getParcelableExtra(BluetoothA2dpSink.EXTRA_AUDIO_CONFIG);
+        int codecType = intent.getIntExtra(EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
+
+        Log.d(TAG, "handleActionAudioConfigChanged device: " + device + ", audioConfig: " +
+            audioConfig + ", codecType: " + codecType);
+
+        mA2dpCodecType.put(device, codecType);
+
+        showA2dpCodec(audioConfig);
+    }
+
+    private void showA2dpCodec(BluetoothAudioConfig audioConfig) {
+        if (audioConfig == null) {
+            Log.e(TAG, "audioConfig null");
+            return;
+        }
+
+        int sampleRate = audioConfig.getSampleRate();
+        int channelConfig = audioConfig.getChannelConfig();
+        int audioFormat = audioConfig.getAudioFormat();
+        int codecType = mA2dpCodecType.containsKey(mDevice) ?
+                        mA2dpCodecType.get(mDevice) : UNKNOWN_A2DP_CODEC_TYPE;
+
+        String codecTypeString = "";
+        switch (codecType) {
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC:
+                codecTypeString = "sbc";
+                break;
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC:
+                codecTypeString = "aac";
+                break;
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX:
+                codecTypeString = "aptx";
+                break;
+            default:
+                codecTypeString = "unknown";
+                break;
+        }
+
+        String channelConfigString = "";
+        switch (channelConfig) {
+            case AudioFormat.CHANNEL_IN_STEREO:
+                channelConfigString = "stereo";
+                break;
+            case AudioFormat.CHANNEL_IN_MONO:
+                channelConfigString = "mono";
+                break;
+            default:
+                channelConfigString = "unknown";
+                break;
+        }
+
+        String audioFormatString = "";
+        switch (audioFormat) {
+            case AudioFormat.ENCODING_PCM_16BIT:
+                audioFormatString = "pcm 16bit";
+                break;
+            case AudioFormat.ENCODING_PCM_8BIT:
+                audioFormatString = "pcm 8bit";
+                break;
+            default:
+                audioFormatString = "unknown";
+                break;
+        }
+
+        String str = "A2DP Codec: type =  " + codecType +
+                     " (" + codecTypeString + ")" +
+                     ", sample_rate = " + sampleRate +
+                     ", channel_config = " + channelConfig +
+                     " (" + channelConfigString + ")" +
+                     ", audio_format = " + audioFormat +
+                     " (" + audioFormatString + ")";
+
+        TextView a2dpCodec = (TextView) findViewById(R.id.id_a2dp_codec);
+        a2dpCodec.setText(str);
     }
 }

@@ -36,9 +36,11 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadsetClient;
 import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothA2dpSink;
 import android.bluetooth.SdpMasRecord;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
+import android.bluetooth.BluetoothAudioConfig;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -143,6 +145,8 @@ public class ProfileService extends Service {
     private BluetoothHeadsetClient mHfpClient = null;
 
     private BluetoothAvrcpController mAvrcpController = null;
+
+    private BluetoothA2dpSink mA2dpSink = null;
 
   /*  private BluetoothPbapClient mPbapClient = null;
 
@@ -682,6 +686,22 @@ public class ProfileService extends Service {
         }
     };
 
+    private final ServiceListener mA2dpSinkServiceListener = new ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            if (profile == BluetoothProfile.A2DP_SINK) {
+                mA2dpSink = (BluetoothA2dpSink) proxy;
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            if (profile == BluetoothProfile.A2DP_SINK) {
+                mA2dpSink = null;
+            }
+        }
+    };
+
 /*    private void createPbapAuthNotification() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -807,16 +827,18 @@ public class ProfileService extends Service {
         filter.addAction(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
 
-        mAdapter.getProfileProxy(getApplicationContext(), mHfpServiceListener,
-                BluetoothProfile.HEADSET_CLIENT);
-        mAdapter.getProfileProxy(getApplicationContext(), mAvrcpControllerServiceListener,
-                BluetoothProfile.AVRCP_CONTROLLER);
         mContext = getApplicationContext();
+        mAdapter.getProfileProxy(mContext, mHfpServiceListener,
+                BluetoothProfile.HEADSET_CLIENT);
+        mAdapter.getProfileProxy(mContext, mAvrcpControllerServiceListener,
+                BluetoothProfile.AVRCP_CONTROLLER);
+        mAdapter.getProfileProxy(mContext, mA2dpSinkServiceListener,
+                BluetoothProfile.A2DP_SINK);
+
         mMediaBrowser = new MediaBrowser(mContext, new ComponentName("com.android.bluetooth",
                         "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService"),
                         browseMediaConnectionCallback, null);
         mMediaBrowser.connect();
-
     }
 
     @Override
@@ -887,6 +909,10 @@ public class ProfileService extends Service {
         return mAvrcpController;
     }
 
+    public BluetoothA2dpSink getA2dpSink() {
+        return mA2dpSink;
+    }
+
     public void sendPlay() {
         Log.d(TAG, "sendPlay");
         if (mMediaController != null) {
@@ -945,6 +971,16 @@ public class ProfileService extends Service {
             } else {
                 Log.e(TAG, "Invalid TransportControls");
             }
+        }
+    }
+
+    public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+        Log.d(TAG, "getAudioConfig, device: " + device);
+        if (mA2dpSink != null) {
+            return mA2dpSink.getAudioConfig(device);
+        } else {
+            Log.e(TAG, "A2dpSink service null");
+            return null;
         }
     }
 
