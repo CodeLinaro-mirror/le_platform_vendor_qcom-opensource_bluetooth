@@ -1,0 +1,359 @@
+/*
+ * Copyright (c) 2013-2016, 2018, The Linux Foundation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *           * Redistributions of source code must retain the above copyright
+ *             notice, this list of conditions and the following disclaimer.
+ *           * Redistributions in binary form must reproduce the above
+ *           * copyright notice, this list of conditions and the following
+ *             disclaimer in the documentation and/or other materials provided
+ *             with the distribution.
+ *           * Neither the name of The Linux Foundation nor the names of its
+ *             contributors may be used to endorse or promote products derived
+ *             from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.codeaurora.bluetooth.bttestapp;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothA2dpSink;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothProfile.ServiceListener;
+import android.bluetooth.BluetoothAudioConfig;
+import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Handler;
+import android.os.Message;
+import android.os.Bundle;
+import android.util.Log;
+
+import org.codeaurora.bluetooth.bttestapp.R;
+
+import android.media.browse.MediaBrowser;
+import android.media.browse.MediaBrowser.MediaItem;
+import android.media.MediaDescription;
+import android.media.session.MediaController;
+import android.media.session.MediaController.TransportControls;
+import android.media.session.MediaSession;
+import android.media.session.MediaSession.QueueItem;
+import android.media.MediaMetadata;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.HashMap;
+
+public class AvrcpProfile {
+
+    private final static String TAG = "AvrcpProfile";
+
+    public static final String BLUETOOTH_PACKAGE = "com.android.bluetooth";
+
+    public static final String A2DP_MEDIA_BROWSER_SERVICE =
+        "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService";
+
+    public static final String ACTION_TRACK_EVENT =
+        "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
+
+    public static final String EXTRA_PLAYBACK =
+        "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
+
+    public static final String EXTRA_METADATA =
+        "android.bluetooth.avrcp-controller.profile.extra.METADATA";
+
+    /**
+     * Intent used to broadcast the change of folder list.
+     *
+     * <p>This intent will have the one extra:
+     * <ul>
+     *    <li> {@link #EXTRA_FOLDER_LIST} - array of {@link MediaBrowser#MediaItem}
+     *    containing the folder listing of currently selected folder.
+     * </ul>
+     */
+    public static final String ACTION_FOLDER_LIST =
+        "android.bluetooth.avrcp-controller.profile.action.FOLDER_LIST";
+
+    public static final String EXTRA_FOLDER_LIST =
+        "android.bluetooth.avrcp-controller.profile.extra.FOLDER_LIST";
+
+    public static final String EXTRA_FOLDER_ID =
+        "com.android.bluetooth.avrcp.EXTRA_FOLDER_ID";
+
+    public static final String ACTION_SUPPORTED_FEATURES =
+        "android.bluetooth.avrcp-controller.profile.action.SUPPORTED_FEATURES";
+
+    public static final String EXTRA_SUPPORTED_FEATURES =
+        "android.bluetooth.avrcp-controller.profile.extra.SUPPORTED_FEATURES";
+
+    // [TODO] Unify EXTRA_CODEC_TYPE into BluetoothA2dpSink
+    /**
+     * Extra for the {@link #ACTION_AUDIO_CONFIG_CHANGED} intent.
+     *
+     * This extra represents the current codec type of the A2DP source device.
+     */
+    public static final String EXTRA_CODEC_TYPE =
+        "android.bluetooth.a2dp-sink.profile.extra.CODEC_TYPE";
+
+    public static int UNKNOWN_CODEC_TYPE = -1;
+
+    // AVRCP feature
+    public static final int BTRC_FEAT_NONE = 0x00;
+    public static final int BTRC_FEAT_METADATA = 0x01;
+    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
+    public static final int BTRC_FEAT_BROWSE = 0x04;
+    public static final int BTRC_FEAT_COVER_ART = 0x08;
+
+    // [TODO] Move the common defintion for customer action into framework
+    // +++ Custom action definition for AVRCP controller
+
+    // Send pass through command (with key state)
+    public static final String CUSTOM_ACTION_SEND_PASS_THRU_CMD =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEND_PASS_THRU_CMD";
+    public static final String KEY_CMD = "cmd";
+    public static final String KEY_STATE = "state";
+
+    // Search
+    public static final String CUSTOM_ACTION_SEARCH =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
+    public static final String KEY_SEARCH = "search";
+
+    // Get remote AVRCP supported features
+    public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
+
+    // Get item attributes
+    public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ITEM_ATTR";
+
+    // --- Custom action definition for AVRCP controller
+
+    public static final int PASS_THRU_CMD_ID_FF = 0x49;
+    public static final int PASS_THRU_CMD_ID_REWIND = 0x48;
+
+    public static final int KEY_STATE_PRESSED = 0;
+    public static final int KEY_STATE_RELEASED = 1;
+
+    public static final String ROOT = "__ROOT__";
+    public static final String NOW_PLAYING_PREFIX = "NOW_PLAYING";
+    public static final String PLAYER_PREFIX = "PLAYER";
+    public static final String SEARCH_PREFIX = "SEARCH";
+
+    private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
+
+    private BluetoothDevice mDevice = null;
+
+    private BluetoothAvrcpController mAvrcpController = null;
+    private BluetoothA2dpSink mA2dpSink = null;
+
+    /* Object used to connect to MediaBrowseService of BT-AVRCP app */
+    private MediaBrowser mMediaBrowser = null;
+    private MediaController mMediaController = null;
+    private List<MediaBrowser.MediaItem> mNowPlayingItems = new ArrayList<>();
+    private List<MediaBrowser.MediaItem> mSearchItems = new ArrayList<>();
+
+    private Context mContext;
+
+    private final ServiceListener mAvrcpControllerServiceListener = new ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = (BluetoothAvrcpController) proxy;
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = null;
+            }
+        }
+    };
+
+    private final ServiceListener mA2dpSinkServiceListener = new ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            if (profile == BluetoothProfile.A2DP_SINK) {
+                mA2dpSink = (BluetoothA2dpSink) proxy;
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            if (profile == BluetoothProfile.A2DP_SINK) {
+                mA2dpSink = null;
+            }
+        }
+    };
+
+    /* Browse connection state callback handler */
+    private MediaBrowser.ConnectionCallback mBrowseMediaConnectionCallback =
+            new MediaBrowser.ConnectionCallback() {
+        @Override
+        public void onConnected() {
+            Log.d(TAG, "mediaBrowser CONNECTED");
+            mMediaController = new MediaController(mContext, mMediaBrowser.getSessionToken());
+        }
+
+        @Override
+        public void onConnectionFailed() {
+            Log.e(TAG, "mediaBrowser Connection failed");
+        }
+
+        @Override
+        public void onConnectionSuspended() {
+            Log.e(TAG, "mediaBrowser SUSPENDED");
+        }
+    };
+
+    public AvrcpProfile(Context context) {
+        mContext = context;
+        init();
+    }
+
+    private void init() {
+        Log.d(TAG, "init");
+
+        mAdapter.getProfileProxy(mContext, mAvrcpControllerServiceListener,
+                BluetoothProfile.AVRCP_CONTROLLER);
+
+        mAdapter.getProfileProxy(mContext, mA2dpSinkServiceListener,
+                BluetoothProfile.A2DP_SINK);
+
+        mMediaBrowser = new MediaBrowser(mContext, new ComponentName(BLUETOOTH_PACKAGE,
+                                         A2DP_MEDIA_BROWSER_SERVICE), mBrowseMediaConnectionCallback, null);
+
+        mMediaBrowser.connect();
+    }
+
+    public void play() {
+        Log.d(TAG, "play");
+        if (mMediaController != null) {
+            Log.d(TAG, "calling play()");
+            mMediaController.getTransportControls().play();
+        }
+    }
+
+    public void pause() {
+        Log.d(TAG, "pause");
+        if (mMediaController != null) {
+            Log.d(TAG, "calling pause()");
+            mMediaController.getTransportControls().pause();
+        }
+    }
+
+    public void sendPassThruCmd(int cmd, boolean pressed) {
+        Log.d(TAG, "sendPassThruCmd, cmd: " + cmd + ", pressed: " + pressed);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_CMD, cmd);
+        extras.putInt(KEY_STATE, pressed ? KEY_STATE_PRESSED : KEY_STATE_RELEASED);
+        sendCustomAction(CUSTOM_ACTION_SEND_PASS_THRU_CMD, extras);
+    }
+
+    public void fastForward(boolean pressed) {
+        Log.d(TAG, "fastForward, pressed: " + pressed);
+        sendPassThruCmd(PASS_THRU_CMD_ID_FF, pressed);
+    }
+
+    public void rewind(boolean pressed) {
+        Log.d(TAG, "rewind, pressed: " + pressed);
+        sendPassThruCmd(PASS_THRU_CMD_ID_REWIND, pressed);
+    }
+
+    public void search(String query) {
+        Log.d(TAG, "search " + query);
+        Bundle extras = new Bundle();
+        extras.putString(KEY_SEARCH, query);
+        sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
+    }
+
+    public void getSupportedFeatures(BluetoothDevice device) {
+        Log.d(TAG, "getSupportedFeatures, device: " + device);
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        sendCustomAction(CUSTOM_ACTION_GET_SUPPORTED_FEATURES, extras);
+    }
+
+    public void getItemAttributes(String mediaId) {
+        Log.d(TAG, "getItemAttributes, mediaId: " + mediaId);
+        Bundle extras = new Bundle();
+        extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        sendCustomAction(CUSTOM_ACTION_GET_ITEM_ATTR, extras);
+    }
+
+    private void sendCustomAction(String action, Bundle extras) {
+        if (mMediaController != null) {
+            Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
+            mMediaController.getTransportControls().sendCustomAction(action, extras);
+        }
+    }
+
+    public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+        Log.d(TAG, "getAudioConfig, device: " + device);
+
+        if (mA2dpSink != null) {
+            return mA2dpSink.getAudioConfig(device);
+        } else {
+            Log.e(TAG, "A2dpSink service null");
+            return null;
+        }
+    }
+
+    public static boolean isNowPlaying(String parentId) {
+        return parentId.startsWith(NOW_PLAYING_PREFIX);
+    }
+
+    public static boolean isSearch(String parentId) {
+        return parentId.startsWith(SEARCH_PREFIX);
+    }
+
+    private List<MediaBrowser.MediaItem> getItemList(String parentId) {
+        if (isNowPlaying(parentId)) {
+            return mNowPlayingItems;
+        } else if (isSearch(parentId)) {
+            return mSearchItems;
+        } else {
+            return null;
+        }
+    }
+
+    public BluetoothAvrcpPlayerSettings getPlayerSettings(BluetoothDevice device) {
+        if (mAvrcpController != null) {
+            return mAvrcpController.getPlayerSettings(device);
+        } else {
+            Log.e(TAG, "mAvrcpController null");
+            return null;
+        }
+    }
+
+    public boolean setPlayerApplicationSetting(BluetoothAvrcpPlayerSettings plAppSetting) {
+        if (mAvrcpController != null) {
+            return mAvrcpController.setPlayerApplicationSetting(plAppSetting);
+        } else {
+            Log.e(TAG, "mAvrcpController null");
+            return false;
+        }
+    }
+}

@@ -93,6 +93,66 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
         <Button
+            android:id="@+id/id_btn_get_item_attr"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_get_item_attr" />
+        <TextView
+            android:id="@+id/id_item_attr"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:text=""
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:text="@string/avrcp_folder"
+            style="@style/textview_normal" />
+        <RadioGroup
+            android:id="@+id/id_folders"
+            style="@style/textview_normal"
+            android:orientation="horizontal"
+            android:gravity="start"
+            android:layout_margin="25dp">
+            <RadioButton
+                android:id="@+id/id_rb_now_playing"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_now_playing" />
+            <RadioButton
+                android:id="@+id/id_rb_search"
+                style="@style/textview_normal"
+                android:checked="true"
+                android:text="@string/avrcp_search" />
+        </RadioGroup>
+        <TextView
+            android:text="@string/avrcp_item_position"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_item_position"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:paddingLeft="5dp"
+            android:digits="0123456789"
+            android:ems="20" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
             android:id="@+id/id_btn_get_supported_features"
             style="@style/textview_normal"
             android:layout_width="0dp"

@@ -29,6 +29,7 @@
 package org.codeaurora.bluetooth.bttestapp;
 
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
+import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
 
 import android.bluetooth.BluetoothAvrcpController;
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
@@ -43,6 +44,10 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.session.PlaybackState;
+import android.media.browse.MediaBrowser;
+import android.media.browse.MediaBrowser.MediaItem;
+import android.media.MediaDescription;
+import android.media.MediaMetadata;
 import android.media.AudioFormat;
 import android.os.Handler;
 import android.os.Message;
@@ -60,8 +65,11 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
+import android.widget.RadioGroup;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AvrcpTestActivity extends MonkeyActivity implements
     OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener,
@@ -76,11 +84,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private EditText mEditTextSearch;
     private Button mBtnGetSupportedFeatures;
     private Button mBtnGetAudioConfig;
+    private Button mBtnGetItemAttr;
+    private RadioGroup mFolders;
+    private EditText mEditItemPosition;
 
     private final String STATUS_PLAY = "Play";
     private final String STATUS_PAUSE = "Pause";
 
-    private ProfileService mProfileService = null;
+    private AvrcpProfile mAvrcp;
     private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
     private BluetoothDevice mDevice;
     private Spinner mSpEqualizer;
@@ -89,6 +100,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Spinner mSpScan;
     // Hash for storing A2DP codec type
     private HashMap<BluetoothDevice, Integer> mA2dpCodecType = new HashMap<BluetoothDevice, Integer>();
+    private boolean mGetItemAttr = false;
+    private List<MediaBrowser.MediaItem> mNowPlayingItems = new ArrayList<>();
+    private List<MediaBrowser.MediaItem> mSearchItems = new ArrayList<>();
 
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
@@ -98,35 +112,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
      * Hash map. key: pas attribute value in string, value: pas attribute value
      */
     private Map<String, Integer> mPasValue = new HashMap<String, Integer>();
-
-    public static final String ACTION_TRACK_EVENT =
-        "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
-
-    public static final String EXTRA_PLAYBACK =
-        "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
-
-    public static final String ACTION_SUPPORTED_FEATURES =
-        "android.bluetooth.avrcp-controller.profile.action.SUPPORTED_FEATURES";
-
-    public static final String EXTRA_SUPPORTED_FEATURES =
-        "android.bluetooth.avrcp-controller.profile.extra.SUPPORTED_FEATURES";
-
-    public static int UNKNOWN_A2DP_CODEC_TYPE = -1;
-
-    // [TODO] Unify EXTRA_CODEC_TYPE into BluetoothA2dpSink
-    /**
-     * Extra for the {@link #ACTION_AUDIO_CONFIG_CHANGED} intent.
-     *
-     * This extra represents the current codec type of the A2DP source device.
-     */
-    public static final String EXTRA_CODEC_TYPE =
-        "android.bluetooth.a2dp-sink.profile.extra.CODEC_TYPE";
-
-    public static final int BTRC_FEAT_NONE = 0x00;
-    public static final int BTRC_FEAT_METADATA = 0x01;
-    public static final int BTRC_FEAT_ABSOLUTE_VOLUME = 0x02;
-    public static final int BTRC_FEAT_BROWSE = 0x04;
-    public static final int BTRC_FEAT_COVER_ART = 0x08;
 
     private static final int FASTFORWARD_PRESSED = 0;
     private static final int REWIND_PRESSED = 1;
@@ -138,15 +123,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         @Override
         public void onServiceDisconnected(ComponentName name) {
             Log.i(TAG, "onServiceDisconnected()");
-            mProfileService = null;
+            mAvrcp = null;
             if (mBtnPlayPause != null) mBtnPlayPause.setText(STATUS_PLAY);
         }
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             Log.i(TAG, "onServiceConnected()");
-            mProfileService = ((ProfileService.LocalBinder) service).getService();
-
+            ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
+            mAvrcp = profileService.getAvrcpProfile();
         }
     };
 
@@ -155,20 +140,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             Log.i(TAG, "action " + action);
-            if (action.equals(ACTION_TRACK_EVENT)) {
-                PlaybackState ps = intent.getParcelableExtra(EXTRA_PLAYBACK);
-                if (ps != null && mBtnPlayPause != null
-                        && (ps.getState() == PlaybackState.STATE_PAUSED
-                        || ps.getState() == PlaybackState.STATE_STOPPED)) {
-                    mBtnPlayPause.setText(STATUS_PLAY);
-                } else if (ps != null && mBtnPlayPause != null
-                        && ps.getState() == PlaybackState.STATE_PLAYING) {
-                    mBtnPlayPause.setText(STATUS_PAUSE);
-                }
+            if (action.equals(AvrcpProfile.ACTION_TRACK_EVENT)) {
+                handleActionTrackEvent(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_FOLDER_LIST)) {
+                handleActionFolderList(intent);
             } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
-                mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
-                updatePlayerAppSettingUI(mPlayerAppSetting);
-            } else if (action.equals(ACTION_SUPPORTED_FEATURES)) {
+                handleActionPlayerSetting(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_SUPPORTED_FEATURES)) {
                 handleActionSupportedFeatures(intent);
             } else if (action.equals(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED)) {
                 handleActionAudioConfigChanged(intent);
@@ -180,10 +158,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         @Override
         public void handleMessage(Message msg) {
             if (msg.what == FASTFORWARD_PRESSED) {
-                sendFastForward(true);
+                fastForward(true);
                 sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
             } else if (msg.what == REWIND_PRESSED) {
-                sendRewind(true);
+                rewind(true);
                 sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
             } else {
                 Log.e(TAG, "Unknown msg: " + msg.what);
@@ -194,6 +172,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
         ActivityHelper.initialize(this, R.layout.layout_avrcp);//use layout_avrcp.xml
         initPasMaps();
         mBtnPlayPause = (Button) findViewById(R.id.id_btn_play_pause);
@@ -235,16 +214,26 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mBtnGetAudioConfig = (Button) findViewById(R.id.id_btn_get_audio_config);
         mBtnGetAudioConfig.setOnClickListener(this);
 
+        mBtnGetItemAttr = (Button) findViewById(R.id.id_btn_get_item_attr);
+        mBtnGetItemAttr.setOnClickListener(this);
+
+        mEditItemPosition = (EditText) findViewById(R.id.id_edit_item_position);
+        mEditItemPosition.setText("0");  // The 1st item by default
+        mEditItemPosition.setVisibility(View.VISIBLE);
+
+        mFolders = (RadioGroup) findViewById(R.id.id_folders);
+
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
 
         // receive playback state change
         IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_TRACK_EVENT);
+        filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
+        filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
-        filter.addAction(ACTION_SUPPORTED_FEATURES);
         filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
+        filter.addAction(AvrcpProfile.ACTION_SUPPORTED_FEATURES);
         registerReceiver(mReceiver, filter);
     }
 
@@ -262,7 +251,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mDevice = device;
 
         // Initialize A2DP codec type
-        mA2dpCodecType.put(device, UNKNOWN_A2DP_CODEC_TYPE);
+        mA2dpCodecType.put(device, AvrcpProfile.UNKNOWN_CODEC_TYPE);
     }
 
     @Override
@@ -289,21 +278,24 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetCurrentPas) {
             Log.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
+        } else if (v == mBtnGetItemAttr) {
+            Log.d(TAG, "onClick mBtnGetItemAttr");
+            handleClickBtnGetItemAttributes();
         }
     }
 
     private void handleClickBtnSearch() {
-        String searchQuery = mEditTextSearch.getText().toString();
-        if ((searchQuery != null) && !searchQuery.isEmpty()) {
-            Log.d(TAG, "BtnSearch clicked, search: " + searchQuery);
-            sendSearch(searchQuery);
+        String query = mEditTextSearch.getText().toString();
+        if ((query != null) && !query.isEmpty()) {
+            Log.d(TAG, "BtnSearch clicked, search: " + query);
+            search(query);
         } else {
             Log.w(TAG, "BtnSearch clicked, but search string empty");
         }
     }
 
     private void handleClickBtnGetSupportedFeatures() {
-        sendGetSupportedFeatures(mDevice);
+        getSupportedFeatures(mDevice);
     }
 
     private void handleClickBtnGetAudioConfig() {
@@ -313,15 +305,41 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private void handleClickBtnGetCurrentPas() {
-        if (mDevice == null || mProfileService == null ||
-            mProfileService.getAvrcpController() == null ||
-            mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null) {
-            Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService
-                + " getAvrcpController() " + mProfileService.getAvrcpController()
-                + " getPlayerSettings" + mProfileService.getAvrcpController().getPlayerSettings(mDevice));
+        Log.d(TAG, "handleClickBtnGetCurrentPas ");
+
+        mPlayerAppSetting = getPlayerSettings(mDevice);
+        if (mPlayerAppSetting == null) {
+            Log.e(TAG, "handleClickBtnGetCurrentPas player app setting null ");
+            return;
+        }
+
+        Log.d(TAG, "handleClickBtnGetCurrentPas update player app setting");
+        updatePlayerAppSettingUI(mPlayerAppSetting);
+    }
+
+    private void handleClickBtnGetItemAttributes() {
+        int btnId = mFolders.getCheckedRadioButtonId();
+        String str = mEditItemPosition.getText().toString();
+        int position = 0;
+
+        if ((str != null) && !str.isEmpty()) {
+            position = Integer.parseInt(str);
+        }
+
+        // Clear edit text
+        TextView itemAttr = (TextView) findViewById(R.id.id_item_attr);
+        itemAttr.setText("");
+
+        if (btnId == R.id.id_rb_search) {
+            Log.d(TAG, "BtnGetItemAttributes clicked in search folder, item position: " + position);
+            mGetItemAttr = true;
+            getItemAttributes(mSearchItems, position);
+        } else if (btnId == R.id.id_rb_now_playing) {
+            Log.d(TAG, "BtnGetItemAttributes clicked in now playing folder, item position: " + position);
+            mGetItemAttr = true;
+            getItemAttributes(mNowPlayingItems, position);
         } else {
-            mPlayerAppSetting = mProfileService.getAvrcpController().getPlayerSettings(mDevice);
-            updatePlayerAppSettingUI(mPlayerAppSetting);
+            Log.w(TAG, "BtnGetItemAttributes none button clicked");
         }
     }
 
@@ -339,14 +357,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 Log.d(TAG, "BtnFastforward, key pressed");
-                sendFastForward(true);
+                fastForward(true);
                 mHandler.sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
                 break;
 
             case MotionEvent.ACTION_UP:
                 Log.d(TAG, "BtnFastforward, key released");
                 mHandler.removeMessages(FASTFORWARD_PRESSED);
-                sendFastForward(false);
+                fastForward(false);
                 break;
 
             default:
@@ -358,14 +376,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 Log.d(TAG, "BtnRewind, key pressed");
-                sendRewind(true);
+                rewind(true);
                 mHandler.sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
                 break;
 
             case MotionEvent.ACTION_UP:
                 Log.d(TAG, "BtnRewind, key released");
                 mHandler.removeMessages(REWIND_PRESSED);
-                sendRewind(false);
+                rewind(false);
                 break;
 
             default:
@@ -376,54 +394,38 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         Log.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id + mSpEqualizer.getSelectedItem().toString());
-        if (mDevice == null || mProfileService == null ||
-            mProfileService.getAvrcpController() == null ||
-            mProfileService.getAvrcpController().getPlayerSettings(mDevice) == null ||
-            mPlayerAppSetting == null) {
-            Log.e(TAG, "mDevice " + mDevice + " mProfileService " + mProfileService + " mPlayerAppSetting" + mPlayerAppSetting);
+
+        mPlayerAppSetting = getPlayerSettings(mDevice);
+        if (mPlayerAppSetting == null) {
+            Log.e(TAG, "player app setting null ");
             return;
         }
 
         boolean result = true;
         if(parent == mSpEqualizer) {
-            Log.d(TAG, "mSpEqualizer, set to " + mSpEqualizer.getSelectedItem().toString() +
-                " " + mPasValue.get(mSpEqualizer.getSelectedItem().toString()));
-            if (mPlayerAppSetting != null) {
-                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
-                    mPasValue.get(mSpEqualizer.getSelectedItem().toString()));
-            }
-
+            String equalizer = mSpEqualizer.getSelectedItem().toString(); 
+            Log.d(TAG, "Set equalizer " + equalizer);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER, equalizer, mPlayerAppSetting);
         } else if (parent == mSpRepeat) {
-            Log.d(TAG, "mSpRepeat, set to " + mSpRepeat.getSelectedItem().toString() +
-                " " + mPasValue.get(mSpRepeat.getSelectedItem().toString()));
-            if (mPlayerAppSetting != null) {
-                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT,
-                    mPasValue.get(mSpRepeat.getSelectedItem().toString()));
-            }
-
+            String repeat = mSpRepeat.getSelectedItem().toString();
+            Log.d(TAG, "Set repeat " + repeat);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT, repeat, mPlayerAppSetting);
         } else if (parent == mSpShuffle) {
-            Log.d(TAG, "mSpShuffle, set to " + mSpShuffle.getSelectedItem().toString() +
-                mPasValue.get(mSpShuffle.getSelectedItem().toString()));
-            if (mPlayerAppSetting != null) {
-                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE,
-                    mPasValue.get(mSpShuffle.getSelectedItem().toString()));
-            }
-
+            String shuffle = mSpShuffle.getSelectedItem().toString();
+            Log.d(TAG, "Set shuffle " + shuffle);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE, shuffle, mPlayerAppSetting);
         } else if (parent == mSpScan) {
-            Log.d(TAG, "mSpScan, set to " + mSpScan.getSelectedItem().toString() +
-                " " + mPasValue.get(mSpScan.getSelectedItem().toString()));
-            if (mPlayerAppSetting != null) {
-                mPlayerAppSetting.addSettingValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN,
-                    mPasValue.get(mSpScan.getSelectedItem().toString()));
-            }
-
+            String scan = mSpScan.getSelectedItem().toString();
+            Log.d(TAG, "Set scan " + scan);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN, scan, mPlayerAppSetting);
         } else {
             Log.e(TAG, "Unknown item");
             result = false;
         }
+
         if (result) {
             Log.d(TAG, "setPlayerApplicationSetting");
-            mProfileService.getAvrcpController().setPlayerApplicationSetting(mPlayerAppSetting);
+            mAvrcp.setPlayerApplicationSetting(mPlayerAppSetting);
         }
     }
 
@@ -450,8 +452,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         Log.d(TAG," set " + setting);
         SpinnerAdapter adapter = spinner.getAdapter();
         int count= adapter.getCount();
-        for(int i = 0; i < count; i++) {
-            if(setting.equals(adapter.getItem(i).toString())) {
+        for (int i = 0; i < count; i++) {
+            if (setting.equals(adapter.getItem(i).toString())) {
                 Log.d(TAG," set " + i);
                 spinner.setSelection(i);
                 break;
@@ -459,64 +461,56 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void updatePlayerAppSettingUI(BluetoothAvrcpPlayerSettings mPlayerAppSetting) {
-        String text;
-        if (mPlayerAppSetting == null) {
-            Log.e(TAG,"mPlayerAppSetting is null");
+    private void updatePlayerAppSettingUI(BluetoothAvrcpPlayerSettings pas) {
+        int supportedSetting = getSupportedSetting(pas);
+        if (supportedSetting == 0) {
+            Log.e(TAG,"updatePlayerAppSettingUI none supported setting");
             return;
         }
-        int supportedSetting = mPlayerAppSetting.getSettings();
-        Log.d(TAG," setting: " + supportedSetting);
+
+        Log.d(TAG,"updatePlayerAppSettingUI supported setting: " + supportedSetting);
+
+        // Disable spinner
         mSpEqualizer.setEnabled(false);
         mSpRepeat.setEnabled(false);
         mSpShuffle.setEnabled(false);
         mSpScan.setEnabled(false);
-        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER) != 0) {
-            TextView avrcp_equalizer_value = (TextView) findViewById(R.id.id_avrcp_equalizer_value);
-            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
-                                                             SETTING_EQUALIZER));
-            avrcp_equalizer_value.setText(text);
-            mSpEqualizer.setEnabled(true);
-        }
-        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_REPEAT) != 0) {
-            TextView avrcp_repeat_value = (TextView) findViewById(R.id.id_avrcp_repeat_value);
-            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
-                                                             SETTING_REPEAT));
-            avrcp_repeat_value.setText(text);
-            mSpRepeat.setEnabled(true);
-        }
-        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE) != 0) {
-            TextView avrcp_shuffle_value = (TextView) findViewById(R.id.id_avrcp_shuffle_value);
-            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
-                                                             SETTING_SHUFFLE));
-            avrcp_shuffle_value.setText(text);
-            mSpShuffle.setEnabled(true);
-        }
-        if ((supportedSetting & BluetoothAvrcpPlayerSettings.SETTING_SCAN) != 0) {
-            TextView avrcp_scan_value = (TextView) findViewById(R.id.id_avrcp_scan_value);
-            text = mPasText.get(mPlayerAppSetting.getSettingValue(BluetoothAvrcpPlayerSettings.
-                                                             SETTING_SCAN));
-            avrcp_scan_value.setText(text);
-            mSpScan.setEnabled(true);
-        }
 
+        // Enable equalizer (if available)
+        enableSpinner(mSpEqualizer, R.id.id_avrcp_equalizer_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
+                      supportedSetting, pas);
+
+        // Enable repeat (if available)
+        enableSpinner(mSpRepeat, R.id.id_avrcp_repeat_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_REPEAT,
+                      supportedSetting, pas);
+
+        // Enable shuffle (if available)
+        enableSpinner(mSpShuffle, R.id.id_avrcp_shuffle_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE,
+                      supportedSetting, pas);
+
+        // Enable scan (if available)
+        enableSpinner(mSpScan, R.id.id_avrcp_scan_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_SCAN,
+                      supportedSetting, pas);
     }
 
     private void sendCommand() {
-        if (mProfileService == null) {
+        if (mAvrcp == null) {
             Log.d(TAG, " Service not connected ");
             return;
         }
+
         String status = mBtnPlayPause.getText().toString().trim();
+
         try {
             if (status.equals(STATUS_PLAY)) {
-
-                mProfileService.sendPlay();
+                mAvrcp.play();
                 mBtnPlayPause.setText(STATUS_PAUSE);
-
             } else if (status.equals(STATUS_PAUSE)) {
-
-                mProfileService.sendPause();
+                mAvrcp.pause();
                 mBtnPlayPause.setText(STATUS_PLAY);
             }
         } catch (Exception e) {
@@ -525,56 +519,91 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void sendFastForward(boolean pressed) {
-        if (mProfileService == null) {
+    private void fastForward(boolean pressed) {
+        if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mProfileService.sendFastForward(pressed);
+            mAvrcp.fastForward(pressed);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private void sendRewind(boolean pressed) {
-        if (mProfileService == null) {
+    private void rewind(boolean pressed) {
+        if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mProfileService.sendRewind(pressed);
+            mAvrcp.rewind(pressed);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private void sendSearch(String searchQuery) {
-        if (mProfileService == null) {
+    private void search(String query) {
+        if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mProfileService.sendSearch(searchQuery);
+            mAvrcp.search(query);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private void sendGetSupportedFeatures(BluetoothDevice device) {
-        if (mProfileService == null) {
+    private void getSupportedFeatures(BluetoothDevice device) {
+        if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mProfileService.sendGetSupportedFeatures(device);
+            mAvrcp.getSupportedFeatures(device);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private MediaBrowser.MediaItem getMediaItem(List<MediaBrowser.MediaItem> list, int position) {
+        Log.d(TAG, "getMediaItem position: " + position);
+        if ((list == null) || (position >= list.size())) {
+            Log.w(TAG, "getMediaItem exceed max size " + list.size());
+            return null;
+        }
+
+        return list.get(position);
+    }
+
+    private void getItemAttributes(List<MediaBrowser.MediaItem> list, int position) {
+        Log.d(TAG, "getItemAttributes position: " + position);
+        MediaBrowser.MediaItem item = getMediaItem(list, position);
+        if (item == null) {
+            Log.e(TAG, "getItemAttributes, MediaItem null");
+            return;
+        }
+
+        getItemAttributes(item.getMediaId());
+    }
+
+    private void getItemAttributes(String mediaId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getItemAttributes(mediaId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -582,13 +611,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
-        if (mProfileService == null) {
+        if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return null;
         }
 
         try {
-            return mProfileService.getAudioConfig(device);
+            return mAvrcp.getAudioConfig(device);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -597,27 +626,69 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         return null;
     }
 
+    private void handleActionTrackEvent(Intent intent) {
+        PlaybackState ps = intent.getParcelableExtra(AvrcpProfile.EXTRA_PLAYBACK);
+        if ((ps != null) && (mBtnPlayPause != null)) {
+            int state = ps.getState();
+            Log.d(TAG, "handleActionTrackEvent state: " + state);
+            if (state == PlaybackState.STATE_PAUSED ||
+                state == PlaybackState.STATE_STOPPED) {
+                mBtnPlayPause.setText(STATUS_PLAY);
+            } else if (state == PlaybackState.STATE_PLAYING) {
+                mBtnPlayPause.setText(STATUS_PAUSE);
+            }
+        }
+
+        if (mGetItemAttr) {
+            MediaMetadata mmd = intent.getParcelableExtra(AvrcpProfile.EXTRA_METADATA);
+            showMediaMetadata(mmd);
+            mGetItemAttr = false;
+        }
+    }
+
+    private void handleActionFolderList(Intent intent) {
+        String id = intent.getStringExtra(AvrcpProfile.EXTRA_FOLDER_ID);
+        ArrayList<MediaItem> items = intent.getParcelableArrayListExtra(AvrcpProfile.EXTRA_FOLDER_LIST);
+        Log.d(TAG, "handleActionFolderList folder " + id);
+
+        if (AvrcpProfile.isNowPlaying(id)) {
+            Log.d(TAG, "handleActionFolderList now playing items " + items);
+            storeMediaItems(mNowPlayingItems, items);
+        } else if (AvrcpProfile.isSearch(id)) {
+            Log.d(TAG, "handleActionFolderList search items " + items);
+            storeMediaItems(mSearchItems, items);
+        } else {
+            // Ignore
+        }
+    }
+
+    private void handleActionPlayerSetting(Intent intent) {
+        mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
+        Log.d(TAG, "handleActionPlayerSetting mPlayerAppSetting: " + mPlayerAppSetting);
+        updatePlayerAppSettingUI(mPlayerAppSetting);
+    }
+
     private void handleActionSupportedFeatures(Intent intent) {
         BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-        int features = (int) intent.getExtra(EXTRA_SUPPORTED_FEATURES);
+        int features = (int) intent.getExtra(AvrcpProfile.EXTRA_SUPPORTED_FEATURES);
         Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
 
         String val = "AVRCP Features: " + features + " (";
 
         if (features != 0) {
-            if ((features & BTRC_FEAT_METADATA) != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_METADATA) != 0) {
                 val += " metadata, ";
             }
 
-            if ((features & BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
                 val += " absolute_volume, ";
             }
 
-            if ((features & BTRC_FEAT_BROWSE) != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_BROWSE) != 0) {
                 val += " browse, ";
             }
 
-            if ((features & BTRC_FEAT_COVER_ART) != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_COVER_ART) != 0) {
                 val += " cover_art, ";
             }
         } else {
@@ -633,7 +704,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private void handleActionAudioConfigChanged(Intent intent) {
         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         BluetoothAudioConfig audioConfig = intent.getParcelableExtra(BluetoothA2dpSink.EXTRA_AUDIO_CONFIG);
-        int codecType = intent.getIntExtra(EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
+        int codecType = intent.getIntExtra(AvrcpProfile.EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
 
         Log.d(TAG, "handleActionAudioConfigChanged device: " + device + ", audioConfig: " +
             audioConfig + ", codecType: " + codecType);
@@ -641,6 +712,55 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mA2dpCodecType.put(device, codecType);
 
         showA2dpCodec(audioConfig);
+    }
+
+    private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
+        return pas != null ? pas.getSettings() : 0;
+    }
+
+    private BluetoothAvrcpPlayerSettings getPlayerSettings(BluetoothDevice device) {
+        return mAvrcp != null ? mAvrcp.getPlayerSettings(device) : null;
+    }
+
+    private void addPasValue(int setting, String valueString, BluetoothAvrcpPlayerSettings pas) {
+        if (valueString != null) {
+            int value = mPasValue.get(valueString);
+            Log.d(TAG, "addPasValue setting: " + setting +", value: " + value + "(" + valueString + ")");
+
+            int supportedSetting = getSupportedSetting(pas);
+
+            if ((setting & supportedSetting) != 0) {
+                pas.addSettingValue(setting, value);
+            } else {
+                Log.w(TAG, "addPasValue setting " + setting + "not in supported list " + supportedSetting);
+            }
+        } else {
+            Log.w(TAG, "addPasValue value null");
+        }
+    }
+
+    private void enableSpinner(Spinner spinner, int textViewId, int setting, int supportedSetting,
+                               BluetoothAvrcpPlayerSettings pas) {
+        if ((setting & supportedSetting) != 0) {
+            TextView textView = (TextView) findViewById(textViewId);
+
+            int value = pas.getSettingValue(setting);
+            String text = mPasText.get(value);
+            textView.setText(text);
+
+            spinner.setEnabled(true);
+        } else {
+            Log.w(TAG, "enableSpinner setting " + setting + "not in supported list " + supportedSetting);
+        }
+    }
+
+    private void storeMediaItems(List<MediaBrowser.MediaItem> dstList,
+                                 List<MediaBrowser.MediaItem> srcList) {
+        if ((dstList == null) || (srcList == null)) {
+            return;
+        }
+        dstList.clear();
+        dstList.addAll(srcList);
     }
 
     private void showA2dpCodec(BluetoothAudioConfig audioConfig) {
@@ -652,8 +772,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int sampleRate = audioConfig.getSampleRate();
         int channelConfig = audioConfig.getChannelConfig();
         int audioFormat = audioConfig.getAudioFormat();
-        int codecType = mA2dpCodecType.containsKey(mDevice) ?
-                        mA2dpCodecType.get(mDevice) : UNKNOWN_A2DP_CODEC_TYPE;
+        int codecType = AvrcpProfile.UNKNOWN_CODEC_TYPE;
+
+        codecType = mA2dpCodecType.containsKey(mDevice) ?
+                    mA2dpCodecType.get(mDevice) : AvrcpProfile.UNKNOWN_CODEC_TYPE;
+        Log.d(TAG, "BluetoothAudioConfig codecType: " + codecType);
 
         String codecTypeString = "";
         switch (codecType) {
@@ -707,5 +830,19 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         TextView a2dpCodec = (TextView) findViewById(R.id.id_a2dp_codec);
         a2dpCodec.setText(str);
+    }
+
+    private void showMediaMetadata(MediaMetadata mmd) {
+        if (mmd == null) {
+            return;
+        }
+
+        Log.d(TAG, "showMediaMetadata " + mmd);
+
+        String str = mmd.getString(MediaMetadata.METADATA_KEY_TITLE) + "  " +
+                     mmd.getString(MediaMetadata.METADATA_KEY_ARTIST) + "  " +
+                     mmd.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        TextView itemAttr = (TextView) findViewById(R.id.id_item_attr);
+        itemAttr.setText(str);
     }
 }

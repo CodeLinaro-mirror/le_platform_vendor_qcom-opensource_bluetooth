@@ -525,7 +525,7 @@ public class ServicesFragment extends ListFragment {
                 break;
 
             case AVRCP:
-                if (mActivity.mProfileService.getAvrcpController() != null) {
+                if (mActivity.mProfileService.getAvrcpProfile() != null) {
                     intent = new Intent(getActivity(), AvrcpTestActivity.class);
                 } else {
                     Log.d(TAG, "BluetoothAvrcpController is null");

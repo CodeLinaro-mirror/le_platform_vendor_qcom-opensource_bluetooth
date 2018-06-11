@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016, 2018, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -58,12 +58,9 @@ import android.bluetooth.client.map.BluetoothMapBmessage;
 import android.bluetooth.client.map.BluetoothMapEventReport;
 import android.bluetooth.client.map.BluetoothMapMessage;
 import android.bluetooth.client.map.BluetoothMasClient;
-/*import android.bluetooth.client.pbap.BluetoothPbapCard;
-import android.bluetooth.client.pbap.BluetoothPbapClient;
-import org.codeaurora.bluetooth.bttestapp.services.IPbapServiceCallback;
-import org.codeaurora.bluetooth.bttestapp.services.PbapAuthActivity; */
 import org.codeaurora.bluetooth.bttestapp.R;
 import org.codeaurora.bluetooth.bttestapp.services.IMapServiceCallback;
+import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
 
 import android.media.browse.MediaBrowser;
 import android.media.browse.MediaBrowser.MediaItem;
@@ -112,48 +109,14 @@ public class ProfileService extends Service {
 
     public static final String EXTRA_MAP_MESSAGE_HANDLE = "org.codeaurora.bluetooth.extra.MAP_MESSAGE_HANDLE";
 
-    // [TODO] Move the common defintion for customer action into framework
-    // +++ Custom action definition for AVRCP controller
-
-    // Send pass through command (with key state)
-    public static final String CUSTOM_ACTION_SEND_PASS_THRU_CMD =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEND_PASS_THRU_CMD";
-    public static final String KEY_CMD = "cmd";
-    public static final String KEY_STATE = "state";
-
-    // Search
-    public static final String CUSTOM_ACTION_SEARCH =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
-    public static final String KEY_SEARCH = "search";
-
-    // Get remote AVRCP supported features
-    public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
-
-    // --- Custom action definition for AVRCP controller
-
-    public static final int PASS_THRU_CMD_ID_FF = 0x49;
-    public static final int PASS_THRU_CMD_ID_REWIND = 0x48;
-
-    public static final int KEY_STATE_PRESSED = 0;
-    public static final int KEY_STATE_RELEASED = 1;
-
     private BluetoothDevice mDevice = null;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
     private BluetoothHeadsetClient mHfpClient = null;
 
-    private BluetoothAvrcpController mAvrcpController = null;
+    private AvrcpProfile mAvrcp;
 
-    private BluetoothA2dpSink mA2dpSink = null;
-
-  /*  private BluetoothPbapClient mPbapClient = null;
-
-    private IPbapServiceCallback mPbapCallback = null;
-
-    private final PbapSessionData mPbapSessionData = new PbapSessionData();
-*/
     private HashMap<Integer, BluetoothMasClient> mMapClients = null;
 
     private HashMap<Integer, IMapServiceCallback> mMapCallbacks = null;
@@ -166,17 +129,8 @@ public class ProfileService extends Service {
 
     private final IBinder mBinder = new LocalBinder();
 
-    /* Object used to connect to MediaBrowseService of BT-AVRCP app */
-    private MediaBrowser mMediaBrowser = null;
-    private MediaController mMediaController = null;
-
     private Context mContext;
-/*    class PbapSessionData {
-        ArrayList<VCardEntry> pullPhoneBook = null;
-        ArrayList<BluetoothPbapCard> pullVcardListing = null;
-        VCardEntry pullVcardEntry = null;
-    }
-*/
+
     class MapSessionData {
         ArrayList<String> getFolderListing;
         ArrayList<BluetoothMapMessage> getMessagesListing;
@@ -188,103 +142,7 @@ public class ProfileService extends Service {
             return ProfileService.this;
         }
     }
-/*
-    private final Handler mPbapHandler = new Handler() {
 
-        @Override
-        public void handleMessage(Message msg) {
-            Intent intent = null;
-
-            switch (msg.what) {
-                case BluetoothPbapClient.EVENT_SESSION_CONNECTED:
-                    intent = new Intent(ACTION_PBAP_CONNECTION_STATE);
-                    intent.putExtra(EXTRA_CONNECTED, true);
-                    break;
-
-                case BluetoothPbapClient.EVENT_SESSION_DISCONNECTED:
-                    intent = new Intent(ACTION_PBAP_CONNECTION_STATE);
-                    intent.putExtra(EXTRA_CONNECTED, false);
-                    break;
-            }
-
-            if (intent != null) {
-                ProfileService.this.sendBroadcast(intent);
-            }
-
-            switch (msg.what) {
-                case BluetoothPbapClient.EVENT_PULL_PHONE_BOOK_DONE:
-                    mPbapSessionData.pullPhoneBook = (ArrayList<VCardEntry>) msg.obj;
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_LISTING_DONE:
-                    mPbapSessionData.pullVcardListing = (ArrayList<BluetoothPbapCard>) msg.obj;
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_ENTRY_DONE:
-                    mPbapSessionData.pullVcardEntry = (VCardEntry) msg.obj;
-                    break;
-            }
-
-            if (mPbapCallback == null) {
-                return;
-            }
-
-            switch (msg.what) {
-                case BluetoothPbapClient.EVENT_SET_PHONE_BOOK_DONE:
-                    mPbapCallback.onSetPhoneBookDone();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_PHONE_BOOK_DONE:
-                    mPbapCallback.onPullPhoneBookDone(mPbapSessionData.pullPhoneBook, msg.arg1);
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_LISTING_DONE:
-                    mPbapCallback.onPullVcardListingDone(mPbapSessionData.pullVcardListing,
-                            msg.arg1);
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_ENTRY_DONE:
-                    mPbapCallback.onPullVcardEntryDone(mPbapSessionData.pullVcardEntry);
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_PHONE_BOOK_SIZE_DONE:
-                    mPbapCallback.onPullPhoneBookSizeDone(msg.arg1, 0);
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_LISTING_SIZE_DONE:
-                    mPbapCallback.onPullPhoneBookSizeDone(msg.arg1, 1);
-                    break;
-                case BluetoothPbapClient.EVENT_SET_PHONE_BOOK_ERROR:
-                    mPbapCallback.onSetPhoneBookError();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_PHONE_BOOK_ERROR:
-                    mPbapCallback.onPullPhoneBookError();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_LISTING_ERROR:
-                    mPbapCallback.onPullVcardListingError();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_ENTRY_ERROR:
-                    mPbapCallback.onPullVcardEntryError();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_PHONE_BOOK_SIZE_ERROR:
-                    mPbapCallback.onPullPhoneBookSizeError();
-                    break;
-                case BluetoothPbapClient.EVENT_PULL_VCARD_LISTING_SIZE_ERROR:
-                    mPbapCallback.onPullVcardListingSizeError();
-                    break;
-                case BluetoothPbapClient.EVENT_SESSION_CONNECTED:
-                    mPbapCallback.onSessionConnected();
-                    break;
-                case BluetoothPbapClient.EVENT_SESSION_DISCONNECTED:
-                    mPbapCallback.onSessionDisconnected();
-                    break;
-                case BluetoothPbapClient.EVENT_SESSION_AUTH_REQUESTED:
-                    createPbapAuthNotification();
-                    break;
-                case BluetoothPbapClient.EVENT_SESSION_AUTH_TIMEOUT:
-                    removePbapAuthNotification();
-                    break;
-
-                default:
-                    Log.w(TAG, "Unknown message in PBAP handler: " + msg.what);
-                    break;
-            }
-        }
-    };
-*/
     private final Handler mMapHandler = new Handler() {
 
         @SuppressWarnings("unchecked")
@@ -618,19 +476,10 @@ public class ProfileService extends Service {
                 } else {
                     Log.d(TAG,"AVRCP connection state change not updated");
                 }
-            }/* else if (PBAP_AUTH_ACTION_RESPONSE.equals(action)) {
-                String key = intent.getStringExtra(PBAP_AUTH_EXTRA_KEY);
-                mPbapClient.setAuthResponse(key);
-            } else if (PBAP_AUTH_ACTION_CANCEL.equals(action)) {
-                mPbapClient.setAuthResponse(null);
-            } */else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+            } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
                 if (dev.equals(mDevice)) {
-                /*    if (mPbapClient != null) {
-                        mPbapClient.disconnect();
-                    }*/
-
                     for (BluetoothMasClient cli : mMapClients.values()) {
                         cli.disconnect();
                     }
@@ -640,10 +489,6 @@ public class ProfileService extends Service {
             } else if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
                 int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                 if (state == BluetoothAdapter.STATE_TURNING_OFF) {
-                    /*if (mPbapClient != null) {
-                        mPbapClient.disconnect();
-                    }*/
-
                     for (BluetoothMasClient cli : mMapClients.values()) {
                         cli.disconnect();
                     }
@@ -670,73 +515,6 @@ public class ProfileService extends Service {
         }
     };
 
-    private final ServiceListener mAvrcpControllerServiceListener = new ServiceListener() {
-        @Override
-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
-                mAvrcpController = (BluetoothAvrcpController) proxy;
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(int profile) {
-            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
-                mAvrcpController = null;
-            }
-        }
-    };
-
-    private final ServiceListener mA2dpSinkServiceListener = new ServiceListener() {
-        @Override
-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            if (profile == BluetoothProfile.A2DP_SINK) {
-                mA2dpSink = (BluetoothA2dpSink) proxy;
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(int profile) {
-            if (profile == BluetoothProfile.A2DP_SINK) {
-                mA2dpSink = null;
-            }
-        }
-    };
-
-/*    private void createPbapAuthNotification() {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-
-        Intent click = new Intent(this, PbapAuthActivity.class);
-        click.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        click.setAction(PBAP_AUTH_ACTION_REQUEST);
-        click.putExtra(BluetoothDevice.EXTRA_DEVICE, mDevice);
-
-        Intent delete = new Intent(this, PbapAuthActivity.class);
-        delete.setAction(PBAP_AUTH_ACTION_CANCEL);
-
-        Notification no = new Notification.Builder(getApplicationContext())
-                .setContentTitle(getString(R.string.auth_notif_title))
-                .setContentText(getString(R.string.auth_notif_message, mDevice.getName()))
-                .setTicker(getString(R.string.auth_notif_ticker))
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentIntent(PendingIntent.getActivity(this, 0, click, 0))
-                .setDeleteIntent(PendingIntent.getBroadcast(this, 0, delete, 0))
-                .setAutoCancel(true)
-                .setOnlyAlertOnce(true)
-                .setDefaults(Notification.DEFAULT_SOUND)
-                .build();
-
-        nm.notify(PBAP_AUTH_NOTIFICATION_ID, no);
-    }
-
-    private void removePbapAuthNotification() {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-
-        nm.cancel(PBAP_AUTH_NOTIFICATION_ID);
-
-        Intent intent = new Intent(PBAP_AUTH_ACTION_TIMEOUT);
-        sendBroadcast(intent);
-    }
-*/
     private void checkAndStop(boolean unbind, boolean disconnect) {
         boolean canStop = true;
 
@@ -744,14 +522,9 @@ public class ProfileService extends Service {
 
         if (unbind) {
             if (mHfpClient != null &&
-                    mHfpClient.getConnectionState(mDevice) != BluetoothProfile.STATE_DISCONNECTED) {
+                mHfpClient.getConnectionState(mDevice) != BluetoothProfile.STATE_DISCONNECTED) {
                 canStop = false;
             }
-
-            /*if (mPbapClient != null
-                    && mPbapClient.getState() != BluetoothPbapClient.ConnectionState.DISCONNECTED) {
-                canStop = false;
-            }*/
 
             for (BluetoothMasClient cli : mMapClients.values()) {
                 if (cli.getState() != BluetoothMasClient.ConnectionState.DISCONNECTED) {
@@ -786,28 +559,8 @@ public class ProfileService extends Service {
         mIsBound = false;
 
         checkAndStop(true, false);
-
         return false;
     }
-
-    /* Browse connection state callback handler */
-    private MediaBrowser.ConnectionCallback browseMediaConnectionCallback =
-           new MediaBrowser.ConnectionCallback() {
-       @Override
-       public void onConnected() {
-           Log.d(TAG, "mediaBrowser CONNECTED");
-           mMediaController = new MediaController(mContext, mMediaBrowser.getSessionToken());
-       }
-
-       @Override
-       public void onConnectionFailed() {
-           Log.e(TAG, "mediaBrowser Connection failed");
-       }
-       @Override
-       public void onConnectionSuspended() {
-           Log.e(TAG, "mediaBrowser SUSPENDED");
-       }
-    };
 
     @Override
     public void onCreate() {
@@ -828,17 +581,11 @@ public class ProfileService extends Service {
         registerReceiver(mReceiver, filter);
 
         mContext = getApplicationContext();
+
         mAdapter.getProfileProxy(mContext, mHfpServiceListener,
                 BluetoothProfile.HEADSET_CLIENT);
-        mAdapter.getProfileProxy(mContext, mAvrcpControllerServiceListener,
-                BluetoothProfile.AVRCP_CONTROLLER);
-        mAdapter.getProfileProxy(mContext, mA2dpSinkServiceListener,
-                BluetoothProfile.A2DP_SINK);
 
-        mMediaBrowser = new MediaBrowser(mContext, new ComponentName("com.android.bluetooth",
-                        "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService"),
-                        browseMediaConnectionCallback, null);
-        mMediaBrowser.connect();
+        mAvrcp = new AvrcpProfile(mContext);
     }
 
     @Override
@@ -855,15 +602,8 @@ public class ProfileService extends Service {
         mAdapter.closeProfileProxy(BluetoothProfile.HEADSET_CLIENT,
                 mHfpClient);
 
-        mAdapter.closeProfileProxy(BluetoothProfile.AVRCP_CONTROLLER,
-                mAvrcpController);
-
         unregisterReceiver(mReceiver);
 
-/*        if (mPbapClient != null) {
-            mPbapClient.disconnect();
-        }
-*/
         for (BluetoothMasClient cli : mMapClients.values()) {
             cli.disconnect();
         }
@@ -878,10 +618,6 @@ public class ProfileService extends Service {
             mHfpClient.disconnect(mDevice);
         }
 
-/*        if (mPbapClient != null) {
-            mPbapClient.disconnect();
-        }
-*/
         for (BluetoothMasClient cli : mMapClients.values()) {
             cli.disconnect();
         }
@@ -896,7 +632,6 @@ public class ProfileService extends Service {
             Log.v(TAG, "Current device: none");
         }
 
- //       mPbapClient = null;
         mMapClients = new HashMap<Integer, BluetoothMasClient>();
         mMapSessionData = new HashMap<Integer, MapSessionData>();
     }
@@ -905,113 +640,18 @@ public class ProfileService extends Service {
         return mHfpClient;
     }
 
-    public BluetoothAvrcpController getAvrcpController() {
-        return mAvrcpController;
+    public AvrcpProfile getAvrcpProfile() {
+        return mAvrcp;
     }
 
-    public BluetoothA2dpSink getA2dpSink() {
-        return mA2dpSink;
-    }
-
-    public void sendPlay() {
-        Log.d(TAG, "sendPlay");
-        if (mMediaController != null) {
-            Log.d(TAG, "calling play()");
-            mMediaController.getTransportControls().play();
-        }
-    }
-
-    public void sendPause() {
-        Log.d(TAG, "sendPause");
-        if (mMediaController != null) {
-            Log.d(TAG, "calling pause()");
-            mMediaController.getTransportControls().pause();
-        }
-    }
-
-    public void sendPassThruCmd(int cmd, boolean pressed) {
-        Log.d(TAG, "sendPassThruCmd, cmd: " + cmd + ", pressed: " + pressed);
-        Bundle extras = new Bundle();
-        extras.putInt(KEY_CMD, cmd);
-        extras.putInt(KEY_STATE, pressed ? KEY_STATE_PRESSED : KEY_STATE_RELEASED);
-        sendCustomAction(CUSTOM_ACTION_SEND_PASS_THRU_CMD, extras);
-    }
-
-    public void sendFastForward(boolean pressed) {
-        Log.d(TAG, "sendFastForward, pressed: " + pressed);
-        sendPassThruCmd(PASS_THRU_CMD_ID_FF, pressed);
-    }
-
-    public void sendRewind(boolean pressed) {
-        Log.d(TAG, "sendRewind, pressed: " + pressed);
-        sendPassThruCmd(PASS_THRU_CMD_ID_REWIND, pressed);
-    }
-
-    public void sendSearch(String searchQuery) {
-        Log.d(TAG, "sendSearch, search: " + searchQuery);
-        Bundle extras = new Bundle();
-        extras.putString(KEY_SEARCH, searchQuery);
-        sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
-    }
-
-    public void sendGetSupportedFeatures(BluetoothDevice device) {
-        Log.d(TAG, "sendGetSupportedFeatures, device: " + device);
-        Bundle extras = new Bundle();
-        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
-        sendCustomAction(CUSTOM_ACTION_GET_SUPPORTED_FEATURES, extras);
-    }
-
-    private void sendCustomAction(String action, Bundle extras) {
-        if (mMediaController != null) {
-            TransportControls transportControls = mMediaController.getTransportControls();
-
-            if (transportControls != null) {
-                Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
-                transportControls.sendCustomAction(action, extras);
-            } else {
-                Log.e(TAG, "Invalid TransportControls");
-            }
-        }
-    }
-
-    public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
-        Log.d(TAG, "getAudioConfig, device: " + device);
-        if (mA2dpSink != null) {
-            return mA2dpSink.getAudioConfig(device);
-        } else {
-            Log.e(TAG, "A2dpSink service null");
-            return null;
-        }
-    }
-
-/*    public BluetoothPbapClient getPbapClient() {
-        if (mDevice == null) {
-            return null;
-        }
-
-        if (mPbapClient == null) {
-            mPbapClient = new BluetoothPbapClient(mDevice, null, mPbapHandler);
-        }
-
-        return mPbapClient;
-    }
-
-    public void setPbapCallback(IPbapServiceCallback callback) {
-        mPbapCallback = callback;
-    }
-
-    public PbapSessionData getPbapSessionData() {
-        return mPbapSessionData;
-    }
-*/
     public void setMasInstances(SdpMasRecord masrec) {
-            // no need to recreate already existing MAS client
-            if (mMapClients.containsKey(masrec.getMasInstanceId())) {
-               return;
-            }
+        // no need to recreate already existing MAS client
+        if (mMapClients.containsKey(masrec.getMasInstanceId())) {
+           return;
+        }
 
-            BluetoothMasClient client = new BluetoothMasClient(mDevice, masrec, mMapHandler);
-            mMapClients.put(masrec.getMasInstanceId(), client);
+        BluetoothMasClient client = new BluetoothMasClient(mDevice, masrec, mMapHandler);
+        mMapClients.put(masrec.getMasInstanceId(), client);
     }
 
     public BluetoothMasClient getMapClient(int id) {
