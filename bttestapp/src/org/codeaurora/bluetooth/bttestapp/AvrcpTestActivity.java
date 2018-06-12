@@ -87,6 +87,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnGetItemAttr;
     private RadioGroup mFolders;
     private EditText mEditItemPosition;
+    private Button mBtnGetTotalNumOfItems;
 
     private final String STATUS_PLAY = "Play";
     private final String STATUS_PAUSE = "Pause";
@@ -144,6 +145,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 handleActionTrackEvent(intent);
             } else if (action.equals(AvrcpProfile.ACTION_FOLDER_LIST)) {
                 handleActionFolderList(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_NUM_OF_ITEMS)) {
+                handleActionGetTotalNumOfItems(intent);
             } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
                 handleActionPlayerSetting(intent);
             } else if (action.equals(AvrcpProfile.ACTION_SUPPORTED_FEATURES)) {
@@ -223,6 +226,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         mFolders = (RadioGroup) findViewById(R.id.id_folders);
 
+        mBtnGetTotalNumOfItems = (Button) findViewById(R.id.id_btn_get_total_num);
+        mBtnGetTotalNumOfItems.setOnClickListener(this);
+
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
@@ -231,6 +237,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         IntentFilter filter = new IntentFilter();
         filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
         filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
+        filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
         filter.addAction(AvrcpProfile.ACTION_SUPPORTED_FEATURES);
@@ -281,6 +288,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetItemAttr) {
             Log.d(TAG, "onClick mBtnGetItemAttr");
             handleClickBtnGetItemAttributes();
+        } else if (v == mBtnGetTotalNumOfItems) {
+            Log.d(TAG, "onClick mBtnGetTotalNumOfItems");
+            handleClickBtnGetTotalNumOfItems();
         }
     }
 
@@ -326,21 +336,64 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             position = Integer.parseInt(str);
         }
 
+        Log.d(TAG, "handleClickBtnGetItemAttributes, item position: " + position);
+
         // Clear edit text
         TextView itemAttr = (TextView) findViewById(R.id.id_item_attr);
         itemAttr.setText("");
 
-        if (btnId == R.id.id_rb_search) {
-            Log.d(TAG, "BtnGetItemAttributes clicked in search folder, item position: " + position);
-            mGetItemAttr = true;
-            getItemAttributes(mSearchItems, position);
-        } else if (btnId == R.id.id_rb_now_playing) {
-            Log.d(TAG, "BtnGetItemAttributes clicked in now playing folder, item position: " + position);
-            mGetItemAttr = true;
-            getItemAttributes(mNowPlayingItems, position);
-        } else {
-            Log.w(TAG, "BtnGetItemAttributes none button clicked");
+        switch (btnId) {
+            case R.id.id_rb_search:
+                Log.d(TAG, "Get item attributes in search folder");
+                mGetItemAttr = true;
+                getItemAttributes(mSearchItems, position);
+                break;
+
+            case R.id.id_rb_now_playing:
+                Log.d(TAG, "Get item attributes in now playing");
+                mGetItemAttr = true;
+                getItemAttributes(mNowPlayingItems, position);
+                break;
+
+            default:
+                Log.w(TAG, "Ignore to get item attributes, btnId: " + btnId);
+                break;
         }
+    }
+
+    private void handleClickBtnGetTotalNumOfItems() {
+        int scope = 0;
+        int btnId = mFolders.getCheckedRadioButtonId();
+
+        Log.d(TAG, "handleClickBtnGetTotalNumOfItems");
+
+        // Clear edit text
+        TextView totalNumOfItems = (TextView) findViewById(R.id.id_total_num);
+        totalNumOfItems.setText("");
+
+        switch (btnId) {
+            case R.id.id_rb_player:
+                scope = AvrcpProfile.BROWSE_SCOPE_PLAYER_LIST;
+                break;
+
+            case R.id.id_rb_vfs:
+                scope = AvrcpProfile.BROWSE_SCOPE_VFS;
+                break;
+
+            case R.id.id_rb_search:
+                scope = AvrcpProfile.BROWSE_SCOPE_SEARCH;
+                break;
+
+            case R.id.id_rb_now_playing:
+                scope = AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING;
+                break;
+
+            default:
+                Log.w(TAG, "Ignore to get total number of items, btnId: " + btnId);
+                return;
+        }
+
+        getTotalNumberOfItems(scope);
     }
 
     @Override
@@ -610,6 +663,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void getTotalNumberOfItems(int scope) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getTotalNumberOfItems(scope);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
     private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
@@ -660,6 +727,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else {
             // Ignore
         }
+    }
+
+    private void handleActionGetTotalNumOfItems(Intent intent) {
+        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
+        Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
+
+        TextView totalNumOfItems = (TextView) findViewById(R.id.id_total_num);
+        totalNumOfItems.setText(Integer.toString(items));
     }
 
     private void handleActionPlayerSetting(Intent intent) {

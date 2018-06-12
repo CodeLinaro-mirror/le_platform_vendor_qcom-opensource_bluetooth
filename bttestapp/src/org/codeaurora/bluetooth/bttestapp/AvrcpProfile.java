@@ -102,6 +102,12 @@ public class AvrcpProfile {
     public static final String EXTRA_FOLDER_ID =
         "com.android.bluetooth.avrcp.EXTRA_FOLDER_ID";
 
+    public static final String ACTION_NUM_OF_ITEMS =
+        "android.bluetooth.avrcp-controller.profile.action.NUM_OF_ITEMS";
+
+    public static final String EXTRA_NUM_OF_ITEMS =
+        "android.bluetooth.avrcp-controller.profile.extra.NUM_OF_ITEMS";
+
     public static final String ACTION_SUPPORTED_FEATURES =
         "android.bluetooth.avrcp-controller.profile.action.SUPPORTED_FEATURES";
 
@@ -148,6 +154,11 @@ public class AvrcpProfile {
     public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ITEM_ATTR";
 
+    // Get total number of items
+    public static final String CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
+    public static final String KEY_BROWSE_SCOPE = "scope";
+
     // --- Custom action definition for AVRCP controller
 
     public static final int PASS_THRU_CMD_ID_FF = 0x49;
@@ -155,6 +166,14 @@ public class AvrcpProfile {
 
     public static final int KEY_STATE_PRESSED = 0;
     public static final int KEY_STATE_RELEASED = 1;
+
+    /* Folder/Media Item scopes.
+     * Keep in sync with AVRCP 1.6 sec. 6.10.1
+     */
+    public static final int BROWSE_SCOPE_PLAYER_LIST = 0x00;
+    public static final int BROWSE_SCOPE_VFS = 0x01;
+    public static final int BROWSE_SCOPE_SEARCH = 0x02;
+    public static final int BROWSE_SCOPE_NOW_PLAYING = 0x03;
 
     public static final String ROOT = "__ROOT__";
     public static final String NOW_PLAYING_PREFIX = "NOW_PLAYING";
@@ -301,6 +320,13 @@ public class AvrcpProfile {
         Bundle extras = new Bundle();
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_GET_ITEM_ATTR, extras);
+    }
+
+    public void getTotalNumberOfItems(int scope) {
+        Log.d(TAG, "getTotalNumberOfItems, scope: " + scope);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_BROWSE_SCOPE, scope);
+        sendCustomAction(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {

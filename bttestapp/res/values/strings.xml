@@ -391,8 +391,11 @@
     <string name="avrcp_search">Search</string>
     <string name="avrcp_get_item_attr">GetItemAttributes</string>
     <string name="avrcp_folder">Folder</string>
+    <string name="avrcp_player">Player</string>
+    <string name="avrcp_vfs">VFS</string>
     <string name="avrcp_now_playing">NowPlaying</string>
     <string name="avrcp_item_position">ItemPosition</string>
+    <string name="avrcp_get_total_num">GetTotalNumberOfItems</string>
     <string name="avrcp_get_supported_features">GetSupportedFeatures</string>
     <string name="avrcp_get_current_pas">GetCurrentPas</string>
     <string name="avrcp_equalizer_title">Equalizer:</string>
