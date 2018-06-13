@@ -79,15 +79,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnPlayPause;
     private Button mBtnFastforward;
     private Button mBtnRewind;
-    private Button mBtnGetCurrentPas;
-    private Button mBtnSearch;
-    private EditText mEditTextSearch;
-    private Button mBtnGetSupportedFeatures;
-    private Button mBtnGetAudioConfig;
-    private Button mBtnGetItemAttr;
+
+    private EditText mEditTextQuery;
+
+    private Button mBtnTestCmd;
+    private Spinner mSpTestCmd;
+    private EditText mEditTestResp;
     private RadioGroup mFolders;
     private EditText mEditItemPosition;
-    private Button mBtnGetTotalNumOfItems;
+
+    private Button mBtnGetCurrentPas;
+    private Spinner mSpEqualizer;
+    private Spinner mSpRepeat;
+    private Spinner mSpShuffle;
+    private Spinner mSpScan;
 
     private final String STATUS_PLAY = "Play";
     private final String STATUS_PAUSE = "Pause";
@@ -95,10 +100,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private AvrcpProfile mAvrcp;
     private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
     private BluetoothDevice mDevice;
-    private Spinner mSpEqualizer;
-    private Spinner mSpRepeat;
-    private Spinner mSpShuffle;
-    private Spinner mSpScan;
+
     // Hash for storing A2DP codec type
     private HashMap<BluetoothDevice, Integer> mA2dpCodecType = new HashMap<BluetoothDevice, Integer>();
     private boolean mGetItemAttr = false;
@@ -177,71 +179,36 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
         ActivityHelper.initialize(this, R.layout.layout_avrcp);//use layout_avrcp.xml
+
         initPasMaps();
-        mBtnPlayPause = (Button) findViewById(R.id.id_btn_play_pause);
-        mBtnPlayPause.setText(STATUS_PLAY);
-        mBtnPlayPause.setOnClickListener(this);
-        mBtnGetCurrentPas = (Button) findViewById(R.id.id_btn_get_current_pas);
-        mBtnGetCurrentPas.setOnClickListener(this);
 
-        mSpEqualizer = (Spinner) findViewById(R.id.id_sp_equalizer);
-        mSpEqualizer.setOnItemSelectedListener(this);
+        mBtnPlayPause = initButton(R.id.id_btn_play_pause);
+        mBtnFastforward = initButton(R.id.id_btn_fast_forward, null, this);
+        mBtnRewind = initButton(R.id.id_btn_rewind, null, this);
 
-        mSpRepeat = (Spinner) findViewById(R.id.id_sp_repeat);
-        mSpRepeat.setOnItemSelectedListener(this);
-
-        mSpShuffle = (Spinner) findViewById(R.id.id_sp_shuffle);
-        mSpShuffle.setOnItemSelectedListener(this);
-
-        mSpScan = (Spinner) findViewById(R.id.id_sp_scan);
-        mSpScan.setOnItemSelectedListener(this);
-
-        BluetoothConnectionReceiver.registerObserver(this);
-
-        mBtnFastforward = (Button) findViewById(R.id.id_btn_fast_forward);
-        mBtnFastforward.setOnTouchListener(this);
-
-        mBtnRewind = (Button) findViewById(R.id.id_btn_rewind);
-        mBtnRewind.setOnTouchListener(this);
-
-        mEditTextSearch = (EditText) findViewById(R.id.id_edit_search);
-        mEditTextSearch.setText("You");  // Sample search string for test
-        mEditTextSearch.setVisibility(View.VISIBLE);
-
-        mBtnSearch = (Button) findViewById(R.id.id_btn_search);
-        mBtnSearch.setOnClickListener(this);
-
-        mBtnGetSupportedFeatures = (Button) findViewById(R.id.id_btn_get_supported_features);
-        mBtnGetSupportedFeatures.setOnClickListener(this);
-
-        mBtnGetAudioConfig = (Button) findViewById(R.id.id_btn_get_audio_config);
-        mBtnGetAudioConfig.setOnClickListener(this);
-
-        mBtnGetItemAttr = (Button) findViewById(R.id.id_btn_get_item_attr);
-        mBtnGetItemAttr.setOnClickListener(this);
-
-        mEditItemPosition = (EditText) findViewById(R.id.id_edit_item_position);
-        mEditItemPosition.setText("0");  // The 1st item by default
-        mEditItemPosition.setVisibility(View.VISIBLE);
+        mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
+        mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
+        mEditTestResp = initEditText(R.id.id_test_resp, "");
 
         mFolders = (RadioGroup) findViewById(R.id.id_folders);
+        mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, "0"); // The 1st item
+        mEditTextQuery = initEditText(R.id.id_edit_query, "You"); // Sample search/query string
 
-        mBtnGetTotalNumOfItems = (Button) findViewById(R.id.id_btn_get_total_num);
-        mBtnGetTotalNumOfItems.setOnClickListener(this);
+        mBtnGetCurrentPas = initButton(R.id.id_btn_get_current_pas);
+        mSpEqualizer = initSpinner(R.id.id_sp_equalizer);
+        mSpRepeat = initSpinner(R.id.id_sp_repeat);
+        mSpShuffle = initSpinner(R.id.id_sp_shuffle);
+        mSpScan = initSpinner(R.id.id_sp_scan);
+
+        BluetoothConnectionReceiver.registerObserver(this);
 
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
 
-        // receive playback state change
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
-        filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
-        filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
-        filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
-        filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
-        filter.addAction(AvrcpProfile.ACTION_SUPPORTED_FEATURES);
-        registerReceiver(mReceiver, filter);
+        initIntentFilter();
+
+        Log.d(TAG, "onCreate leave");
     }
 
     @Override
@@ -268,50 +235,193 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         invalidateOptionsMenu();
     }
 
+    private void initIntentFilter() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
+        filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
+        filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
+        filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
+        filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
+        filter.addAction(AvrcpProfile.ACTION_SUPPORTED_FEATURES);
+        registerReceiver(mReceiver, filter);
+    }
+
+    private Button initButton(int id) {
+        return initButton(id, this, null);
+    }
+
+    private Button initButton(int id, OnClickListener clickListener,
+                              OnTouchListener touchListener) {
+        Button btn = (Button) findViewById(id);
+        if (btn != null) {
+            if (clickListener != null) {
+                btn.setOnClickListener(clickListener);
+            }
+            if (touchListener != null) {
+                btn.setOnTouchListener(touchListener);
+            }
+            return btn;
+        } else {
+            Log.w(TAG, "initButton can't find id " + id);
+            return null;
+        }
+    }
+
+    private EditText initEditText(int id, String str) {
+        EditText editText = (EditText) findViewById(id);
+        if (editText != null) {
+            if (str != null) {
+                editText.setText(str);
+            }
+            editText.setVisibility(View.VISIBLE);
+            return editText;
+        } else {
+            Log.w(TAG, "initEditText can't find id " + id);
+            return null;
+        }
+    }
+
+    private Spinner initSpinner(int id) {
+        return initSpinner(id, 0);
+    }
+
+    private Spinner initSpinner(int id, int pos) {
+        Spinner spinner = (Spinner) findViewById(id);
+        if (spinner != null) {
+            spinner.setOnItemSelectedListener(this);
+            spinner.setSelection(pos, true);
+            spinner.setEnabled(true);
+            return spinner;
+        } else {
+            Log.w(TAG, "initSpinner can't find id " + id);
+            return null;
+        }
+    }
+
     @Override
     public void onClick(View v) {
         if (v == mBtnPlayPause) {
             Log.d(TAG, "onClick mBtnPlayPause");
             sendCommand();
-        } else if (v == mBtnSearch) {
-            Log.d(TAG, "onClick mBtnSearch");
-            handleClickBtnSearch();
-        } else if (v == mBtnGetSupportedFeatures) {
-            Log.d(TAG, "onClick mBtnGetSupportedFeatures");
-            handleClickBtnGetSupportedFeatures();
-        } else if (v == mBtnGetAudioConfig) {
-            Log.d(TAG, "onClick mBtnGetAudioConfig");
-            handleClickBtnGetAudioConfig();
+        } else if (v == mBtnTestCmd) {
+            Log.d(TAG, "onClick mBtnTestCmd");
+            handleClickBtnTestCmd();
         } else if (v == mBtnGetCurrentPas) {
             Log.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
-        } else if (v == mBtnGetItemAttr) {
-            Log.d(TAG, "onClick mBtnGetItemAttr");
-            handleClickBtnGetItemAttributes();
-        } else if (v == mBtnGetTotalNumOfItems) {
-            Log.d(TAG, "onClick mBtnGetTotalNumOfItems");
-            handleClickBtnGetTotalNumOfItems();
         }
     }
 
-    private void handleClickBtnSearch() {
-        String query = mEditTextSearch.getText().toString();
+    private void handleClickBtnTestCmd() {
+        String testCmd = mSpTestCmd.getSelectedItem().toString();
+        Log.d(TAG, "handleClickBtnTestCmd " + testCmd);
+
+        if (testCmd.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
+            handleAddToNowPlaying();
+        } else if (testCmd.equals(this.getString(R.string.avrcp_get_item_attr))) {
+            handleGetItemAttributes();
+        } else if (testCmd.equals(this.getString(R.string.avrcp_get_total_num))) {
+            handleGetTotalNumOfItems();
+        } else if (testCmd.equals(this.getString(R.string.avrcp_search))) {
+            handleSearch();
+        } else if (testCmd.equals(this.getString(R.string.avrcp_get_audio_config))) {
+            handleGetAudioConfig();
+        } else if (testCmd.equals(this.getString(R.string.avrcp_get_supported_features))) {
+            handleGetSupportedFeatures();
+        } else {
+            Log.w(TAG, "unknown test cmd: " + testCmd);
+        }
+    }
+
+    private void handleAddToNowPlaying() {
+        int scope = getScope();
+        int position = getItemPosition();
+        Log.d(TAG, "handleGetItemAttributes, scope: " + scope + ", item position: " + position);
+
+        // Clear edit text
+        mEditTestResp.setText("");
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Log.d(TAG, "Add item in vfs");
+                // TODO
+                break;
+            case AvrcpProfile.BROWSE_SCOPE_SEARCH:
+                Log.d(TAG, "Add item in search folder");
+                // TODO
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
+                Log.d(TAG, "Add item in now playing");
+                // TODO
+                break;
+
+            default:
+                Log.w(TAG, "Ignore to add item in scope: " + scope);
+                break;
+        }
+    }
+
+    private void handleGetItemAttributes() {
+        int scope = getScope();
+        int position = getItemPosition();
+        Log.d(TAG, "handleGetItemAttributes, scope: " + scope + ", item position: " + position);
+
+        // Clear edit text
+        mEditTestResp.setText("");
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_SEARCH:
+                Log.d(TAG, "Get item attributes in search folder");
+                mGetItemAttr = true;
+                getItemAttributes(mSearchItems, position);
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
+                Log.d(TAG, "Get item attributes in now playing");
+                mGetItemAttr = true;
+                getItemAttributes(mNowPlayingItems, position);
+                break;
+
+            default:
+                Log.w(TAG, "Ignore to get item attributes in scope: " + scope);
+                break;
+        }
+    }
+
+    private void handleGetTotalNumOfItems() {
+        int scope = getScope();
+        Log.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
+
+        // Clear edit text
+        mEditTestResp.setText("");
+
+        getTotalNumberOfItems(scope);
+    }
+
+    private void handleSearch() {
+        // Clear edit text
+        mEditTestResp.setText("");
+
+        String query = mEditTextQuery.getText().toString();
+        Log.d(TAG, "handleSearch, query: " + query);
         if ((query != null) && !query.isEmpty()) {
-            Log.d(TAG, "BtnSearch clicked, search: " + query);
             search(query);
         } else {
-            Log.w(TAG, "BtnSearch clicked, but search string empty");
+            Log.w(TAG, "handleSearch, but query string empty");
         }
+
+        mEditTestResp.setText("Find search result in Android Bluetooth Audio app");
     }
 
-    private void handleClickBtnGetSupportedFeatures() {
+    private void handleGetAudioConfig() {
+        Log.d(TAG, "handleGetAudioConfig device: " + mDevice);
+        getAudioConfig(mDevice);
+    }
+
+    private void handleGetSupportedFeatures() {
+        Log.d(TAG, "handleGetSupportedFeatures device: " + mDevice);
         getSupportedFeatures(mDevice);
-    }
-
-    private void handleClickBtnGetAudioConfig() {
-        BluetoothAudioConfig audioConfig = getAudioConfig(mDevice);
-        Log.d(TAG, "handleClickBtnGetAudioConfig audioConfig: " + audioConfig);
-        showA2dpCodec(audioConfig);
     }
 
     private void handleClickBtnGetCurrentPas() {
@@ -327,49 +437,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         updatePlayerAppSettingUI(mPlayerAppSetting);
     }
 
-    private void handleClickBtnGetItemAttributes() {
-        int btnId = mFolders.getCheckedRadioButtonId();
-        String str = mEditItemPosition.getText().toString();
-        int position = 0;
-
-        if ((str != null) && !str.isEmpty()) {
-            position = Integer.parseInt(str);
-        }
-
-        Log.d(TAG, "handleClickBtnGetItemAttributes, item position: " + position);
-
-        // Clear edit text
-        TextView itemAttr = (TextView) findViewById(R.id.id_item_attr);
-        itemAttr.setText("");
-
-        switch (btnId) {
-            case R.id.id_rb_search:
-                Log.d(TAG, "Get item attributes in search folder");
-                mGetItemAttr = true;
-                getItemAttributes(mSearchItems, position);
-                break;
-
-            case R.id.id_rb_now_playing:
-                Log.d(TAG, "Get item attributes in now playing");
-                mGetItemAttr = true;
-                getItemAttributes(mNowPlayingItems, position);
-                break;
-
-            default:
-                Log.w(TAG, "Ignore to get item attributes, btnId: " + btnId);
-                break;
-        }
-    }
-
-    private void handleClickBtnGetTotalNumOfItems() {
+    private int getScope() {
         int scope = 0;
         int btnId = mFolders.getCheckedRadioButtonId();
-
-        Log.d(TAG, "handleClickBtnGetTotalNumOfItems");
-
-        // Clear edit text
-        TextView totalNumOfItems = (TextView) findViewById(R.id.id_total_num);
-        totalNumOfItems.setText("");
 
         switch (btnId) {
             case R.id.id_rb_player:
@@ -389,11 +459,23 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 break;
 
             default:
-                Log.w(TAG, "Ignore to get total number of items, btnId: " + btnId);
-                return;
+                Log.w(TAG, "Unknown btnId: " + btnId);
+                break;
         }
 
-        getTotalNumberOfItems(scope);
+        Log.d(TAG,"getScope " + scope);
+        return scope;
+    }
+
+    private int getItemPosition() {
+        String str = mEditItemPosition.getText().toString();
+        int position = 0;
+
+        if ((str != null) && !str.isEmpty()) {
+            position = Integer.parseInt(str);
+        }
+
+        return position;
     }
 
     @Override
@@ -446,8 +528,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        Log.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id + mSpEqualizer.getSelectedItem().toString());
+        Log.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id);
 
+        // PAS
         mPlayerAppSetting = getPlayerSettings(mDevice);
         if (mPlayerAppSetting == null) {
             Log.e(TAG, "player app setting null ");
@@ -455,7 +538,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
 
         boolean result = true;
-        if(parent == mSpEqualizer) {
+        if (parent == mSpEqualizer) {
             String equalizer = mSpEqualizer.getSelectedItem().toString(); 
             Log.d(TAG, "Set equalizer " + equalizer);
             addPasValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER, equalizer, mPlayerAppSetting);
@@ -677,20 +760,18 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+    private void getAudioConfig(BluetoothDevice device) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
-            return null;
+            return;
         }
 
         try {
-            return mAvrcp.getAudioConfig(device);
+            mAvrcp.getAudioConfig(device);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
-
-        return null;
     }
 
     private void handleActionTrackEvent(Intent intent) {
@@ -718,7 +799,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         ArrayList<MediaItem> items = intent.getParcelableArrayListExtra(AvrcpProfile.EXTRA_FOLDER_LIST);
         Log.d(TAG, "handleActionFolderList folder " + id);
 
-        if (AvrcpProfile.isNowPlaying(id)) {
+        if (AvrcpProfile.isPlayer(id)) {
+            Log.d(TAG, "handleActionFolderList player items " + items);
+            // TODO
+        } else if (AvrcpProfile.isNowPlaying(id)) {
             Log.d(TAG, "handleActionFolderList now playing items " + items);
             storeMediaItems(mNowPlayingItems, items);
         } else if (AvrcpProfile.isSearch(id)) {
@@ -733,8 +817,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
         Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
 
-        TextView totalNumOfItems = (TextView) findViewById(R.id.id_total_num);
-        totalNumOfItems.setText(Integer.toString(items));
+        mEditTestResp.setText(Integer.toString(items));
     }
 
     private void handleActionPlayerSetting(Intent intent) {
@@ -772,8 +855,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         val += ")";
 
-        TextView avrcpSupportedFeatures = (TextView) findViewById(R.id.id_supported_features);
-        avrcpSupportedFeatures.setText(val);
+        mEditTestResp.setText(val);
     }
 
     private void handleActionAudioConfigChanged(Intent intent) {
@@ -903,8 +985,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                      ", audio_format = " + audioFormat +
                      " (" + audioFormatString + ")";
 
-        TextView a2dpCodec = (TextView) findViewById(R.id.id_a2dp_codec);
-        a2dpCodec.setText(str);
+        mEditTestResp.setText(str);
     }
 
     private void showMediaMetadata(MediaMetadata mmd) {
@@ -917,7 +998,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         String str = mmd.getString(MediaMetadata.METADATA_KEY_TITLE) + "  " +
                      mmd.getString(MediaMetadata.METADATA_KEY_ARTIST) + "  " +
                      mmd.getString(MediaMetadata.METADATA_KEY_ALBUM);
-        TextView itemAttr = (TextView) findViewById(R.id.id_item_attr);
-        itemAttr.setText(str);
+        mEditTestResp.setText(str);
     }
 }

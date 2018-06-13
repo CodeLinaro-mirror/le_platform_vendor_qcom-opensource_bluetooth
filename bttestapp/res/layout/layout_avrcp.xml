@@ -53,6 +53,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:textAllCaps="false"
+            android:text="@string/avrcp_play"
             android:layout_margin="@dimen/activity_vertical_margin" />
         <Button
             android:id="@+id/id_btn_fast_forward"
@@ -70,45 +71,29 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
         <Button
-            android:id="@+id/id_btn_search"
+            android:id="@+id/id_btn_test_cmd"
             style="@style/textview_normal"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="@dimen/activity_vertical_margin"
             android:textAllCaps="false"
-            android:text="@string/avrcp_search" />
+            android:text="@string/avrcp_test" />
+        <Spinner
+            android:id="@+id/id_sp_test_cmd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_test_cmd" />
         <EditText
-            android:id="@+id/id_edit_search"
-            android:layout_width="0dp"
+            android:id="@+id/id_test_resp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_margin="@dimen/activity_vertical_margin"
             android:paddingLeft="5dp"
             android:ems="20" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/id_btn_get_item_attr"
-            style="@style/textview_normal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:textAllCaps="false"
-            android:text="@string/avrcp_get_item_attr" />
-        <TextView
-            android:id="@+id/id_item_attr"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:text=""
-            android:textAppearance="?android:attr/textAppearanceLarge" />
     </LinearLayout>
 
     <LinearLayout
@@ -147,82 +132,24 @@
             style="@style/textview_normal" />
         <EditText
             android:id="@+id/id_edit_item_position"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_margin="@dimen/layout_vertical_margin"
             android:paddingLeft="5dp"
             android:digits="0123456789"
             android:ems="20" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/id_btn_get_total_num"
-            style="@style/textview_normal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:textAllCaps="false"
-            android:text="@string/avrcp_get_total_num" />
         <TextView
-            android:id="@+id/id_total_num"
-            android:layout_width="0dp"
+            android:text="@string/avrcp_query"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_query"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:text=""
-            android:textAppearance="?android:attr/textAppearanceLarge" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/id_btn_get_supported_features"
-            style="@style/textview_normal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:textAllCaps="false"
-            android:text="@string/avrcp_get_supported_features" />
-        <TextView
-            android:id="@+id/id_supported_features"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:text=""
-            android:textAppearance="?android:attr/textAppearanceLarge" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/id_btn_get_audio_config"
-            style="@style/textview_normal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:textAllCaps="false"
-            android:text="@string/a2dp_get_audio_config" />
-        <TextView
-            android:id="@+id/id_a2dp_codec"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:text=""
-            android:textAppearance="?android:attr/textAppearanceLarge" />
+            android:layout_margin="@dimen/layout_vertical_margin"
+            android:paddingLeft="5dp"
+            android:ems="20" />
     </LinearLayout>
 
     <Button

@@ -146,9 +146,13 @@ public class AvrcpProfile {
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
     public static final String KEY_SEARCH = "search";
 
-    // Get remote AVRCP supported features
-    public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
+    // Fetch album art
+    public static final String CUSTOM_ACTION_FETCH_ALBUM_ART =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_FETCH_ALBUM_ART";
+    public static final String KEY_ALBUM_ART_MIME_TYPE = "mimeType";
+    public static final String KEY_ALBUM_ART_HEIGHT = "height";
+    public static final String KEY_ALBUM_ART_WIDTH = "width";
+    public static final String KEY_ALBUM_ART_MAX_SIZE = "maxSize";
 
     // Get item attributes
     public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
@@ -158,6 +162,14 @@ public class AvrcpProfile {
     public static final String CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
     public static final String KEY_BROWSE_SCOPE = "scope";
+
+    // Get A2DP audio config
+    public static final String CUSTOM_ACTION_GET_AUDIO_CONFIG =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_AUDIO_CONFIG";
+
+    // Get remote AVRCP supported features
+    public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
 
     // --- Custom action definition for AVRCP controller
 
@@ -308,13 +320,6 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
     }
 
-    public void getSupportedFeatures(BluetoothDevice device) {
-        Log.d(TAG, "getSupportedFeatures, device: " + device);
-        Bundle extras = new Bundle();
-        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
-        sendCustomAction(CUSTOM_ACTION_GET_SUPPORTED_FEATURES, extras);
-    }
-
     public void getItemAttributes(String mediaId) {
         Log.d(TAG, "getItemAttributes, mediaId: " + mediaId);
         Bundle extras = new Bundle();
@@ -329,6 +334,20 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS, extras);
     }
 
+    public void getAudioConfig(BluetoothDevice device) {
+        Log.d(TAG, "getAudioConfig, device: " + device);
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        sendCustomAction(CUSTOM_ACTION_GET_AUDIO_CONFIG, extras);
+    }
+
+    public void getSupportedFeatures(BluetoothDevice device) {
+        Log.d(TAG, "getSupportedFeatures, device: " + device);
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        sendCustomAction(CUSTOM_ACTION_GET_SUPPORTED_FEATURES, extras);
+    }
+
     private void sendCustomAction(String action, Bundle extras) {
         if (mMediaController != null) {
             Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
@@ -336,15 +355,8 @@ public class AvrcpProfile {
         }
     }
 
-    public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
-        Log.d(TAG, "getAudioConfig, device: " + device);
-
-        if (mA2dpSink != null) {
-            return mA2dpSink.getAudioConfig(device);
-        } else {
-            Log.e(TAG, "A2dpSink service null");
-            return null;
-        }
+    public static boolean isPlayer(String parentId) {
+        return parentId.startsWith(PLAYER_PREFIX);
     }
 
     public static boolean isNowPlaying(String parentId) {

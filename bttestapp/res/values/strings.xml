@@ -385,23 +385,35 @@
     <string name="type">Type</string>
     <string name="width">Width</string>
     <string name="height">Height</string>
-    <string name="a2dp_get_audio_config">GetAudioConfig</string>
+    <string name="avrcp_play">Play</string>
     <string name="avrcp_fastforward">Fastforward</string>
     <string name="avrcp_rewind">Rewind</string>
     <string name="avrcp_search">Search</string>
+    <string name="avrcp_test">Test</string>
     <string name="avrcp_get_item_attr">GetItemAttributes</string>
     <string name="avrcp_folder">Folder</string>
     <string name="avrcp_player">Player</string>
     <string name="avrcp_vfs">VFS</string>
     <string name="avrcp_now_playing">NowPlaying</string>
     <string name="avrcp_item_position">ItemPosition</string>
+    <string name="avrcp_query">Query</string>
     <string name="avrcp_get_total_num">GetTotalNumberOfItems</string>
+    <string name="avrcp_add_to_now_playing">AddToNowPlaying</string>
+    <string name="avrcp_get_audio_config">GetAudioConfig</string>
     <string name="avrcp_get_supported_features">GetSupportedFeatures</string>
     <string name="avrcp_get_current_pas">GetCurrentPas</string>
     <string name="avrcp_equalizer_title">Equalizer:</string>
     <string name="avrcp_repeat_title">Repeat:</string>
     <string name="avrcp_shuffle_title">Shuffle:</string>
     <string name="avrcp_scan_title">Scan:</string>
+    <string-array name="array_test_cmd">
+        <item>AddToNowPlaying</item>
+        <item>GetItemAttributes</item>
+        <item>GetTotalNumberOfItems</item>
+        <item>Search</item>
+        <item>GetAudioConfig</item>
+        <item>GetSupportedFeatures</item>
+    </string-array>
     <string-array name="array_equalizer">
         <item>Off</item>
         <item>On</item>
