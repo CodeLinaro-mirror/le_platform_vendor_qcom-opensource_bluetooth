@@ -163,9 +163,9 @@ public class AvrcpProfile {
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
     public static final String KEY_BROWSE_SCOPE = "scope";
 
-    // Get A2DP audio config
-    public static final String CUSTOM_ACTION_GET_AUDIO_CONFIG =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_AUDIO_CONFIG";
+    // Get A2DP audio config with codec type
+    public static final String CUSTOM_ACTION_GET_AUDIO_CONFIG_EXT =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_AUDIO_CONFIG_EXT";
 
     // Get remote AVRCP supported features
     public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
@@ -334,11 +334,21 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS, extras);
     }
 
-    public void getAudioConfig(BluetoothDevice device) {
+    public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
         Log.d(TAG, "getAudioConfig, device: " + device);
+        if (mA2dpSink != null) {
+            return mA2dpSink.getAudioConfig(device);
+        } else {
+            Log.e(TAG, "A2dpSink service null");
+            return null;
+        }
+    }
+
+    public void getAudioConfigExt(BluetoothDevice device) {
+        Log.d(TAG, "getAudioConfigExt, device: " + device);
         Bundle extras = new Bundle();
         extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
-        sendCustomAction(CUSTOM_ACTION_GET_AUDIO_CONFIG, extras);
+        sendCustomAction(CUSTOM_ACTION_GET_AUDIO_CONFIG_EXT, extras);
     }
 
     public void getSupportedFeatures(BluetoothDevice device) {
@@ -353,6 +363,10 @@ public class AvrcpProfile {
             Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
             mMediaController.getTransportControls().sendCustomAction(action, extras);
         }
+    }
+
+    public static boolean isRoot(String parentId) {
+        return parentId.startsWith(ROOT);
     }
 
     public static boolean isPlayer(String parentId) {

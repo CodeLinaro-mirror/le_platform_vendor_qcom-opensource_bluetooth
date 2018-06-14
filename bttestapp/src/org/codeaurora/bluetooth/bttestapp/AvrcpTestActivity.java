@@ -37,6 +37,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothA2dpSink;
 import android.bluetooth.BluetoothCodecConfig;
 import android.bluetooth.BluetoothAudioConfig;
+import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -53,6 +54,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Parcelable;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -70,23 +72,24 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
 
 public class AvrcpTestActivity extends MonkeyActivity implements
     OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener,
-    OnTouchListener {
+    OnTouchListener, RadioGroup.OnCheckedChangeListener {
 
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
     private Button mBtnFastforward;
     private Button mBtnRewind;
 
-    private EditText mEditTextQuery;
-
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
     private EditText mEditTestResp;
-    private RadioGroup mFolders;
+    private RadioGroup mScopes;
+    private EditText mEditFolder;
     private EditText mEditItemPosition;
+    private EditText mEditQuery;
 
     private Button mBtnGetCurrentPas;
     private Spinner mSpEqualizer;
@@ -102,10 +105,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private BluetoothDevice mDevice;
 
     // Hash for storing A2DP codec type
-    private HashMap<BluetoothDevice, Integer> mA2dpCodecType = new HashMap<BluetoothDevice, Integer>();
+    private HashMap<BluetoothDevice, Integer> mA2dpCodecType =
+        new HashMap<BluetoothDevice, Integer>();
     private boolean mGetItemAttr = false;
-    private List<MediaBrowser.MediaItem> mNowPlayingItems = new ArrayList<>();
-    private List<MediaBrowser.MediaItem> mSearchItems = new ArrayList<>();
+    private List<MediaItem> mPlayerItems = new ArrayList<MediaItem>();
+    private HashMap<String, List<MediaItem>> mFolderItems =
+        new HashMap<String, List<MediaItem>>();
+    private List<MediaItem> mSearchItems = new ArrayList<MediaItem>();
+    private List<MediaItem> mNowPlayingItems = new ArrayList<MediaItem>();
 
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
@@ -120,6 +127,33 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private static final int REWIND_PRESSED = 1;
 
     private static final int TIMEOUT_IN_MS = 1000;
+
+    private static final String TEST_FOLDER = "MyMusic";
+    private static final String TEST_ITEM_POSITION = "0";  // The 1st item
+    private static final String TEST_QUERY = "You";
+
+    // Test command definition
+    enum TestCmd {
+        INVALID_TEST_CMD,
+
+        // AddToNowPlaying
+        TEST_CMD_ADD_TO_NOW_PLAYING,
+
+        // GetItemAttributes
+        TEST_CMD_GET_ITEM_ATTRIBUTES,
+
+        // GetTotalNumberOfItems
+        TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
+
+        // Search
+        TEST_CMD_SEARCH,
+
+        // GetAudioConfig
+        TEST_CMD_GET_AUDIO_CONFIG,
+
+        // GetSupportedFeatures
+        TEST_CMD_GET_SUPPORTED_FEATTURES
+    }
 
     private final ServiceConnection mAvrcpConnection = new ServiceConnection() {
 
@@ -143,7 +177,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             Log.i(TAG, "action " + action);
-            if (action.equals(AvrcpProfile.ACTION_TRACK_EVENT)) {
+            if (action.equals(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED)) {
+                handleActionConnectionStateChanged(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_TRACK_EVENT)) {
                 handleActionTrackEvent(intent);
             } else if (action.equals(AvrcpProfile.ACTION_FOLDER_LIST)) {
                 handleActionFolderList(intent);
@@ -178,7 +214,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
-        ActivityHelper.initialize(this, R.layout.layout_avrcp);//use layout_avrcp.xml
+        ActivityHelper.initialize(this, R.layout.layout_avrcp); //use layout_avrcp.xml
 
         initPasMaps();
 
@@ -188,11 +224,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
-        mEditTestResp = initEditText(R.id.id_test_resp, "");
+        mEditTestResp = (EditText) initEditText(R.id.id_test_resp, "");
 
-        mFolders = (RadioGroup) findViewById(R.id.id_folders);
-        mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, "0"); // The 1st item
-        mEditTextQuery = initEditText(R.id.id_edit_query, "You"); // Sample search/query string
+        mScopes = (RadioGroup) findViewById(R.id.id_rg_scope);
+        mScopes.setOnCheckedChangeListener(this);
+        mEditFolder = (EditText) initEditText(R.id.id_edit_folder, TEST_FOLDER);
+        mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, TEST_ITEM_POSITION);
+        mEditQuery = initEditText(R.id.id_edit_query, TEST_QUERY);
 
         mBtnGetCurrentPas = initButton(R.id.id_btn_get_current_pas);
         mSpEqualizer = initSpinner(R.id.id_sp_equalizer);
@@ -237,6 +275,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void initIntentFilter() {
         IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
         filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
         filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
@@ -274,6 +313,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 editText.setText(str);
             }
             editText.setVisibility(View.VISIBLE);
+            editText.setEnabled(true);
             return editText;
         } else {
             Log.w(TAG, "initEditText can't find id " + id);
@@ -309,27 +349,37 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetCurrentPas) {
             Log.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
+        } else {
+            Log.d(TAG, "onClick View: " + v);
         }
     }
 
     private void handleClickBtnTestCmd() {
-        String testCmd = mSpTestCmd.getSelectedItem().toString();
-        Log.d(TAG, "handleClickBtnTestCmd " + testCmd);
+        TestCmd cmd = getTestCmd();
+        Log.d(TAG, "handleClickBtnTestCmd " + cmd);
 
-        if (testCmd.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
-            handleAddToNowPlaying();
-        } else if (testCmd.equals(this.getString(R.string.avrcp_get_item_attr))) {
-            handleGetItemAttributes();
-        } else if (testCmd.equals(this.getString(R.string.avrcp_get_total_num))) {
-            handleGetTotalNumOfItems();
-        } else if (testCmd.equals(this.getString(R.string.avrcp_search))) {
-            handleSearch();
-        } else if (testCmd.equals(this.getString(R.string.avrcp_get_audio_config))) {
-            handleGetAudioConfig();
-        } else if (testCmd.equals(this.getString(R.string.avrcp_get_supported_features))) {
-            handleGetSupportedFeatures();
-        } else {
-            Log.w(TAG, "unknown test cmd: " + testCmd);
+        switch (cmd) {
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+                handleAddToNowPlaying();
+                break;
+            case TEST_CMD_GET_ITEM_ATTRIBUTES:
+                handleGetItemAttributes();
+                break;
+            case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
+                handleGetTotalNumOfItems();
+                break;
+            case TEST_CMD_SEARCH:
+                handleSearch();
+                break;
+            case TEST_CMD_GET_AUDIO_CONFIG:
+                handleGetAudioConfig();
+                break;
+            case TEST_CMD_GET_SUPPORTED_FEATTURES:
+                handleGetSupportedFeatures();
+                break;
+            default:
+                Log.w(TAG, "handleClickBtnTestCmd unknown cmd: " + cmd);
+                break;
         }
     }
 
@@ -338,14 +388,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int position = getItemPosition();
         Log.d(TAG, "handleGetItemAttributes, scope: " + scope + ", item position: " + position);
 
-        // Clear edit text
-        mEditTestResp.setText("");
-
         switch (scope) {
             case AvrcpProfile.BROWSE_SCOPE_VFS:
                 Log.d(TAG, "Add item in vfs");
                 // TODO
                 break;
+
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
                 Log.d(TAG, "Add item in search folder");
                 // TODO
@@ -363,29 +411,37 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private void handleGetItemAttributes() {
+        boolean result = false;
+        String folder = getFolder();
         int scope = getScope();
         int position = getItemPosition();
-        Log.d(TAG, "handleGetItemAttributes, scope: " + scope + ", item position: " + position);
-
-        // Clear edit text
-        mEditTestResp.setText("");
+        mGetItemAttr = true;
 
         switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Log.d(TAG, "Get item attributes in VFS, folder: " +
+                    folder + ", position: " + position);
+                result = getItemAttributes(mFolderItems, folder, position);
+                break;
+
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
-                Log.d(TAG, "Get item attributes in search folder");
-                mGetItemAttr = true;
-                getItemAttributes(mSearchItems, position);
+                Log.d(TAG, "Get item attributes in search folder, position: " + position);
+                result = getItemAttributes(mSearchItems, position);
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
-                Log.d(TAG, "Get item attributes in now playing");
-                mGetItemAttr = true;
-                getItemAttributes(mNowPlayingItems, position);
+                Log.d(TAG, "Get item attributes in now playing, position: " + position);
+                result = getItemAttributes(mNowPlayingItems, position);
                 break;
 
             default:
                 Log.w(TAG, "Ignore to get item attributes in scope: " + scope);
+                mGetItemAttr = false;
                 break;
+        }
+
+        if (!result) {
+            Log.w(TAG, "handleGetItemAttributes fail");
         }
     }
 
@@ -393,17 +449,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int scope = getScope();
         Log.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
 
-        // Clear edit text
-        mEditTestResp.setText("");
-
         getTotalNumberOfItems(scope);
     }
 
     private void handleSearch() {
-        // Clear edit text
-        mEditTestResp.setText("");
-
-        String query = mEditTextQuery.getText().toString();
+        String query = mEditQuery.getText().toString();
         Log.d(TAG, "handleSearch, query: " + query);
         if ((query != null) && !query.isEmpty()) {
             search(query);
@@ -411,12 +461,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Log.w(TAG, "handleSearch, but query string empty");
         }
 
-        mEditTestResp.setText("Find search result in Android Bluetooth Audio app");
+        showTestResult("Find search result in Android Bluetooth Audio app");
     }
 
     private void handleGetAudioConfig() {
         Log.d(TAG, "handleGetAudioConfig device: " + mDevice);
-        getAudioConfig(mDevice);
+        getAudioConfigExt(mDevice);
     }
 
     private void handleGetSupportedFeatures() {
@@ -437,9 +487,35 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         updatePlayerAppSettingUI(mPlayerAppSetting);
     }
 
+    private TestCmd getTestCmd() {
+        String str = mSpTestCmd.getSelectedItem().toString();
+        TestCmd cmd = TestCmd.INVALID_TEST_CMD;
+
+        if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
+            cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
+        } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
+            cmd = TestCmd.TEST_CMD_GET_ITEM_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
+            cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
+        } else if (str.equals(this.getString(R.string.avrcp_search))) {
+            cmd = TestCmd.TEST_CMD_SEARCH;
+        } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
+            cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
+        } else if (str.equals(this.getString(R.string.avrcp_get_supported_features))) {
+            cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
+        }
+
+        Log.d(TAG, "getTestCmd " + cmd);
+        return cmd;
+    }
+
+    private String getFolder() {
+        return mEditFolder.getText().toString();
+    }
+
     private int getScope() {
         int scope = 0;
-        int btnId = mFolders.getCheckedRadioButtonId();
+        int btnId = mScopes.getCheckedRadioButtonId();
 
         switch (btnId) {
             case R.id.id_rb_player:
@@ -530,6 +606,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         Log.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id);
 
+        if (parent == mSpTestCmd) {
+            updateTestCmdUI();
+            return;
+        }
+
         // PAS
         mPlayerAppSetting = getPlayerSettings(mDevice);
         if (mPlayerAppSetting == null) {
@@ -568,6 +649,101 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
 
+    }
+
+    private void updateTestCmdUI() {
+        boolean enableScope = false;
+        boolean enableFolder = false;
+        boolean enableItemPosition = false;
+        boolean enableQuery = false;
+        TestCmd cmd = getTestCmd();
+        Log.d(TAG, "updateTestCmdUI " + cmd);
+
+        // Clear test result
+        showTestResult("");
+
+        switch (cmd) {
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+            case TEST_CMD_GET_ITEM_ATTRIBUTES:
+                enableScope = true;
+                enableFolder = true;
+                enableItemPosition = true;
+                break;
+            case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
+                enableScope = true;
+                break;
+            case TEST_CMD_SEARCH:
+                enableQuery = true;
+                break;
+            case TEST_CMD_GET_AUDIO_CONFIG:
+            case TEST_CMD_GET_SUPPORTED_FEATTURES:
+            default:
+                break;
+        }
+
+        if (enableScope) {
+            Log.d(TAG, "Enable scope ");
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mScopes.getChildAt(i).setEnabled(true);
+            }
+            mScopes.check(R.id.id_rb_vfs);
+        } else {
+            Log.d(TAG, "Disable scope ");
+            mScopes.clearCheck();
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mScopes.getChildAt(i).setEnabled(false);
+            }
+        }
+
+        if (enableFolder) {
+            Log.d(TAG, "Enable folder ");
+            mEditFolder.setEnabled(true);
+            mEditFolder.setText(TEST_FOLDER);
+        } else {
+            Log.d(TAG, "Disable folder ");
+            mEditFolder.setText("");
+            mEditFolder.setEnabled(false);
+        }
+
+        if (enableItemPosition) {
+            Log.d(TAG, "Enable item position ");
+            mEditItemPosition.setEnabled(true);
+            mEditItemPosition.setText(TEST_ITEM_POSITION);
+        } else {
+            Log.d(TAG, "Disable item position ");
+            mEditItemPosition.setText("");
+            mEditItemPosition.setEnabled(false);
+        }
+
+        if (enableQuery) {
+            Log.d(TAG, "Enable query ");
+            mEditQuery.setEnabled(true);
+            mEditQuery.setText(TEST_QUERY);
+        } else {
+            Log.d(TAG, "Disable query ");
+            mEditQuery.setText("");
+            mEditQuery.setEnabled(false);
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(RadioGroup group, int checkedId) {
+        Log.d(TAG,"onCheckedChanged");
+
+        if (group == mScopes) {
+            int scope = getScope();
+            boolean enableFolder = (scope == AvrcpProfile.BROWSE_SCOPE_VFS) ? true : false;
+
+            if (enableFolder) {
+                Log.d(TAG, "Enable folder ");
+                mEditFolder.setEnabled(true);
+                mEditFolder.setText(TEST_FOLDER);
+            } else {
+                Log.d(TAG, "Disable folder ");
+                mEditFolder.setText("");
+                mEditFolder.setEnabled(false);
+            }
+        }
     }
 
     private void initPasMaps() {
@@ -711,7 +887,47 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private MediaBrowser.MediaItem getMediaItem(List<MediaBrowser.MediaItem> list, int position) {
+    private MediaItem getMediaItem(HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        boolean found = false;
+        String mediaId = null;
+        Log.d(TAG, "getMediaItem folder: " + folder + ", position: " + position);
+        if ((folderItems == null) || (folder == null) || (position < 0)) {
+            return null;
+        }
+
+        Iterator iter = folderItems.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            String key = (String) entry.getKey();
+            List<MediaItem> val = (List<MediaItem>) entry.getValue();
+
+            if (val != null) {
+                for (int index = 0; index < val.size(); index++) {
+                    MediaItem item = val.get(index);
+                    MediaDescription md = item.getDescription();
+                    if (folder.equals(md.getTitle().toString())) {
+                        mediaId = item.getMediaId();
+                        found = true;
+                    }
+                }
+            }
+
+            if (found) {
+                break;
+            }
+        }
+
+        if (found) {
+            Log.d(TAG, "getMediaItem folder: " + folder + ", mediaId: " + mediaId);
+            return getMediaItem(folderItems.get(mediaId), position);
+        } else {
+            Log.d(TAG, "getMediaItem can't find item ");
+            return null;
+        }
+    }
+
+    private MediaItem getMediaItem(List<MediaItem> list, int position) {
         Log.d(TAG, "getMediaItem position: " + position);
         if ((list == null) || (position >= list.size())) {
             Log.w(TAG, "getMediaItem exceed max size " + list.size());
@@ -721,15 +937,34 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         return list.get(position);
     }
 
-    private void getItemAttributes(List<MediaBrowser.MediaItem> list, int position) {
-        Log.d(TAG, "getItemAttributes position: " + position);
-        MediaBrowser.MediaItem item = getMediaItem(list, position);
+    private boolean getItemAttributes(HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        List<MediaItem> list;
+        Log.d(TAG, "getItemAttributes folder: " + folder + ", position: " + position);
+
+        MediaItem item = getMediaItem(folderItems, folder, position);
         if (item == null) {
             Log.e(TAG, "getItemAttributes, MediaItem null");
-            return;
+            showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+            return false;
         }
 
         getItemAttributes(item.getMediaId());
+        return true;
+    }
+
+    private boolean getItemAttributes(List<MediaItem> list, int position) {
+        Log.d(TAG, "getItemAttributes position: " + position);
+        MediaItem item = getMediaItem(list, position);
+        if (item == null) {
+            Log.e(TAG, "getItemAttributes, MediaItem null");
+            showTestResult("Can't find MediaItem, position " + position +
+                " exceed max size " + list.size());
+            return false;
+        }
+
+        getItemAttributes(item.getMediaId());
+        return true;
     }
 
     private void getItemAttributes(String mediaId) {
@@ -760,17 +995,36 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void getAudioConfig(BluetoothDevice device) {
+    private void getAudioConfigExt(BluetoothDevice device) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.getAudioConfig(device);
+            // Test only to use legacy API to get audio config
+            BluetoothAudioConfig audioConfig = mAvrcp.getAudioConfig(device);
+            Log.d(TAG, "BluetoothAudioConfig " + audioConfig);
+
+            mAvrcp.getAudioConfigExt(device);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
+        }
+    }
+
+    private void handleActionConnectionStateChanged(Intent intent) {
+        BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int state = (int) intent.getExtra(BluetoothProfile.EXTRA_STATE);
+        Log.d(TAG, "handleActionConnectionStateChanged device: " + device + ", state: " + state);
+
+        if (state == BluetoothProfile.STATE_CONNECTED) {
+            Log.d(TAG, "handleActionConnectionStateChanged AVRCP connected");
+        } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
+            Log.d(TAG, "handleActionConnectionStateChanged AVRCP disconnected");
+            mSearchItems.clear();
+            mNowPlayingItems.clear();
+            mFolderItems.clear();
         }
     }
 
@@ -796,20 +1050,31 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void handleActionFolderList(Intent intent) {
         String id = intent.getStringExtra(AvrcpProfile.EXTRA_FOLDER_ID);
-        ArrayList<MediaItem> items = intent.getParcelableArrayListExtra(AvrcpProfile.EXTRA_FOLDER_LIST);
-        Log.d(TAG, "handleActionFolderList folder " + id);
+        List<Parcelable> extraParcelableList = (ArrayList<Parcelable>)
+            intent.getParcelableArrayListExtra(AvrcpProfile.EXTRA_FOLDER_LIST);
+        List<MediaItem> folderList = new ArrayList<MediaItem>();
+        for (Parcelable p : extraParcelableList) {
+            folderList.add((MediaItem) p);
+        }
 
-        if (AvrcpProfile.isPlayer(id)) {
-            Log.d(TAG, "handleActionFolderList player items " + items);
+        Log.d(TAG, "handleActionFolderList id " + id);
+
+        if (AvrcpProfile.isRoot(id)) {
+            Log.d(TAG, "handleActionFolderList root items " + folderList);
+            storeMediaItems(mPlayerItems, folderList);
+        } else if (AvrcpProfile.isPlayer(id)) {
+            Log.d(TAG, "handleActionFolderList player items " + folderList);
             // TODO
-        } else if (AvrcpProfile.isNowPlaying(id)) {
-            Log.d(TAG, "handleActionFolderList now playing items " + items);
-            storeMediaItems(mNowPlayingItems, items);
         } else if (AvrcpProfile.isSearch(id)) {
-            Log.d(TAG, "handleActionFolderList search items " + items);
-            storeMediaItems(mSearchItems, items);
+            Log.d(TAG, "handleActionFolderList search items " + folderList);
+            storeMediaItems(mSearchItems, folderList);
+        } else if (AvrcpProfile.isNowPlaying(id)) {
+            Log.d(TAG, "handleActionFolderList now playing items " + folderList);
+            storeMediaItems(mNowPlayingItems, folderList);
         } else {
-            // Ignore
+            // Store folder
+            Log.d(TAG, "handleActionFolderList store folder id " + id);
+            mFolderItems.put(id, folderList);
         }
     }
 
@@ -817,7 +1082,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
         Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
 
-        mEditTestResp.setText(Integer.toString(items));
+        showTestResult(Integer.toString(items));
     }
 
     private void handleActionPlayerSetting(Intent intent) {
@@ -855,7 +1120,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         val += ")";
 
-        mEditTestResp.setText(val);
+        showTestResult(val);
     }
 
     private void handleActionAudioConfigChanged(Intent intent) {
@@ -911,8 +1176,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void storeMediaItems(List<MediaBrowser.MediaItem> dstList,
-                                 List<MediaBrowser.MediaItem> srcList) {
+    private void storeMediaItems(List<MediaItem> dstList,
+                                 List<MediaItem> srcList) {
         if ((dstList == null) || (srcList == null)) {
             return;
         }
@@ -985,7 +1250,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                      ", audio_format = " + audioFormat +
                      " (" + audioFormatString + ")";
 
-        mEditTestResp.setText(str);
+        showTestResult(str);
     }
 
     private void showMediaMetadata(MediaMetadata mmd) {
@@ -998,6 +1263,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         String str = mmd.getString(MediaMetadata.METADATA_KEY_TITLE) + "  " +
                      mmd.getString(MediaMetadata.METADATA_KEY_ARTIST) + "  " +
                      mmd.getString(MediaMetadata.METADATA_KEY_ALBUM);
-        mEditTestResp.setText(str);
+        showTestResult(str);
+    }
+
+    private void showTestResult(String result) {
+        if (result == null) {
+            return;
+        }
+
+        mEditTestResp.setText(result);
     }
 }

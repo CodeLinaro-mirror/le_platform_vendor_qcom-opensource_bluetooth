@@ -101,10 +101,10 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
         <TextView
-            android:text="@string/avrcp_folder"
+            android:text="@string/avrcp_scope"
             style="@style/textview_normal" />
         <RadioGroup
-            android:id="@+id/id_folders"
+            android:id="@+id/id_rg_scope"
             style="@style/textview_normal"
             android:orientation="horizontal"
             android:gravity="start"
@@ -127,6 +127,17 @@
                 android:checked="true"
                 android:text="@string/avrcp_now_playing" />
         </RadioGroup>
+        <TextView
+            android:text="@string/avrcp_folder"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_folder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/layout_vertical_margin"
+            android:paddingLeft="5dp"
+            android:ems="20" />
         <TextView
             android:text="@string/avrcp_item_position"
             style="@style/textview_normal" />

@@ -391,6 +391,7 @@
     <string name="avrcp_search">Search</string>
     <string name="avrcp_test">Test</string>
     <string name="avrcp_get_item_attr">GetItemAttributes</string>
+    <string name="avrcp_scope">Scope</string>
     <string name="avrcp_folder">Folder</string>
     <string name="avrcp_player">Player</string>
     <string name="avrcp_vfs">VFS</string>
@@ -407,12 +408,12 @@
     <string name="avrcp_shuffle_title">Shuffle:</string>
     <string name="avrcp_scan_title">Scan:</string>
     <string-array name="array_test_cmd">
-        <item>AddToNowPlaying</item>
-        <item>GetItemAttributes</item>
-        <item>GetTotalNumberOfItems</item>
-        <item>Search</item>
-        <item>GetAudioConfig</item>
-        <item>GetSupportedFeatures</item>
+        <item>@string/avrcp_add_to_now_playing</item>
+        <item>@string/avrcp_get_item_attr</item>
+        <item>@string/avrcp_get_total_num</item>
+        <item>@string/avrcp_search</item>
+        <item>@string/avrcp_get_audio_config</item>
+        <item>@string/avrcp_get_supported_features</item>
     </string-array>
     <string-array name="array_equalizer">
         <item>Off</item>
