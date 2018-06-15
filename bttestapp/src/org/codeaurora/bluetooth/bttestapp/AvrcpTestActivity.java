@@ -128,7 +128,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private static final int TIMEOUT_IN_MS = 1000;
 
-    private static final String TEST_FOLDER = "MyMusic";
+    private static final int INVALID_ITEM_POSITION = -1;
+
+    private static final String TEST_FOLDER = "Songs";
     private static final String TEST_ITEM_POSITION = "0";  // The 1st item
     private static final String TEST_QUERY = "You";
 
@@ -551,7 +553,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private int getItemPosition() {
         String str = mEditItemPosition.getText().toString();
-        int position = 0;
+        int position = INVALID_ITEM_POSITION;
 
         if ((str != null) && !str.isEmpty()) {
             position = Integer.parseInt(str);
@@ -892,12 +894,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private MediaItem getMediaItem(HashMap<String, List<MediaItem>> folderItems,
-        String folder, int position) {
+    private String getMediaId(HashMap<String, List<MediaItem>> folderItems,
+        String folder) {
         boolean found = false;
         String mediaId = null;
-        Log.d(TAG, "getMediaItem folder: " + folder + ", position: " + position);
-        if ((folderItems == null) || (folder == null) || (position < 0)) {
+        Log.d(TAG, "getMediaId folder: " + folder);
+        if ((folderItems == null) || (folder == null)) {
             return null;
         }
 
@@ -924,10 +926,25 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
 
         if (found) {
+            Log.d(TAG, "getMediaId folder: " + folder + ", mediaId: " + mediaId);
+            return mediaId;
+        } else {
+            Log.d(TAG, "getMediaId can't find folder item ");
+            return null;
+        }
+    }
+
+    private MediaItem getMediaItem(HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        Log.d(TAG, "getMediaItem folder: " + folder + ", position: " + position);
+
+        String mediaId = getMediaId(folderItems, folder);
+
+        if (mediaId != null) {
             Log.d(TAG, "getMediaItem folder: " + folder + ", mediaId: " + mediaId);
             return getMediaItem(folderItems.get(mediaId), position);
         } else {
-            Log.d(TAG, "getMediaItem can't find item ");
+            Log.d(TAG, "getMediaItem can't find folder item ");
             return null;
         }
     }
@@ -944,17 +961,29 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private boolean getItemAttributes(HashMap<String, List<MediaItem>> folderItems,
         String folder, int position) {
-        List<MediaItem> list;
+        String mediaId = null;
         Log.d(TAG, "getItemAttributes folder: " + folder + ", position: " + position);
 
-        MediaItem item = getMediaItem(folderItems, folder, position);
-        if (item == null) {
-            Log.e(TAG, "getItemAttributes, MediaItem null");
-            showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+        if (position != INVALID_ITEM_POSITION) {
+            MediaItem item = getMediaItem(folderItems, folder, position);
+            if (item == null) {
+                Log.e(TAG, "getItemAttributes, MediaItem null");
+                showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+                return false;
+            }
+            // Get element's MediaId
+            mediaId = item.getMediaId();
+        } else {
+            // Get folder's MediaId
+            mediaId = getMediaId(folderItems, folder);
+        }
+
+        Log.d(TAG, "getItemAttributes mediaId: " + mediaId);
+        if (mediaId == null) {
             return false;
         }
 
-        getItemAttributes(item.getMediaId());
+        getItemAttributes(mediaId);
         return true;
     }
 
@@ -988,17 +1017,29 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private boolean addToNowPlaying(HashMap<String, List<MediaItem>> folderItems,
         String folder, int position) {
-        List<MediaItem> list;
+        String mediaId = null;
         Log.d(TAG, "addToNowPlaying folder: " + folder + ", position: " + position);
 
-        MediaItem item = getMediaItem(folderItems, folder, position);
-        if (item == null) {
-            Log.e(TAG, "addToNowPlaying, MediaItem null");
-            showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+        if (position != INVALID_ITEM_POSITION) {
+            MediaItem item = getMediaItem(folderItems, folder, position);
+            if (item == null) {
+                Log.e(TAG, "addToNowPlaying, MediaItem null");
+                showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+                return false;
+            }
+            // Get element's MediaId
+            mediaId = item.getMediaId();
+        } else {
+            // Get folder's MediaId
+            mediaId = getMediaId(folderItems, folder);
+        }
+
+        Log.d(TAG, "addToNowPlaying mediaId: " + mediaId);
+        if (mediaId == null) {
             return false;
         }
 
-        addToNowPlaying(item.getMediaId());
+        addToNowPlaying(mediaId);
         return true;
     }
 
@@ -1029,7 +1070,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             e.printStackTrace();
         }
     }
-
 
     private void getTotalNumberOfItems(int scope) {
         if (mAvrcp == null) {
