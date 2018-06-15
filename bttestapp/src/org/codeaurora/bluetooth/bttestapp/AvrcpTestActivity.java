@@ -183,6 +183,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 handleActionTrackEvent(intent);
             } else if (action.equals(AvrcpProfile.ACTION_FOLDER_LIST)) {
                 handleActionFolderList(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT)) {
+                handleActionCustomActionResult(intent);
             } else if (action.equals(AvrcpProfile.ACTION_NUM_OF_ITEMS)) {
                 handleActionGetTotalNumOfItems(intent);
             } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
@@ -278,6 +280,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         filter.addAction(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
         filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
+        filter.addAction(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT);
         filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
@@ -358,6 +361,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         TestCmd cmd = getTestCmd();
         Log.d(TAG, "handleClickBtnTestCmd " + cmd);
 
+        clearTestResult();
+
         switch (cmd) {
             case TEST_CMD_ADD_TO_NOW_PLAYING:
                 handleAddToNowPlaying();
@@ -384,29 +389,30 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private void handleAddToNowPlaying() {
+        boolean result = false;
+        String folder = getFolder();
         int scope = getScope();
         int position = getItemPosition();
-        Log.d(TAG, "handleGetItemAttributes, scope: " + scope + ", item position: " + position);
 
         switch (scope) {
             case AvrcpProfile.BROWSE_SCOPE_VFS:
-                Log.d(TAG, "Add item in vfs");
-                // TODO
+                Log.d(TAG, "Add VFS item into NowPlaying, folder: " +
+                    folder + ", position: " + position);
+                result = addToNowPlaying(mFolderItems, folder, position);
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
-                Log.d(TAG, "Add item in search folder");
-                // TODO
-                break;
-
-            case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
-                Log.d(TAG, "Add item in now playing");
-                // TODO
+                Log.d(TAG, "Add search item into NowPlaying, position: " + position);
+                result = addToNowPlaying(mSearchItems, position);
                 break;
 
             default:
-                Log.w(TAG, "Ignore to add item in scope: " + scope);
+                Log.w(TAG, "Ignore to add to now playing in scope: " + scope);
                 break;
+        }
+
+        if (!result) {
+            Log.e(TAG, "handleAddToNowPlaying fail");
         }
     }
 
@@ -441,7 +447,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
 
         if (!result) {
-            Log.w(TAG, "handleGetItemAttributes fail");
+            Log.e(TAG, "handleGetItemAttributes fail");
         }
     }
 
@@ -659,8 +665,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         TestCmd cmd = getTestCmd();
         Log.d(TAG, "updateTestCmdUI " + cmd);
 
-        // Clear test result
-        showTestResult("");
+        clearTestResult();
 
         switch (cmd) {
             case TEST_CMD_ADD_TO_NOW_PLAYING:
@@ -981,6 +986,51 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private boolean addToNowPlaying(HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        List<MediaItem> list;
+        Log.d(TAG, "addToNowPlaying folder: " + folder + ", position: " + position);
+
+        MediaItem item = getMediaItem(folderItems, folder, position);
+        if (item == null) {
+            Log.e(TAG, "addToNowPlaying, MediaItem null");
+            showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+            return false;
+        }
+
+        addToNowPlaying(item.getMediaId());
+        return true;
+    }
+
+    private boolean addToNowPlaying(List<MediaItem> list, int position) {
+        Log.d(TAG, "addToNowPlaying position: " + position);
+        MediaItem item = getMediaItem(list, position);
+        if (item == null) {
+            Log.e(TAG, "addToNowPlaying, MediaItem null");
+            showTestResult("Can't find MediaItem, position " + position +
+                " exceed max size " + list.size());
+            return false;
+        }
+
+        addToNowPlaying(item.getMediaId());
+        return true;
+    }
+
+    private void addToNowPlaying(String mediaId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.addToNowPlaying(mediaId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+
     private void getTotalNumberOfItems(int scope) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
@@ -1076,6 +1126,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Log.d(TAG, "handleActionFolderList store folder id " + id);
             mFolderItems.put(id, folderList);
         }
+    }
+
+    private void handleActionCustomActionResult(Intent intent) {
+        String cmd = intent.getStringExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION);
+        int result = intent.getIntExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION_RESULT, 0);
+        Log.d(TAG, "handleActionCustomActionResult cmd: " + cmd + ", result: " + result);
+
+        String str = getCustomActionResult(cmd, result);
+        showTestResult(str);
     }
 
     private void handleActionGetTotalNumOfItems(Intent intent) {
@@ -1185,6 +1244,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         dstList.addAll(srcList);
     }
 
+    private String getCustomActionResult(String cmd, int result) {
+        String customAction = AvrcpProfile.getCustomActionCmd(cmd);
+        String resultStr = AvrcpProfile.getCustomActionResult(result);
+        String fullStr = customAction + " " + resultStr;
+        return fullStr;
+    }
+
     private void showA2dpCodec(BluetoothAudioConfig audioConfig) {
         if (audioConfig == null) {
             Log.e(TAG, "audioConfig null");
@@ -1264,6 +1330,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                      mmd.getString(MediaMetadata.METADATA_KEY_ARTIST) + "  " +
                      mmd.getString(MediaMetadata.METADATA_KEY_ALBUM);
         showTestResult(str);
+    }
+
+    private void clearTestResult() {
+        showTestResult("");
     }
 
     private void showTestResult(String result) {

@@ -154,6 +154,10 @@ public class AvrcpProfile {
     public static final String KEY_ALBUM_ART_WIDTH = "width";
     public static final String KEY_ALBUM_ART_MAX_SIZE = "maxSize";
 
+    // Add item into NowPlaying
+    public static final String CUSTOM_ACTION_ADD_TO_NOW_PLAYING =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_ADD_TO_NOW_PLAYING";
+
     // Get item attributes
     public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ITEM_ATTR";
@@ -170,6 +174,26 @@ public class AvrcpProfile {
     // Get remote AVRCP supported features
     public static final String CUSTOM_ACTION_GET_SUPPORTED_FEATURES =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_SUPPORTED_FEATURES";
+
+    // + Response for custom action
+
+    public static final String ACTION_CUSTOM_ACTION_RESULT =
+        "com.android.bluetooth.a2dpsink.mbs.action.CUSTOM_ACTION_RESULT";
+
+    public static final String EXTRA_CUSTOM_ACTION =
+        "com.android.bluetooth.a2dpsink.mbs.extra.CUSTOM_ACTION";
+
+    public static final String EXTRA_CUSTOM_ACTION_RESULT =
+        "com.android.bluetooth.a2dpsink.mbs.extra.CUSTOM_ACTION_RESULT";
+
+    // Result code
+    public static final int RESULT_SUCCESS = 0;
+    public static final int RESULT_ERROR = 1;
+    public static final int RESULT_INVALID_PARAMETER = 2;
+    public static final int RESULT_NOT_SUPPORTED = 3;
+    public static final int RESULT_TIMEOUT = 4;
+
+    // - Response for custom action
 
     // --- Custom action definition for AVRCP controller
 
@@ -320,6 +344,13 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
     }
 
+    public void addToNowPlaying(String mediaId) {
+        Log.d(TAG, "addToNowPlaying, mediaId: " + mediaId);
+        Bundle extras = new Bundle();
+        extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        sendCustomAction(CUSTOM_ACTION_ADD_TO_NOW_PLAYING, extras);
+    }
+
     public void getItemAttributes(String mediaId) {
         Log.d(TAG, "getItemAttributes, mediaId: " + mediaId);
         Bundle extras = new Bundle();
@@ -406,6 +437,47 @@ public class AvrcpProfile {
         } else {
             Log.e(TAG, "mAvrcpController null");
             return false;
+        }
+    }
+
+    public static String getCustomActionCmd(String cmd) {
+        if (cmd == null) {
+            return null;
+        }
+
+        if (cmd.equals(CUSTOM_ACTION_SEND_PASS_THRU_CMD)) {
+            return "SendPassThruCmd";
+        } else if (cmd.equals(CUSTOM_ACTION_SEARCH)) {
+            return "Search";
+        } else if (cmd.equals(CUSTOM_ACTION_FETCH_ALBUM_ART)) {
+            return "FetchAlbumArt";
+        } else if (cmd.equals(CUSTOM_ACTION_ADD_TO_NOW_PLAYING)) {
+            return "AddToNowPlaying";
+        } else if (cmd.equals(CUSTOM_ACTION_GET_ITEM_ATTR)) {
+           return "GetItemAttributes";
+        } else if (cmd.equals(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS)) {
+           return "GetTotalNumberOfItems";
+        } else if (cmd.equals(CUSTOM_ACTION_GET_AUDIO_CONFIG_EXT)) {
+           return "GetAudioConfig";
+        } else if (cmd.equals(CUSTOM_ACTION_GET_SUPPORTED_FEATURES)) {
+            return "GetSupportedFeatures";
+        } else {
+            return "Unknown";
+        }
+    }
+
+    public static String getCustomActionResult(int result) {
+        switch (result) {
+            case RESULT_SUCCESS:
+                return "success";
+            case RESULT_INVALID_PARAMETER:
+                return "invalid parameter";
+            case RESULT_NOT_SUPPORTED:
+                return "not supported";
+            case RESULT_TIMEOUT:
+                return "timeout";
+            default:
+                return "error";
         }
     }
 }
