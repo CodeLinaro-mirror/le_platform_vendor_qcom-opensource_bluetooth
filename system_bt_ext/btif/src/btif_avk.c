@@ -1614,6 +1614,11 @@ static void btif_avk_handle_event(UINT16 event, char* p_param)
             memcpy(&req, p_param, sizeof(req));
             memcpy(&bt_addr1, &(req.peer_bd), sizeof(bt_bdaddr_t));
             index = btif_avk_idx_by_bdaddr(&bt_addr1.address);
+            if (index >= 0 && index < btif_max_avk_clients) {
+                btif_avk_cb[index].sink_codec_type = req.codec_type;
+                BTIF_TRACE_DEBUG("%s :BTIF_AVK_SINK_CONFIG_REQ_EVT codec_type = %d",
+                                __FUNCTION__,btif_avk_cb[index].sink_codec_type);
+            }
             break;
         default:
             BTIF_TRACE_ERROR("Unhandled AVK event = %d", event);
@@ -1900,15 +1905,16 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
     tA2D_APTX_CIE aptx_cie;
 #endif
     btif_avk_config_req_t config_req;
-    int index = btif_avk_idx_by_bdaddr(bd_addr);
-    if (index >= btif_max_avk_clients)
-    {
-        BTIF_TRACE_DEBUG("%s Invalid index for device", __FUNCTION__);
-        return;
-    }
+    int index ;
 
     if (event == BTA_AVK_MEDIA_DATA_EVT)/* Switch to BTIF_MEDIA context */
     {
+        index = btif_avk_idx_by_bdaddr(bd_addr);
+        if (index >= btif_max_avk_clients)
+        {
+            BTIF_TRACE_DEBUG("%s Invalid index for device", __FUNCTION__);
+            return;
+        }
         state= btif_sm_get_state(btif_avk_cb[index].sm_handle);
         BTIF_TRACE_DEBUG("%s index = %d state = %d", __FUNCTION__, index, state);
         if (((state == BTIF_AVK_STATE_STARTED) || /* send SBC packets only in Started State */
@@ -1975,7 +1981,6 @@ static void bte_avk_media_callback(tBTA_AVK_EVT event, tBTA_AVK_MEDIA *p_data, B
         /* send a command to BT Media Task */
         //memcpy(config_req.codec_info,(UINT8*)(p_data->avk_config.codec_info), AVDT_CODEC_SIZE);
         config_req.codec_type = codec_type;
-        btif_avk_cb[index].sink_codec_type = codec_type;
         switch(codec_type)
         {
         case BTIF_AVK_CODEC_SBC:
