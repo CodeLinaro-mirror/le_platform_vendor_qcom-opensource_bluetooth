@@ -187,12 +187,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 handleActionFolderList(intent);
             } else if (action.equals(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT)) {
                 handleActionCustomActionResult(intent);
-            } else if (action.equals(AvrcpProfile.ACTION_NUM_OF_ITEMS)) {
-                handleActionGetTotalNumOfItems(intent);
             } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
                 handleActionPlayerSetting(intent);
-            } else if (action.equals(AvrcpProfile.ACTION_SUPPORTED_FEATURES)) {
-                handleActionSupportedFeatures(intent);
             } else if (action.equals(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED)) {
                 handleActionAudioConfigChanged(intent);
             }
@@ -283,10 +279,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
         filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
         filter.addAction(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT);
-        filter.addAction(AvrcpProfile.ACTION_NUM_OF_ITEMS);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
-        filter.addAction(AvrcpProfile.ACTION_SUPPORTED_FEATURES);
         registerReceiver(mReceiver, filter);
     }
 
@@ -468,8 +462,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else {
             Log.w(TAG, "handleSearch, but query string empty");
         }
-
-        showTestResult("Find search result in Android Bluetooth Audio app");
     }
 
     private void handleGetAudioConfig() {
@@ -952,7 +944,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private MediaItem getMediaItem(List<MediaItem> list, int position) {
         Log.d(TAG, "getMediaItem position: " + position);
         if ((list == null) || (position >= list.size())) {
-            Log.w(TAG, "getMediaItem exceed max size " + list.size());
+            Log.w(TAG, "getMediaItem exceed max size ");
             return null;
         }
 
@@ -1152,9 +1144,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (AvrcpProfile.isRoot(id)) {
             Log.d(TAG, "handleActionFolderList root items " + folderList);
             storeMediaItems(mPlayerItems, folderList);
-        } else if (AvrcpProfile.isPlayer(id)) {
-            Log.d(TAG, "handleActionFolderList player items " + folderList);
-            // TODO
         } else if (AvrcpProfile.isSearch(id)) {
             Log.d(TAG, "handleActionFolderList search items " + folderList);
             storeMediaItems(mSearchItems, folderList);
@@ -1168,29 +1157,68 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void handleActionCustomActionResult(Intent intent) {
-        String cmd = intent.getStringExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION);
-        int result = intent.getIntExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION_RESULT, 0);
-        Log.d(TAG, "handleActionCustomActionResult cmd: " + cmd + ", result: " + result);
-
-        String str = getCustomActionResult(cmd, result);
-        showTestResult(str);
-    }
-
-    private void handleActionGetTotalNumOfItems(Intent intent) {
-        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
-        Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
-
-        showTestResult(Integer.toString(items));
-    }
-
     private void handleActionPlayerSetting(Intent intent) {
         mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
         Log.d(TAG, "handleActionPlayerSetting mPlayerAppSetting: " + mPlayerAppSetting);
         updatePlayerAppSettingUI(mPlayerAppSetting);
     }
 
-    private void handleActionSupportedFeatures(Intent intent) {
+    private void handleActionAudioConfigChanged(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        BluetoothAudioConfig audioConfig = intent.getParcelableExtra(BluetoothA2dpSink.EXTRA_AUDIO_CONFIG);
+        int codecType = intent.getIntExtra(AvrcpProfile.EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
+
+        Log.d(TAG, "handleActionAudioConfigChanged device: " + device + ", audioConfig: " +
+            audioConfig + ", codecType: " + codecType);
+
+        mA2dpCodecType.put(device, codecType);
+
+        showA2dpCodec(audioConfig);
+    }
+
+    private void handleActionCustomActionResult(Intent intent) {
+        String cmd = intent.getStringExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION);
+        int result = intent.getIntExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION_RESULT, 0);
+        Log.d(TAG, "handleActionCustomActionResult cmd: " + cmd + ", result: " + result);
+
+        if (cmd != null) {
+            if (result == AvrcpProfile.RESULT_SUCCESS) {
+                if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_SEARCH)) {
+                    handleSearchResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_ADD_TO_NOW_PLAYING)) {
+                    handleAddToNowPlayingResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS)) {
+                    handleGetTotalNumOfItemsResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_SUPPORTED_FEATURES)) {
+                    handleGetSupportedFeaturesResp(intent);
+                }
+            } else {
+                String str = getCustomActionResult(cmd, result);
+                showTestResult(str);
+            }
+        }
+    }
+
+    private void handleSearchResp(Intent intent) {
+        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
+        Log.d(TAG, "handleSearchResp " + items);
+        String result = "Found " + items +
+                        ". Use Bluetooth Audio App to browse search result";
+        showTestResult(result);
+    }
+
+    private void handleAddToNowPlayingResp(Intent intent) {
+        Log.d(TAG, "handleAddToNowPlayingResp " + intent);
+        showTestResult("Check NowPlaying in Bluetooth Audio App");
+    }
+
+    private void handleGetTotalNumOfItemsResp(Intent intent) {
+        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
+        Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
+        showTestResult(Integer.toString(items));
+    }
+
+    private void handleGetSupportedFeaturesResp(Intent intent) {
         BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         int features = (int) intent.getExtra(AvrcpProfile.EXTRA_SUPPORTED_FEATURES);
         Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
@@ -1220,19 +1248,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         val += ")";
 
         showTestResult(val);
-    }
-
-    private void handleActionAudioConfigChanged(Intent intent) {
-        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-        BluetoothAudioConfig audioConfig = intent.getParcelableExtra(BluetoothA2dpSink.EXTRA_AUDIO_CONFIG);
-        int codecType = intent.getIntExtra(AvrcpProfile.EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
-
-        Log.d(TAG, "handleActionAudioConfigChanged device: " + device + ", audioConfig: " +
-            audioConfig + ", codecType: " + codecType);
-
-        mA2dpCodecType.put(device, codecType);
-
-        showA2dpCodec(audioConfig);
     }
 
     private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
