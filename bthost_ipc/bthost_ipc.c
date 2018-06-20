@@ -1073,8 +1073,8 @@ int audio_suspend_stream()
             else if (status == A2DP_CTRL_ACK_SUCCESS)
             {
                 ALOGW("audio suspend stream successful");
-                pthread_mutex_unlock(&audio_stream.lock);
                 audio_stream.state = AUDIO_A2DP_STATE_SUSPENDED;
+                pthread_mutex_unlock(&audio_stream.lock);
                 pthread_mutex_unlock(&audio_stream.ack_lock);
                 return 0;
             }
