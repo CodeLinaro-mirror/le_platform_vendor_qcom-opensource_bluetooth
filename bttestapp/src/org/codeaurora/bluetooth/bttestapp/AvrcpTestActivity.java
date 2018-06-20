@@ -394,12 +394,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case AvrcpProfile.BROWSE_SCOPE_VFS:
                 Log.d(TAG, "Add VFS item into NowPlaying, folder: " +
                     folder + ", position: " + position);
-                result = addToNowPlaying(mFolderItems, folder, position);
+                result = addToNowPlaying(scope, mFolderItems, folder, position);
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
                 Log.d(TAG, "Add search item into NowPlaying, position: " + position);
-                result = addToNowPlaying(mSearchItems, position);
+                result = addToNowPlaying(scope, mSearchItems, position);
                 break;
 
             default:
@@ -423,17 +423,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case AvrcpProfile.BROWSE_SCOPE_VFS:
                 Log.d(TAG, "Get item attributes in VFS, folder: " +
                     folder + ", position: " + position);
-                result = getItemAttributes(mFolderItems, folder, position);
+                result = getItemAttributes(scope, mFolderItems, folder, position);
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
                 Log.d(TAG, "Get item attributes in search folder, position: " + position);
-                result = getItemAttributes(mSearchItems, position);
+                result = getItemAttributes(scope, mSearchItems, position);
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
                 Log.d(TAG, "Get item attributes in now playing, position: " + position);
-                result = getItemAttributes(mNowPlayingItems, position);
+                result = getItemAttributes(scope, mNowPlayingItems, position);
                 break;
 
             default:
@@ -943,7 +943,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private MediaItem getMediaItem(List<MediaItem> list, int position) {
         Log.d(TAG, "getMediaItem position: " + position);
-        if ((list == null) || (position >= list.size())) {
+        if ((list == null) ||
+            (position == INVALID_ITEM_POSITION) ||
+            (position >= list.size())) {
             Log.w(TAG, "getMediaItem exceed max size ");
             return null;
         }
@@ -951,7 +953,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         return list.get(position);
     }
 
-    private boolean getItemAttributes(HashMap<String, List<MediaItem>> folderItems,
+    private boolean getItemAttributes(int scope, HashMap<String, List<MediaItem>> folderItems,
         String folder, int position) {
         String mediaId = null;
         Log.d(TAG, "getItemAttributes folder: " + folder + ", position: " + position);
@@ -975,11 +977,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(mediaId);
+        getItemAttributes(scope, mediaId);
         return true;
     }
 
-    private boolean getItemAttributes(List<MediaItem> list, int position) {
+    private boolean getItemAttributes(int scope, List<MediaItem> list, int position) {
         Log.d(TAG, "getItemAttributes position: " + position);
         MediaItem item = getMediaItem(list, position);
         if (item == null) {
@@ -989,28 +991,28 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(item.getMediaId());
+        getItemAttributes(scope, item.getMediaId());
         return true;
     }
 
-    private void getItemAttributes(String mediaId) {
+    private void getItemAttributes(int scope, String mediaId) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.getItemAttributes(mediaId);
+            mAvrcp.getItemAttributes(scope, mediaId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private boolean addToNowPlaying(HashMap<String, List<MediaItem>> folderItems,
+    private boolean addToNowPlaying(int scope, HashMap<String, List<MediaItem>> folderItems,
         String folder, int position) {
         String mediaId = null;
-        Log.d(TAG, "addToNowPlaying folder: " + folder + ", position: " + position);
+        Log.d(TAG, "addToNowPlaying scope: " + scope + ", folder: " + folder + ", position: " + position);
 
         if (position != INVALID_ITEM_POSITION) {
             MediaItem item = getMediaItem(folderItems, folder, position);
@@ -1031,12 +1033,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        addToNowPlaying(mediaId);
+        addToNowPlaying(scope, mediaId);
         return true;
     }
 
-    private boolean addToNowPlaying(List<MediaItem> list, int position) {
-        Log.d(TAG, "addToNowPlaying position: " + position);
+    private boolean addToNowPlaying(int scope, List<MediaItem> list, int position) {
+        Log.d(TAG, "addToNowPlaying scope: " + scope + ", position: " + position);
         MediaItem item = getMediaItem(list, position);
         if (item == null) {
             Log.e(TAG, "addToNowPlaying, MediaItem null");
@@ -1045,18 +1047,18 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        addToNowPlaying(item.getMediaId());
+        addToNowPlaying(scope, item.getMediaId());
         return true;
     }
 
-    private void addToNowPlaying(String mediaId) {
+    private void addToNowPlaying(int scope, String mediaId) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.addToNowPlaying(mediaId);
+            mAvrcp.addToNowPlaying(scope, mediaId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

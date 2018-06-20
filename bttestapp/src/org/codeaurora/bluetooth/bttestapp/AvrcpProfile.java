@@ -479,16 +479,18 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_SEARCH, extras);
     }
 
-    public void addToNowPlaying(String mediaId) {
-        Log.d(TAG, "addToNowPlaying, mediaId: " + mediaId);
+    public void addToNowPlaying(int scope, String mediaId) {
+        Log.d(TAG, "addToNowPlaying scope: " + scope + ", mediaId: " + mediaId);
         Bundle extras = new Bundle();
+        extras.putInt(KEY_BROWSE_SCOPE, scope);
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_ADD_TO_NOW_PLAYING, extras);
     }
 
-    public void getItemAttributes(String mediaId) {
-        Log.d(TAG, "getItemAttributes, mediaId: " + mediaId);
+    public void getItemAttributes(int scope, String mediaId) {
+        Log.d(TAG, "getItemAttributes scope: " + scope + ", mediaId: " + mediaId);
         Bundle extras = new Bundle();
+        extras.putInt(KEY_BROWSE_SCOPE, scope);
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_GET_ITEM_ATTR, extras);
     }
