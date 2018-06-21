@@ -466,12 +466,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void handleGetAudioConfig() {
         Log.d(TAG, "handleGetAudioConfig device: " + mDevice);
-        getAudioConfigExt(mDevice);
+        BluetoothAudioConfig audioConfig = getAudioConfig(mDevice);
+        showA2dpCodec(audioConfig);
     }
 
     private void handleGetSupportedFeatures() {
         Log.d(TAG, "handleGetSupportedFeatures device: " + mDevice);
-        getSupportedFeatures(mDevice);
+        int features = getSupportedFeatures(mDevice);
+        showSupportedFeatures(mDevice, features);
     }
 
     private void handleClickBtnGetCurrentPas() {
@@ -872,20 +874,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void getSupportedFeatures(BluetoothDevice device) {
-        if (mAvrcp == null) {
-            Log.e(TAG, " Service not connected ");
-            return;
-        }
-
-        try {
-            mAvrcp.getSupportedFeatures(device);
-        } catch (Exception e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
-        }
-    }
-
     private String getMediaId(HashMap<String, List<MediaItem>> folderItems,
         String folder) {
         boolean found = false;
@@ -1079,22 +1067,37 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void getAudioConfigExt(BluetoothDevice device) {
+    private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+        BluetoothAudioConfig audioConfig = null;
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
-            return;
+            return null;
         }
 
         try {
-            // Test only to use legacy API to get audio config
-            BluetoothAudioConfig audioConfig = mAvrcp.getAudioConfig(device);
+            audioConfig = mAvrcp.getAudioConfig(device);
             Log.d(TAG, "BluetoothAudioConfig " + audioConfig);
-
-            mAvrcp.getAudioConfigExt(device);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
+        return audioConfig;
+    }
+
+    private int getSupportedFeatures(BluetoothDevice device) {
+        int features = 0;
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return 0;
+        }
+
+        try {
+            features = mAvrcp.getSupportedFeatures(device);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+        return features;
     }
 
     private void handleActionConnectionStateChanged(Intent intent) {
@@ -1191,8 +1194,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                     handleAddToNowPlayingResp(intent);
                 } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS)) {
                     handleGetTotalNumOfItemsResp(intent);
-                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_SUPPORTED_FEATURES)) {
-                    handleGetSupportedFeaturesResp(intent);
                 }
             } else {
                 String str = getCustomActionResult(cmd, result);
@@ -1218,38 +1219,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
         Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
         showTestResult(Integer.toString(items));
-    }
-
-    private void handleGetSupportedFeaturesResp(Intent intent) {
-        BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-        int features = (int) intent.getExtra(AvrcpProfile.EXTRA_SUPPORTED_FEATURES);
-        Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
-
-        String val = "AVRCP Features: " + features + " (";
-
-        if (features != 0) {
-            if ((features & AvrcpProfile.BTRC_FEAT_METADATA) != 0) {
-                val += " metadata, ";
-            }
-
-            if ((features & AvrcpProfile.BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
-                val += " absolute_volume, ";
-            }
-
-            if ((features & AvrcpProfile.BTRC_FEAT_BROWSE) != 0) {
-                val += " browse, ";
-            }
-
-            if ((features & AvrcpProfile.BTRC_FEAT_COVER_ART) != 0) {
-                val += " cover_art, ";
-            }
-        } else {
-            val += "none";
-        }
-
-        val += ")";
-
-        showTestResult(val);
     }
 
     private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
@@ -1374,6 +1343,36 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                      " (" + audioFormatString + ")";
 
         showTestResult(str);
+    }
+
+    private void showSupportedFeatures(BluetoothDevice device, int features) {
+        Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
+
+        String val = "AVRCP Features: " + features + " (";
+
+        if (features != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_METADATA) != 0) {
+                val += " metadata, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+                val += " absolute_volume, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_BROWSE) != 0) {
+                val += " browse, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_COVER_ART) != 0) {
+                val += " cover_art, ";
+            }
+        } else {
+            val += "none";
+        }
+
+        val += ")";
+
+        showTestResult(val);
     }
 
     private void showMediaMetadata(MediaMetadata mmd) {
