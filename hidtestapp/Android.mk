@@ -1,3 +1,4 @@
+ifneq ($(TARGET_HAS_LOW_RAM), true)
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -8,6 +9,7 @@ LOCAL_SRC_FILES := \
         $(call all-java-files-under, $(src_dirs)) \
 
 LOCAL_PACKAGE_NAME := HidTestApp
+LOCAL_PRIVATE_PLATFORM_APIS := true
 LOCAL_CERTIFICATE := platform
 
 LOCAL_PROGUARD_ENABLED := disabled
@@ -18,3 +20,4 @@ include $(BUILD_PACKAGE)
 
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
+endif
