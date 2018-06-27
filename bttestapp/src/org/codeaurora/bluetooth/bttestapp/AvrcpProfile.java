@@ -120,6 +120,12 @@ public class AvrcpProfile {
     public static final int BTRC_FEAT_BROWSE = 0x04;
     public static final int BTRC_FEAT_COVER_ART = 0x08;
 
+    // Custom actions for PTS testing.
+    private String CUSTOM_ACTION_VOL_UP = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_VOL_UP";
+    private String CUSTOM_ACTION_VOL_DN = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_VOL_DN";
+    private String CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE";
+
     // [TODO] Move the common defintion for customer action into framework
     // +++ Custom action definition for AVRCP controller
 
@@ -386,6 +392,12 @@ public class AvrcpProfile {
             Log.d(TAG, "calling pause()");
             mMediaController.getTransportControls().pause();
         }
+    }
+
+    public void getPlayStatus() {
+        Log.d(TAG, "getPlayStatus");
+        Bundle extras = new Bundle();
+        sendCustomAction(CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE, extras);
     }
 
     public void sendPassThruCmd(int cmd, boolean pressed) {

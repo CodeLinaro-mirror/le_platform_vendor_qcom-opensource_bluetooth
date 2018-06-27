@@ -113,6 +113,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         new HashMap<String, List<MediaItem>>();
     private List<MediaItem> mSearchItems = new ArrayList<MediaItem>();
     private List<MediaItem> mNowPlayingItems = new ArrayList<MediaItem>();
+    private boolean mGetPlayStatus = false;
 
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
@@ -143,6 +144,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         // GetItemAttributes
         TEST_CMD_GET_ITEM_ATTRIBUTES,
+
+        // GetPlayStatus
+        TEST_CMD_GET_PLAY_STATUS,
 
         // GetTotalNumberOfItems
         TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
@@ -366,6 +370,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
                 handleGetItemAttributes();
                 break;
+            case TEST_CMD_GET_PLAY_STATUS:
+                handleGetPlayStatus();
+                break;
             case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
                 handleGetTotalNumOfItems();
                 break;
@@ -447,6 +454,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void handleGetPlayStatus() {
+        Log.d(TAG, "handleGetPlayStatus");
+        mGetPlayStatus = true;
+        getPlayStatus();
+    }
+
     private void handleGetTotalNumOfItems() {
         int scope = getScope();
         Log.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
@@ -497,6 +510,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
         } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
             cmd = TestCmd.TEST_CMD_GET_ITEM_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_play_status))) {
+            cmd = TestCmd.TEST_CMD_GET_PLAY_STATUS;
         } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
             cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
         } else if (str.equals(this.getString(R.string.avrcp_search))) {
@@ -676,6 +691,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_SEARCH:
                 enableQuery = true;
                 break;
+            case TEST_CMD_GET_PLAY_STATUS:
             case TEST_CMD_GET_AUDIO_CONFIG:
             case TEST_CMD_GET_SUPPORTED_FEATTURES:
             default:
@@ -1053,6 +1069,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void getPlayStatus() {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getPlayStatus();
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
     private void getTotalNumberOfItems(int scope) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
@@ -1117,14 +1147,23 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void handleActionTrackEvent(Intent intent) {
         PlaybackState ps = intent.getParcelableExtra(AvrcpProfile.EXTRA_PLAYBACK);
-        if ((ps != null) && (mBtnPlayPause != null)) {
+        if (ps != null) {
             int state = ps.getState();
             Log.d(TAG, "handleActionTrackEvent state: " + state);
-            if (state == PlaybackState.STATE_PAUSED ||
-                state == PlaybackState.STATE_STOPPED) {
-                mBtnPlayPause.setText(STATUS_PLAY);
-            } else if (state == PlaybackState.STATE_PLAYING) {
-                mBtnPlayPause.setText(STATUS_PAUSE);
+            if (mBtnPlayPause != null) {
+                if (state == PlaybackState.STATE_PAUSED ||
+                    state == PlaybackState.STATE_STOPPED) {
+                    mBtnPlayPause.setText(STATUS_PLAY);
+                } else if (state == PlaybackState.STATE_PLAYING) {
+                    mBtnPlayPause.setText(STATUS_PAUSE);
+                }
+            }
+
+            if (mGetPlayStatus) {
+                mGetPlayStatus = false;
+                long position = ps.getPosition() / 1000; // in second
+                String result = "Current play position: " + position + " sec";
+                showTestResult(result);
             }
         }
 
