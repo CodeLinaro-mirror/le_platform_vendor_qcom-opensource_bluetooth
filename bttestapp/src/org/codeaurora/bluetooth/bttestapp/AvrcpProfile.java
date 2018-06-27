@@ -278,6 +278,10 @@ public class AvrcpProfile {
     public static final int KEY_STATE_PRESSED = 0;
     public static final int KEY_STATE_RELEASED = 1;
 
+    /* Group Navigation Key Codes */
+    public static final int PASS_THRU_CMD_ID_NEXT_GRP = 0x00;
+    public static final int PASS_THRU_CMD_ID_PREV_GRP = 0x01;
+
     /* Folder/Media Item scopes.
      * Keep in sync with AVRCP 1.6 sec. 6.10.1
      */
@@ -301,8 +305,6 @@ public class AvrcpProfile {
     /* Object used to connect to MediaBrowseService of BT-AVRCP app */
     private MediaBrowser mMediaBrowser = null;
     private MediaController mMediaController = null;
-    private List<MediaBrowser.MediaItem> mNowPlayingItems = new ArrayList<>();
-    private List<MediaBrowser.MediaItem> mSearchItems = new ArrayList<>();
 
     private Context mContext;
 
@@ -507,13 +509,21 @@ public class AvrcpProfile {
         return parentId.startsWith(SEARCH_PREFIX);
     }
 
-    private List<MediaBrowser.MediaItem> getItemList(String parentId) {
-        if (isNowPlaying(parentId)) {
-            return mNowPlayingItems;
-        } else if (isSearch(parentId)) {
-            return mSearchItems;
+    public void sendNextGroupCmd(BluetoothDevice device) {
+        sendGroupNavigationCmd(device, PASS_THRU_CMD_ID_NEXT_GRP, KEY_STATE_PRESSED);
+        sendGroupNavigationCmd(device, PASS_THRU_CMD_ID_NEXT_GRP, KEY_STATE_RELEASED);
+    }
+
+    public void sendPreviousGroupCmd(BluetoothDevice device) {
+        sendGroupNavigationCmd(device, PASS_THRU_CMD_ID_PREV_GRP, KEY_STATE_PRESSED);
+        sendGroupNavigationCmd(device, PASS_THRU_CMD_ID_PREV_GRP, KEY_STATE_RELEASED);
+    }
+
+    public void sendGroupNavigationCmd(BluetoothDevice device, int keyCode, int keyState) {
+        if (mAvrcpController != null) {
+            mAvrcpController.sendGroupNavigationCmd(device, keyCode, keyState);
         } else {
-            return null;
+            Log.e(TAG, "mAvrcpController null");
         }
     }
 

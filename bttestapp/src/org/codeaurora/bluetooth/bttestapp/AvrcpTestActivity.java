@@ -81,10 +81,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
     private Button mBtnStop;
-    private Button mBtnVolumeDown;
-    private Button mBtnVolumeUp;
     private Button mBtnFastforward;
     private Button mBtnRewind;
+    private Button mBtnVolumeDown;
+    private Button mBtnVolumeUp;
+    private Button mBtnPreviousGroup;
+    private Button mBtnNextGroup;
 
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
@@ -227,10 +229,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         mBtnPlayPause = initButton(R.id.id_btn_play_pause);
         mBtnStop = initButton(R.id.id_btn_stop);
-        mBtnVolumeDown = initButton(R.id.id_btn_volume_down);
-        mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
         mBtnFastforward = initButton(R.id.id_btn_fast_forward, null, this);
         mBtnRewind = initButton(R.id.id_btn_rewind, null, this);
+        mBtnVolumeDown = initButton(R.id.id_btn_volume_down);
+        mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
+        mBtnPreviousGroup = initButton(R.id.id_btn_previous_group);
+        mBtnNextGroup = initButton(R.id.id_btn_next_group);
 
         mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
@@ -361,6 +365,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnVolumeUp) {
             Log.d(TAG, "onClick mBtnVolumeUp");
             volumeUp();
+         } else if (v == mBtnPreviousGroup) {
+            Log.d(TAG, "onClick mBtnPreviousGroup");
+            previousGroup();
+        } else if (v == mBtnNextGroup) {
+            Log.d(TAG, "onClick mBtnNextGroup");
+            nextGroup();
         } else if (v == mBtnTestCmd) {
             Log.d(TAG, "onClick mBtnTestCmd");
             handleClickBtnTestCmd();
@@ -877,6 +887,34 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void fastForward(boolean pressed) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.fastForward(pressed);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void rewind(boolean pressed) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.rewind(pressed);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
     private void volumeDown() {
         if (mAvrcp == null) {
             Log.d(TAG, " Service not connected ");
@@ -905,28 +943,28 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
-    private void fastForward(boolean pressed) {
+    private void previousGroup() {
         if (mAvrcp == null) {
-            Log.e(TAG, " Service not connected ");
+            Log.d(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.fastForward(pressed);
+            mAvrcp.sendPreviousGroupCmd(mDevice);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private void rewind(boolean pressed) {
+    private void nextGroup() {
         if (mAvrcp == null) {
-            Log.e(TAG, " Service not connected ");
+            Log.d(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.rewind(pressed);
+            mAvrcp.sendNextGroupCmd(mDevice);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
