@@ -80,6 +80,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
+    private Button mBtnStop;
     private Button mBtnFastforward;
     private Button mBtnRewind;
 
@@ -223,6 +224,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         initPasMaps();
 
         mBtnPlayPause = initButton(R.id.id_btn_play_pause);
+        mBtnStop = initButton(R.id.id_btn_stop);
         mBtnFastforward = initButton(R.id.id_btn_fast_forward, null, this);
         mBtnRewind = initButton(R.id.id_btn_rewind, null, this);
 
@@ -346,6 +348,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (v == mBtnPlayPause) {
             Log.d(TAG, "onClick mBtnPlayPause");
             sendCommand();
+        } else if (v == mBtnStop) {
+            Log.d(TAG, "onClick mBtnStop");
+            sendStopCommand();
         } else if (v == mBtnTestCmd) {
             Log.d(TAG, "onClick mBtnTestCmd");
             handleClickBtnTestCmd();
@@ -842,6 +847,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 mAvrcp.pause();
                 mBtnPlayPause.setText(STATUS_PLAY);
             }
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendStopCommand() {
+        if (mAvrcp == null) {
+            Log.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.stop();
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

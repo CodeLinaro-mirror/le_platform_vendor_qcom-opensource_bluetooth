@@ -394,6 +394,14 @@ public class AvrcpProfile {
         }
     }
 
+    public void stop() {
+        Log.d(TAG, "stop");
+        if (mMediaController != null) {
+            Log.d(TAG, "calling stop()");
+            mMediaController.getTransportControls().stop();
+        }
+    }
+
     public void getPlayStatus() {
         Log.d(TAG, "getPlayStatus");
         Bundle extras = new Bundle();

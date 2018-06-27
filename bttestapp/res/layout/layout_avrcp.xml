@@ -56,6 +56,15 @@
             android:text="@string/avrcp_play"
             android:layout_margin="@dimen/activity_vertical_margin" />
         <Button
+            android:id="@+id/id_btn_stop"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_stop" />
+        <Button
             android:id="@+id/id_btn_fast_forward"
             style="@style/textview_normal"
             android:layout_width="0dp"
