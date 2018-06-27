@@ -389,6 +389,8 @@
     <string name="avrcp_stop">Stop</string>
     <string name="avrcp_fastforward">Fastforward</string>
     <string name="avrcp_rewind">Rewind</string>
+    <string name="avrcp_volume_down">VolumeDown</string>
+    <string name="avrcp_volume_up">VolumeUp</string>
     <string name="avrcp_search">Search</string>
     <string name="avrcp_test">Test</string>
     <string name="avrcp_get_play_status">GetPlayStatus</string>

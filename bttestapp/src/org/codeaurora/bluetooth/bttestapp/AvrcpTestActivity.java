@@ -81,6 +81,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
     private Button mBtnStop;
+    private Button mBtnVolumeDown;
+    private Button mBtnVolumeUp;
     private Button mBtnFastforward;
     private Button mBtnRewind;
 
@@ -225,6 +227,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         mBtnPlayPause = initButton(R.id.id_btn_play_pause);
         mBtnStop = initButton(R.id.id_btn_stop);
+        mBtnVolumeDown = initButton(R.id.id_btn_volume_down);
+        mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
         mBtnFastforward = initButton(R.id.id_btn_fast_forward, null, this);
         mBtnRewind = initButton(R.id.id_btn_rewind, null, this);
 
@@ -351,6 +355,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnStop) {
             Log.d(TAG, "onClick mBtnStop");
             sendStopCommand();
+        } else if (v == mBtnVolumeDown) {
+            Log.d(TAG, "onClick mBtnVolumeDown");
+            volumeDown();
+        } else if (v == mBtnVolumeUp) {
+            Log.d(TAG, "onClick mBtnVolumeUp");
+            volumeUp();
         } else if (v == mBtnTestCmd) {
             Log.d(TAG, "onClick mBtnTestCmd");
             handleClickBtnTestCmd();
@@ -861,6 +871,34 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         try {
             mAvrcp.stop();
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void volumeDown() {
+        if (mAvrcp == null) {
+            Log.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.volumeDown();
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void volumeUp() {
+        if (mAvrcp == null) {
+            Log.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.volumeUp();
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

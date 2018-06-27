@@ -402,6 +402,18 @@ public class AvrcpProfile {
         }
     }
 
+    public void volumeUp() {
+        Log.d(TAG, "volumeUp");
+        Bundle extras = new Bundle();
+        sendCustomAction(CUSTOM_ACTION_VOL_UP, extras);
+    }
+
+    public void volumeDown() {
+        Log.d(TAG, "volumeDown");
+        Bundle extras = new Bundle();
+        sendCustomAction(CUSTOM_ACTION_VOL_DN, extras);
+    }
+
     public void getPlayStatus() {
         Log.d(TAG, "getPlayStatus");
         Bundle extras = new Bundle();
@@ -456,6 +468,13 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS, extras);
     }
 
+    private void sendCustomAction(String action, Bundle extras) {
+        if (mMediaController != null) {
+            Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
+            mMediaController.getTransportControls().sendCustomAction(action, extras);
+        }
+    }
+
     public BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
         Log.d(TAG, "getAudioConfig, device: " + device);
         if (mA2dpSink != null) {
@@ -470,13 +489,6 @@ public class AvrcpProfile {
         Log.d(TAG, "getSupportedFeatures, device: " + device);
         // TODO
         return 0;
-    }
-
-    private void sendCustomAction(String action, Bundle extras) {
-        if (mMediaController != null) {
-            Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
-            mMediaController.getTransportControls().sendCustomAction(action, extras);
-        }
     }
 
     public static boolean isRoot(String parentId) {
