@@ -409,6 +409,7 @@
     <string name="avrcp_browse_up">BrowseUp</string>
     <string name="avrcp_request_conti_resp">RequestContinuingResponse</string>
     <string name="avrcp_abort_conti_resp">AbortContinuingResponse</string>
+    <string name="avrcp_release_connection">ReleaseConnection</string>
     <string name="avrcp_get_audio_config">GetAudioConfig</string>
     <string name="avrcp_get_supported_features">GetSupportedFeatures</string>
     <string name="avrcp_set_addr_player">SetAddressedPlayer</string>
@@ -426,6 +427,7 @@
         <item>@string/avrcp_get_play_status</item>
         <item>@string/avrcp_get_supported_features</item>
         <item>@string/avrcp_get_total_num</item>
+        <item>@string/avrcp_release_connection</item>
         <item>@string/avrcp_request_conti_resp</item>
         <item>@string/avrcp_search</item>
         <item>@string/avrcp_set_addr_player</item>

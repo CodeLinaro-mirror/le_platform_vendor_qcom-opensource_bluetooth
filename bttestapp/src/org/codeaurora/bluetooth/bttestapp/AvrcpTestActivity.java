@@ -119,7 +119,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private List<MediaItem> mSearchItems = new ArrayList<MediaItem>();
     private List<MediaItem> mNowPlayingItems = new ArrayList<MediaItem>();
     private boolean mGetPlayStatus = false;
-    private boolean mAvailOfMediaPlayers = false;
 
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
@@ -170,6 +169,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         // GetTotalNumberOfItems
         TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
+
+        // ReleaseConnection
+        TEST_CMD_RELEASE_CONNECTION,
 
         // RequestContinuingResponse
         TEST_CMD_REQUEST_CONTINUING_RESPONSE,
@@ -428,6 +430,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
                 handleGetTotalNumOfItems();
                 break;
+            case TEST_CMD_RELEASE_CONNECTION:
+                handleReleaseConnection();
+                break;
             case TEST_CMD_REQUEST_CONTINUING_RESPONSE:
                 handleRequestContinuingResponse();
                 break;
@@ -518,7 +523,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                     result = getItemAttributes(scope, mFolderItems, folder, position);
                 } else {
                     // Send GetElementAttributes for PLAYING
-                    getItemAttributes(scope, null);
+                    getItemAttributes(scope, null, false);
                     result = true;
                 }
                 break;
@@ -554,6 +559,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int scope = getScope();
         Log.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
         getTotalNumberOfItems(scope);
+    }
+
+    private void handleReleaseConnection() {
+        Log.d(TAG, "handleReleaseConnection");
+        releaseConnection(mDevice);
     }
 
     private void handleSearch() {
@@ -617,6 +627,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
         } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
             cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
+        } else if (str.equals(this.getString(R.string.avrcp_release_connection))) {
+            cmd = TestCmd.TEST_CMD_RELEASE_CONNECTION;
         } else if (str.equals(this.getString(R.string.avrcp_request_conti_resp))) {
             cmd = TestCmd.TEST_CMD_REQUEST_CONTINUING_RESPONSE;
         } else if (str.equals(this.getString(R.string.avrcp_search))) {
@@ -823,6 +835,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 folder = TEST_FOLDER;
                 break;
             case TEST_CMD_GET_PLAY_STATUS:
+            case TEST_CMD_RELEASE_CONNECTION:
             case TEST_CMD_GET_AUDIO_CONFIG:
             case TEST_CMD_GET_SUPPORTED_FEATTURES:
             default:
@@ -1182,7 +1195,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(scope, mediaId);
+        getItemAttributes(scope, mediaId, false);
         return true;
     }
 
@@ -1195,15 +1208,29 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(scope, item.getMediaId());
+        getItemAttributes(scope, item.getMediaId(), false);
         return true;
     }
 
-    private void getItemAttributes(int scope, String mediaId) {
-        int[] attributeId = {
-            AvrcpProfile.MEDIA_ATTR_ID_TITLE,
-        };
-        getItemAttributes(scope, mediaId, attributeId);
+    private void getItemAttributes(int scope, String mediaId, boolean all) {
+        if (all) {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getItemAttributes(scope, mediaId, allAttributes);
+        } else {
+            int[] titleAttribute = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getItemAttributes(scope, mediaId, titleAttribute);
+        }
     }
 
     private void getItemAttributes(int scope, String mediaId, int[] attributeId) {
@@ -1394,6 +1421,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void releaseConnection(BluetoothDevice device) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.releaseConnection(device);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
     private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
         BluetoothAudioConfig audioConfig = null;
         if (mAvrcp == null) {
@@ -1431,15 +1472,22 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
         int state = (int) intent.getExtra(BluetoothProfile.EXTRA_STATE);
         Log.d(TAG, "handleActionConnectionStateChanged device: " + device + ", state: " + state);
+        String result = "";
 
         if (state == BluetoothProfile.STATE_CONNECTED) {
             Log.d(TAG, "handleActionConnectionStateChanged AVRCP connected");
+            result = "AVRCP connected";
         } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
             Log.d(TAG, "handleActionConnectionStateChanged AVRCP disconnected");
             mSearchItems.clear();
             mNowPlayingItems.clear();
             mFolderItems.clear();
+            result = "AVRCP disconnected";
+        } else {
+            result = "AVRCP state: " + state;
         }
+
+        showTestResult(result);
     }
 
     private void handleActionTrackEvent(Intent intent) {

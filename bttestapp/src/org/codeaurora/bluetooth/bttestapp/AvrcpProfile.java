@@ -302,6 +302,24 @@ public class AvrcpProfile {
     public static final String CUSTOM_ACTION_BROWSE_UP =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_BROWSE_UP";
 
+    /**
+     * Custom action to release AVRCP connection.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * @param Bundle wrapped with {@link #BluetoothDevice.EXTRA_DEVICE}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link android.media.MediaMetadata}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_RELEASE_CONNECTION =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_RELEASE_CONNECTION";
+
     // + Response for custom action
 
     /**
@@ -367,7 +385,6 @@ public class AvrcpProfile {
     public static final String NOW_PLAYING_PREFIX = "NOW_PLAYING";
     public static final String PLAYER_PREFIX = "PLAYER";
     public static final String SEARCH_PREFIX = "SEARCH";
-    public static final int INVALID_PLAYER_ID = -1;
 
     public static final int MEDIA_ATTR_ID_INVALID = -1;
     public static final int MEDIA_ATTR_ID_TITLE = 0x00000001;
@@ -379,6 +396,8 @@ public class AvrcpProfile {
     public static final int MEDIA_ATTR_ID_PLAYING_TIME = 0x00000007;
     public static final int MEDIA_ATTR_ID_COVER_ART = 0x00000008;
     public static final int MAX_NUM_MEDIA_ATTR_ID = 8;
+
+    public static final int INVALID_PLAYER_ID = -1;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -583,6 +602,13 @@ public class AvrcpProfile {
         Bundle extras = new Bundle();
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_BROWSE_UP, extras);
+    }
+
+    public void releaseConnection(BluetoothDevice device) {
+        Log.d(TAG, "releaseConnection device: " + device);
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        sendCustomAction(CUSTOM_ACTION_RELEASE_CONNECTION, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {
