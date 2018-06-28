@@ -1,4 +1,4 @@
-/ndleSetAddressedPlayerResp*
+/*
  * Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -460,9 +460,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         switch (scope) {
             case AvrcpProfile.BROWSE_SCOPE_VFS:
-                Log.d(TAG, "Get item attributes in VFS, folder: " +
-                    folder + ", position: " + position);
-                result = getItemAttributes(scope, mFolderItems, folder, position);
+                if ((folder != null) && !folder.isEmpty()) {
+                    Log.d(TAG, "Get item attributes in VFS, folder: " +
+                        folder + ", position: " + position);
+                    result = getItemAttributes(scope, mFolderItems, folder, position);
+                } else {
+                    // Send GetElementAttributes for PLAYING
+                    getItemAttributes(scope, null);
+                    result = true;
+                }
                 break;
 
             case AvrcpProfile.BROWSE_SCOPE_SEARCH:
@@ -1112,13 +1118,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private void getItemAttributes(int scope, String mediaId) {
+        int[] attributeId = {
+            AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+        };
+        getItemAttributes(scope, mediaId, attributeId);
+    }
+
+    private void getItemAttributes(int scope, String mediaId, int[] attributeId) {
         if (mAvrcp == null) {
             Log.e(TAG, " Service not connected ");
             return;
         }
 
         try {
-            mAvrcp.getItemAttributes(scope, mediaId);
+            mAvrcp.getItemAttributes(scope, mediaId, attributeId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

@@ -209,6 +209,8 @@ public class AvrcpProfile {
      */
     public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ITEM_ATTR";
+    public static final String KEY_BROWSE_SCOPE = "scope";
+    public static final String KEY_ATTRIBUTE_ID = "attribute_id";
 
     /**
      * Custom action to get total number of items.
@@ -227,7 +229,6 @@ public class AvrcpProfile {
      */
     public static final String CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
-    public static final String KEY_BROWSE_SCOPE = "scope";
 
     /**
      * Custom action to set addressed player
@@ -316,6 +317,17 @@ public class AvrcpProfile {
     public static final String PLAYER_PREFIX = "PLAYER";
     public static final String SEARCH_PREFIX = "SEARCH";
     public static final int INVALID_PLAYER_ID = -1;
+
+    public static final int MEDIA_ATTR_ID_INVALID = -1;
+    public static final int MEDIA_ATTR_ID_TITLE = 0x00000001;
+    public static final int MEDIA_ATTR_ID_ARTIST = 0x00000002;
+    public static final int MEDIA_ATTR_ID_ALBUM = 0x00000003;
+    public static final int MEDIA_ATTR_ID_TRACK_NUM = 0x00000004;
+    public static final int MEDIA_ATTR_ID_NUM_TRACKS = 0x00000005;
+    public static final int MEDIA_ATTR_ID_GENRE = 0x00000006;
+    public static final int MEDIA_ATTR_ID_PLAYING_TIME = 0x00000007;
+    public static final int MEDIA_ATTR_ID_COVER_ART = 0x00000008;
+    public static final int MAX_NUM_MEDIA_ATTR_ID = 8;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -477,11 +489,12 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_ADD_TO_NOW_PLAYING, extras);
     }
 
-    public void getItemAttributes(int scope, String mediaId) {
+    public void getItemAttributes(int scope, String mediaId, int[] attributeId) {
         Log.d(TAG, "getItemAttributes scope: " + scope + ", mediaId: " + mediaId);
         Bundle extras = new Bundle();
         extras.putInt(KEY_BROWSE_SCOPE, scope);
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        extras.putIntArray(KEY_ATTRIBUTE_ID, attributeId);
         sendCustomAction(CUSTOM_ACTION_GET_ITEM_ATTR, extras);
     }
 
