@@ -284,6 +284,24 @@ public class AvrcpProfile {
     public static final String CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE =
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE";
 
+    /**
+     * Custom action to browse up.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * @param Bundle wrapped with {@link MediaMetadata.METADATA_KEY_MEDIA_ID}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link android.media.MediaMetadata}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_BROWSE_UP =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_BROWSE_UP";
+
     // + Response for custom action
 
     /**
@@ -558,6 +576,13 @@ public class AvrcpProfile {
         Bundle extras = new Bundle();
         extras.putInt(KEY_PDU_ID, pduId);
         sendCustomAction(CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE, extras);
+    }
+
+    public void browseUp(String mediaId) {
+        Log.d(TAG, "browseUp mediaId: " + mediaId);
+        Bundle extras = new Bundle();
+        extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        sendCustomAction(CUSTOM_ACTION_BROWSE_UP, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {

@@ -153,6 +153,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         // AddToNowPlaying
         TEST_CMD_ADD_TO_NOW_PLAYING,
 
+        // ChangePath(FolderUp)
+        TEST_CMD_BROWSE_UP,
+
         // GetAudioConfig
         TEST_CMD_GET_AUDIO_CONFIG,
 
@@ -407,6 +410,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_ADD_TO_NOW_PLAYING:
                 handleAddToNowPlaying();
                 break;
+            case TEST_CMD_BROWSE_UP:
+                handleBrowseUp();
+                break;
             case TEST_CMD_GET_AUDIO_CONFIG:
                 handleGetAudioConfig();
                 break;
@@ -479,6 +485,24 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void handleBrowseUp() {
+        String folder = getFolder();
+        int scope = getScope();
+
+        Log.d(TAG, "handleBrowseUp scope: " + scope + ", folder: " + folder);
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Log.d(TAG, "handleBrowseUp in VFS");
+                browseUp(mFolderItems, folder);
+                break;
+
+            default:
+                Log.w(TAG, "Ignore to browse up in scope: " + scope);
+                break;
+        }
+    }
+
     private void handleGetItemAttributes() {
         boolean result = false;
         String folder = getFolder();
@@ -529,7 +553,6 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private void handleGetTotalNumOfItems() {
         int scope = getScope();
         Log.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
-
         getTotalNumberOfItems(scope);
     }
 
@@ -582,6 +605,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_ABORT_CONTINUING_RESPONSE;
         } else if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
             cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
+        } else if (str.equals(this.getString(R.string.avrcp_browse_up))) {
+            cmd = TestCmd.TEST_CMD_BROWSE_UP;
         } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
             cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
         } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
@@ -763,6 +788,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         boolean enableItemPosition = false;
         boolean enableValue = false;
         String value = "";
+        String folder = "";
         TestCmd cmd = getTestCmd();
         Log.d(TAG, "updateTestCmdUI " + cmd);
 
@@ -774,11 +800,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 enableValue = true;
                 value = TEST_PDU_ID;
                 break;
-
             case TEST_CMD_ADD_TO_NOW_PLAYING:
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
                 enableScope = true;
                 enableFolder = true;
+                folder = TEST_FOLDER;
                 enableItemPosition = true;
                 break;
             case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
@@ -790,6 +816,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 break;
             case TEST_CMD_SET_ADDRESSED_PLAYER:
                 enableItemPosition = true;
+                break;
+            case TEST_CMD_BROWSE_UP:
+                enableScope = true;
+                enableFolder = true;
+                folder = TEST_FOLDER;
                 break;
             case TEST_CMD_GET_PLAY_STATUS:
             case TEST_CMD_GET_AUDIO_CONFIG:
@@ -815,7 +846,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (enableFolder) {
             Log.d(TAG, "Enable folder ");
             mEditFolder.setEnabled(true);
-            mEditFolder.setText(TEST_FOLDER);
+            mEditFolder.setText(folder);
         } else {
             Log.d(TAG, "Disable folder ");
             mEditFolder.setText("");
@@ -1244,6 +1275,35 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private boolean browseUp(HashMap<String, List<MediaItem>> folderItems, String folder) {
+        String mediaId = null;
+        Log.d(TAG, "browseUp folder: " + folder);
+
+        // Get folder's MediaId
+        mediaId = getMediaId(folderItems, folder);
+        Log.d(TAG, "browseUp mediaId: " + mediaId);
+        if (mediaId == null) {
+            return false;
+        }
+
+        browseUp(mediaId);
+        return true;
+    }
+
+    private void browseUp(String mediaId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.browseUp(mediaId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
     private void setAddressedPlayer(List<MediaItem> playerList, int position) {
         Log.d(TAG, "setAddressedPlayer position: " + position);
         MediaItem item = getMediaItem(playerList, position);
@@ -1472,6 +1532,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                     handleGetTotalNumOfItemsResp(intent);
                 } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_SET_ADDRESSED_PLAYER)) {
                     handleSetAddressedPlayerResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_BROWSE_UP)) {
+                    handleBrowseUpResp(intent);
                 }
             } else {
                 String str = getCustomActionResult(cmd, result);
@@ -1502,6 +1564,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private void handleSetAddressedPlayerResp(Intent intent) {
         Log.d(TAG, "handleSetAddressedPlayerResp " + intent);
         showTestResult("SetAddressedPlayer succeed");
+    }
+
+    private void handleBrowseUpResp(Intent intent) {
+        Log.d(TAG, "handleBrowseUpResp " + intent);
+        showTestResult("ChangePath(FolderUp) succeed");
     }
 
     private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
