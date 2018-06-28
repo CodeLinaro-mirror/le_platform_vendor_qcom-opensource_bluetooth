@@ -408,6 +408,7 @@
     <string name="avrcp_add_to_now_playing">AddToNowPlaying</string>
     <string name="avrcp_get_audio_config">GetAudioConfig</string>
     <string name="avrcp_get_supported_features">GetSupportedFeatures</string>
+    <string name="avrcp_set_addr_player">SetAddressedPlayer</string>
     <string name="avrcp_get_current_pas">GetCurrentPas</string>
     <string name="avrcp_equalizer_title">Equalizer:</string>
     <string name="avrcp_repeat_title">Repeat:</string>
@@ -415,12 +416,13 @@
     <string name="avrcp_scan_title">Scan:</string>
     <string-array name="array_test_cmd">
         <item>@string/avrcp_add_to_now_playing</item>
+        <item>@string/avrcp_get_audio_config</item>
         <item>@string/avrcp_get_item_attr</item>
         <item>@string/avrcp_get_play_status</item>
+        <item>@string/avrcp_get_supported_features</item>
         <item>@string/avrcp_get_total_num</item>
         <item>@string/avrcp_search</item>
-        <item>@string/avrcp_get_audio_config</item>
-        <item>@string/avrcp_get_supported_features</item>
+        <item>@string/avrcp_set_addr_player</item>
     </string-array>
     <string-array name="array_equalizer">
         <item>Off</item>

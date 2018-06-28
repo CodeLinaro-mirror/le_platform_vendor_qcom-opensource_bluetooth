@@ -229,6 +229,27 @@ public class AvrcpProfile {
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
     public static final String KEY_BROWSE_SCOPE = "scope";
 
+    /**
+     * Custom action to set addressed player
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * <p>Intent {@link #ACTION_CUSTOM_ACTION_RESULT} will be broadcast to notify the result.
+     * {@link AvrcpControllerService} will update NowPlaying list if succeed.
+     *
+     * @param Bundle wrapped with {@link #KEY_PLAYER_ID}, {@link #MediaMetadata.METADATA_KEY_MEDIA_ID}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_SET_ADDRESSED_PLAYER =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SET_ADDRESSED_PLAYER";
+    public static final String KEY_PLAYER_ID = "player_id";
+
     // + Response for custom action
 
     /**
@@ -294,6 +315,7 @@ public class AvrcpProfile {
     public static final String NOW_PLAYING_PREFIX = "NOW_PLAYING";
     public static final String PLAYER_PREFIX = "PLAYER";
     public static final String SEARCH_PREFIX = "SEARCH";
+    public static final int INVALID_PLAYER_ID = -1;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -470,6 +492,14 @@ public class AvrcpProfile {
         sendCustomAction(CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS, extras);
     }
 
+    public void setAddressedPlayer(int id, String mediaId) {
+        Log.d(TAG, "setAddressedPlayer player id: " + id + ", mediaId: " + mediaId);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_PLAYER_ID, id);
+        extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        sendCustomAction(CUSTOM_ACTION_SET_ADDRESSED_PLAYER, extras);
+    }
+
     private void sendCustomAction(String action, Bundle extras) {
         if (mMediaController != null) {
             Log.d(TAG, "sendCustomAction, action: " + action + ", extras: " + extras);
@@ -507,6 +537,16 @@ public class AvrcpProfile {
 
     public static boolean isSearch(String parentId) {
         return parentId.startsWith(SEARCH_PREFIX);
+    }
+
+    public static int getPlayerId(String mediaId) {
+        int playerId = INVALID_PLAYER_ID;
+        Log.d(TAG, "getPlayerId mediaId=" + mediaId);
+        if (mediaId != null) {
+            String playerIdStr = mediaId.substring(PLAYER_PREFIX.length());
+            playerId = Integer.parseInt(playerIdStr);
+        }
+        return playerId;
     }
 
     public void sendNextGroupCmd(BluetoothDevice device) {

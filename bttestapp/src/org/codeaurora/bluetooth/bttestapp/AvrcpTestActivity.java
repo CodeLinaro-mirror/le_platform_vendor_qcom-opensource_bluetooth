@@ -1,4 +1,4 @@
-/*
+/ndleSetAddressedPlayerResp*
  * Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -119,6 +119,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private List<MediaItem> mSearchItems = new ArrayList<MediaItem>();
     private List<MediaItem> mNowPlayingItems = new ArrayList<MediaItem>();
     private boolean mGetPlayStatus = false;
+    private boolean mAvailOfMediaPlayers = false;
 
     /*
      * Hash map. key: pas attribute value, value: pas attribute value in string
@@ -147,11 +148,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         // AddToNowPlaying
         TEST_CMD_ADD_TO_NOW_PLAYING,
 
+        // GetAudioConfig
+        TEST_CMD_GET_AUDIO_CONFIG,
+
         // GetItemAttributes
         TEST_CMD_GET_ITEM_ATTRIBUTES,
 
         // GetPlayStatus
         TEST_CMD_GET_PLAY_STATUS,
+
+        // GetSupportedFeatures
+        TEST_CMD_GET_SUPPORTED_FEATTURES,
 
         // GetTotalNumberOfItems
         TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
@@ -159,11 +166,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         // Search
         TEST_CMD_SEARCH,
 
-        // GetAudioConfig
-        TEST_CMD_GET_AUDIO_CONFIG,
-
-        // GetSupportedFeatures
-        TEST_CMD_GET_SUPPORTED_FEATTURES
+        // SetAddressedPlayer
+        TEST_CMD_SET_ADDRESSED_PLAYER,
     }
 
     private final ServiceConnection mAvrcpConnection = new ServiceConnection() {
@@ -392,8 +396,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_ADD_TO_NOW_PLAYING:
                 handleAddToNowPlaying();
                 break;
+            case TEST_CMD_GET_AUDIO_CONFIG:
+                handleGetAudioConfig();
+                break;
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
                 handleGetItemAttributes();
+                break;
+            case TEST_CMD_GET_SUPPORTED_FEATTURES:
+                handleGetSupportedFeatures();
                 break;
             case TEST_CMD_GET_PLAY_STATUS:
                 handleGetPlayStatus();
@@ -404,11 +414,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_SEARCH:
                 handleSearch();
                 break;
-            case TEST_CMD_GET_AUDIO_CONFIG:
-                handleGetAudioConfig();
-                break;
-            case TEST_CMD_GET_SUPPORTED_FEATTURES:
-                handleGetSupportedFeatures();
+            case TEST_CMD_SET_ADDRESSED_PLAYER:
+                handleSetAddressedPlayer();
                 break;
             default:
                 Log.w(TAG, "handleClickBtnTestCmd unknown cmd: " + cmd);
@@ -502,6 +509,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
     }
 
+    private void handleSetAddressedPlayer() {
+        int position = getItemPosition();
+        Log.d(TAG, "handleSetAddressedPlayer position: " + position);
+        setAddressedPlayer(mPlayerItems, position);
+    }
+
     private void handleGetAudioConfig() {
         Log.d(TAG, "handleGetAudioConfig device: " + mDevice);
         BluetoothAudioConfig audioConfig = getAudioConfig(mDevice);
@@ -533,18 +546,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
             cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
+        } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
+            cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
         } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
             cmd = TestCmd.TEST_CMD_GET_ITEM_ATTRIBUTES;
         } else if (str.equals(this.getString(R.string.avrcp_get_play_status))) {
             cmd = TestCmd.TEST_CMD_GET_PLAY_STATUS;
+        } else if (str.equals(this.getString(R.string.avrcp_get_supported_features))) {
+            cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
         } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
             cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
         } else if (str.equals(this.getString(R.string.avrcp_search))) {
             cmd = TestCmd.TEST_CMD_SEARCH;
-        } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
-            cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
-        } else if (str.equals(this.getString(R.string.avrcp_get_supported_features))) {
-            cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
+        } else if (str.equals(this.getString(R.string.avrcp_set_addr_player))) {
+            cmd = TestCmd.TEST_CMD_SET_ADDRESSED_PLAYER;
         }
 
         Log.d(TAG, "getTestCmd " + cmd);
@@ -715,6 +730,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 break;
             case TEST_CMD_SEARCH:
                 enableQuery = true;
+                break;
+            case TEST_CMD_SET_ADDRESSED_PLAYER:
+                enableItemPosition = true;
                 break;
             case TEST_CMD_GET_PLAY_STATUS:
             case TEST_CMD_GET_AUDIO_CONFIG:
@@ -1045,7 +1063,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if ((list == null) ||
             (position == INVALID_ITEM_POSITION) ||
             (position >= list.size())) {
-            Log.w(TAG, "getMediaItem exceed max size ");
+            Log.w(TAG, "getMediaItem exceed max size");
             return null;
         }
 
@@ -1060,8 +1078,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (position != INVALID_ITEM_POSITION) {
             MediaItem item = getMediaItem(folderItems, folder, position);
             if (item == null) {
-                Log.e(TAG, "getItemAttributes, MediaItem null");
-                showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+                Log.e(TAG, "getItemAttributes, item null");
+                showTestResult("Can't find item, position " + position + " exceed max size");
                 return false;
             }
             // Get element's MediaId
@@ -1084,9 +1102,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         Log.d(TAG, "getItemAttributes position: " + position);
         MediaItem item = getMediaItem(list, position);
         if (item == null) {
-            Log.e(TAG, "getItemAttributes, MediaItem null");
-            showTestResult("Can't find MediaItem, position " + position +
-                " exceed max size " + list.size());
+            Log.e(TAG, "getItemAttributes, item null");
+            showTestResult("Can't find item, position " + position + " exceed max size");
             return false;
         }
 
@@ -1116,8 +1133,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (position != INVALID_ITEM_POSITION) {
             MediaItem item = getMediaItem(folderItems, folder, position);
             if (item == null) {
-                Log.e(TAG, "addToNowPlaying, MediaItem null");
-                showTestResult("Can't find MediaItem, position " + position + " exceed max size ");
+                Log.e(TAG, "addToNowPlaying, item null");
+                showTestResult("Can't find item, position " + position + " exceed max size");
                 return false;
             }
             // Get element's MediaId
@@ -1140,9 +1157,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         Log.d(TAG, "addToNowPlaying scope: " + scope + ", position: " + position);
         MediaItem item = getMediaItem(list, position);
         if (item == null) {
-            Log.e(TAG, "addToNowPlaying, MediaItem null");
-            showTestResult("Can't find MediaItem, position " + position +
-                " exceed max size " + list.size());
+            Log.e(TAG, "addToNowPlaying, item null");
+            showTestResult("Can't find item, position " + position + " exceed max size");
             return false;
         }
 
@@ -1158,6 +1174,40 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         try {
             mAvrcp.addToNowPlaying(scope, mediaId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void setAddressedPlayer(List<MediaItem> playerList, int position) {
+        Log.d(TAG, "setAddressedPlayer position: " + position);
+        MediaItem item = getMediaItem(playerList, position);
+        if (item == null) {
+            Log.e(TAG, "setAddressedPlayer, player null");
+            showTestResult("Can't find player, position " + position + " exceed max size");
+            return;
+        }
+
+        String mediaId = item.getMediaId();
+        int id = AvrcpProfile.getPlayerId(mediaId);
+
+        if (id != AvrcpProfile.INVALID_PLAYER_ID) {
+            setAddressedPlayer(id, mediaId);
+        } else {
+            Log.e(TAG, "setAddressedPlayer, invalid player id");
+            showTestResult("invalid player id");
+        }
+    }
+
+    private void setAddressedPlayer(int id, String mediaId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.setAddressedPlayer(id, mediaId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
@@ -1328,6 +1378,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                     handleAddToNowPlayingResp(intent);
                 } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS)) {
                     handleGetTotalNumOfItemsResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_SET_ADDRESSED_PLAYER)) {
+                    handleSetAddressedPlayerResp(intent);
                 }
             } else {
                 String str = getCustomActionResult(cmd, result);
@@ -1353,6 +1405,11 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
         Log.d(TAG, "handleActionGetTotalNumOfItems " + items);
         showTestResult(Integer.toString(items));
+    }
+
+    private void handleSetAddressedPlayerResp(Intent intent) {
+        Log.d(TAG, "handleSetAddressedPlayerResp " + intent);
+        showTestResult("SetAddressedPlayer succeed");
     }
 
     private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
