@@ -205,7 +205,7 @@
             android:text="@string/avrcp_query"
             style="@style/textview_normal" />
         <EditText
-            android:id="@+id/id_edit_query"
+            android:id="@+id/id_edit_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"

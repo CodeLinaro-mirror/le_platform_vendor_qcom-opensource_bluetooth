@@ -94,7 +94,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private RadioGroup mScopes;
     private EditText mEditFolder;
     private EditText mEditItemPosition;
-    private EditText mEditQuery;
+    private EditText mEditValue;
 
     private Button mBtnGetCurrentPas;
     private Spinner mSpEqualizer;
@@ -136,14 +136,19 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private static final int TIMEOUT_IN_MS = 1000;
 
     private static final int INVALID_ITEM_POSITION = -1;
+    private static final int INVALID_PDU_ID = -1;
 
     private static final String TEST_FOLDER = "Songs";
     private static final String TEST_ITEM_POSITION = "0";  // The 1st item
     private static final String TEST_QUERY = "You";
+    private static final String TEST_PDU_ID = "20";    // PDU ID for GetElementAttributes (0x20)
 
     // Test command definition
     enum TestCmd {
         INVALID_TEST_CMD,
+
+        // AbortContinuingResponse
+        TEST_CMD_ABORT_CONTINUING_RESPONSE,
 
         // AddToNowPlaying
         TEST_CMD_ADD_TO_NOW_PLAYING,
@@ -162,6 +167,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         // GetTotalNumberOfItems
         TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
+
+        // RequestContinuingResponse
+        TEST_CMD_REQUEST_CONTINUING_RESPONSE,
 
         // Search
         TEST_CMD_SEARCH,
@@ -248,7 +256,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mScopes.setOnCheckedChangeListener(this);
         mEditFolder = (EditText) initEditText(R.id.id_edit_folder, TEST_FOLDER);
         mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, TEST_ITEM_POSITION);
-        mEditQuery = initEditText(R.id.id_edit_query, TEST_QUERY);
+        mEditValue = initEditText(R.id.id_edit_value, "");
 
         mBtnGetCurrentPas = initButton(R.id.id_btn_get_current_pas);
         mSpEqualizer = initSpinner(R.id.id_sp_equalizer);
@@ -393,6 +401,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         clearTestResult();
 
         switch (cmd) {
+            case TEST_CMD_ABORT_CONTINUING_RESPONSE:
+                handleAbortContinuingResponse();
+                break;
             case TEST_CMD_ADD_TO_NOW_PLAYING:
                 handleAddToNowPlaying();
                 break;
@@ -411,6 +422,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
                 handleGetTotalNumOfItems();
                 break;
+            case TEST_CMD_REQUEST_CONTINUING_RESPONSE:
+                handleRequestContinuingResponse();
+                break;
             case TEST_CMD_SEARCH:
                 handleSearch();
                 break;
@@ -420,6 +434,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             default:
                 Log.w(TAG, "handleClickBtnTestCmd unknown cmd: " + cmd);
                 break;
+        }
+    }
+
+    private void handleAbortContinuingResponse() {
+        int pduId = getPduId();
+        Log.d(TAG, "handleAbortContinuingResponse pduId: " + pduId);
+        abortContinuingResponse(pduId);
+    }
+
+    private void handleRequestContinuingResponse() {
+        int pduId = getPduId();
+        Log.d(TAG, "handleRequestContinuingResponse pduId: " + pduId);
+        if (pduId != INVALID_PDU_ID) {
+            requestContinuingResponse(pduId);
         }
     }
 
@@ -506,7 +534,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     }
 
     private void handleSearch() {
-        String query = mEditQuery.getText().toString();
+        String query = mEditValue.getText().toString();
         Log.d(TAG, "handleSearch, query: " + query);
         if ((query != null) && !query.isEmpty()) {
             search(query);
@@ -550,7 +578,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         String str = mSpTestCmd.getSelectedItem().toString();
         TestCmd cmd = TestCmd.INVALID_TEST_CMD;
 
-        if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
+        if (str.equals(this.getString(R.string.avrcp_abort_conti_resp))) {
+            cmd = TestCmd.TEST_CMD_ABORT_CONTINUING_RESPONSE;
+        } else if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
             cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
         } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
             cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
@@ -562,6 +592,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
         } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
             cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
+        } else if (str.equals(this.getString(R.string.avrcp_request_conti_resp))) {
+            cmd = TestCmd.TEST_CMD_REQUEST_CONTINUING_RESPONSE;
         } else if (str.equals(this.getString(R.string.avrcp_search))) {
             cmd = TestCmd.TEST_CMD_SEARCH;
         } else if (str.equals(this.getString(R.string.avrcp_set_addr_player))) {
@@ -615,6 +647,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         }
 
         return position;
+    }
+
+    private int getPduId() {
+        String str = mEditValue.getText().toString();
+        int pduId = INVALID_PDU_ID;
+
+        if ((str != null) && !str.isEmpty()) {
+            pduId = Integer.parseInt(str, 16);
+        }
+
+        return pduId;
     }
 
     @Override
@@ -718,13 +761,20 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         boolean enableScope = false;
         boolean enableFolder = false;
         boolean enableItemPosition = false;
-        boolean enableQuery = false;
+        boolean enableValue = false;
+        String value = "";
         TestCmd cmd = getTestCmd();
         Log.d(TAG, "updateTestCmdUI " + cmd);
 
         clearTestResult();
 
         switch (cmd) {
+            case TEST_CMD_ABORT_CONTINUING_RESPONSE:
+            case TEST_CMD_REQUEST_CONTINUING_RESPONSE:
+                enableValue = true;
+                value = TEST_PDU_ID;
+                break;
+
             case TEST_CMD_ADD_TO_NOW_PLAYING:
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
                 enableScope = true;
@@ -735,7 +785,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 enableScope = true;
                 break;
             case TEST_CMD_SEARCH:
-                enableQuery = true;
+                enableValue = true;
+                value = TEST_QUERY;
                 break;
             case TEST_CMD_SET_ADDRESSED_PLAYER:
                 enableItemPosition = true;
@@ -781,14 +832,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             mEditItemPosition.setEnabled(false);
         }
 
-        if (enableQuery) {
-            Log.d(TAG, "Enable query ");
-            mEditQuery.setEnabled(true);
-            mEditQuery.setText(TEST_QUERY);
+        if (enableValue) {
+            Log.d(TAG, "Enable value ");
+            mEditValue.setEnabled(true);
+            mEditValue.setText(value);
         } else {
-            Log.d(TAG, "Disable query ");
-            mEditQuery.setText("");
-            mEditQuery.setEnabled(false);
+            Log.d(TAG, "Disable value ");
+            mEditValue.setText("");
+            mEditValue.setEnabled(false);
         }
     }
 
@@ -1249,6 +1300,34 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         try {
             mAvrcp.getTotalNumberOfItems(scope);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void requestContinuingResponse(int pduId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.requestContinuingResponse(pduId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void abortContinuingResponse(int pduId) {
+        if (mAvrcp == null) {
+            Log.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.abortContinuingResponse(pduId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();

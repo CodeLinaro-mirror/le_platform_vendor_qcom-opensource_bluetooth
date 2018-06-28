@@ -251,6 +251,39 @@ public class AvrcpProfile {
         "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SET_ADDRESSED_PLAYER";
     public static final String KEY_PLAYER_ID = "player_id";
 
+    /**
+     * Custom action to request for continuing response packets.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * @param Bundle wrapped with {@link #KEY_PDU_ID}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     */
+    public static final String CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE";
+    public static final String KEY_PDU_ID = "pdu_id";
+
+    /**
+     * Custom action to abort continuing response.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * @param Bundle wrapped with {@link #KEY_PDU_ID}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     */
+    public static final String CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE";
+
     // + Response for custom action
 
     /**
@@ -511,6 +544,20 @@ public class AvrcpProfile {
         extras.putInt(KEY_PLAYER_ID, id);
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_SET_ADDRESSED_PLAYER, extras);
+    }
+
+    public void requestContinuingResponse(int pduId) {
+        Log.d(TAG, "requestContinuingResponse pduId: " + pduId);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_PDU_ID, pduId);
+        sendCustomAction(CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE, extras);
+    }
+
+    public void abortContinuingResponse(int pduId) {
+        Log.d(TAG, "abortContinuingResponse pduId: " + pduId);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_PDU_ID, pduId);
+        sendCustomAction(CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE, extras);
     }
 
     private void sendCustomAction(String action, Bundle extras) {
