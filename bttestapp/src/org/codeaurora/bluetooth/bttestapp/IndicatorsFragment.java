@@ -43,9 +43,12 @@ import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
 import org.codeaurora.bluetooth.bttestapp.R;
 
 public class IndicatorsFragment extends Fragment implements OnClickListener {
+
+    private final static String TAG = "IndicatorsFragment";
 
     private HfpTestActivity mActivity;
 
@@ -78,7 +81,6 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.indicators_fragment, null);
-
         mIndConnState = (ToggleButton) view.findViewById(R.id.ind_conn_state);
         mIndConnState.setOnClickListener(this);
         mIndAudioState = (ToggleButton) view.findViewById(R.id.ind_audio_state);
@@ -185,9 +187,10 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
             TextView barInd = null;
 
             if (param.equals(BluetoothHeadsetClient.EXTRA_VOICE_RECOGNITION)) {
-
+                Logger.v(TAG,"EXTRA_VOICE_RECOGNITION:" + params.getInt(param));
                 boolean enabled = (params.getInt(param) != 0);
                 mIndVrState.setChecked(enabled);
+                mIndVrState.setText("VR:"+ (enabled ? "start":"stop"));
                 mIndVrState.setEnabled(mActivity.mFeatVoiceRecognition);
 
             } else if (param.equals(BluetoothHeadsetClient.EXTRA_IN_BAND_RING)) {
@@ -366,26 +369,41 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
     }
 
     public void onClickConnState(boolean state) {
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
+
         if (state) {
-            mActivity.mBluetoothHeadsetClient.disconnect(mActivity.mDevice);
+            headsetClient.disconnect(mActivity.mDevice);
         } else {
-            mActivity.mBluetoothHeadsetClient.connect(mActivity.mDevice);
+            headsetClient.connect(mActivity.mDevice);
         }
     }
 
     public void onClickAudioState(boolean state) {
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
+
         if (state) {
-         //   mActivity.mBluetoothHeadsetClient.disconnectAudio();
+            headsetClient.disconnectAudio(mActivity.mDevice);
         } else {
-          //  mActivity.mBluetoothHeadsetClient.connectAudio();
+            headsetClient.connectAudio(mActivity.mDevice);
         }
     }
 
     public void onClickVrState(boolean state) {
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
+
         if (state) {
-            mActivity.mBluetoothHeadsetClient.stopVoiceRecognition(mActivity.mDevice);
+            headsetClient.stopVoiceRecognition(mActivity.mDevice);
         } else {
-            mActivity.mBluetoothHeadsetClient.startVoiceRecognition(mActivity.mDevice);
+            headsetClient.startVoiceRecognition(mActivity.mDevice);
         }
         mIndVrState.setEnabled(false);
     }

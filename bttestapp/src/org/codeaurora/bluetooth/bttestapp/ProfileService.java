@@ -113,9 +113,8 @@ public class ProfileService extends Service {
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
-    private BluetoothHeadsetClient mHfpClient = null;
-
     private AvrcpProfile mAvrcp;
+    private HfpProfile mHfp;
 
     private HashMap<Integer, BluetoothMasClient> mMapClients = null;
 
@@ -499,30 +498,14 @@ public class ProfileService extends Service {
         }
     };
 
-    private final ServiceListener mHfpServiceListener = new ServiceListener() {
-        @Override
-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            if (profile == BluetoothProfile.HEADSET_CLIENT) {
-                mHfpClient = (BluetoothHeadsetClient) proxy;
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(int profile) {
-            if (profile == BluetoothProfile.HEADSET_CLIENT) {
-                mHfpClient = null;
-            }
-        }
-    };
-
     private void checkAndStop(boolean unbind, boolean disconnect) {
         boolean canStop = true;
 
         Log.v(TAG, "checkAndStop(): unbind=" + unbind + " disconnect=" + disconnect);
 
         if (unbind) {
-            if (mHfpClient != null &&
-                mHfpClient.getConnectionState(mDevice) != BluetoothProfile.STATE_DISCONNECTED) {
+            if (mHfp != null &&
+                mHfp.getHeadsetClient().getConnectionState(mDevice) != BluetoothProfile.STATE_DISCONNECTED) {
                 canStop = false;
             }
 
@@ -582,10 +565,8 @@ public class ProfileService extends Service {
 
         mContext = getApplicationContext();
 
-        mAdapter.getProfileProxy(mContext, mHfpServiceListener,
-                BluetoothProfile.HEADSET_CLIENT);
-
         mAvrcp = new AvrcpProfile(mContext);
+        mHfp = new HfpProfile(mContext);
     }
 
     @Override
@@ -599,9 +580,6 @@ public class ProfileService extends Service {
     public void onDestroy() {
         Log.v(TAG, "onDestroy");
 
-        mAdapter.closeProfileProxy(BluetoothProfile.HEADSET_CLIENT,
-                mHfpClient);
-
         unregisterReceiver(mReceiver);
 
         for (BluetoothMasClient cli : mMapClients.values()) {
@@ -614,8 +592,8 @@ public class ProfileService extends Service {
             return;
         }
 
-        if (mHfpClient != null) {
-            mHfpClient.disconnect(mDevice);
+        if (mHfp != null) {
+            mHfp.getHeadsetClient().disconnect(mDevice);
         }
 
         for (BluetoothMasClient cli : mMapClients.values()) {
@@ -636,12 +614,12 @@ public class ProfileService extends Service {
         mMapSessionData = new HashMap<Integer, MapSessionData>();
     }
 
-    public BluetoothHeadsetClient getHfpClient() {
-        return mHfpClient;
-    }
-
     public AvrcpProfile getAvrcpProfile() {
         return mAvrcp;
+    }
+
+    public HfpProfile getHfpProfile() {
+        return mHfp;
     }
 
     public void setMasInstances(SdpMasRecord masrec) {

@@ -59,7 +59,7 @@ import java.util.ArrayList;
 
 public class MainActivity extends MonkeyActivity {
 
-    private final String TAG = "MainActivity";
+    private final static String TAG = "MainActivity";
 
     public static final String PREF_DEVICE = "device";
     public static final String PREF_SERVICES = "services";

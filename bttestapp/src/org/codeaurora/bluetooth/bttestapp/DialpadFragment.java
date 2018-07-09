@@ -31,6 +31,7 @@ package org.codeaurora.bluetooth.bttestapp;
 
 import android.app.Activity;
 import android.app.Fragment;
+import android.bluetooth.BluetoothHeadsetClient;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -52,9 +53,12 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
 import org.codeaurora.bluetooth.bttestapp.R;
 
 public class DialpadFragment extends Fragment implements OnClickListener, OnLongClickListener {
+
+    private final static String TAG = "DialpadFragment";
 
     private HfpTestActivity mActivity;
 
@@ -236,11 +240,14 @@ public class DialpadFragment extends Fragment implements OnClickListener, OnLong
 
     private void onClickDialpadButton(int position, boolean shift) {
         @SuppressWarnings("unchecked")
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
         Pair<String, String> bval = (Pair<String, String>) mButtonsGrid.getItemAtPosition(position);
 
         if (mDtmfButton.isChecked()) {
-            mActivity.mBluetoothHeadsetClient.sendDTMF(mActivity.mDevice,
-                    bval.first.getBytes()[0]);
+            headsetClient.sendDTMF(mActivity.mDevice, bval.first.getBytes()[0]);
         } else {
             if (shift) {
                 mNumberEdit.append(bval.second.trim());
@@ -260,20 +267,26 @@ public class DialpadFragment extends Fragment implements OnClickListener, OnLong
     }
 
     private void onClickDial() {
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
+
         String number = mNumberEdit.getText().toString().trim();
 
-        if (number.isEmpty()) {
-           // mActivity.mBluetoothHeadsetClient.redial(mActivity.mDevice);
-        } else {
-           // mActivity.mBluetoothHeadsetClient.dial(mActivity.mDevice, mNumberEdit.getText()
-           //         .toString());
-        }
+        /* BT stack will trigger calling the last phone number if the current number is empty */
+        headsetClient.dial(mActivity.mDevice, number);
     }
 
     private void onClickMemDial() {
+        HfpProfile hfp = mActivity.mHfpProfile;
+        if (hfp == null) {
+            return;
+        }
+
         try {
-           // mActivity.mBluetoothHeadsetClient.dialMemory(mActivity.mDevice,
-           //         Integer.valueOf(mNumberEdit.getText().toString()));
+            int location = Integer.valueOf(mNumberEdit.getText().toString());
+            hfp.memDial(mActivity.mDevice, location);
         } catch (NumberFormatException e) {
             // just ignore
         }

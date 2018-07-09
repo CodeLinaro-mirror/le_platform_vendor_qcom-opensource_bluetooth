@@ -268,7 +268,8 @@ public class ServicesFragment extends ListFragment {
             if (mActivity.mProfileService != null) {
                 switch (srv.mType) {
                     case HFP: {
-                        BluetoothHeadsetClient cli = mActivity.mProfileService.getHfpClient();
+                        HfpProfile hfp = mActivity.mProfileService.getHfpProfile();
+                        BluetoothHeadsetClient cli = hfp.getHeadsetClient();
 
                         if (cli == null || bluetoothOn == false) {
                             swSrv.setChecked(false);
@@ -409,15 +410,15 @@ public class ServicesFragment extends ListFragment {
             if (mActivity.mProfileService != null) {
                 switch (srv.mType) {
                     case HFP:
+                        HfpProfile hfp = mActivity.mProfileService.getHfpProfile();
                         if (isChecked) {
-                            if (mActivity.mProfileService.getHfpClient() != null) {
-                                mActivity.mProfileService.getHfpClient().connect(mActivity.mDevice);
+                            if (hfp != null) {
+                                hfp.getHeadsetClient().connect(mActivity.mDevice);
                             }
                             buttonView.setEnabled(false);
                         } else {
-                            if (mActivity.mProfileService.getHfpClient() != null) {
-                                mActivity.mProfileService.getHfpClient()
-                                        .disconnect(mActivity.mDevice);
+                            if (hfp != null) {
+                                hfp.getHeadsetClient().disconnect(mActivity.mDevice);
                             }
                             buttonView.setEnabled(false);
                         }
@@ -516,10 +517,10 @@ public class ServicesFragment extends ListFragment {
                 break;
              */
             case HFP:
-                if (mActivity.mProfileService.getHfpClient() != null)
+                if (mActivity.mProfileService.getHfpProfile() != null)
                     intent = new Intent(getActivity(), HfpTestActivity.class);
                 else {
-                    Log.v(TAG, "HfpClient service is null");
+                    Log.w(TAG, "HfpClient service is null");
                     return;
                 }
                 break;
@@ -528,7 +529,7 @@ public class ServicesFragment extends ListFragment {
                 if (mActivity.mProfileService.getAvrcpProfile() != null) {
                     intent = new Intent(getActivity(), AvrcpTestActivity.class);
                 } else {
-                    Log.d(TAG, "BluetoothAvrcpController is null");
+                    Log.w(TAG, "BluetoothAvrcpController is null");
                     return;
                 }
                 break;

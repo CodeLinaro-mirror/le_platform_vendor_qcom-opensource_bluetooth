@@ -63,7 +63,7 @@ import java.util.Hashtable;
 public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnectionObserver,
         CallHistoryDialogListener {
 
-    private final String TAG = "HfpTestActivity";
+    private final static String TAG = "HfpTestActivity";
 
     private DialpadFragment mDialpadFragment = null;
 
@@ -77,7 +77,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
 
     private Hashtable<Integer, BluetoothHeadsetClientCall> mCalls;
 
-   // this should be visible for fragments
+    HfpProfile mHfpProfile;
     BluetoothHeadsetClient mBluetoothHeadsetClient;
     ProfileService mProfileService = null;
     BluetoothDevice mDevice;
@@ -282,7 +282,8 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
         public void onServiceConnected(ComponentName name, IBinder service) {
             Logger.v(TAG, "onServiceConnected()");
             mProfileService = ((ProfileService.LocalBinder) service).getService();
-            mBluetoothHeadsetClient = mProfileService.getHfpClient();
+            mHfpProfile = mProfileService.getHfpProfile();
+            mBluetoothHeadsetClient = mHfpProfile.getHeadsetClient();
 
             int connState = mBluetoothHeadsetClient.getConnectionState(mDevice);
 
