@@ -3155,7 +3155,7 @@ static bt_status_t search_cmd_vendor(bt_bdaddr_t *bd_addr, uint16_t length, uint
     {
         avrc_cmd.search.string.p_str = osi_malloc(length+1);
         memset(avrc_cmd.search.string.p_str, 0, length+1);
-        strncpy((char*)avrc_cmd.search.string.p_str, (char*)string, length+1);
+        strlcpy((char*)avrc_cmd.search.string.p_str, (char*)string, length+1);
     }
 
     status = AVRC_BldCommand(&avrc_cmd, &p_msg);
