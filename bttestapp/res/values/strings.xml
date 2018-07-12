@@ -338,6 +338,7 @@
     <string name="call_action_hold">Hold</string>
     <string name="call_action_respond_and_hold">Respond and hold</string>
     <string name="call_action_private_mode">Private mode</string>
+    <string name="call_action_release_call">Release call</string>
     <string name="call_action_explicit_transfer">Explicit transfer</string>
 
         <!-- HFP result codes messages -->

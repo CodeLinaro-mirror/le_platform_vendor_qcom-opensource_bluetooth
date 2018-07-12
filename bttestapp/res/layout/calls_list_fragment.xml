@@ -121,6 +121,13 @@
                 android:text="@string/call_action_private_mode" />
 
             <Button
+                android:id="@+id/call_action_release_call"
+                android:layout_height="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="@string/call_action_release_call" />
+
+            <Button
                 android:id="@+id/call_action_explicit_transfer"
                 android:layout_height="wrap_content"
                 android:layout_width="0dp"

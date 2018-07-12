@@ -78,6 +78,8 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
 
     private Button mActionPrivateMode;
 
+    private Button mActionReleaseCall;
+
     private Button mActionExplicitTransfer;
 
     private class CallsAdapter extends BaseAdapter {
@@ -244,6 +246,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         mActionHold = (Button) view.findViewById(R.id.call_action_hold);
         mActionRespondAndHold = (Button) view.findViewById(R.id.call_action_respond_and_hold);
         mActionPrivateMode = (Button) view.findViewById(R.id.call_action_private_mode);
+        mActionReleaseCall = (Button) view.findViewById(R.id.call_action_release_call);
         mActionExplicitTransfer = (Button) view.findViewById(R.id.call_action_explicit_transfer);
 
         mActionAccept.setEnabled(false);
@@ -254,6 +257,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         mActionHold.setEnabled(false);
         mActionRespondAndHold.setEnabled(false);
         mActionPrivateMode.setEnabled(false);
+        mActionReleaseCall.setEnabled(false);
         mActionExplicitTransfer.setEnabled(false);
 
         mActionAccept.setOnClickListener(this);
@@ -264,6 +268,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         mActionHold.setOnClickListener(this);
         mActionRespondAndHold.setOnClickListener(this);
         mActionPrivateMode.setOnClickListener(this);
+        mActionReleaseCall.setOnClickListener(this);
         mActionExplicitTransfer.setOnClickListener(this);
 
         return view;
@@ -299,6 +304,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
     @Override
     public void onClick(View v) {
         BluetoothHeadsetClient cli = mActivity.mBluetoothHeadsetClient;
+        HfpProfile hfp = mActivity.mHfpProfile;
         BluetoothDevice device = mActivity.mDevice;
         CallsAdapter adapter = (CallsAdapter) mCallsList.getAdapter();
         BluetoothHeadsetClientCall selectedCall = adapter.getSelected();
@@ -350,6 +356,11 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
                 result = cli.enterPrivateMode(device, selectedCall.getId());
                 break;
 
+            case R.id.call_action_release_call:
+                // Extended function to release call
+                result = hfp.releaseCall(device, selectedCall.getId());
+                break;
+
             case R.id.call_action_explicit_transfer:
                 result = cli.explicitCallTransfer(device);
                 break;
@@ -387,6 +398,7 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         boolean canTerminate = false;
         boolean canRespondAndHold = false;
         boolean canHold = false;
+        boolean canRelease = false;
 
         boolean hasIncoming = adapter.hasCallsInState(BluetoothHeadsetClientCall.CALL_STATE_INCOMING);
         boolean hasActive = adapter.hasCallsInState(BluetoothHeadsetClientCall.CALL_STATE_ACTIVE);
@@ -406,6 +418,12 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         if (hasActive || adapter.hasCallsInState(BluetoothHeadsetClientCall.CALL_STATE_ALERTING,
                                                 BluetoothHeadsetClientCall.CALL_STATE_DIALING)) {
             canTerminate = true;
+        }
+
+        if (hasActive) {
+            if (mActivity.mFeatEnhancedCallControl && selectedCall != null) {
+                canRelease = true;
+            }
         }
 
         if (hasHeld) {
@@ -476,6 +494,8 @@ public class CallsListFragment extends Fragment implements OnClickListener, OnIt
         mActionHold.setEnabled(canHold);
 
         mActionPrivateMode.setEnabled(mActivity.mFeatEnhancedCallControl && selectedCall != null && selectedCall.isMultiParty());
+
+        mActionReleaseCall.setEnabled(canRelease);
 
         mActionExplicitTransfer.setEnabled(mActivity.mFeatMergeDetach && (adapter.getCount() > 1));
     }

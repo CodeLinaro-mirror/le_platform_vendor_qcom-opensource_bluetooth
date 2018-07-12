@@ -93,6 +93,18 @@ public class HfpProfile {
         "android.bluetooth.headsetclient.CUSTOM_ACTION_MEM_DIAL";
     public static final String KEY_LOCATION = "location";
 
+    /**
+     * Custom action to release specific active call
+     *
+     * @param Bundle wrapped with
+     *  {@link #KEY_COMMAND}
+     *  {@link #BluetoothDevice.EXTRA_DEVICE}
+     *  {@link #KEY_CALL_INDEX}
+     */
+    public static final String CUSTOM_ACTION_RELEASE_CALL =
+        "android.bluetooth.headsetclient.CUSTOM_ACTION_RELEASE_CALL";
+    public static final String KEY_CALL_INDEX = "index";
+
     // + Response for custom action
 
     /**
@@ -155,10 +167,18 @@ public class HfpProfile {
         return mHeadsetClient;
     }
 
-    public void memDial(BluetoothDevice device, int location) {
+    public boolean memDial(BluetoothDevice device, int location) {
         Bundle extras = createBundle(CUSTOM_ACTION_MEM_DIAL, device);
         extras.putInt(KEY_LOCATION, location);
         sendCustomAction(extras);
+        return true;
+    }
+
+    public boolean releaseCall(BluetoothDevice device, int index) {
+        Bundle extras = createBundle(CUSTOM_ACTION_RELEASE_CALL, device);
+        extras.putInt(KEY_CALL_INDEX, index);
+        sendCustomAction(extras);
+        return true;
     }
 
     private void sendCustomAction(Bundle extras) {
