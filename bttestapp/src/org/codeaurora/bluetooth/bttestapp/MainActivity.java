@@ -120,19 +120,21 @@ public class MainActivity extends MonkeyActivity {
 
                 if (uuids != null) {
                     for (Parcelable uuid : uuids) {
-                         Log.v(TAG, "Received UUID: " + uuid.toString());
-                       /* if (BluetoothUuid.PBAP_PSE.equals(uuid)) {
+                        Log.v(TAG, "Received UUID: " + uuid.toString());
+                        if (BluetoothUuid.PBAP_PSE.equals(uuid)) {
+                            Log.d(TAG, "Adding PBAP");
                             mServicesFragment.addService(ServicesFragment.Service.Type.PBAP, null);
-                        } else */if (BluetoothUuid.Handsfree_AG.equals(uuid)) {
+                        } else if (BluetoothUuid.Handsfree_AG.equals(uuid)) {
+                            Log.d(TAG, "Adding HFP");
                             mServicesFragment.addService(ServicesFragment.Service.Type.HFP, null);
                         } else if (BluetoothUuid.AvrcpTarget.equals(uuid) ||
                                     BluetoothUuid.AudioSource.equals(uuid) ||
                                     BluetoothUuid.AudioSink.equals(uuid)) {
-                            Log.v(TAG, "Adding AVRCP");
+                            Log.d(TAG, "Adding A2DP/AVRCP");
                             mServicesFragment.addService(ServicesFragment.Service.Type.AVRCP, null);
                         }
                         if (BluetoothUuid.AvrcpController.equals(uuid)) {
-                            Log.v(TAG, "Adding AVRCP");
+                            Log.d(TAG, "Adding AVRCP");
                             mServicesFragment.addService(ServicesFragment.Service.Type.AVRCP, null);
                         }
                     }

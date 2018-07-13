@@ -30,7 +30,6 @@
 package org.codeaurora.bluetooth.bttestapp.services;
 
 import com.android.vcard.VCardEntry;
-import android.bluetooth.client.pbap.BluetoothPbapCard;
 
 import java.util.ArrayList;
 
@@ -38,28 +37,29 @@ public interface IPbapServiceCallback {
 
     void onSetPhoneBookDone();
 
-    void onPullPhoneBookDone(ArrayList<VCardEntry> list, int missedCalls);
+    void onPullPhoneBookDone(int phonebookSize, int missedCalls);
 
-    void onPullVcardListingDone(ArrayList<BluetoothPbapCard> list, int missedCalls);
+    void onPullVcardListingDone(ArrayList<String> vcardListing, int phonebookSize, int missedCalls);
 
-    void onPullVcardEntryDone(VCardEntry vcard);
+    void onPullVcardEntryDone(String vcard);
 
-    void onPullPhoneBookSizeDone(int size, int type);
+    void onAbortDone();
 
-    void onSetPhoneBookError();
+    void onSetPhoneBookError(int result);
 
-    void onPullPhoneBookError();
+    void onPullPhoneBookError(int result);
 
-    void onPullVcardListingError();
+    void onPullVcardListingError(int result);
 
-    void onPullVcardEntryError();
+    void onPullVcardEntryError(int result);
 
-    void onPullPhoneBookSizeError();
+    void onPullPhoneBookSizeError(int result);
 
-    void onPullVcardListingSizeError();
+    void onPullVcardListingSizeError(int result);
+
+    void onAbortError(int result);
 
     void onSessionConnected();
 
     void onSessionDisconnected();
-
 }

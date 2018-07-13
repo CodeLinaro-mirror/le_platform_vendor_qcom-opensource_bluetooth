@@ -5,9 +5,7 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_SRC_FILES := \
         $(call all-java-files-under, src)
-LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/PbapTestActivity.java,$(LOCAL_SRC_FILES))
-LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/services/IPbapServiceCallback.java,$(LOCAL_SRC_FILES))
-LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/services/PbapAuthAcitivty.java,$(LOCAL_SRC_FILES))
+
 LOCAL_PACKAGE_NAME := BTTestApp
 LOCAL_CERTIFICATE := platform
 

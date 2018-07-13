@@ -14,8 +14,11 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
+    <protected-broadcast android:name="com.android.bluetooth.a2dpsink.mbs.action.CUSTOM_ACTION_RESULT" />
     <protected-broadcast android:name="android.bluetooth.headsetclient.action.CUSTOM_ACTION" />
     <protected-broadcast android:name="android.bluetooth.headsetclient.action.CUSTOM_ACTION_RESULT" />
+    <protected-broadcast android:name="android.bluetooth.pbapclient.action.CUSTOM_ACTION" />
+    <protected-broadcast android:name="android.bluetooth.pbapclient.action.CUSTOM_ACTION_RESULT" />
 
     <uses-sdk
         android:minSdkVersion="17"
@@ -55,10 +58,10 @@
             android:name=".AvrcpTestActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:launchMode="singleTop" />
-        <!--activity
+        <activity
             android:name=".PbapTestActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
-            android:launchMode="singleTop" /-->
+            android:launchMode="singleTop" />
         <activity
             android:name=".MapTestActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"

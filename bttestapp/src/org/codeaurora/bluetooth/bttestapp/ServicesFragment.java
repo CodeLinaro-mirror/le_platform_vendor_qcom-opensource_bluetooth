@@ -512,10 +512,14 @@ public class ServicesFragment extends ListFragment {
         if (BluetoothAdapter.getDefaultAdapter().isEnabled() == false) return;
 
         switch (srv.mType) {
-            /*case PBAP:
-                intent = new Intent(getActivity(), PbapTestActivity.class);
-                break;
-             */
+            case PBAP:
+                if (mActivity.mProfileService.getPbapProfile() != null) {
+                    intent = new Intent(getActivity(), PbapTestActivity.class);
+                    break;
+                } else {
+                    Log.w(TAG, "PbapClient service is null");
+                    return;
+                }
             case HFP:
                 if (mActivity.mProfileService.getHfpProfile() != null)
                     intent = new Intent(getActivity(), HfpTestActivity.class);

@@ -33,11 +33,18 @@ import android.app.ActionBar.Tab;
 import android.app.ActionBar.TabListener;
 import android.app.FragmentTransaction;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothPbapClient;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.view.LayoutInflater;
@@ -54,18 +61,22 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ViewFlipper;
+import android.util.Log;
 
 import com.android.vcard.VCardEntry;
-import android.bluetooth.client.pbap.BluetoothPbapCard;
-import android.bluetooth.client.pbap.BluetoothPbapClient;
+import com.android.vcard.VCardEntry.NameData;
+import com.android.vcard.VCardConstants;
+import com.android.vcard.VCardProperty;
 import org.codeaurora.bluetooth.bttestapp.R;
 import org.codeaurora.bluetooth.bttestapp.services.IPbapServiceCallback;
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
 import org.codeaurora.bluetooth.bttestapp.util.MonkeyEvent;
+import org.codeaurora.bluetooth.bttestapp.PbapProfile;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -75,17 +86,34 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private final String TAG = "PbapTestActivity";
 
+    private static final int MSG_UNKNOWN = -1;
+
+    // Message for PBAP connection
+    private static final int MSG_DISCONNECTED = 0;
+    private static final int MSG_CONNECTED = 1;
+
+    // Message for custom action response
+    private static final int MSG_PULL_PHONEBOOK_RESP = 80;
+    private static final int MSG_PULL_VCARD_LISTING_RESP = 81;
+    private static final int MSG_PULL_VCARD_ENTRY_RESP = 82;
+    private static final int MSG_SET_PHONEBOOK_RESP = 83;
+    private static final int MSG_ABORT_RESP = 84;
+
+    // "telecom/cch.vcf"
+    private static final int DEFAULT_PHONEBOOK_POSITION = 4;
+
     /*
      * Class constants.
      */
     private static final int REQUEST_CODE_GET_FILTER_FOR_DOWNLOAD_TAB = 0;
     private static final int REQUEST_CODE_GET_FILTER_FOR_VCARD_TAB = 1;
 
-    private ArrayDeque<String> mSetPathQueue = null;
-
-    private static final short MAX_COUNT_DEFAULT_VALUE = 0;
+    private static final short MAX_COUNT_DEFAULT_VALUE = 10;
     private static final short OFFSET_DEFAULT_VALUE = 0;
-    private static final String HANDLE_DEFAULT_VALUE = "0.vcf";
+    private static final String HANDLE_DEFAULT_VALUE = "1";  // with suffix ".vcf"
+    private static final String VCF_SUFFIX = ".vcf";
+
+    private BluetoothDevice mDevice = null;
 
     /*
      * Common UI.
@@ -96,12 +124,13 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
      * Download functionality UI.
      */
     private Spinner mDownloadSpinner = null;
+    private RadioGroup mRadioGroupFormat = null;
     private RadioButton mRadioButtonVCard21 = null;
     private RadioButton mRadioButtonVCard30 = null;
     private EditText mEditTextDownloadMaxListCount = null;
     private EditText mEditTextDownloadOffsetValue = null;
     private Button mButtonFilter = null;
-    private Button mButtonDownloadSearch = null;
+    private Button mButtonDownload = null;
 
     private ProgressBar mDownloadProgressBar = null;
     private TextView mTextViewDownloadNothingFound = null;
@@ -119,6 +148,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private RadioButton mRadioButtonOrderPhonetic = null;
     private Button mButtonBrowseSearch = null;
 
+    private Spinner mBrowseSpinner = null;
     private ProgressBar mBrowseProgressBar = null;
     private TextView mTextViewBrowseNothingFound = null;
     private ListView mListViewBrowseContacts = null;
@@ -134,17 +164,20 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
      * Download local variables.
      */
     private long mDownloadValueFilter = 0;
-    private byte mDownloadValueCardType = BluetoothPbapClient.VCARD_TYPE_21;
+    private byte mDownloadValueCardType = PbapProfile.VCARD_TYPE_21;
     private int mDownloadValueMaxCount = MAX_COUNT_DEFAULT_VALUE;
     private int mDownloadValueOffset = OFFSET_DEFAULT_VALUE;
+    private int mPhonebookSize = 0;
+    private int mNewMissedCalls = 0;
 
     /*
      * Browse local variables.
      */
-    private byte mBrowseValueOrder = BluetoothPbapClient.ORDER_BY_DEFAULT;
-    private byte mBrowseValueSearchAttr = BluetoothPbapClient.SEARCH_ATTR_NAME;
+    private byte mBrowseValueOrder = PbapProfile.ORDER_INDEXED;
+    private byte mBrowseValueSearchAttr = PbapProfile.SEARCH_ATTR_NAME;
     private int mBrowseValueMaxCount = MAX_COUNT_DEFAULT_VALUE;
     private int mBrowseValueOffset = OFFSET_DEFAULT_VALUE;
+    private boolean mSetPhoneBookButtonClicked = false;
 
     /*
      * Action bar tabs.
@@ -158,7 +191,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
      */
     private String mVcardHandleValue = HANDLE_DEFAULT_VALUE;
     private long mVcardValueFilter = 0;
-    private byte mVcardValueCardType = BluetoothPbapClient.VCARD_TYPE_21;
+    private byte mVcardValueCardType = PbapProfile.VCARD_TYPE_30;
 
     /*
      * Download adapter.
@@ -178,162 +211,139 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
      * Browse adapter.
      */
     private BluetoothPbapCardAdapter mBluetoothPbapCardAdapter = null;
+    private BluetoothPbapVcardListingAdapter mBluetoothPbapVcardListingAdapter = null;
 
     OnItemClickListener mOnBrowseItemClickListener = new OnItemClickListener() {
         @Override
         public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-            BluetoothPbapCard pbacpCard = (BluetoothPbapCard) parent.getAdapter().getItem(position);
-            if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-                mProfileService.getPbapClient().pullVcardEntry(pbacpCard.handle);
-            }
+            VCardEntry pbapCard = (VCardEntry) parent.getAdapter().getItem(position);
+            // FIXME: Not supported
+            String vcardHandle = null;
+            pullVcardEntry(vcardHandle);
         }
     };
 
     /*
      * PBAP Service.
      */
-    private ProfileService mProfileService = null;
+    private PbapProfile mPbap = null;
     private final IPbapServiceCallback mPbapServiceCallback = new IPbapServiceCallback() {
 
         @Override
         public void onSetPhoneBookDone() {
-            if (mSetPathQueue != null && mSetPathQueue.size() > 0) {
-                String next = mSetPathQueue.removeFirst();
-
-                setPhonebookFolder(next);
-            } else {
-                new MonkeyEvent("pbap-setphonebook", true).send();
+            if (mSetPhoneBookButtonClicked) {
+                mSetPhoneBookButtonClicked = false;
+                showToastShort("SetPhoneBook done");
             }
+
+            new MonkeyEvent("pbap-setphonebook", true).send();
         }
 
         @Override
-        public void onPullPhoneBookDone(ArrayList<VCardEntry> list, int missedCalls) {
-            mVCardEntryAdapter.clear();
-            mVCardEntryAdapter.addAll(list);
+        public void onPullPhoneBookDone(int phonebookSize, int missedCalls) {
+            // vCard has been stored into Contact DB.
+            storeResponse(phonebookSize, missedCalls);
 
             stopProgressBarDownload();
 
-            /* send event for monkeyrunner */
-            MonkeyEvent evt = new MonkeyEvent("pbap-pullphonebook", true);
-            evt.addReplyParam("size", list.size());
-            for (VCardEntry card : list) {
-                evt.addExtReply(BluetoothPbapCard.jsonifyVcardEntry(card));
-            }
-            evt.send();
+            showToastLong("PhonebookSize=" + phonebookSize + ", NewMissedCalls=" + missedCalls);
 
-            Toast.makeText(PbapTestActivity.this, "Missed calls=" + missedCalls, Toast.LENGTH_SHORT)
-                    .show();
+            cleanResponse();
         }
 
         @Override
-        public void onPullVcardListingDone(ArrayList<BluetoothPbapCard> list, int missedCalls) {
-            mBluetoothPbapCardAdapter.clear();
-            mBluetoothPbapCardAdapter.addAll(list);
+        public void onPullVcardListingDone(ArrayList<String> vcardListing, int phonebookSize, int missedCalls) {
+            storeResponse(phonebookSize, missedCalls);
+
+            if (vcardListing != null) {
+                mBluetoothPbapVcardListingAdapter.clear();
+                mBluetoothPbapVcardListingAdapter.addAll(vcardListing);
+            }
+
             stopProgressBarBrowse();
 
-            /* send event for monkeyrunner */
-            new MonkeyEvent("pbap-pullvcardlisting", true)
-                    .addReplyParam("size", list.size())
-                    .addExtReply(list)
-                    .send();
+            showToastShort("PhonebookSize=" + phonebookSize + ", NewMissedCalls=" + missedCalls);
 
-            Toast.makeText(PbapTestActivity.this, "Missed calls=" + missedCalls, Toast.LENGTH_SHORT)
-                    .show();
+            cleanResponse();
         }
 
         @Override
-        public void onPullVcardEntryDone(VCardEntry vcard) {
-            Logger.v(TAG, "onReceivedPbapPullVcardEntryDone()");
+        public void onPullVcardEntryDone(String vcard) {
+            Logger.d(TAG, "onReceivedPbapPullVcardEntryDone()");
+            showToastShort("PullVcardEntry done { " + getContactInfo(vcard) + " }");
 
-            /* send event for monkeyrunner */
-            new MonkeyEvent("pbap-pullvcardentry", true)
-                    .addExtReply(BluetoothPbapCard.jsonifyVcardEntry(vcard))
-                    .send();
+            VCardEntry vcardEntry = createVcardEntry(vcard);
 
-            mVcardView.setVCardEntry(vcard);
+            mVcardView.setVCardEntry(vcardEntry);
             mActionBar.selectTab(mVcardTab);
         }
 
         @Override
-        public void onPullPhoneBookSizeDone(int size, int type) {
-            /* send event for monkeyrunner */
-            if (type == 0) {
-                new MonkeyEvent("pbap-pullphonebook-size", true)
-                        .addReplyParam("size", size)
-                        .send();
-            } else {
-                new MonkeyEvent("pbap-pullvcardlisting-size", true)
-                        .addReplyParam("size", size)
-                        .send();
-            }
-
-            Toast.makeText(PbapTestActivity.this, "size=" + size, Toast.LENGTH_SHORT).show();
+        public void onAbortDone() {
+            showToastLong("PBAP session abort done");
         }
 
         @Override
-        public void onSetPhoneBookError() {
-            Logger.e(TAG, "Received from PBAP set phone book error.");
-
-            mSetPathQueue = null;
+        public void onSetPhoneBookError(int result) {
+            showResult("SetPhoneBook", result);
 
             new MonkeyEvent("pbap-setphonebook", false).send();
         }
 
         @Override
-        public void onPullPhoneBookError() {
+        public void onPullPhoneBookError(int result) {
             Logger.e(TAG, "Received from PBAP pull phone book error.");
             stopProgressBarDownload();
             mListViewDownloadContacts.setVisibility(View.GONE);
-            Toast.makeText(PbapTestActivity.this, "PullPhoneBook FAILED", Toast.LENGTH_LONG).show();
+            showResult("PullPhoneBook", result);
             new MonkeyEvent("pbap-pullphonebook", false).send();
         }
 
         @Override
-        public void onPullVcardListingError() {
+        public void onPullVcardListingError(int result) {
             Logger.e(TAG, "Received from PBAP listing error.");
             stopProgressBarBrowse();
             mListViewBrowseContacts.setVisibility(View.GONE);
-            Toast.makeText(PbapTestActivity.this, "PullvCardListing FAILED", Toast.LENGTH_LONG)
-                    .show();
+            showResult("PullvCardListing", result);
             new MonkeyEvent("pbap-pullvcardlisting", false).send();
         }
 
         @Override
-        public void onPullVcardEntryError() {
+        public void onPullVcardEntryError(int result) {
             Logger.e(TAG, "Received from PBAP vCard entry error.");
-            Toast.makeText(PbapTestActivity.this, "PullvCardEntry FAILED", Toast.LENGTH_LONG)
-                    .show();
+            showResult("PullvCardEntry", result);
             new MonkeyEvent("pbap-pullvcardentry", false).send();
         }
 
         @Override
-        public void onPullPhoneBookSizeError() {
+        public void onPullPhoneBookSizeError(int result) {
             Logger.e(TAG, "Received from PBAP pull phone book size error.");
-            Toast.makeText(PbapTestActivity.this, "PullPhoneBook size FAILED", Toast.LENGTH_LONG)
-                    .show();
+            showResult("PullPhoneBookSize", result);
             new MonkeyEvent("pbap-pullphonebook-size", false).send();
         }
 
         @Override
-        public void onPullVcardListingSizeError() {
-            Logger.e(TAG, "Received from PBAP pull vCard listing sizeerror.");
-            Toast.makeText(PbapTestActivity.this, "PullvCardListing size FAILED", Toast.LENGTH_LONG)
-                    .show();
+        public void onPullVcardListingSizeError(int result) {
+            Logger.e(TAG, "Received from PBAP pull vCard listing size error.");
+            showResult("PullvCardListingSize", result);
             new MonkeyEvent("pbap-pullvcardlisting-size", false).send();
         }
 
         @Override
+        public void onAbortError(int result) {
+            showResult("PBAP session abort", result);
+        }
+
+        @Override
         public void onSessionConnected() {
-            Toast.makeText(PbapTestActivity.this, "PBAP session connected", Toast.LENGTH_SHORT)
-                    .show();
+            showToastShort("PBAP session connected");
             invalidateOptionsMenu();
             setButtonsVisible(true);
         }
 
         @Override
         public void onSessionDisconnected() {
-            Toast.makeText(PbapTestActivity.this, "PBAP session disconnected", Toast.LENGTH_SHORT)
-                    .show();
+            showToastShort("PBAP session disconnected");
             invalidateOptionsMenu();
             setButtonsVisible(false);
         }
@@ -345,40 +355,72 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private final ServiceConnection mPbapServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Logger.v(TAG, "onServiceConnected()");
-            mProfileService = ((ProfileService.LocalBinder) service).getService();
+            Logger.d(TAG, "onServiceConnected()");
 
-            if (mProfileService != null) {
-                mProfileService.setPbapCallback(mPbapServiceCallback);
-                if (mProfileService.getPbapClient() != null) {
-                    if (mProfileService.getPbapClient().getState() == BluetoothPbapClient.ConnectionState.CONNECTED)
-                        setButtonsVisible(true);
-                }
-            }
+            ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
+            mPbap = profileService.getPbapProfile();
 
-            ProfileService.PbapSessionData pbap = mProfileService.getPbapSessionData();
-
-            if (pbap.pullPhoneBook != null) {
-                mVCardEntryAdapter.clear();
-                mVCardEntryAdapter.addAll(pbap.pullPhoneBook);
-                stopProgressBarDownload();
-            }
-
-            if (pbap.pullVcardListing != null) {
-                mBluetoothPbapCardAdapter.clear();
-                mBluetoothPbapCardAdapter.addAll(pbap.pullVcardListing);
-                stopProgressBarBrowse();
-            }
-
-            if (pbap.pullVcardEntry != null) {
-                mVcardView.setVCardEntry(pbap.pullVcardEntry);
-            }
+            setButtonsVisible(true);
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            Logger.v(TAG, "onServiceDisconnected()");
-            mProfileService = null;
+            Logger.d(TAG, "onServiceDisconnected()");
+            mPbap = null;
+        }
+    };
+
+    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            Log.i(TAG, "action " + action);
+            if (BluetoothPbapClient.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
+                handleActionConnectionStateChanged(intent);
+            } else if (PbapProfile.ACTION_CUSTOM_ACTION_RESULT.equals(action)) {
+                handleActionCustomActionResult(intent);
+            }
+        }
+    };
+
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            int what = msg.what;
+            Log.d(TAG, "handleMessage " + what);
+            switch (what) {
+                case MSG_DISCONNECTED:
+                    processDisconnected();
+                    break;
+
+                case MSG_CONNECTED:
+                    processConnected();
+                    break;
+
+                case MSG_PULL_PHONEBOOK_RESP:
+                    processPullPhonebookResp(msg.arg1, (Bundle) msg.obj);
+                    break;
+
+                case MSG_PULL_VCARD_LISTING_RESP:
+                    processPullVcardListingResp(msg.arg1, (Bundle) msg.obj);
+                    break;
+
+                case MSG_PULL_VCARD_ENTRY_RESP:
+                    processPullVcardEntryResp(msg.arg1, (Bundle) msg.obj);
+                    break;
+
+                case MSG_SET_PHONEBOOK_RESP:
+                    processSetPhonebookResp(msg.arg1, (Bundle) msg.obj);
+                    break;
+
+                case MSG_ABORT_RESP:
+                    processAbortResp(msg.arg1, (Bundle) msg.obj);
+                    break;
+
+                default:
+                    Log.e(TAG, "Unknown msg: " + msg.what);
+                    break;
+            }
         }
     };
 
@@ -389,7 +431,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void setButtonsVisible (boolean visible) {
         enableButton(R.id.pbap_download_filter_button, visible);
-        enableButton(R.id.pbap_download_search, visible);
+        enableButton(R.id.pbap_download, visible);
         enableButton(R.id.pbap_browse_search, visible);
         enableButton(R.id.pbap_download_getsize, visible);
         enableButton(R.id.pbap_download_abort, visible);
@@ -398,6 +440,13 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         enableButton(R.id.pbap_browse_set_phonebook, visible);
         enableButton(R.id.pbap_vcard_set_phonebook, visible);
         enableButton(R.id.pbap_vcard_get_vcard, visible);
+    }
+
+    private void initIntentFilter() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothPbapClient.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(PbapProfile.ACTION_CUSTOM_ACTION_RESULT);
+        registerReceiver(mReceiver, filter);
     }
 
     @Override
@@ -414,13 +463,15 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         prepareUserInterfaceVcard();
         setButtonsVisible (false);
 
-        mBluetoothPbapCardAdapter = new BluetoothPbapCardAdapter();
-        mListViewBrowseContacts.setAdapter(mBluetoothPbapCardAdapter);
+        mBluetoothPbapVcardListingAdapter = new BluetoothPbapVcardListingAdapter();
+        mListViewBrowseContacts.setAdapter(mBluetoothPbapVcardListingAdapter);
 
         mVCardEntryAdapter = new VCardEntryAdapter();
         mListViewDownloadContacts.setAdapter(mVCardEntryAdapter);
 
         BluetoothConnectionReceiver.registerObserver(this);
+
+        initIntentFilter();
 
         // bind to PBAP service
         Intent intent = new Intent(this, ProfileService.class);
@@ -441,20 +492,14 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     @Override
     protected void onDestroy() {
-    /*
+        /*
          * Going to call abort if any pending request is ongoing,
          * checks for the same are handled internally
-        */
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().abort();
-        } else {
-            Logger.e(TAG, "Not able to ABORT");
-        }
+         */
+        abort();
 
         super.onDestroy();
         Logger.v(TAG, "onDestroy()");
-
-        mProfileService.setPbapCallback(null);
 
         unbindService(mPbapServiceConnection);
         BluetoothConnectionReceiver.removeObserver(this);
@@ -478,18 +523,11 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
         getMenuInflater().inflate(R.menu.menu_pbap_test, menu);
 
-        if (mProfileService == null)
-        {
-            Logger.e(TAG, "mProfileSevice is null");
-            return false;
-        }
-
-        if (mProfileService.getPbapClient() != null) {
-            if (mProfileService.getPbapClient().getState() != BluetoothPbapClient.ConnectionState.DISCONNECTED) {
-                menu.findItem(R.id.menu_pbap_disconnect).setVisible(true);
-            } else {
-                menu.findItem(R.id.menu_pbap_connect).setVisible(true);
-            }
+        int state = getConnectionState();
+        if (state != BluetoothProfile.STATE_DISCONNECTED) {
+            menu.findItem(R.id.menu_pbap_disconnect).setVisible(true);
+        } else {
+            menu.findItem(R.id.menu_pbap_connect).setVisible(true);
         }
 
         return true;
@@ -499,12 +537,10 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.menu_pbap_connect:
-                if ((mProfileService != null) && (mProfileService.getPbapClient() != null))
-                    mProfileService.getPbapClient().connect();
+                connect();
                 break;
             case R.id.menu_pbap_disconnect:
-                if ((mProfileService != null) && (mProfileService.getPbapClient() != null))
-                    mProfileService.getPbapClient().disconnect();
+                disconnect();
                 break;
             default:
                 Logger.w(TAG, "Unknown item selected.");
@@ -548,6 +584,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void prepareUserInterfaceDownload() {
         mDownloadSpinner = (Spinner) findViewById(R.id.pbap_download_spinner);
+        mDownloadSpinner.setSelection(DEFAULT_PHONEBOOK_POSITION, true);
         mButtonFilter = (Button) findViewById(R.id.pbap_download_filter_button);
         mButtonFilter.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -567,12 +604,13 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         mEditTextDownloadOffsetValue = (EditText) findViewById(R.id.pbap_download_offset_value);
         mEditTextDownloadOffsetValue.setText(String.valueOf(mDownloadValueOffset));
 
+        mRadioGroupFormat = (RadioGroup) findViewById(R.id.pbap_download_formats);
         mRadioButtonVCard21 = (RadioButton) findViewById(R.id.pbap_download_vcard21);
         mRadioButtonVCard21.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButonVCard21.onClick()");
-                mDownloadValueCardType = BluetoothPbapClient.VCARD_TYPE_21;
+                mDownloadValueCardType = PbapProfile.VCARD_TYPE_21;
             }
         });
 
@@ -581,15 +619,15 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButonVCard30.onClick()");
-                mDownloadValueCardType = BluetoothPbapClient.VCARD_TYPE_30;
+                mDownloadValueCardType = PbapProfile.VCARD_TYPE_30;
             }
         });
 
-        mButtonDownloadSearch = (Button) findViewById(R.id.pbap_download_search);
-        mButtonDownloadSearch.setOnClickListener(new View.OnClickListener() {
+        mButtonDownload = (Button) findViewById(R.id.pbap_download);
+        mButtonDownload.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Logger.v(TAG, "mButtonDownloadSearch.onClick()");
+                Logger.v(TAG, "mButtonDownload.onClick()");
                 runPbapTestDownload();
             }
         });
@@ -604,12 +642,14 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     }
 
     private void prepareUserInterfaceBrowse() {
+        mBrowseSpinner = (Spinner) findViewById(R.id.pbap_browse_spinner);
+        mBrowseSpinner.setSelection(DEFAULT_PHONEBOOK_POSITION, true);
         mRadioButtonSearchName = (RadioButton) findViewById(R.id.pbap_browse_name);
         mRadioButtonSearchName.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonSearchName.onClick()");
-                mBrowseValueSearchAttr = BluetoothPbapClient.SEARCH_ATTR_NAME;
+                mBrowseValueSearchAttr = PbapProfile.SEARCH_ATTR_NAME;
             }
         });
 
@@ -618,7 +658,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonSearchNumber.onClick()");
-                mBrowseValueSearchAttr = BluetoothPbapClient.SEARCH_ATTR_NUMBER;
+                mBrowseValueSearchAttr = PbapProfile.SEARCH_ATTR_NUMBER;
             }
         });
 
@@ -627,7 +667,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonSearchSound.onClick()");
-                mBrowseValueSearchAttr = BluetoothPbapClient.SEARCH_ATTR_SOUND;
+                mBrowseValueSearchAttr = PbapProfile.SEARCH_ATTR_SOUND;
             }
         });
 
@@ -644,7 +684,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonOrderUnordered.onClick()");
-                mBrowseValueOrder = BluetoothPbapClient.ORDER_BY_DEFAULT;
+                mBrowseValueOrder = PbapProfile.ORDER_INDEXED;
             }
         });
 
@@ -653,7 +693,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonOrderAlphabetical.onClick()");
-                mBrowseValueOrder = BluetoothPbapClient.ORDER_BY_ALPHABETICAL;
+                mBrowseValueOrder = PbapProfile.ORDER_ALPHABETICAL;
             }
         });
 
@@ -662,7 +702,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonOrderIndexed.onClick()");
-                mBrowseValueOrder = BluetoothPbapClient.ORDER_BY_INDEXED;
+                mBrowseValueOrder = PbapProfile.ORDER_INDEXED;
             }
         });
 
@@ -671,7 +711,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             @Override
             public void onClick(View v) {
                 Logger.v(TAG, "mRadioButtonOrderPhonetic.onClick()");
-                mBrowseValueOrder = BluetoothPbapClient.ORDER_BY_PHONETIC;
+                mBrowseValueOrder = PbapProfile.ORDER_PHONETICAL;
             }
         });
 
@@ -695,6 +735,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void prepareUserInterfaceVcard() {
         mVcardSpinner = (Spinner) findViewById(R.id.pbap_vcard_spinner);
+        mVcardSpinner.setSelection(DEFAULT_PHONEBOOK_POSITION, true);
         mVcardView = (VcardView) findViewById(R.id.pbap_vcard_vcardview);
 
         mEditTextHandleValue = (EditText) findViewById(R.id.pbap_vcard_header);
@@ -771,39 +812,30 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     }
 
     private void runPbapTestDownload() {
-        Logger.v(TAG, "runPbapTestDownload()");
+        Logger.d(TAG, "runPbapTestDownload()");
 
-        try {
-            mDownloadValueMaxCount = Integer.parseInt(mEditTextDownloadMaxListCount.getText()
-                    .toString());
-        } catch (NumberFormatException e) {
-            mDownloadValueMaxCount = MAX_COUNT_DEFAULT_VALUE;
-        }
+        mDownloadValueCardType = getVcardFormat();
+        mDownloadValueMaxCount = getIntValue(mEditTextDownloadMaxListCount, MAX_COUNT_DEFAULT_VALUE);
+        mDownloadValueOffset = getIntValue(mEditTextDownloadOffsetValue, OFFSET_DEFAULT_VALUE);
 
-        try {
-            mDownloadValueOffset = Integer.parseInt(mEditTextDownloadOffsetValue.getText()
-                    .toString());
-        } catch (NumberFormatException e) {
-            mDownloadValueOffset = OFFSET_DEFAULT_VALUE;
-        }
+        Log.d(TAG, "runPbapTestDownload maxCount: " + mDownloadValueMaxCount +
+              ", offset: " + mDownloadValueOffset);
 
         // Refresh UI EditTexts value if some are blank after edit.
         mEditTextDownloadMaxListCount.setText(String.valueOf(mDownloadValueMaxCount));
         mEditTextDownloadOffsetValue.setText(String.valueOf(mDownloadValueOffset));
 
+        String pbName = mDownloadSpinner.getSelectedItem().toString();
+
         try {
-            if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-                if (mProfileService.getPbapClient().pullPhoneBook(
-                        mDownloadSpinner.getSelectedItem().toString(), mDownloadValueFilter,
-                        mDownloadValueCardType, mDownloadValueMaxCount, mDownloadValueOffset))
-                    startProgressBarDownload();
-            } else {
-                    Toast.makeText(this, "PullPhoneBook FAILED", Toast.LENGTH_LONG).show();
+            setPhoneBookRoot();
+
+            if (pullPhoneBook(pbName, mDownloadValueFilter, mDownloadValueCardType,
+                mDownloadValueMaxCount, mDownloadValueOffset)) {
+                startProgressBarDownload();
             }
         } catch (IllegalArgumentException e) {
-            Toast.makeText(this,
-                    "PullPhoneBook FAILED: illegal arguments (" + e.getMessage() + ")",
-                    Toast.LENGTH_LONG).show();
+            showToastLong("PullPhoneBook FAILED: illegal arguments (" + e.getMessage() + ")");
         }
     }
 
@@ -815,7 +847,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void stopProgressBarDownload() {
         mDownloadProgressBar.setVisibility(View.GONE);
-        if (mVCardEntryAdapter.getCount() == 0) {
+        if (mPhonebookSize <= 0) {
             mTextViewDownloadNothingFound.setVisibility(View.VISIBLE);
             mListViewDownloadContacts.setVisibility(View.GONE);
         } else {
@@ -825,50 +857,31 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     }
 
     private void runPbapTestBrowse() {
-        Logger.v(TAG, "runPbapTestBrowse()");
+        Logger.d(TAG, "runPbapTestBrowse()");
 
+        String path = getFolder(mBrowseSpinner);
         byte order = mBrowseValueOrder;
         String searchValue = mEditTextSearchValue.getText().toString();
-
-        try {
-            mBrowseValueMaxCount = Integer.parseInt(mEditTextBrowseMaxListCount.getText()
-                    .toString());
-        } catch (NumberFormatException e) {
-            mBrowseValueMaxCount = MAX_COUNT_DEFAULT_VALUE;
-        }
-
-        try {
-            mBrowseValueOffset = Integer.parseInt(mEditTextBrowseOffsetValue.getText().toString());
-        } catch (NumberFormatException e) {
-            mBrowseValueOffset = OFFSET_DEFAULT_VALUE;
-        }
+        mBrowseValueMaxCount = getIntValue(mEditTextBrowseMaxListCount, MAX_COUNT_DEFAULT_VALUE);
+        mBrowseValueOffset = getIntValue(mEditTextBrowseOffsetValue, OFFSET_DEFAULT_VALUE);
 
         // Refresh UI EditTexts value if some are blank after edit.
         mEditTextBrowseMaxListCount.setText(String.valueOf(mBrowseValueMaxCount));
         mEditTextBrowseOffsetValue.setText(String.valueOf(mBrowseValueOffset));
 
         try {
-            boolean started = false;
-            if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-                if (searchValue != "" && !searchValue.isEmpty()) {
-                    started = mProfileService.getPbapClient().pullVcardListing(null, order,
-                        mBrowseValueSearchAttr, searchValue, mBrowseValueMaxCount,
-                        mBrowseValueOffset);
-                } else {
-                    started = mProfileService.getPbapClient().pullVcardListing(null, order,
-                        mBrowseValueMaxCount, mBrowseValueOffset);
-                }
-            }
+            setPhoneBookRoot();
+
+            boolean started = pullVcardListing(path, order, mBrowseValueSearchAttr,
+                searchValue, mBrowseValueMaxCount, mBrowseValueOffset);
 
             if (started) {
                 startProgressBarBrowse();
             } else {
-                Toast.makeText(this, "PullvCardListing FAILED", Toast.LENGTH_LONG).show();
+                showToastLong("PullvCardListing FAILED");
             }
         } catch (IllegalArgumentException e) {
-            Toast.makeText(this,
-                    "PullvCardListing FAILED: illegal arguments (" + e.getMessage() + ")",
-                    Toast.LENGTH_LONG).show();
+            showToastLong("PullvCardListing FAILED: illegal arguments (" + e.getMessage() + ")");
         }
     }
 
@@ -880,7 +893,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void stopProgressBarBrowse() {
         mBrowseProgressBar.setVisibility(View.GONE);
-        if (mBluetoothPbapCardAdapter.getCount() == 0) {
+        if (mPhonebookSize <= 0) {
             mTextViewBrowseNothingFound.setVisibility(View.VISIBLE);
             mListViewBrowseContacts.setVisibility(View.GONE);
         } else {
@@ -929,7 +942,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
     }
 
-    class BluetoothPbapCardAdapter extends ArrayAdapter<BluetoothPbapCard> {
+    class BluetoothPbapCardAdapter extends ArrayAdapter<VCardEntry> {
         BluetoothPbapCardAdapter() {
             super(PbapTestActivity.this, android.R.layout.simple_list_item_1);
         }
@@ -943,45 +956,70 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
                 row = inflater.inflate(R.layout.vcard_row, null);
             }
 
-            BluetoothPbapCard tmp = getItem(position);
+            VCardEntry tmp = getItem(position);
+            NameData nd = tmp.getNameData();
 
             StringBuilder sb = new StringBuilder();
 
-            if (tmp.firstName != null) {
-                sb.append(tmp.firstName).append(" ");
+            if (nd.getGiven() != null) {
+                sb.append(nd.getGiven()).append(" ");
             }
-            sb.append(tmp.lastName);
+            sb.append(nd.getFamily());
 
             ((TextView) row.findViewById(R.id.vcard_title)).setText(sb.toString());
             return row;
         }
     }
 
+    class BluetoothPbapVcardListingAdapter extends ArrayAdapter<String> {
+        BluetoothPbapVcardListingAdapter() {
+            super(PbapTestActivity.this, android.R.layout.simple_list_item_1);
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            View row = convertView;
+
+            if (row == null) {
+                LayoutInflater inflater = getLayoutInflater();
+                row = inflater.inflate(R.layout.vcard_row, null);
+            }
+
+            String vcardString = getItem(position);
+
+            ((TextView) row.findViewById(R.id.vcard_title)).setText(vcardString);
+            return row;
+        }
+    }
+
     @Override
     public void onDeviceChanged(BluetoothDevice device) {
-        Logger.v(TAG, "onDeviceChanged()");
-        /* NoP */
+        Logger.d(TAG, "onDeviceChanged device: " + device);
+        mDevice = device;
     }
 
     @Override
     public void onDeviceDisconected() {
         Logger.e(TAG, "BT device disconnected!");
+        mDevice = null;
     }
 
     public void onClick_download_getsize(View v) {
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().pullPhoneBookSize(
-                mDownloadSpinner.getSelectedItem().toString());
-        }
+        Log.d(TAG, "onClick_download_getsize");
+        setPhoneBookRoot();
+        String path = mDownloadSpinner.getSelectedItem().toString();
+        pullPhoneBookSize(path);
     }
 
     public void onClick_browse_getsize(View v) {
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().pullVcardListingSize("");
-        }
+        Log.d(TAG, "onClick_browse_getsize");
+        setPhoneBookRoot();
+        String path = getFolder(mBrowseSpinner);
+        pullVcardListingSize(path);
     }
 
     public void onClickVcardFilterAttributes(View v) {
+        Log.d(TAG, "onClickVcardFilterAttributes");
         Intent intent = new Intent(PbapTestActivity.this, VcardFilterActivity.class);
         intent.putExtra("filter", mVcardValueFilter);
         intent.putExtra("type", mVcardValueCardType);
@@ -989,11 +1027,11 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     }
 
     public void onClickRadioButtonVcardType21(View v) {
-        mVcardValueCardType = BluetoothPbapClient.VCARD_TYPE_21;
+        mVcardValueCardType = PbapProfile.VCARD_TYPE_21;
     }
 
     public void onClickRadioButtonVcardType30(View v) {
-        mVcardValueCardType = BluetoothPbapClient.VCARD_TYPE_30;
+        mVcardValueCardType = PbapProfile.VCARD_TYPE_30;
     }
 
     public void onClick_setPhonebook(View v) {
@@ -1001,48 +1039,486 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
         Spinner spinner = (Spinner) findViewById(id);
 
+        mSetPhoneBookButtonClicked = true;
+
         if (spinner != null) {
-            setPhonebook(spinner.getSelectedItem().toString());
+            String folder = getFolder(spinner);
+            setPhoneBook(folder);
         }
     }
 
     public void onClickVcardButtonGet(View v) {
-        mVcardHandleValue = mEditTextHandleValue.getText().toString();
+        String handle = mEditTextHandleValue.getText().toString();
 
-        if (mVcardHandleValue.isEmpty() || mVcardHandleValue == null) {
-            mVcardHandleValue = HANDLE_DEFAULT_VALUE;
-            mEditTextHandleValue.setText(mVcardHandleValue);
+        if ((handle == null) || handle.isEmpty()) {
+            handle = HANDLE_DEFAULT_VALUE;
+            mEditTextHandleValue.setText(handle);
         }
 
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().pullVcardEntry(mVcardHandleValue, mVcardValueFilter,
-                mVcardValueCardType);
-        }
-    }
+        mVcardHandleValue = handle + VCF_SUFFIX;
 
-    private void setPhonebook(String dst) {
-        dst = dst.replaceFirst("\\.vcf$", "");
-
-        mSetPathQueue = new ArrayDeque<String>(Arrays.asList(dst.split("/")));
-
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().setPhoneBookFolderRoot();
-        }
-    }
-
-    private void setPhonebookFolder(String folder) {
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().setPhoneBookFolderDown(folder);
-        }
+        pullVcardEntry(mVcardHandleValue, mVcardValueFilter, mVcardValueCardType);
     }
 
     public void onClick_abort(View v) {
+        mPhonebookSize = 0;
+
+        stopProgressBarDownload();        
+
         /*
          * Going to call abort if any pending request is ongoing,
          * checks for the same are handled internally
          */
-        if ((mProfileService != null) && (mProfileService.getPbapClient() != null)) {
-            mProfileService.getPbapClient().abort();
+        abort();
+    }
+
+    private void storeResponse(int phonebookSize, int missedCalls) {
+        mPhonebookSize = phonebookSize;
+        mNewMissedCalls = missedCalls;
+    }
+
+    private void cleanResponse() {
+        mPhonebookSize = 0;
+        mNewMissedCalls = 0;
+    }
+
+    private String getContactInfo(String vcard) {
+        String nullStr = "null";
+        String familyPatten = " family: ";
+        String givenPatten = " given: ";
+        String middlePatten = " middle: ";
+        String numberPatten = " number: ";
+        String typePatten = " type: ";
+        StringBuilder sb = new StringBuilder();
+
+        if (vcard == null) {
+            return null;
         }
+
+        // FamilyName
+        String familyName = vcard.substring(
+            vcard.indexOf(familyPatten) + familyPatten.length(),
+            vcard.indexOf(givenPatten));
+        Log.d(TAG, "familyName: " + familyName);
+        if ((familyName != null) && !familyName.equals(nullStr)) {
+            sb.append(familyName).append(" ");
+        }
+
+        // GivenName
+        String givenName = vcard.substring(
+            vcard.indexOf(givenPatten) + givenPatten.length(),
+            vcard.indexOf(middlePatten));
+        Log.d(TAG, "givenName: " + givenName);
+        if ((givenName != null) && !givenName.equals(nullStr)) {
+            sb.append(givenName).append(" ");
+        }
+
+        // TEL (only get the 1st)
+
+        String tel = vcard.substring(
+            vcard.indexOf(numberPatten) + numberPatten.length(),
+            vcard.indexOf(typePatten));
+        Log.d(TAG, "tel: " + tel);
+        if ((tel != null) && !tel.equals(nullStr)) {
+            sb.append(tel).append(" ");
+        }
+
+        return sb.toString();
+    }
+
+    private VCardEntry createVcardEntry(String vcard) {
+        VCardEntry vcardEntry = new VCardEntry();
+        String nullStr = "null";
+        String familyPatten = " family: ";
+        String givenPatten = " given: ";
+        String middlePatten = " middle: ";
+        String numberPatten = " number: ";
+        String typePatten = " type: ";
+
+        if (vcard == null) {
+            return null;
+        }
+
+        // FamilyName
+        String familyName = vcard.substring(
+            vcard.indexOf(familyPatten) + familyPatten.length(),
+            vcard.indexOf(givenPatten));
+        Log.d(TAG, "familyName: " + familyName);
+        if ((familyName != null) && !familyName.equals(nullStr)) {
+            VCardProperty nProp = new VCardProperty();
+            nProp.setName(VCardConstants.PROPERTY_N);
+            nProp.addValues(familyName);
+            vcardEntry.addProperty(nProp);
+        }
+
+        // GivenName
+        String givenName = vcard.substring(
+            vcard.indexOf(givenPatten) + givenPatten.length(),
+            vcard.indexOf(middlePatten));
+        Log.d(TAG, "givenName: " + givenName);
+
+        // TEL (only get the 1st)
+
+        String tel = vcard.substring(
+            vcard.indexOf(numberPatten) + numberPatten.length(),
+            vcard.indexOf(typePatten));
+        Log.d(TAG, "tel: " + tel);
+        if ((tel != null) && !tel.equals(nullStr)) {
+            VCardProperty telProp = new VCardProperty();
+            telProp.setName(VCardConstants.PROPERTY_TEL);
+            telProp.addValues(tel);
+            vcardEntry.addProperty(telProp);
+        }
+
+        return vcardEntry;
+    }
+
+    private String getFolder(Spinner spinner) {
+        if (spinner != null) {
+            String pbName = spinner.getSelectedItem().toString();
+            Log.d(TAG, "getFolder pbName: " + pbName);
+            // E.g. "telecom/pb.vcf" -> "telecom/pb"
+            String[] folders = pbName.split("\\.");
+            return (folders != null) ? folders[0] : null;
+        } else {
+            return null;
+        }
+    }
+
+    private byte getVcardFormat() {
+        byte format = 0;
+        int btnId = mRadioGroupFormat.getCheckedRadioButtonId();
+
+        switch (btnId) {
+            case R.id.pbap_download_vcard30:
+                format = PbapProfile.VCARD_TYPE_30;
+                break;
+
+            case R.id.pbap_download_vcard21:
+            default:
+                format = PbapProfile.VCARD_TYPE_21;
+                break;
+        }
+
+        return format;
+    }
+
+    private void handleActionConnectionStateChanged(Intent intent) {
+        int currState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
+            BluetoothProfile.STATE_DISCONNECTED);
+        BluetoothDevice device = (BluetoothDevice) intent.getExtra(BluetoothDevice.EXTRA_DEVICE);
+        Log.d(TAG, "handleActionConnectionStateChanged device: " + device + ", currState: " + currState);
+
+        mDevice = device;
+
+        if (currState == BluetoothProfile.STATE_CONNECTED) {
+            Log.d(TAG, "PBAP connected");
+            mHandler.sendEmptyMessage(MSG_CONNECTED);
+        } else if (currState == BluetoothProfile.STATE_DISCONNECTED) {
+            Log.d(TAG, "PBAP disconnected");
+            mHandler.sendEmptyMessage(MSG_DISCONNECTED);
+        }
+    }
+
+    private void handleActionCustomActionResult(Intent intent) {
+        Bundle extras = (Bundle) intent.getExtra(PbapProfile.EXTRA_CUSTOM_ACTION_RESULT);
+        Log.d(TAG, "handleActionCustomActionResult extras=" + extras);
+        if (extras == null) {
+            return;
+        }
+
+        String cmd = extras.getString(PbapProfile.KEY_COMMAND);
+        int result = extras.getInt(PbapProfile.KEY_RESULT);
+        int what = getMessage(cmd);
+        mHandler.sendMessage(mHandler.obtainMessage(what, result, 0, extras));
+    }
+
+    private void processDisconnected() {
+        Log.d(TAG, "processDisconnected");
+        mPbapServiceCallback.onSessionDisconnected();
+    }
+
+    private void processConnected() {
+        Log.d(TAG, "processConnected");
+        mPbapServiceCallback.onSessionConnected();
+    }
+
+    private void processPullPhonebookResp(int result, Bundle extras) {
+        int phonebookSize = extras.getInt(PbapProfile.KEY_PHONEBOOK_SIZE);
+        int newMissedCalls = extras.getInt(PbapProfile.KEY_NEW_MISSED_CALLS);
+        Log.d(TAG, "processPullPhonebookResp");
+
+        if (PbapProfile.isSuccess(result)) {
+            mPbapServiceCallback.onPullPhoneBookDone(phonebookSize, newMissedCalls);
+        } else {
+            mPbapServiceCallback.onPullPhoneBookError(result);
+        }
+    }
+
+    private void processPullVcardListingResp(int result, Bundle extras) {
+        int phonebookSize = extras.getInt(PbapProfile.KEY_PHONEBOOK_SIZE);
+        int newMissedCalls = extras.getInt(PbapProfile.KEY_NEW_MISSED_CALLS);
+        ArrayList<String> vcardListing = extras.getStringArrayList(PbapProfile.KEY_VCARD_LISTING);
+
+        Log.d(TAG, "processPullVcardListingResp");
+
+        if (PbapProfile.isSuccess(result)) {
+            mPbapServiceCallback.onPullVcardListingDone(vcardListing, phonebookSize, newMissedCalls);
+        } else {
+            mPbapServiceCallback.onPullVcardListingError(result);
+        }
+    }
+
+    private void processPullVcardEntryResp(int result, Bundle extras) {
+        Log.d(TAG, "processPullVcardEntryResp");
+        String vcard = extras.getString(PbapProfile.KEY_VCARD_ENTRY);
+        if (PbapProfile.isSuccess(result) && (vcard != null)) {
+            mPbapServiceCallback.onPullVcardEntryDone(vcard);
+        } else {
+            mPbapServiceCallback.onPullVcardEntryError(result);
+        }
+    }
+
+    private void processSetPhonebookResp(int result, Bundle extras) {
+        Log.d(TAG, "processSetPhonebookResp");
+        if (PbapProfile.isSuccess(result)) {
+            mPbapServiceCallback.onSetPhoneBookDone();
+        } else {
+            mPbapServiceCallback.onSetPhoneBookError(result);
+        }
+    }
+
+    private void processAbortResp(int result, Bundle extras) {
+        Log.d(TAG, "processAbortResp");
+        if (PbapProfile.isSuccess(result)) {
+            mPbapServiceCallback.onAbortDone();
+        } else {
+            mPbapServiceCallback.onAbortError(result);
+        }
+    }
+
+    private int getMessage(String cmd) {
+        if (cmd == null) {
+            return MSG_UNKNOWN;
+        }
+
+        if (cmd.equals(PbapProfile.CUSTOM_ACTION_PULL_PHONEBOOK)) {
+            return MSG_PULL_PHONEBOOK_RESP;
+        } else if (cmd.equals(PbapProfile.CUSTOM_ACTION_PULL_VCARD_LISTING)) {
+            return MSG_PULL_VCARD_LISTING_RESP;
+        } else if (cmd.equals(PbapProfile.CUSTOM_ACTION_PULL_VCARD_ENTRY)) {
+            return MSG_PULL_VCARD_ENTRY_RESP;
+        } else if (cmd.equals(PbapProfile.CUSTOM_ACTION_SET_PHONEBOOK)) {
+            return MSG_SET_PHONEBOOK_RESP;
+        } else if (cmd.equals(PbapProfile.CUSTOM_ACTION_ABORT)) {
+            return MSG_ABORT_RESP;
+        } else {
+            return MSG_UNKNOWN;
+        }
+    }
+
+    private void connect() {
+        Log.d(TAG, "connect");
+        if (!verifyPbapDevice()) {
+            return;
+        }
+
+        mPbap.connect(mDevice);
+    }
+
+    private void disconnect() {
+        Log.d(TAG, "disconnect");
+        if (!verifyPbapDevice()) {
+            return;
+        }
+
+        mPbap.disconnect(mDevice);
+    }
+
+    private int getConnectionState() {
+        Log.d(TAG, "getConnectionState");
+        if (!verifyPbapDevice()) {
+            return BluetoothProfile.STATE_DISCONNECTED;
+        }
+
+        return mPbap.getConnectionState(mDevice);
+    }
+
+    private boolean pullPhoneBook(String pbName, long filter, byte format,
+        int maxListCount, int listStartOffset) {
+        Log.d(TAG, "pullPhoneBook pbName: " + pbName + ", filter: " +
+            Long.toHexString(filter) + ", format: " + format + ", maxListCount: " +
+            maxListCount + ", listStartOffset: " + listStartOffset);
+        if (!verifyPbapDevice()) {
+            return false;
+        }
+
+        try {
+            return mPbap.pullPhoneBook(mDevice, pbName,
+                filter, format, maxListCount, listStartOffset);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void pullPhoneBookSize(String path) {
+        Log.d(TAG, "pullPhoneBookSize path: " + path);
+        // Get phonebook size with MaxListCount = 0
+        pullPhoneBook(path, PbapProfile.PBAP_REQUESTED_FIELDS,
+            PbapProfile.VCARD_TYPE_30, 0, 0);
+    }
+
+    private boolean pullVcardListing(String path, byte order, byte searchProp, String searchValue,
+        int maxListCount, int listStartOffset) {
+        Log.d(TAG, "pullVcardListing path: " + path + ", order: " + order +
+            ", searchProp" + searchProp + ", searchValue: " + searchValue +
+            ", maxListCount: " + maxListCount + ", listStartOffset" + listStartOffset);
+        if (!verifyPbapDevice()) {
+            return false;
+        }
+
+        try {
+            return mPbap.pullVcardListing(mDevice, path, order,
+                searchProp, searchValue, maxListCount, listStartOffset);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void pullVcardListingSize(String path) {
+        Log.d(TAG, "pullVcardListingSize path: " + path);
+        // Get vCard listing size with MaxListCount = 0
+        pullVcardListing(path, PbapProfile.ORDER_INDEXED,
+            PbapProfile.SEARCH_ATTR_NAME, null, 0, 0);
+    }
+
+    private void pullVcardEntry(String vcardHandle, long filter, byte format) {
+        Log.d(TAG, "pullVcardEntry vcardHandle: " + vcardHandle +
+            ", filter: " + filter + ", format: " + format);
+        if (!verifyPbapDevice()) {
+            return;
+        }
+
+        try {
+            mPbap.pullVcardEntry(mDevice, vcardHandle, filter, format);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void pullVcardEntry(String vcardHandle) {
+        Log.d(TAG, "pullVcardEntry vcardHandle: " + vcardHandle);
+        pullVcardEntry(vcardHandle, PbapProfile.PBAP_REQUESTED_FIELDS,
+            PbapProfile.VCARD_TYPE_30);
+    }
+
+    private void setPhoneBook(String folder) {
+       Log.d(TAG, "setPhoneBook folder: " + folder);
+       if (!verifyPbapDevice()) {
+            return;
+        }
+
+        try {
+            mPbap.setPhoneBook(mDevice, folder);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void setPhoneBookRoot() {
+        Log.d(TAG, "setPhoneBookRoot");
+        setPhoneBook(PbapProfile.ROOT_PATH);
+    }
+
+    private void abort() {
+        Log.d(TAG, "abort");
+        if (!verifyPbapDevice()) {
+            return;
+        }
+
+        try {
+            mPbap.abort(mDevice);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private boolean verifyPbapDevice() {
+        if (mPbap == null) {
+            Log.e(TAG, " PBAP client not connected ");
+            return false;
+        }
+
+        if (mDevice == null) {
+            Log.e(TAG, " Bluetooth device null ");
+            return false;
+        }
+
+        return true;
+    }
+
+    private int getIntValue(EditText editText, int defaultValue) {
+        int value = defaultValue;
+
+        if (editText == null) {
+            return defaultValue;
+        }
+
+        try {
+            value = Integer.parseInt(editText.getText().toString());
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Can't parse int, use default " + defaultValue);
+        }
+        return value;
+    }
+
+    private void showResult(String msg, int result) {
+        StringBuilder sb = new StringBuilder();
+        String resultString;
+
+        switch (result) {
+            case PbapProfile.RESULT_SUCCESS:
+                resultString = "succeed";
+                break;
+            case PbapProfile.RESULT_INVALID_PARAMETER:
+                resultString = "invalid parameter";
+                break;
+            case PbapProfile.RESULT_NOT_SUPPORTED:
+                resultString = "not supported";
+                break;
+            case PbapProfile.RESULT_TIMEOUT:
+                resultString = "timeout";
+                break;
+            case PbapProfile.RESULT_BUSY:
+                resultString = "busy";
+                break;
+            case PbapProfile.RESULT_NOT_FOUND:
+                resultString = "not found";
+                break;
+            default:
+                resultString = "fail";
+                break;
+        }
+
+        sb.append(msg).append(" ").append(resultString);
+
+        showToastLong(sb.toString());
+    }
+
+    private void showToastShort(String msg) {
+        Log.d(TAG, msg);
+        Toast.makeText(PbapTestActivity.this, msg, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showToastLong(String msg) {
+        Log.d(TAG, msg);
+        Toast.makeText(PbapTestActivity.this, msg, Toast.LENGTH_LONG).show();
     }
 }

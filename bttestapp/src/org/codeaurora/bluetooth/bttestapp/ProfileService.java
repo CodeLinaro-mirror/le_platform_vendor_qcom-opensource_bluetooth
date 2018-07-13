@@ -60,7 +60,6 @@ import android.bluetooth.client.map.BluetoothMapMessage;
 import android.bluetooth.client.map.BluetoothMasClient;
 import org.codeaurora.bluetooth.bttestapp.R;
 import org.codeaurora.bluetooth.bttestapp.services.IMapServiceCallback;
-import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
 
 import android.media.browse.MediaBrowser;
 import android.media.browse.MediaBrowser.MediaItem;
@@ -115,6 +114,7 @@ public class ProfileService extends Service {
 
     private AvrcpProfile mAvrcp;
     private HfpProfile mHfp;
+    private PbapProfile mPbap;
 
     private HashMap<Integer, BluetoothMasClient> mMapClients = null;
 
@@ -567,6 +567,7 @@ public class ProfileService extends Service {
 
         mAvrcp = new AvrcpProfile(mContext);
         mHfp = new HfpProfile(mContext);
+        mPbap = new PbapProfile(mContext);
     }
 
     @Override
@@ -620,6 +621,10 @@ public class ProfileService extends Service {
 
     public HfpProfile getHfpProfile() {
         return mHfp;
+    }
+
+    public PbapProfile getPbapProfile() {
+        return mPbap;
     }
 
     public void setMasInstances(SdpMasRecord masrec) {

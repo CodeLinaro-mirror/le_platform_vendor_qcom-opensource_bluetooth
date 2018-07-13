@@ -88,7 +88,8 @@
     <string name="vcard_header_prompt">vCard header:</string>
     <string name="offset_prompt">Offset value:</string>
     <string name="search">Search</string>
-    <string name="getsize">Get size</string>
+    <string name="pull_phonebook">Pull Phonebook</string>
+    <string name="getsize">Get Size</string>
     <string name="abort">Abort</string>
     <string name="pbap_session_key_dialog_header">OBEX session key required</string>
     <string name="pbap_session_key_dialog_title">Type session key for %1$s</string>
@@ -97,6 +98,7 @@
     <string name="auth_notif_title">Session key</string>
     <string name="auth_notif_message">Type session key for %1$s</string>
     <string name="get_vcard">Get vCard</string>
+    <string name="vcard_suffix_prompt">.vcf</string>
 
     <string name="search_attribute_prompt">Search Attribute:</string>
     <string name="search_value_prompt">Search Value:</string>
@@ -269,6 +271,7 @@
         <item>telecom/och.vcf</item>
         <item>telecom/mch.vcf</item>
         <item>telecom/cch.vcf</item>
+        <item>telecom/fav.vcf</item>
         <item>SIM1/telecom/pb.vcf</item>
         <item>SIM1/telecom/ich.vcf</item>
         <item>SIM1/telecom/och.vcf</item>
