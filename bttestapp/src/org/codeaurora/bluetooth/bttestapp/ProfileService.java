@@ -594,11 +594,16 @@ public class ProfileService extends Service {
         }
 
         if (mHfp != null) {
-            mHfp.getHeadsetClient().disconnect(mDevice);
+            BluetoothHeadsetClient headsetClient = mHfp.getHeadsetClient();
+            if (headsetClient != null) {
+                headsetClient.disconnect(mDevice);
+            }
         }
 
-        for (BluetoothMasClient cli : mMapClients.values()) {
-            cli.disconnect();
+        if (mMapClients != null) {
+            for (BluetoothMasClient cli : mMapClients.values()) {
+                cli.disconnect();
+            }
         }
 
         mDevice = device;
