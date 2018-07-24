@@ -8,9 +8,9 @@ AM_CFLAGS = -Wall \
         -DHAS_NO_BDROID_BUILDCFG
 
 AM_CPPFLAGS = \
-        -I$(WORKSPACE)/vendor/qcom/proprietary/bluetooth/hidl_transport/hidl \
         -Iinc \
-        -I$(bdroid_C_INCLUDES)
+        -I$(bdroid_C_INCLUDES) \
+        -I${D}${includedir}
 
 if MDM_ROME
 AM_CFLAGS += -DBT_SOC_TYPE_ROME
