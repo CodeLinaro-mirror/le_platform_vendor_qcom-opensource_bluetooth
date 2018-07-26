@@ -123,6 +123,8 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         IDLE,
         CONNECT,
         DISCONNECT,
+        REGISTER_NOTIFICATION,
+        UNREGISTER_NOTIFICATION,
         UPDATE_INBOX,
         SET_PATH,
         GET_MESSAGE_LISTING,
@@ -613,6 +615,10 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         menu.findItem(R.id.menu_map_connect).setVisible(!connected);
         menu.findItem(R.id.menu_map_disconnect).setVisible(connected);
         menu.findItem(R.id.menu_map_update_inbox).setVisible(connected);
+        menu.findItem(R.id.menu_map_register_notification).setVisible(connected &&
+                !mProfileService.getMapClient(mMasInstanceId).getNotificationRegistration());
+        menu.findItem(R.id.menu_map_unregister_notification).setVisible(connected &&
+                mProfileService.getMapClient(mMasInstanceId).getNotificationRegistration());
 
         return true;
     }
@@ -625,6 +631,12 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                 break;
             case R.id.menu_map_disconnect:
                 onClickDisconnect();
+                break;
+            case R.id.menu_map_register_notification:
+                onClickRegisterNotification();
+                break;
+            case R.id.menu_map_unregister_notification:
+                onClickUnregisterNotification();
                 break;
             case R.id.menu_map_update_inbox:
                 onClickUpdateInbox();
@@ -662,6 +674,20 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         if(mProfileService != null && (mProfileService.getMapClient(mMasInstanceId)) != null ){
             mProfileService.getMapClient(mMasInstanceId).disconnect();
             goToState(Job.DISCONNECT);
+        }
+    }
+
+    private void onClickRegisterNotification() {
+        if(mProfileService != null && (mProfileService.getMapClient(mMasInstanceId)) != null ){
+            mProfileService.getMapClient(mMasInstanceId).setNotificationRegistration(true);
+            goToState(Job.REGISTER_NOTIFICATION);
+        }
+    }
+
+    private void onClickUnregisterNotification() {
+        if(mProfileService != null && (mProfileService.getMapClient(mMasInstanceId)) != null ){
+            mProfileService.getMapClient(mMasInstanceId).setNotificationRegistration(false);
+            goToState(Job.UNREGISTER_NOTIFICATION);
         }
     }
 

@@ -46,6 +46,16 @@
           android:showAsAction="never"
           android:visible="false" />
 
+    <item android:id="@+id/menu_map_register_notification"
+          android:title="@string/map_register_notification"
+          android:showAsAction="never"
+          android:visible="false" />
+
+    <item android:id="@+id/menu_map_unregister_notification"
+          android:title="@string/map_unregister_notification"
+          android:showAsAction="never"
+          android:visible="false" />
+
     <item
         android:id="@+id/menu_map_goto_inbox"
         android:title="@string/map_goto_inbox"

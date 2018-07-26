@@ -156,6 +156,8 @@
     <string name="msgflag_sent">SENT</string>
     <string name="msgflag_drm">DRM</string>
     <string name="msgflag_prio">PRIO</string>
+    <string name="map_register_notification">Register Notification</string>
+    <string name="map_unregister_notification">Unregister Notification</string>
     <string name="map_goto_inbox">go to inbox</string>
     <string name="map_goto_outbox">go to outbox</string>
     <string name="map_goto_draft">go to draft</string>
