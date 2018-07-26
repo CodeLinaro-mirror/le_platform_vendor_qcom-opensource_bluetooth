@@ -41,6 +41,7 @@ import android.os.ParcelUuid;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.AdapterView;
@@ -107,6 +108,8 @@ public class DipTestActivity extends Activity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dip_test);
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
         mBtnDipTest = (Button) findViewById(R.id.id_dip_test);
         mBtnDipTest.setOnClickListener(this);
         mBtnDipClear = (Button) findViewById(R.id.id_dip_clear);
@@ -161,6 +164,17 @@ public class DipTestActivity extends Activity
         Logger.v(TAG, "onDeviceDisconected");
 
         invalidateOptionsMenu();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
+                return true;
+        }
+        return false;
     }
 
     private void clearDipInfor() {

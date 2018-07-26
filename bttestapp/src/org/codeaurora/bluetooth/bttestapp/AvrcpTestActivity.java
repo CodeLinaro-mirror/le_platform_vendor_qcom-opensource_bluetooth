@@ -56,10 +56,11 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcelable;
 import android.util.Log;
+import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnTouchListener;
-import android.view.MotionEvent;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Button;
@@ -241,6 +242,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
         ActivityHelper.initialize(this, R.layout.layout_avrcp); //use layout_avrcp.xml
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
 
         initPasMaps();
 
@@ -792,6 +795,21 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
 
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
+                return true;
+            default:
+                Logger.w(TAG, "Unknown item selected.");
+                break;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 
     private void updateTestCmdUI() {

@@ -472,6 +472,8 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         ActivityHelper.initialize(this, R.layout.activity_map_test);
         ActivityHelper.setActionBarTitle(this, R.string.title_map_test);
 
+        getActionBar().setDisplayHomeAsUpEnabled(true);
+
         mMasInstanceId = intent.getIntExtra(ProfileService.EXTRA_MAP_INSTANCE_ID, -1);
 
         if (ProfileService.ACTION_MAP_GET_MESSAGE.equals(intent.getAction())) {
@@ -651,6 +653,10 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
             case R.id.menu_map_goto_draft:
                 goToFolder("telecom/msg/draft");
                 break;
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
+                return true;
             default:
                 Logger.w(TAG, "Unknown item selected.");
                 break;

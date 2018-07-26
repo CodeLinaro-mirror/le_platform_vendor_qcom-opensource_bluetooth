@@ -324,6 +324,8 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
         Logger.v(TAG, "onCreate()");
 
         ActivityHelper.initialize(this, R.layout.activity_hfp_test);
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
         BluetoothConnectionReceiver.registerObserver(this);
         mCalls = new Hashtable<Integer, BluetoothHeadsetClientCall>();
 
@@ -444,6 +446,11 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
             case R.id.menu_call_history:
                 new CallHistoryDialogFragment(mCallHistory).show(getFragmentManager(),
                         "call-history");
+                return true;
+
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
                 return true;
         }
 

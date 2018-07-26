@@ -44,6 +44,7 @@ import android.os.Bundle;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.AdapterView;
@@ -105,6 +106,8 @@ public class AvrcpCoverArtActivity extends Activity
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_avrcp_coverart);
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
         mIvCoverArt = (ImageView) findViewById(R.id.id_iv_fullimage);
         mIvThumbNail = (ImageView) findViewById(R.id.id_iv_thumbnail);
         mIvCoverArt.setImageResource(R.drawable.ic_bt_connected);
@@ -244,6 +247,17 @@ public class AvrcpCoverArtActivity extends Activity
             mSpImgWidth.setEnabled(false);
             Log.v(TAG," Not image");
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                Log.d(TAG, "Go back");
+                finish();
+                return true;
+        }
+        return false;
     }
 
     @Override
