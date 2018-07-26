@@ -100,7 +100,7 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
 
     private final String TAG = "MapTestActivity";
 
-    private final static short MAX_LIST_COUNT_DEFAULT = 0;
+    private final static short MAX_LIST_COUNT_DEFAULT = 1;
     private final static short LIST_START_OFFSET_DEFAULT = 0;
     private final static byte SUBJECT_LENGTH_DEFAULT = 0;
     private final static String MESSAGES_FILTER_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
@@ -448,6 +448,7 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                 mTextViewCurrentFolder.setText(mProfileService.getMapClient(mMasInstanceId)
                     .getCurrentPath());
             }
+
             updateUi(true);
 
             if (mStartingGetMessageHandle != null) {
@@ -508,7 +509,7 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 String handle = mModelMessages.get(position).getHandle();
-
+                Logger.d(TAG, "getMessage");
                 getMessage(handle, CharsetType.UTF_8, false);
             }
         });
@@ -1185,6 +1186,8 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                 v = getLayoutInflater().inflate(R.layout.message_row, parent, false);
             }
 
+            Logger.d(TAG, "getView position " + position);
+
             BluetoothMapMessage msg = mModelMessages.get(position);
 
             ((TextView) v.findViewById(R.id.message_row_type)).setText(msg.getType().toString());
@@ -1223,6 +1226,35 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
             } else {
                 ((TextView) v.findViewById(R.id.message_row_to_lbl)).setVisibility(View.INVISIBLE);
             }
+
+            Button mBtnRead = (Button) v.findViewById(R.id.message_row_btn_read);
+            mBtnRead.setText("Set " + (!msg.isRead() ? "Read":"Unread"));
+            mBtnRead.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Logger.d(TAG, "Current read status " + msg.isRead());
+                    mProfileService.getMapClient(mMasInstanceId).setMessageReadStatus(msg.getHandle(), !msg.isRead());
+                    if (msg.isRead()) {
+                        goToState(Job.SET_STATUS_UNREAD);
+                    } else {
+                        goToState(Job.SET_STATUS_READ);
+                    }
+                    /* setFocusable(false) is to allow click list item to get message */
+                    mBtnRead.setFocusable(false);
+                }
+            });
+
+            Button mBtnDel = (Button) v.findViewById(R.id.message_row_btn_delete);
+            mBtnDel.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Logger.d(TAG, "Delete msg " + msg.getHandle());
+                    mProfileService.getMapClient(mMasInstanceId).setMessageDeletedStatus(msg.getHandle(), true);
+                    goToState(Job.DELETE_MESSAGE);
+                    /* setFocusable(false) is to allow click list item to get message */
+                    mBtnDel.setFocusable(false);
+                }
+            });
 
             return v;
         }
