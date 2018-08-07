@@ -353,7 +353,12 @@ typedef struct {
     /** Determine the type of the remote device (LE, BR/EDR, Dual-mode) */
     int (*get_device_type)( const bt_bdaddr_t *bd_addr );
 
-    /** Set the advertising data or scan response data */
+    /** Set the advertising data or scan response data
+     * The Service Data AD Type allows arbitrary data associated with a specific UUID
+     * to be included in advertising packets or scan response PDUs.
+     * There are three variations of this type; one for 16-bit UUIDs, one for 32-bit UUIDs
+     * and one for 128-bit UUIDs, For setting service data first Byte must be specific uuid len
+     * eg. 2, 4, 16, then next bytes include service data UUID along with arbitary data.*/
     bt_status_t (*set_adv_data)(int client_if, bool set_scan_rsp, bool include_name,
                     bool include_txpower, int min_interval, int max_interval, int appearance,
                     uint16_t manufacturer_len, char* manufacturer_data,
