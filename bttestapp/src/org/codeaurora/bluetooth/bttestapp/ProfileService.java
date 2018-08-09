@@ -642,7 +642,9 @@ public class ProfileService extends Service {
     public void setMasInstances(SdpMasRecord masrec) {
         // no need to recreate already existing MAS client
         if (mMapClients.containsKey(masrec.getMasInstanceId())) {
-           return;
+            /* Update mas sdp record */
+            getMapClient(masrec.getMasInstanceId()).setInstanceData(masrec);
+            return;
         }
 
         BluetoothMasClient client = new BluetoothMasClient(mDevice, masrec, mMapHandler);
