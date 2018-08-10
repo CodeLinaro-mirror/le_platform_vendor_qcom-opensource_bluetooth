@@ -48,6 +48,7 @@
     <string name="select_device">Select</string>
     <string name="showCoverArt">Cover Art</string>
     <string name="discover_services">Discover</string>
+    <string name="add_oob_bond_dev">Add OOB Bond</string>
     <string name="clear">Clear</string>
     <string name="list_empty">No records found!</string>
     <string name="a2dp_source">A2DP Source</string>

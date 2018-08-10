@@ -55,6 +55,11 @@ import android.widget.ToggleButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+
 import java.util.ArrayList;
 
 public class MainActivity extends MonkeyActivity {
@@ -171,7 +176,18 @@ public class MainActivity extends MonkeyActivity {
 
                     mDiscoveryInProgress = false;
                 }
-            } if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+            } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
+                BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
+                                                   BluetoothDevice.ERROR);
+
+                Log.d(TAG, "bonded state" + bondState);
+                boolean sent = true ? bondState == BluetoothDevice.BOND_BONDED : false;
+
+                Toast.makeText(MainActivity.this, "added bond device " + sent, Toast.LENGTH_SHORT).show();
+            }
+            if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
                 final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                         BluetoothAdapter.ERROR);
                 Log.d(TAG, " Action " + action + " state :" + state);
@@ -267,12 +283,14 @@ public class MainActivity extends MonkeyActivity {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_UUID);
         filter.addAction(BluetoothDevice.ACTION_SDP_RECORD);
+        filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dpSink.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
         mBtnDiscoverService=(Button) findViewById(R.id.discover_services);
         mBtnSelectDevice=(Button) findViewById(R.id.select_device);
+        mBtnSelectDevice=(Button) findViewById(R.id.add_oob_bond_dev);
         mSinkButton = (Button) findViewById(R.id.id_a2dp_sink);
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -325,6 +343,23 @@ public class MainActivity extends MonkeyActivity {
 
             Log.v(TAG, "fetching UUIDs");
             mDiscoveryInProgress = mDevice.fetchUuidsWithSdp();
+
+        } else if (v.getId() == R.id.add_oob_bond_dev) {
+            if (mDevice != null && mProfileService != null) {
+                Log.v(TAG, "add bond device");
+
+                char[] keys = new char[32];
+                int[]  dev  = new int[2];
+
+                String fileName = "/etc/bluetooth/remote_dev.txt";
+                File   file     = new File(fileName);
+
+                getDevInfoFromFile(file, keys, dev);
+                String linkKey = new String(keys);
+
+                Log.d(TAG, "linkKey " + linkKey + " keyType " + dev[0] + " pinLen " + dev[1]);
+                mProfileService.addOutOfBandBondDevice(mDevice, linkKey, dev[0], dev[1]);
+            }
         }
     }
 
@@ -438,6 +473,41 @@ public class MainActivity extends MonkeyActivity {
         } else {
             mBtnDiscoverService.setEnabled(false);
             mBtnSelectDevice.setEnabled(false);
+        }
+    }
+
+    private void getDevInfoFromFile(File file, char[] keys, int[] dev) {
+        try {
+            InputStreamReader reader = new InputStreamReader(new FileInputStream(file));
+            BufferedReader br        = new BufferedReader(reader);
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.contains("linkkey:")) {
+                    String linkKey = line.substring(8, line.length());
+                    for (int i = 0 ; i < linkKey.length(); i++) {
+                        keys[i] = linkKey.charAt(i);
+                    }
+
+                    keys = linkKey.toCharArray();
+                    Log.d(TAG, "linkKey =" + linkKey);
+                } else if (line.contains("keytype:")) {
+                    try {
+                        dev[0] = Integer.parseInt(line.substring(8, line.length()));
+                        Log.d(TAG, "keyType = " + dev[0]);
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                    }
+                } else if (line.contains("pinlen:")) {
+                    try {
+                        dev[1] = Integer.parseInt(line.substring(7, line.length()));
+                        Log.d(TAG, "pinLen = " + dev[1]);
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

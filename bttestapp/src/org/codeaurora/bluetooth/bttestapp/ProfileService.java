@@ -46,12 +46,14 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Bundle;
 import android.util.Log;
+import android.os.Bundle;
 
 import com.android.vcard.VCardEntry;
 import android.bluetooth.client.map.BluetoothMapBmessage;
@@ -71,6 +73,7 @@ import android.media.session.MediaSession.QueueItem;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.lang.String;
 
 public class ProfileService extends Service {
 
@@ -108,6 +111,22 @@ public class ProfileService extends Service {
 
     public static final String EXTRA_MAP_MESSAGE_HANDLE = "org.codeaurora.bluetooth.extra.MAP_MESSAGE_HANDLE";
 
+    public static final String KEY_RESULT = "result";
+
+    public static final String ACTION_CUSTOM_ACTION_RESULT =
+        "android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT";
+
+    public static final String EXTRA_CUSTOM_ACTION_RESULT =
+        "android.bluetooth.adapter.extra.CUSTOM_ACTION_RESULT";
+
+    public static final String ACTION_CUSTOM_ACTION = "android.bluetooth.adapter.action.CUSTOM_ACTION";
+
+    public static final String EXTRA_CUSTOM_ACTION = "android.bluetooth.adapter.extra.CUSTOM_ACTION";
+    public static final String PREFS_READ = "PREFS_READ";
+    public static final String KEY_LINK_KEY= "link_key";
+    public static final String KEY_LINK_KEY_TYPE= "link_key_type";
+    public static final String KEY_PIN_LEN = "pin_len";
+    public static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
     private BluetoothDevice mDevice = null;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -647,7 +666,6 @@ public class ProfileService extends Service {
     public HfpProfile getHfpProfile() {
         return mHfp;
     }
-
     public PbapProfile getPbapProfile() {
         return mPbap;
     }
@@ -674,5 +692,29 @@ public class ProfileService extends Service {
 
     public MapSessionData getMapSessionData(int id) {
         return mMapSessionData.get(id);
+    }
+
+    public boolean addOutOfBandBondDevice(BluetoothDevice device, String linkKey, int linkKeyType, int pinLen) {
+        Log.v(TAG, "Current device: address= " + device.getAddress() + " linkKey = "
+                            + linkKey + " linkKeyType = " + linkKeyType + " pinLen = " + pinLen);
+
+        SharedPreferences pref = getSharedPreferences(PREFS_READ, Context.MODE_WORLD_READABLE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putString(KEY_LINK_KEY, linkKey);
+        editor.putInt(KEY_LINK_KEY_TYPE, linkKeyType);
+        editor.putInt(KEY_PIN_LEN, pinLen);
+        editor.commit();
+
+        Bundle extras = new Bundle();
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        extras.putString("Package", "org.codeaurora.bluetooth.bttestapp");
+        sendCustomAction(extras);
+        return true;
+    }
+
+    private void sendCustomAction(Bundle extras) {
+        Intent intent = new Intent(ACTION_CUSTOM_ACTION);
+        intent.putExtra(EXTRA_CUSTOM_ACTION, extras);
+        mContext.sendBroadcast(intent, BLUETOOTH_PERM);
     }
 }
