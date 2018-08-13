@@ -273,6 +273,13 @@ public class ProfileService extends Service {
                     BluetoothMapEventReport evt = (BluetoothMapEventReport) msg.obj;
                     cb.onEventReport(evt);
                     break;
+                case BluetoothMasClient.EVENT_ABORT:
+                    if (success) {
+                        cb.onAbort();
+                    } else {
+                        cb.onAbortError();
+                    }
+                    break;
                 default:
                     Log.w(TAG, "Unknown message in MAP: " + msg.what);
             }

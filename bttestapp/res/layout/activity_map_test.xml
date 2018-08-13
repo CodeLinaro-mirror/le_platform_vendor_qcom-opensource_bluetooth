@@ -57,6 +57,14 @@
         android:text="@string/map_folder_up"
         android:onClick="onClickSetPathUp" />
 
+    <Button
+        android:id="@+id/maptest_abort"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0"
+        android:text="@string/map_abort"
+        android:onClick="onClickAbort" />
+
     <TextView
         android:id="@+id/maptest_nav_current"
         android:layout_width="wrap_content"

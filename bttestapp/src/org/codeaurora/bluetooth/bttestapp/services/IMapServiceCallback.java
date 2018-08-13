@@ -78,4 +78,8 @@ public interface IMapServiceCallback {
     public void onGetMessagesListingSizeError();
 
     public void onEventReport(BluetoothMapEventReport eventReport);
+
+    public void onAbort();
+
+    public void onAbortError();
 }

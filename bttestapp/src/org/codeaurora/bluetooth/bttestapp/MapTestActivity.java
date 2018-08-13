@@ -135,7 +135,8 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         SET_STATUS_READ,
         SET_STATUS_UNREAD,
         DELETE_MESSAGE,
-        PUSH_MESSAGE;
+        PUSH_MESSAGE,
+        ABORT;
     }
 
     private Job mCurrentJob = Job.IDLE;
@@ -228,7 +229,7 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                 @Override
                 public void onConnectError() {
                     goToState(Job.IDLE);
-                    shortToast("MAS connect FAILED");
+                    shortToast("MAS disconnected");
                 }
 
                 @Override
@@ -424,6 +425,19 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                             .addReplyParam("msg_type", msgType)
                             .send();
                 }
+
+                @Override
+                public void onAbort() {
+                    goToState(Job.IDLE);
+                    shortToast("Abort OK");
+                }
+
+                @Override
+                public void onAbortError() {
+                    goToState(Job.IDLE);
+                    shortToast("Abort FAILED");
+                }
+
             });
 
             ProfileService.MapSessionData map = mProfileService.getMapSessionData(mMasInstanceId);
@@ -842,6 +856,13 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
         if(mProfileService != null && (mProfileService.getMapClient(mMasInstanceId)) != null ){
             mProfileService.getMapClient(mMasInstanceId).setFolderUp();
             goToState(Job.SET_PATH);
+        }
+    }
+
+    public void onClickAbort(View view) {
+        if(mProfileService != null && (mProfileService.getMapClient(mMasInstanceId)) != null ){
+            mProfileService.getMapClient(mMasInstanceId).abort();
+            goToState(Job.ABORT);
         }
     }
 
