@@ -307,6 +307,8 @@ public class ProfileService extends Service {
 
         public final int MESSAGE_SHIFT_NOTIFICATION_ID = 20008;
 
+        public final int READ_STATUS_CHANGED_NOTIFICATION_ID = 20009;
+
         private final NotificationManager mNotificationManager;
 
         MapNotificationSender() {
@@ -341,6 +343,9 @@ public class ProfileService extends Service {
                     break;
                 case MESSAGE_SHIFT:
                     notifyMessageShift(eventReport);
+                    break;
+                case READ_STATUS_CHANGED:
+                    notifyReadStatusChanged(eventReport);
                     break;
                 default:
                     Log.e(TAG, "Unknown MAP report type (" + eventReport.getType().toString()
@@ -440,6 +445,14 @@ public class ProfileService extends Service {
                     String.format(getString(R.string.map_report_notif_fromto,
                             eventReport.getOldFolder(), eventReport.getFolder())));
         }
+
+        private void notifyReadStatusChanged(BluetoothMapEventReport eventReport) {
+            send(READ_STATUS_CHANGED_NOTIFICATION_ID,
+                    getString(R.string.map_report_notif_title_read_status_changed),
+                    String.format(getString(R.string.map_report_notif_handle,
+                            eventReport.getHandle())));
+        }
+
     }
 
     BroadcastReceiver mReceiver = new BroadcastReceiver() {

@@ -423,6 +423,10 @@ public class MapTestActivity extends MonkeyActivity implements GetTextDialogList
                             .addReplyParam("folder", eventReport.getFolder())
                             .addReplyParam("old_folder", eventReport.getOldFolder())
                             .addReplyParam("msg_type", msgType)
+                            .addReplyParam("datetime", eventReport.getDatetime())
+                            .addReplyParam("subject", eventReport.getSubject())
+                            .addReplyParam("sender_name", eventReport.getSenderName())
+                            .addReplyParam("priority", eventReport.getPriority())
                             .send();
                 }
 

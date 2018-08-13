@@ -238,6 +238,7 @@
     <string name="map_report_notif_title_memory_full">Memory full</string>
     <string name="map_report_notif_title_memory_available">Memory available</string>
     <string name="map_report_notif_title_message_deleted">Message deleted</string>
+    <string name="map_report_notif_title_read_status_changed">Read status changed</string>
     <string name="map_report_notif_received">Received new %1$s message</string>
     <string name="map_report_notif_handle">Handle: %1$s</string>
     <string name="map_report_notif_shifted">Message %1$s shifted</string>
