@@ -60,7 +60,7 @@ public class PbapProfile {
     private final static String TAG = "PbapProfile";
 
     public static final String PBAP_CLIENT_ENABLE_PTS_PROPERTY =
-        "persist.bt.pbapclient.enable_pts";
+        "bt.pbapclient.enable_pts";
 
     public static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
 
