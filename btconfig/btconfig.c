@@ -6834,10 +6834,15 @@ int main(int argc, char *argv[])
 				continue;
 		}
 	}
-
 #ifdef ANDROID
-	property_get("ro.qualcomm.bt.hci_transport", prop, NULL);
-	property_get("qcom.bluetooth.soc", soc_type, NULL);
+    property_get("ro.qualcomm.bt.hci_transport", prop, NULL);
+    property_get("qcom.bluetooth.soc", soc_type, NULL);
+#else
+#if BT_SOC_TYPE_ROME
+    strcpy(soc_type, "rome");
+#elif BT_SOC_TYPE_CHEROKEE
+    strcpy(soc_type, "cherokee");
+#endif
 #endif
 
 	if((!strcasecmp(soc_type, "rome")) || (!strcasecmp(soc_type, "cherokee")))
@@ -6861,30 +6866,16 @@ int main(int argc, char *argv[])
 	        // skip interface entry
 	        argv += 1;
 	        argc -= 1;
-	} else if (is_qca_transport_uart){
+} else if (is_qca_transport_uart){
 		if(!strcasecmp(soc_type, "rome"))
 			printf("SOC is ROME\n");
 		else
 			printf("SOC is CHEROKEE\n");
-#ifdef ANDROID
 		fd = connect_to_wds_server();
 		if(fd < 0) {
 			perror("connection to WDS server failed");
 			exit(1);
 		}
-#else
-		if ((fd = init_uart(argv[optind], ((atoi(argv[optind+1]) != 115200) ? 3000000 : atoi(argv[optind+1])) )) < 0) {
-			perror("Device is not available");
-			exit(1);
-		}
-
-		//Move to next argv if <speed> inputed.
-		if (atoi(argv[optind+1]) >= 115200)
-		{
-			argv +=1;
-			argc -=1;
-		}
-#endif
 	} else {
 		strcpy(soc_type, "300x");
 		printf("SOC is AR300x\n");

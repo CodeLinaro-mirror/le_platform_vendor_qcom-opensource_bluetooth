@@ -5,6 +5,7 @@ AC_CONFIG_SRCDIR([hal/hardware.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile \
                  hal/Makefile
+                 btconfig/Makefile
                  ])
 
 AC_PROG_CXX

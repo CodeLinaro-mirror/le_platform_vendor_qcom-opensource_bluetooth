@@ -1,1 +1,2 @@
 SUBDIRS = hal
+SUBDIRS += btconfig
