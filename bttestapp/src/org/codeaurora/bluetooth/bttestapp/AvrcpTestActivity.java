@@ -92,9 +92,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
     private EditText mEditTestResp;
+    private TextView mScopesTextView;
     private RadioGroup mScopes;
+    private TextView mAttributesTextView;
+    private RadioGroup mAttributes;
+    private TextView mEditFolderTextView;
     private EditText mEditFolder;
+    private TextView mEditItemPositionTextView;
     private EditText mEditItemPosition;
+    private TextView mEditValueTextView;
     private EditText mEditValue;
 
     private Button mBtnGetCurrentPas;
@@ -161,6 +167,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         // GetItemAttributes
         TEST_CMD_GET_ITEM_ATTRIBUTES,
+
+        // GetElementAttributes
+        TEST_CMD_GET_ELEMENT_ATTRIBUTES,
+
+        // GetFolderItems
+        TEST_CMD_GET_FOLDER_ITEMS,
 
         // GetPlayStatus
         TEST_CMD_GET_PLAY_STATUS,
@@ -260,10 +272,16 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
         mEditTestResp = (EditText) initEditText(R.id.id_test_resp, "");
 
+        mScopesTextView = (TextView) findViewById(R.id.id_tv_scope);
         mScopes = (RadioGroup) findViewById(R.id.id_rg_scope);
+        mAttributesTextView = (TextView) findViewById(R.id.id_tv_attribute);
+        mAttributes = (RadioGroup) findViewById(R.id.id_rg_attribute);
         mScopes.setOnCheckedChangeListener(this);
+        mEditFolderTextView = (TextView) findViewById(R.id.id_tv_edit_folder);
         mEditFolder = (EditText) initEditText(R.id.id_edit_folder, TEST_FOLDER);
+        mEditItemPositionTextView = (TextView) findViewById(R.id.id_tv_edit_item_position);
         mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, TEST_ITEM_POSITION);
+        mEditValueTextView = (TextView) findViewById(R.id.id_tv_edit_value);
         mEditValue = initEditText(R.id.id_edit_value, "");
 
         mBtnGetCurrentPas = initButton(R.id.id_btn_get_current_pas);
@@ -424,6 +442,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
                 handleGetItemAttributes();
                 break;
+            case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
+                handleGetElementAttributes();
+                break;
+            case TEST_CMD_GET_FOLDER_ITEMS:
+                handleGetFolderItems();
+                break;
             case TEST_CMD_GET_SUPPORTED_FEATTURES:
                 handleGetSupportedFeatures();
                 break;
@@ -526,7 +550,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                     result = getItemAttributes(scope, mFolderItems, folder, position);
                 } else {
                     // Send GetElementAttributes for PLAYING
-                    getItemAttributes(scope, null, false);
+                    getItemAttributes(scope, null);
                     result = true;
                 }
                 break;
@@ -550,6 +574,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (!result) {
             Log.e(TAG, "handleGetItemAttributes fail");
         }
+    }
+
+    private void handleGetElementAttributes() {
+        getElementAttributes();
+    }
+
+    private void handleGetFolderItems() {
+        getFolderItems();
     }
 
     private void handleGetPlayStatus() {
@@ -624,6 +656,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
         } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
             cmd = TestCmd.TEST_CMD_GET_ITEM_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_element_attr))) {
+            cmd = TestCmd.TEST_CMD_GET_ELEMENT_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_folder_item))) {
+            cmd = TestCmd.TEST_CMD_GET_FOLDER_ITEMS;
         } else if (str.equals(this.getString(R.string.avrcp_get_play_status))) {
             cmd = TestCmd.TEST_CMD_GET_PLAY_STATUS;
         } else if (str.equals(this.getString(R.string.avrcp_get_supported_features))) {
@@ -670,6 +706,33 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 break;
 
             default:
+                Log.w(TAG, "Unknown btnId: " + btnId);
+                break;
+        }
+
+        Log.d(TAG,"getScope " + scope);
+        return scope;
+    }
+
+    private int getAttributes() {
+        int scope = 0;
+        int btnId = mAttributes.getCheckedRadioButtonId();
+
+        switch (btnId) {
+            case R.id.id_rb_title:
+                scope = AvrcpProfile.ATTRIBUTE_ID_TITLE;
+                break;
+
+            case R.id.id_rb_cover_art:
+                scope = AvrcpProfile.ATTRIBUTE_ID_COVER_ART;
+                break;
+
+            case R.id.id_rb_all:
+                scope = AvrcpProfile.ATTRIBUTE_ID_ALL;
+                break;
+
+            default:
+                scope = AvrcpProfile.ATTRIBUTE_ID_ALL;
                 Log.w(TAG, "Unknown btnId: " + btnId);
                 break;
         }
@@ -814,6 +877,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private void updateTestCmdUI() {
         boolean enableScope = false;
+        boolean enableAttributes = false;
         boolean enableFolder = false;
         boolean enableItemPosition = false;
         boolean enableValue = false;
@@ -832,7 +896,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 break;
             case TEST_CMD_ADD_TO_NOW_PLAYING:
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
+            case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
+            case TEST_CMD_GET_FOLDER_ITEMS:
                 enableScope = true;
+                enableAttributes = true;
                 enableFolder = true;
                 folder = TEST_FOLDER;
                 enableItemPosition = true;
@@ -862,46 +929,81 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         if (enableScope) {
             Log.d(TAG, "Enable scope ");
+            mScopesTextView.setVisibility(View.VISIBLE);
             for (int i = 0; i < mScopes.getChildCount(); i++) {
                 mScopes.getChildAt(i).setEnabled(true);
+                mScopes.getChildAt(i).setVisibility(View.VISIBLE);
             }
             mScopes.check(R.id.id_rb_vfs);
         } else {
             Log.d(TAG, "Disable scope ");
             mScopes.clearCheck();
+            mScopesTextView.setVisibility(View.GONE);
             for (int i = 0; i < mScopes.getChildCount(); i++) {
                 mScopes.getChildAt(i).setEnabled(false);
+                mScopes.getChildAt(i).setVisibility(View.GONE);
+            }
+        }
+
+        if(enableAttributes) {
+            Log.d(TAG, "Enable attributes ");
+            mAttributesTextView.setVisibility(View.VISIBLE);
+            for (int i = 0; i < mAttributes.getChildCount(); i++) {
+                mAttributes.getChildAt(i).setEnabled(true);
+                mAttributes.getChildAt(i).setVisibility(View.VISIBLE);
+            }
+            mAttributes.check(R.id.id_rb_title);
+        } else {
+            Log.d(TAG, "Disable attributes ");
+            mAttributesTextView.setVisibility(View.GONE);
+            mAttributes.clearCheck();
+            mAttributesTextView.setVisibility(View.GONE);
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mAttributes.getChildAt(i).setEnabled(false);
+                mAttributes.getChildAt(i).setVisibility(View.GONE);
             }
         }
 
         if (enableFolder) {
             Log.d(TAG, "Enable folder ");
+            mEditFolderTextView.setVisibility(View.VISIBLE);
             mEditFolder.setEnabled(true);
             mEditFolder.setText(folder);
+            mEditFolder.setVisibility(View.VISIBLE);
         } else {
             Log.d(TAG, "Disable folder ");
+            mEditFolderTextView.setVisibility(View.GONE);
             mEditFolder.setText("");
             mEditFolder.setEnabled(false);
+            mEditFolder.setVisibility(View.GONE);
         }
 
         if (enableItemPosition) {
             Log.d(TAG, "Enable item position ");
+            mEditItemPositionTextView.setVisibility(View.VISIBLE);
             mEditItemPosition.setEnabled(true);
             mEditItemPosition.setText(TEST_ITEM_POSITION);
+            mEditItemPosition.setVisibility(View.VISIBLE);
         } else {
             Log.d(TAG, "Disable item position ");
             mEditItemPosition.setText("");
             mEditItemPosition.setEnabled(false);
+            mEditItemPosition.setVisibility(View.GONE);
+            mEditItemPositionTextView.setVisibility(View.GONE);
         }
 
         if (enableValue) {
             Log.d(TAG, "Enable value ");
+            mEditValueTextView.setVisibility(View.VISIBLE);
             mEditValue.setEnabled(true);
             mEditValue.setText(value);
+            mEditValue.setVisibility(View.VISIBLE);
         } else {
             Log.d(TAG, "Disable value ");
+            mEditValueTextView.setVisibility(View.GONE);
             mEditValue.setText("");
             mEditValue.setEnabled(false);
+            mEditValue.setVisibility(View.GONE);
         }
     }
 
@@ -1213,7 +1315,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(scope, mediaId, false);
+        getItemAttributes(scope, mediaId);
         return true;
     }
 
@@ -1226,12 +1328,24 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             return false;
         }
 
-        getItemAttributes(scope, item.getMediaId(), false);
+        getItemAttributes(scope, item.getMediaId());
         return true;
     }
 
-    private void getItemAttributes(int scope, String mediaId, boolean all) {
-        if (all) {
+    private void getItemAttributes(int scope, String mediaId) {
+        int attributes = getAttributes();
+        Log.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE){
+            int[] titleAttribute = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getItemAttributes(scope, mediaId, titleAttribute);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART){
+            int[] coverArtAttribute = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getItemAttributes(scope, mediaId, coverArtAttribute);
+        } else {
             int[] allAttributes = {
                 AvrcpProfile.MEDIA_ATTR_ID_TITLE,
                 AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
@@ -1243,11 +1357,64 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
             };
             getItemAttributes(scope, mediaId, allAttributes);
-        } else {
-            int[] titleAttribute = {
+        }
+    }
+
+    private void getElementAttributes() {
+        int attributes = getAttributes();
+        Log.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE) {
+            int[] titleAttributes = {
                 AvrcpProfile.MEDIA_ATTR_ID_TITLE,
             };
-            getItemAttributes(scope, mediaId, titleAttribute);
+            getElementAttributes(titleAttributes);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART) {
+            int[] coverArtAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getElementAttributes(coverArtAttributes);
+        } else {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getElementAttributes(allAttributes);
+        }
+    }
+
+    private void getFolderItems() {
+        int scope = getScope();
+        int attributes = getAttributes();
+        int start = 0, end = 0xFF;
+        Log.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE) {
+            int[] titleAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getFolderItems(scope, start, end, titleAttributes);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART) {
+            int[] coverArtAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getFolderItems(scope, start, end, coverArtAttributes);
+        } else {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getFolderItems(scope, start, end, allAttributes);
         }
     }
 
@@ -1259,6 +1426,24 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         try {
             mAvrcp.getItemAttributes(scope, mediaId, attributeId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getElementAttributes(int[] attributeId) {
+        try {
+            mAvrcp.getElementAttributes(attributeId);
+        } catch (Exception e) {
+            Log.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getFolderItems(int scope, int start, int end, int[] attributeId) {
+        try {
+            mAvrcp.getFolderItems(scope, start, end, attributeId);
         } catch (Exception e) {
             Log.e(TAG, e.toString());
             e.printStackTrace();
