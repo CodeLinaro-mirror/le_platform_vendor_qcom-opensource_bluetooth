@@ -233,7 +233,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_GET_ELEMENT_ATTR =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ELEMENT_ATTR";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_GET_ELEMENT_ATTR";
 
     /**
      * Custom action to get folder items.
@@ -254,7 +254,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_GET_FOLDER_ITEM =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_FOLDER_ITEM";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_GET_FOLDER_ITEM";
     public static final String KEY_START = "start";
     public static final String KEY_END = "end";
 
