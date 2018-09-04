@@ -719,6 +719,8 @@ static void bta_avk_api_register(tBTA_AVK_DATA *p_data)
             {
                 APPL_TRACE_DEBUG(" %s ~~ AVDTP v1.3 : cs.cfg.psc_mask |= AVDT_PSC_DELAY_RPT ",__func__);
                 cs.cfg.psc_mask |= AVDT_PSC_DELAY_RPT;
+                a2d_set_avdt_sdp_ver(AVDT_VERSION_SYNC);
+                a2d_set_a2dp_sdp_ver(A2D_VERSION_SYNC);
             }
 
             if (profile_initialized == UUID_SERVCLASS_AUDIO_SINK)
