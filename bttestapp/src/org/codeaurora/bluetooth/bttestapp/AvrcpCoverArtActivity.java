@@ -31,6 +31,7 @@ package org.codeaurora.bluetooth.bttestapp;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
@@ -211,7 +212,9 @@ public class AvrcpCoverArtActivity extends Activity
             IMAGE_WIDTH_DEFAULT);
         int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
             MAXSIZE_DEFAULT);
-        // mAvrcpController.startFetchingAlbumArt(type, height, width, maxSize);
+
+        BluetoothDevice device = mAvrcpController.getActiveDevice();
+        mAvrcpController.startFetchingAlbumArt(device, type, height, width, maxSize);
     }
 
     private void setSpinners() {
