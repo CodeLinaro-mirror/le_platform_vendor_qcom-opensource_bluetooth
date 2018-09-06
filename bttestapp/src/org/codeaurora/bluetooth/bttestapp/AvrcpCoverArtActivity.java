@@ -68,6 +68,14 @@ public class AvrcpCoverArtActivity extends Activity
     private final BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     BluetoothAvrcpController mAvrcpController;
 
+    private static final String MIMETYPE_DEFAULT = "JPEG";
+    private static final String IMAGETYPE_DEFAULT = "Image";
+    private static final int IMAGE_HEIGHT_DEFAULT = 500;
+    private static final int IMAGE_WIDTH_DEFAULT = 500;
+    private static final int THUMBNAIL_IMAGE_HEIGHT_DEFAULT = 200;
+    private static final int THUMBNAIL_IMAGE_WIDTH_DEFAULT = 200;
+    private static final int MAXSIZE_DEFAULT = 200000;
+
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
         @Override
@@ -179,38 +187,53 @@ public class AvrcpCoverArtActivity extends Activity
             SystemProperties.set("persist.service.bt.avrcpct.imgsize",
                     getValue(mSpImgSize));
         } else if (v == mBtnConfigBase) {
-            SystemProperties.set("persist.service.bt.avrcpct.imgtype", "Image");
-            SystemProperties.set("persist.service.bt.avrcpct.imgencode", "JPEG");
-            SystemProperties.set("persist.service.bt.avrcpct.imgwidth", "500");
-            SystemProperties.set("persist.service.bt.avrcpct.imgheight", "500");
-            SystemProperties.set("persist.service.bt.avrcpct.imgsize", "200000");
+            SystemProperties.set("persist.service.bt.avrcpct.imgtype", IMAGETYPE_DEFAULT);
+            SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
+            SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                IMAGE_WIDTH_DEFAULT + "");
+            SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                IMAGE_HEIGHT_DEFAULT + "");
+            SystemProperties.set("persist.service.bt.avrcpct.imgsize",
+                MAXSIZE_DEFAULT + "");
             setSpinners();
         }
     }
 
     public void getCoveArtImage(View v) {
         Log.i(TAG, "Start Fetching Album art");
-        mAvrcpController.startFetchingAlbumArt("JPEG", 500, 500, 2000000);
+        String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype",
+            IMAGETYPE_DEFAULT);
+        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+            IMAGE_HEIGHT_DEFAULT);
+        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+            IMAGE_WIDTH_DEFAULT);
+        int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
+            MAXSIZE_DEFAULT);
+        mAvrcpController.startFetchingAlbumArt(type, height, width, maxSize);
     }
 
     private void setSpinners() {
         String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype");
-        if (TextUtils.isEmpty(type) || type.equalsIgnoreCase("Image")) {
+        if (TextUtils.isEmpty(type) || type.equalsIgnoreCase(IMAGETYPE_DEFAULT)) {
             mSpImgType.setSelection(0);
         } else {
             mSpImgType.setSelection(1);
         }
         String mime = SystemProperties.get("persist.service.bt.avrcpct.imgencode");
-        if (TextUtils.isEmpty(mime) || mime.equalsIgnoreCase("JPEG")) {
-            mSpImgEncode.setSelection(0);
-        } else {
+        if ("PNG".equalsIgnoreCase(mime)){
             mSpImgEncode.setSelection(1);
+        } else if ("GIF".equalsIgnoreCase(mime)){
+            mSpImgEncode.setSelection(2);
+        } else {
+            mSpImgEncode.setSelection(0);
         }
 
-        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight", 500);
-        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth", 500);
+        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+            IMAGE_HEIGHT_DEFAULT);
+        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+            IMAGE_WIDTH_DEFAULT);
         int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
-                200000);
+            MAXSIZE_DEFAULT);
         Log.i(TAG, " Type :" + type + " Mime :" + mime + " Height:" + height + ": width :"
                 + width + " Max size:" + maxSize);
         mSpImgWidth.setSelection(getIndex(mSpImgWidth, width + ""));
@@ -234,18 +257,30 @@ public class AvrcpCoverArtActivity extends Activity
 
     @Override
     public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
-        if(mSpImgType.getSelectedItem().toString().equals("Image")) {
+        if(mSpImgType.getSelectedItem().toString().equals(IMAGETYPE_DEFAULT)) {
             mSpImgEncode.setEnabled(true);
             mSpImgheight.setEnabled(true);
             mSpImgSize.setEnabled(true);
             mSpImgWidth.setEnabled(true);
             Log.v(TAG," Image");
-        }else {
+        } else {
+            Log.v(TAG," Thumbnail");
+            if(mSpImgType.getSelectedItem().toString().equals("ThumbnailImage")) {
+                SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
+                SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                    THUMBNAIL_IMAGE_HEIGHT_DEFAULT + "");
+                SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                    THUMBNAIL_IMAGE_WIDTH_DEFAULT + "");
+                mSpImgEncode.setSelection(getIndex(mSpImgEncode, MIMETYPE_DEFAULT));
+                mSpImgWidth.setSelection(getIndex(mSpImgheight,
+                    THUMBNAIL_IMAGE_HEIGHT_DEFAULT + ""));
+                mSpImgheight.setSelection(getIndex(mSpImgWidth,
+                    THUMBNAIL_IMAGE_WIDTH_DEFAULT + ""));
+            }
             mSpImgEncode.setEnabled(false);
             mSpImgheight.setEnabled(false);
             mSpImgSize.setEnabled(false);
             mSpImgWidth.setEnabled(false);
-            Log.v(TAG," Not image");
         }
     }
 
