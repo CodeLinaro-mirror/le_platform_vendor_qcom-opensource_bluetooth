@@ -472,11 +472,13 @@
     <string name="getCoveArtImage">Get CoveArt Image</string>
     <string-array name="array_image_type">
         <item>Image</item>
-        <item>Thumbnail</item>
+        <item>ThumbnailLinked</item>
+        <item>ThumbnailImage</item>
     </string-array>
     <string-array name="array_image_encode">
         <item>JPEG</item>
         <item>PNG</item>
+        <item>GIF</item>
     </string-array>
     <string-array name="array_image_width">
         <item>100</item>
