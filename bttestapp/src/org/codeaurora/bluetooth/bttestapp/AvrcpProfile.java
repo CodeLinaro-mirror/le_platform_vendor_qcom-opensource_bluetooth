@@ -213,6 +213,50 @@ public class AvrcpProfile {
     public static final String KEY_ATTRIBUTE_ID = "attribute_id";
 
     /**
+     * Custom action to get element attributes.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * <p>Intent {@link AvrcpControllerService.ACTION_TRACK_EVENT} will be broadcast.
+     * to notify the item attributes retrieved.
+     *
+     * @param Bundle wrapped with KEY_ATTRIBUTE_ID
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link android.media.MediaMetadata}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_GET_ELEMENT_ATTR =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ELEMENT_ATTR";
+
+    /**
+     * Custom action to get folder items.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * <p>Intent {@link AvrcpControllerService.EXTRA_FOLDER_LIST} will be broadcast.
+     * to notify the items(player or folder/item) retrieved.
+     *
+     * @param Bundle wrapped with KEY_BROWSE_SCOPE and KEY_ATTRIBUTE_ID
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link android.media.MediaMetadata}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_GET_FOLDER_ITEM =
+        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_FOLDER_ITEM";
+    public static final String KEY_START = "start";
+    public static final String KEY_END = "end";
+
+    /**
      * Custom action to get total number of items.
      *
      * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
@@ -380,6 +424,16 @@ public class AvrcpProfile {
     public static final int BROWSE_SCOPE_VFS = 0x01;
     public static final int BROWSE_SCOPE_SEARCH = 0x02;
     public static final int BROWSE_SCOPE_NOW_PLAYING = 0x03;
+
+    public static final int ATTRIBUTE_ID_TITLE = 0x01;
+    public static final int ATTRIBUTE_ID_ARTIST = 0x02;
+    public static final int ATTRIBUTE_ID_ALBUM = 0x03;
+    public static final int ATTRIBUTE_ID_TRACK_NUM = 0x04;
+    public static final int ATTRIBUTE_ID_NUM_TRACKS = 0x05;
+    public static final int ATTRIBUTE_ID_GENRE = 0x06;
+    public static final int ATTRIBUTE_ID_PLAYING_TIME = 0x07;
+    public static final int ATTRIBUTE_ID_COVER_ART = 0x08;
+    public static final int ATTRIBUTE_ID_ALL = 0x00;
 
     public static final String ROOT = "__ROOT__";
     public static final String NOW_PLAYING_PREFIX = "NOW_PLAYING";
@@ -566,6 +620,23 @@ public class AvrcpProfile {
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         extras.putIntArray(KEY_ATTRIBUTE_ID, attributeId);
         sendCustomAction(CUSTOM_ACTION_GET_ITEM_ATTR, extras);
+    }
+
+    public void getElementAttributes(int[] attributeId) {
+        Log.d(TAG, "getElementAttributes");
+        Bundle extras = new Bundle();
+        extras.putIntArray(KEY_ATTRIBUTE_ID, attributeId);
+        sendCustomAction(CUSTOM_ACTION_GET_ELEMENT_ATTR, extras);
+    }
+
+    public void getFolderItems(int scope, int start, int end, int[] attributeId) {
+        Log.d(TAG, "getFolderItems");
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_BROWSE_SCOPE, scope);
+        extras.putInt(KEY_START, start);
+        extras.putInt(KEY_END, end);
+        extras.putIntArray(KEY_ATTRIBUTE_ID, attributeId);
+        sendCustomAction(CUSTOM_ACTION_GET_FOLDER_ITEM, extras);
     }
 
     public void getTotalNumberOfItems(int scope) {

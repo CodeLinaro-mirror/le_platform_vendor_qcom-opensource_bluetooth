@@ -406,11 +406,16 @@
     <string name="avrcp_test">Test</string>
     <string name="avrcp_get_play_status">GetPlayStatus</string>
     <string name="avrcp_get_item_attr">GetItemAttributes</string>
+    <string name="avrcp_get_element_attr">GetElementAttributes</string>
+    <string name="avrcp_get_folder_item">GetFolderItems</string>
     <string name="avrcp_scope">Scope</string>
     <string name="avrcp_folder">Folder</string>
     <string name="avrcp_player">Player</string>
     <string name="avrcp_vfs">VFS</string>
     <string name="avrcp_now_playing">NowPlaying</string>
+    <string name="avrcp_attribute">Attribute</string>
+    <string name="avrcp_title">Title</string>
+    <string name="avrcp_all">All</string>
     <string name="avrcp_item_position">ItemPosition</string>
     <string name="avrcp_query">Query</string>
     <string name="avrcp_get_total_num">GetTotalNumberOfItems</string>
@@ -433,6 +438,8 @@
         <item>@string/avrcp_browse_up</item>
         <item>@string/avrcp_get_audio_config</item>
         <item>@string/avrcp_get_item_attr</item>
+        <item>@string/avrcp_get_element_attr</item>
+        <item>@string/avrcp_get_folder_item</item>
         <item>@string/avrcp_get_play_status</item>
         <item>@string/avrcp_get_supported_features</item>
         <item>@string/avrcp_get_total_num</item>
