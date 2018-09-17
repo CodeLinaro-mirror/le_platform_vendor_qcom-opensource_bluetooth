@@ -35,6 +35,30 @@ typedef struct{
     void *val;
 }btvendor_lename_t;
 
+/** Bluetooth PnP information*/
+/* The maximum length, in bytes, of an attribute. */
+#ifndef SDP_MAX_ATTR_LEN
+#define SDP_MAX_ATTR_LEN            400
+#endif
+
+/* Used to set the DI record */
+typedef struct{
+    uint16_t       vendor;
+    uint16_t       vendor_id_source;
+    uint16_t       product;
+    uint16_t       version;
+    bool           primary_record;
+    char           client_executable_url[SDP_MAX_ATTR_LEN];   /* optional */
+    char           service_description[SDP_MAX_ATTR_LEN];     /* optional */
+    char           documentation_url[SDP_MAX_ATTR_LEN];       /* optional */
+}bt_sdp_did_record_t;
+
+/* Used to get the DI record */
+typedef struct{
+    uint16_t             spec_id;
+    bt_sdp_did_record_t  rec;
+}bt_sdp_did_get_record;
+
 /** Callback when bredr cleanup is done.
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
@@ -50,6 +74,10 @@ typedef void (*btvendor_acl_state_changed_with_reason_callback)(bt_status_t stat
                                                        bt_acl_state_t state,
                                                        uint8_t reason,
                                                        uint8_t transport_type);
+
+/** Callback to notify DID info to app.*/
+typedef void (*btvendor_did_info_callback)(bt_sdp_did_get_record di_rec);
+
 /** BT-Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtVendorCallbacks) */
@@ -58,6 +86,7 @@ typedef struct {
     btvendor_ssr_cleanup_callback    ssr_cleanup_cb;
     btvendor_snooplog_status_callback  update_snooplog_status_cb;
     btvendor_acl_state_changed_with_reason_callback acl_state_changed_with_reason_cb;
+    btvendor_did_info_callback did_info_cb;
 } btvendor_callbacks_t;
 
 /** Represents the standard BT-Vendor interface.
