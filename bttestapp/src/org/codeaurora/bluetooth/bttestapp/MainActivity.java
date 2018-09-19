@@ -35,6 +35,8 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.SdpMasRecord;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothUuid;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -59,7 +61,8 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
-
+import java.io.IOException;
+import java.util.UUID;
 import java.util.ArrayList;
 
 public class MainActivity extends MonkeyActivity {
@@ -87,6 +90,8 @@ public class MainActivity extends MonkeyActivity {
     private BluetoothAdapter mBtAdapter;
     private Button mBtnDiscoverService,mBtnSelectDevice, mSinkButton, mSourceButton;
     private static long current_time, switch_time;
+
+    private Eir128bitUUIDSample EirSample1 = null,EirSample2 = null,EirSample3 = null;
 
     private final BroadcastReceiver mPickerReceiver = new BroadcastReceiver() {
 
@@ -295,6 +300,24 @@ public class MainActivity extends MonkeyActivity {
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
         setBTState();
+
+        if (EirSample1 == null)
+        {
+            EirSample1  = new Eir128bitUUIDSample("128UUID_SAMPLE1",  "00112233-4455-6677-8899-aabbccddeeff");
+            EirSample1.start();
+        }
+
+        if (EirSample2 == null)
+        {
+            EirSample2    = new Eir128bitUUIDSample("128UUID_SAMPLE2",  "00000000-2222-2222-3333-555555555555");
+            EirSample2.start();
+        }
+
+        if (EirSample3 == null)
+        {
+            EirSample3 = new Eir128bitUUIDSample("128UUID_SAMPLE3",  "11112222-8877-aabb-ccdd-666666666666");
+            EirSample3.start();
+        }
     }
 
     @Override
@@ -510,4 +533,41 @@ public class MainActivity extends MonkeyActivity {
             e.printStackTrace();
         }
     }
+
+    private class Eir128bitUUIDSample extends Thread {
+
+       private final BluetoothServerSocket mmServerSocket;
+
+       public Eir128bitUUIDSample(String serviceName, String uuid) {
+
+           BluetoothServerSocket tmp = null;
+           try {
+               tmp = mBtAdapter.listenUsingRfcommWithServiceRecord(serviceName, UUID.fromString(uuid));
+           } catch (IOException e) { }
+           mmServerSocket = tmp;
+       }
+       public void run() {
+           BluetoothSocket socket = null;
+           while (true) {
+               try {
+                   socket = mmServerSocket.accept();
+               } catch (IOException e) {
+                   break;
+               }
+               if (socket != null) {
+                   try{
+                       mmServerSocket.close();
+                   }catch(IOException e) {
+                       e.printStackTrace();
+                   }
+                break;
+              }
+           }
+       }
+       public void cancel() {
+           try {
+               mmServerSocket.close();
+           } catch (IOException e) { }
+       }
+   }
 }
