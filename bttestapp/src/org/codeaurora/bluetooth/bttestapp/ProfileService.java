@@ -41,6 +41,8 @@ import android.bluetooth.SdpMasRecord;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.bluetooth.BluetoothAudioConfig;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothUuid;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -54,6 +56,7 @@ import android.os.Message;
 import android.os.Bundle;
 import android.util.Log;
 import android.os.Bundle;
+import android.os.SystemProperties;
 
 import com.android.vcard.VCardEntry;
 import android.bluetooth.client.map.BluetoothMapBmessage;
@@ -127,6 +130,8 @@ public class ProfileService extends Service {
     public static final String KEY_LINK_KEY_TYPE= "link_key_type";
     public static final String KEY_PIN_LEN = "pin_len";
     public static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
+    public static final String PTS_IOPT_PROPERTY = "bt.pts.iopt";
+
     private BluetoothDevice mDevice = null;
 
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -148,6 +153,7 @@ public class ProfileService extends Service {
     private final IBinder mBinder = new LocalBinder();
 
     private Context mContext;
+    private static volatile BluetoothServerSocket mListenSocket = null;
 
     class MapSessionData {
         ArrayList<String> getFolderListing;
@@ -607,12 +613,15 @@ public class ProfileService extends Service {
         mAvrcp = new AvrcpProfile(mContext);
         mHfp = new HfpProfile(mContext);
         mPbap = new PbapProfile(mContext);
+        enablePts(true);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.v(TAG, "onStartCommand intent=" + intent + " flags=" + Integer.toHexString(flags)
                 + " startId=" + startId);
+
+        createPceService();
         return START_STICKY;
     }
 
@@ -710,6 +719,25 @@ public class ProfileService extends Service {
         extras.putString("Package", "org.codeaurora.bluetooth.bttestapp");
         sendCustomAction(extras);
         return true;
+    }
+
+    public void createPceService() {
+        if (SystemProperties.getBoolean(PTS_IOPT_PROPERTY, false)) {
+            Log.d(TAG, "connectSocket: UUID: " + BluetoothUuid.PBAP_PCE.getUuid());
+            try {
+                mListenSocket = mAdapter.listenUsingRfcommWithServiceRecord(
+                    "Phonebook Access - PCE",
+                    BluetoothUuid.PBAP_PCE.getUuid());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            Log.d(TAG, "bt.pts.iopt is not set");
+        }
+    }
+
+    public void enablePts(boolean enable) {
+        SystemProperties.set(PTS_IOPT_PROPERTY, String.valueOf(enable));
     }
 
     private void sendCustomAction(Bundle extras) {
