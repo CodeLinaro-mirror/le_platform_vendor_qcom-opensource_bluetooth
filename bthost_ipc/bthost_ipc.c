@@ -989,7 +989,8 @@ int audio_stop_stream()
                 audio_stream.ack_status = A2DP_CTRL_ACK_UNKNOWN;
                 if (status == A2DP_CTRL_ACK_SUCCESS) ret = 0;
             }
-            else if (status == A2DP_CTRL_ACK_SUCCESS)
+
+            if (status == A2DP_CTRL_ACK_SUCCESS)
             {
                 ALOGW("audio stop stream successful");
                 audio_stream.state = AUDIO_A2DP_STATE_STANDBY;
@@ -1070,7 +1071,8 @@ int audio_suspend_stream()
                 status = audio_stream.ack_status;
                 audio_stream.ack_status = A2DP_CTRL_ACK_UNKNOWN;
             }
-            else if (status == A2DP_CTRL_ACK_SUCCESS)
+
+            if (status == A2DP_CTRL_ACK_SUCCESS)
             {
                 ALOGW("audio suspend stream successful");
                 pthread_mutex_unlock(&audio_stream.lock);
