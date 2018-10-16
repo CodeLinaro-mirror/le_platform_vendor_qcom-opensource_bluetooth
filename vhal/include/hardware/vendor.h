@@ -59,6 +59,11 @@ typedef struct{
     bt_sdp_did_record_t  rec;
 }bt_sdp_did_get_record;
 
+typedef struct{
+    bt_bdaddr_t            bd_addr;      /* BD address peer device. */
+    bt_sdp_did_get_record  rec;
+}bt_sdp_did_info;
+
 /** Callback when bredr cleanup is done.
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
@@ -76,7 +81,7 @@ typedef void (*btvendor_acl_state_changed_with_reason_callback)(bt_status_t stat
                                                        uint8_t transport_type);
 
 /** Callback to notify DID info to app.*/
-typedef void (*btvendor_did_info_callback)(bt_sdp_did_get_record di_rec);
+typedef void (*btvendor_did_info_callback)(bt_sdp_did_info di_info);
 
 /** BT-Vendor callback structure. */
 typedef struct {
