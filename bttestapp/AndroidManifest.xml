@@ -20,6 +20,7 @@
     <protected-broadcast android:name="android.bluetooth.pbapclient.action.CUSTOM_ACTION" />
     <protected-broadcast android:name="android.bluetooth.pbapclient.action.CUSTOM_ACTION_RESULT" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.CUSTOM_ACTION" />
+    <protected-broadcast android:name="android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT" />
 
     <uses-sdk
         android:minSdkVersion="17"

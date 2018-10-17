@@ -114,7 +114,65 @@ public class ProfileService extends Service {
 
     public static final String EXTRA_MAP_MESSAGE_HANDLE = "org.codeaurora.bluetooth.extra.MAP_MESSAGE_HANDLE";
 
-    public static final String KEY_RESULT = "result";
+
+    // +++ Custom action definition
+
+    /**
+      * Broadcast Action: Indicates custom action(request) from application.
+      *
+      * <p>Always contains the extra field {@link #EXTRA_CUSTOM_ACTION}.
+      *
+      * <p>Requires {@link android.Manifest.permission#BLUETOOTH} to receive.
+      */
+    public static final String ACTION_CUSTOM_ACTION =
+        "android.bluetooth.adapter.action.CUSTOM_ACTION";
+
+    public static final String EXTRA_CUSTOM_ACTION =
+        "android.bluetooth.adapter.extra.CUSTOM_ACTION";
+
+    public static final String KEY_COMMAND = "command";
+
+    /**
+      * Custom action to get link key
+      *
+      * @param Bundle wrapped with
+      *  {@link #KEY_COMMAND}
+      *  {@link #BluetoothDevice.EXTRA_DEVICE}
+      */
+
+    public static final String CUSTOM_ACTION_GET_LINK_KEY = "android.bluetooth.adapter.CUSTOM_ACTION_GET_LINK_KEY";
+
+    /**
+      * Custom action to add oob bond device
+      *
+      * @param Bundle wrapped with
+      *  {@link #KEY_COMMAND}
+      *  {@link #BluetoothDevice.EXTRA_DEVICE}
+      */
+
+    public static final String CUSTOM_ACTION_ADD_OOB_BOND_DEV =
+        "android.bluetooth.adapter.CUSTOM_ACTION_ADD_OOB_BOND_DEV";
+
+    public static final String KEY_LINK_KEY = "link_key";
+    public static final String KEY_LINK_KEY_TYPE = "link_key_type";
+    public static final String KEY_PIN_LEN = "pin_len";
+
+    // + Response for custom action
+
+    /**
+     * Intent used to broadcast custom action result
+     *
+     * <p>This intent will have 2 extras at least:
+     * <ul>
+     *   <li> {@link #EXTRA_CUSTOM_ACTION} - custom action command. </li>
+     *
+     *   <li> {@link #EXTRA_CUSTOM_ACTION_RESULT} - custom action result. </li>
+     *
+     * </ul>
+     *
+     * <p>Requires {@link android.Manifest.permission#BLUETOOTH} permission to
+     * receive.
+     */
 
     public static final String ACTION_CUSTOM_ACTION_RESULT =
         "android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT";
@@ -122,13 +180,6 @@ public class ProfileService extends Service {
     public static final String EXTRA_CUSTOM_ACTION_RESULT =
         "android.bluetooth.adapter.extra.CUSTOM_ACTION_RESULT";
 
-    public static final String ACTION_CUSTOM_ACTION = "android.bluetooth.adapter.action.CUSTOM_ACTION";
-
-    public static final String EXTRA_CUSTOM_ACTION = "android.bluetooth.adapter.extra.CUSTOM_ACTION";
-    public static final String PREFS_READ = "PREFS_READ";
-    public static final String KEY_LINK_KEY= "link_key";
-    public static final String KEY_LINK_KEY_TYPE= "link_key_type";
-    public static final String KEY_PIN_LEN = "pin_len";
     public static final String BLUETOOTH_PERM = android.Manifest.permission.BLUETOOTH;
     public static final String PTS_IOPT_PROPERTY = "bt.pts.iopt";
 
@@ -703,24 +754,6 @@ public class ProfileService extends Service {
         return mMapSessionData.get(id);
     }
 
-    public boolean addOutOfBandBondDevice(BluetoothDevice device, String linkKey, int linkKeyType, int pinLen) {
-        Log.v(TAG, "Current device: address= " + device.getAddress() + " linkKey = "
-                            + linkKey + " linkKeyType = " + linkKeyType + " pinLen = " + pinLen);
-
-        SharedPreferences pref = getSharedPreferences(PREFS_READ, Context.MODE_WORLD_READABLE);
-        SharedPreferences.Editor editor = pref.edit();
-        editor.putString(KEY_LINK_KEY, linkKey);
-        editor.putInt(KEY_LINK_KEY_TYPE, linkKeyType);
-        editor.putInt(KEY_PIN_LEN, pinLen);
-        editor.commit();
-
-        Bundle extras = new Bundle();
-        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
-        extras.putString("Package", "org.codeaurora.bluetooth.bttestapp");
-        sendCustomAction(extras);
-        return true;
-    }
-
     public void createPceService() {
         if (SystemProperties.getBoolean(PTS_IOPT_PROPERTY, false)) {
             Log.d(TAG, "connectSocket: UUID: " + BluetoothUuid.PBAP_PCE.getUuid());
@@ -736,10 +769,35 @@ public class ProfileService extends Service {
         }
     }
 
+
+    public void addOutOfBandBondDevice(BluetoothDevice device, String linkKey, int linkKeyType, int pinLen) {
+        Log.v(TAG, "Current device: address = " + device.getAddress() + " linkKey = "
+              + linkKey + " linkKeyType = " + linkKeyType + " pinLen = " + pinLen);
+
+        Bundle extras = createBundle(CUSTOM_ACTION_ADD_OOB_BOND_DEV, device);
+        extras.putString(KEY_LINK_KEY, linkKey);
+        extras.putInt(KEY_LINK_KEY_TYPE, linkKeyType);
+        extras.putInt(KEY_PIN_LEN, pinLen);
+        sendCustomAction(extras);
+    }
+
+    public void getLinkKey(BluetoothDevice device) {
+        Log.v(TAG, "Current device: address= " + device.getAddress());
+
+        Bundle extras = createBundle(CUSTOM_ACTION_GET_LINK_KEY, device);
+        sendCustomAction(extras);
+    }
+
     public void enablePts(boolean enable) {
         SystemProperties.set(PTS_IOPT_PROPERTY, String.valueOf(enable));
     }
 
+    private Bundle createBundle(String cmd, BluetoothDevice device) {
+        Bundle extras = new Bundle();
+        extras.putString(KEY_COMMAND, cmd);
+        extras.putParcelable(BluetoothDevice.EXTRA_DEVICE, device);
+        return extras;
+    }
     private void sendCustomAction(Bundle extras) {
         Intent intent = new Intent(ACTION_CUSTOM_ACTION);
         intent.putExtra(EXTRA_CUSTOM_ACTION, extras);
