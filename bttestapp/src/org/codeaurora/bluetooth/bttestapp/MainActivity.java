@@ -92,7 +92,7 @@ public class MainActivity extends MonkeyActivity {
     private ServicesFragment mServicesFragment = null;
 
     private BluetoothAdapter mBtAdapter;
-    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond;
+    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond, mBtnGetLinkKey;
     private static long current_time, switch_time;
 
     private Eir128bitUUIDSample EirSample1 = null,EirSample2 = null,EirSample3 = null;
@@ -330,6 +330,7 @@ public class MainActivity extends MonkeyActivity {
         mBtnDiscoverService=(Button) findViewById(R.id.discover_services);
         mBtnSelectDevice=(Button) findViewById(R.id.select_device);
         mBtnAddOobBond=(Button) findViewById(R.id.add_oob_bond_dev);
+        mBtnGetLinkKey=(Button) findViewById(R.id.get_link_key);
         mSinkButton = (Button) findViewById(R.id.id_a2dp_sink);
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -468,6 +469,11 @@ public class MainActivity extends MonkeyActivity {
                     mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
                 }
             }
+        } else if (v.getId() == R.id.get_link_key) {
+            if (mDevice != null && mProfileService != null) {
+                Logger.v(TAG, "get link key");
+                mDevice.getLinkKey();
+            }
         }
     }
 
@@ -511,7 +517,6 @@ public class MainActivity extends MonkeyActivity {
         Log.i(TAG," showHidHost");
         startActivity(new Intent(this, HidTestApp.class));
     }
-
 
     private void updateDevice(BluetoothDevice device) {
         SharedPreferences.Editor prefs = getPreferences(MODE_PRIVATE).edit();
@@ -587,10 +592,12 @@ public class MainActivity extends MonkeyActivity {
             mBtnDiscoverService.setEnabled(true);
             mBtnSelectDevice.setEnabled(true);
             mBtnAddOobBond.setEnabled(true);
+            mBtnGetLinkKey.setEnabled(true);
         } else {
             mBtnDiscoverService.setEnabled(false);
             mBtnSelectDevice.setEnabled(false);
             mBtnAddOobBond.setEnabled(false);
+            mBtnGetLinkKey.setEnabled(false);
         }
     }
 

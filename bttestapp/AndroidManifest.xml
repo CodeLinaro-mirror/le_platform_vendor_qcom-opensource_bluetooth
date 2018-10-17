@@ -25,6 +25,7 @@
     <protected-broadcast android:name="android.bluetooth.pbapclient.action.CUSTOM_ACTION_RESULT" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.CUSTOM_ACTION" />
     <protected-broadcast android:name="android.bluetooth.adapter.action.CUSTOM_ACTION_RESULT" />
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
