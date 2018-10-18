@@ -60,6 +60,7 @@ typedef struct{
 }bt_sdp_did_get_record;
 
 typedef struct{
+    uint8_t                status;       /* success or fail */
     bt_bdaddr_t            bd_addr;      /* BD address peer device. */
     bt_sdp_did_get_record  rec;
 }bt_sdp_did_info;
