@@ -219,7 +219,7 @@ public class BluetoothFtpService extends Service {
 
     private BluetoothServerSocket mRfcommServerSocket = null;
 
-
+    private boolean mIsServiceClosed = false;
     private BluetoothSocket mConnSocket = null;
     private BluetoothDevice mRemoteDevice = null;
 
@@ -273,6 +273,7 @@ public class BluetoothFtpService extends Service {
                     filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
                     filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
                     registerReceiver(mFtpReceiver, filter);
+                    mIsServiceClosed = false;
                 }
                 mSessionStatusHandler.sendMessage(mSessionStatusHandler
                         .obtainMessage(MSG_INTERNAL_START_LISTENER));
@@ -510,22 +511,23 @@ public class BluetoothFtpService extends Service {
         }
     }
     private final void closeService() {
-        Log.v(TAG, "Ftp Service closeService mFtpReceiver :" + mFtpReceiver);
-
+        Log.d(TAG, "closeService :" + mIsServiceClosed);
+        if (mIsServiceClosed) {
+            return;
+        }
+        mIsServiceClosed = true;
         try {
             closeRfcommSocket(true, false);
         } catch (IOException ex) {
             Log.e(TAG, "CloseSocket error: " + ex);
         }
-        synchronized (BluetoothFtpService.this) {
-            if (mRfcommAcceptThread != null) {
-                try {
-                    mRfcommAcceptThread.shutdown();
-                    mRfcommAcceptThread.join();
-                    mRfcommAcceptThread = null;
-                } catch (InterruptedException ex) {
-                    Log.w(TAG, "mAcceptThread close error" + ex);
-                }
+        if (mRfcommAcceptThread != null) {
+            try {
+                mRfcommAcceptThread.shutdown();
+                mRfcommAcceptThread.join();
+                mRfcommAcceptThread = null;
+            } catch (InterruptedException ex) {
+                Log.w(TAG, "mAcceptThread close error" + ex);
             }
             Log.d(TAG, "mRfcommAcceptThread stopped");
         }
@@ -676,7 +678,6 @@ public class BluetoothFtpService extends Service {
 
             if (mRfcommServerSocket == null) {
                  if (!initRfcommSocket()) {
-                     closeService();
                      return;
                  }
              }
