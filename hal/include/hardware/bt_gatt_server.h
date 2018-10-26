@@ -189,6 +189,9 @@ typedef struct {
     bt_status_t (*send_response)(int conn_id, int trans_id,
                                  int status, btgatt_response_t *response);
 
+    /** sends service change indication */
+    bt_status_t (*service_changed)();
+
 } btgatt_server_interface_t;
 
 __END_DECLS
