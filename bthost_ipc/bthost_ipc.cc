@@ -104,8 +104,10 @@ struct a2dp_stream_common audio_stream;
 ******************************************************************************/
 
 audio_sbc_encoder_config sbc_codec;
-audio_aptx_encoder_config aptx_codec;
+audio_aptx_default_config aptx_codec;
 audio_aac_encoder_config aac_codec;
+audio_aptx_ad_config aptx_adaptive_codec;
+audio_aptx_dual_mono_config aptx_tws_codec;
 /*****************************************************************************
 **  Externs
 ******************************************************************************/
@@ -186,6 +188,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
     char byte,len;
     uint8_t *p_cfg = codec_cfg;
     INFO("%s",__func__);
+    INFO("%s: codec_type = %x",__func__, codec_cfg[CODEC_OFFSET]);
     if (codec_cfg[CODEC_OFFSET] == CODEC_TYPE_PCM)
     {
         *codec_type = AUDIO_FORMAT_PCM_16_BIT;
@@ -291,6 +294,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         sbc_codec.bitrate |= (*p_cfg++ << 8);
         sbc_codec.bitrate |= (*p_cfg++ << 16);
         sbc_codec.bitrate |= (*p_cfg++ << 24);
+        sbc_codec.bits_per_sample = *(uint32_t *)p_cfg;
         *codec_type = AUDIO_FORMAT_SBC;
         INFO("SBC: Done copying full codec config");
         return ((void *)(&sbc_codec));
@@ -387,7 +391,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
 
         aac_bit_rate |= 0x000000FF & (((uint32_t)byte));
         aac_codec.bitrate = aac_bit_rate;
-
+        aac_codec.bits_per_sample = *(uint32_t *)p_cfg;
         *codec_type = AUDIO_FORMAT_AAC;
         INFO("AAC: Done copying full codec config");
         return ((void *)(&aac_codec));
@@ -406,7 +410,117 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             INFO("AptX-HD codec");
             *codec_type = AUDIO_FORMAT_APTX_HD;
         }
-        memset(&aptx_codec,0,sizeof(audio_aptx_encoder_config));
+
+        if (codec_cfg[VENDOR_ID_OFFSET] == VENDOR_APTX_ADAPTIVE &&
+            codec_cfg[CODEC_ID_OFFSET] == APTX_ADAPTIVE_CODEC_ID)
+        {
+            INFO("AptX-Adaptive codec");
+            *codec_type = AUDIO_FORMAT_APTX_ADAPTIVE;
+
+            memset(&aptx_adaptive_codec, 0, sizeof(audio_aptx_ad_config));
+            p_cfg++; //skip dev_idx
+            len = *p_cfg++;//LOSC
+            p_cfg++; // Skip media type
+            len--;
+            p_cfg++; //codec_type
+            len--;
+            p_cfg+=4;//skip vendor id
+            len -= 4;
+            p_cfg += 2; //skip codec id
+            len -= 2;
+
+            switch(*p_cfg++ & A2D_APTX_ADAPTIVE_SAMP_FREQ_MASK)
+            {
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_44100:
+                     aptx_adaptive_codec.sampling_rate = 0x2;
+                     break;
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_48000:
+                     aptx_adaptive_codec.sampling_rate = 0x1;
+                     break;
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_88000:
+                     aptx_adaptive_codec.sampling_rate = 0;
+                     break;
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_192000:
+                     aptx_adaptive_codec.sampling_rate = 0;
+                     break;
+                default:
+                     ERROR("Unknown sampling rate");
+            }
+            len--;
+
+            switch(*p_cfg++ & A2D_APTX_ADAPTIVE_CHAN_MASK)
+            {
+                case A2DP_APTX_ADAPTIVE_CHANNELS_MONO:
+                     aptx_adaptive_codec.channel_mode = 1;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_TWS_MONO:
+                     aptx_adaptive_codec.channel_mode = 2;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO:
+                     aptx_adaptive_codec.channel_mode = 0;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_TWS_STEREO:
+                     aptx_adaptive_codec.channel_mode = 4;
+                     break;
+                default:
+                     ERROR("Unknown channel id");
+            }
+            len--;
+
+            aptx_adaptive_codec.min_sink_buffering_LL = 20; // gghai temp setting to default value
+            aptx_adaptive_codec.max_sink_buffering_LL = 50;
+            aptx_adaptive_codec.min_sink_buffering_HQ = 20;
+            aptx_adaptive_codec.max_sink_buffering_HQ = 50;
+            aptx_adaptive_codec.min_sink_buffering_TWS = 20;
+            aptx_adaptive_codec.max_sink_buffering_TWS = 50;
+
+            aptx_adaptive_codec.TTP_LL_low = *(p_cfg ++);
+            aptx_adaptive_codec.TTP_LL_high = *(p_cfg ++);
+            aptx_adaptive_codec.TTP_HQ_low = *(p_cfg ++);
+            aptx_adaptive_codec.TTP_HQ_high = *(p_cfg ++);
+            aptx_adaptive_codec.TTP_TWS_low = *(p_cfg ++);
+            aptx_adaptive_codec.TTP_TWS_high = *(p_cfg ++);
+            len -= 6;
+
+            p_cfg += 3; // ignoring eoc bits
+            len -= 3;
+            p_cfg += APTX_ADAPTIVE_RESERVED_BITS;
+            len -= APTX_ADAPTIVE_RESERVED_BITS;
+            INFO("%s: ## aptXAdaptive ## sampleRate 0x%x", __func__, aptx_adaptive_codec.sampling_rate);
+            INFO("%s: ## aptXAdaptive ## channelMode 0x%x", __func__, aptx_adaptive_codec.channel_mode);
+            INFO("%s: ## aptXAdaptive ## ttp_ll_0 0x%x", __func__, aptx_adaptive_codec.TTP_LL_low);
+            INFO("%s: ## aptXAdaptive ## ttp_ll_1 0x%x", __func__, aptx_adaptive_codec.TTP_LL_high);
+            INFO("%s: ## aptXAdaptive ## ttp_hq_0 0x%x", __func__, aptx_adaptive_codec.TTP_HQ_low);
+            INFO("%s: ## aptXAdaptive ## ttp_hq_1 0x%x", __func__, aptx_adaptive_codec.TTP_HQ_high);
+            INFO("%s: ## aptXAdaptive ## ttp_tws_0 0x%x", __func__, aptx_adaptive_codec.TTP_TWS_low);
+            INFO("%s: ## aptXAdaptive ## ttp_tws_1 0x%x", __func__, aptx_adaptive_codec.TTP_TWS_high);
+
+            if(len == 0)
+                INFO("%s: codec config copied", __func__);
+            else
+                INFO("%s: codec config length error: %d", __func__, len);
+
+            aptx_adaptive_codec.mtu = *(uint16_t *)p_cfg;
+            p_cfg += 6;
+            aptx_adaptive_codec.bits_per_sample = *(uint32_t *)p_cfg;
+            p_cfg += 4;
+            aptx_adaptive_codec.aptx_mode= *(uint16_t *)p_cfg;
+
+            INFO("%s: ## aptXAdaptive ## MTU =  %d", __func__, aptx_adaptive_codec.mtu);
+            INFO("%s: ## aptXAdaptive ## Bits Per Sample =  %d", __func__, aptx_adaptive_codec.bits_per_sample);
+            INFO("%s: ## aptXAdaptive ## Mode =  %d", __func__, aptx_adaptive_codec.aptx_mode);
+
+            return ((void *)&aptx_adaptive_codec);
+        }
+
+        if (codec_cfg[VENDOR_ID_OFFSET] == VENDOR_APTX_HD &&
+            codec_cfg[CODEC_ID_OFFSET] == APTX_TWS_CODEC_ID)
+        {
+            INFO("AptX-TWS codec");
+            *codec_type = AUDIO_FORMAT_APTX_HD;
+            //aptx_codec.sync_mode = 0x01;
+        }
+        memset(&aptx_codec,0,sizeof(audio_aptx_default_config));
         p_cfg++; //skip dev_idx
         len = *p_cfg++;//LOSC
         p_cfg++; // Skip media type
@@ -433,6 +547,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         switch (byte & A2D_APTX_CHAN_MASK)
         {
             case A2D_APTX_CHAN_STEREO:
+            case A2D_APTX_TWS_CHAN_MODE:
                  aptx_codec.channels = 2;
                  break;
             case A2D_APTX_CHAN_MONO:
@@ -446,15 +561,24 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             len -= 4;//ignore 4 bytes not used
         }
         if (len == 0)
+        {
             INFO("Codec config copied");
-
+        }
         p_cfg += 2; //skip mtu
 
         aptx_codec.bitrate = *p_cfg++;
         aptx_codec.bitrate |= (*p_cfg++ << 8);
         aptx_codec.bitrate |= (*p_cfg++ << 16);
         aptx_codec.bitrate |= (*p_cfg++ << 24);
-
+        aptx_codec.bits_per_sample = *(uint32_t *)p_cfg;
+        INFO("APTx: Done copying full codec config bits_per_sample : %d", aptx_codec.bits_per_sample);
+        if (*codec_type == AUDIO_FORMAT_APTX_HD)
+        {
+            memset(&aptx_tws_codec, 0, sizeof(audio_aptx_dual_mono_config));
+            memcpy(&aptx_tws_codec, &aptx_codec, sizeof(aptx_codec));
+            aptx_tws_codec.sync_mode = 0x02;
+            return ((void *)&aptx_tws_codec);
+        }
         INFO("APTx: Done copying full codec config");
         return ((void *)&aptx_codec);
     }
