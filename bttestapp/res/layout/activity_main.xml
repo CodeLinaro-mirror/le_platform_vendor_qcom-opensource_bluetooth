@@ -72,6 +72,13 @@
             android:layout_weight="1"
             android:onClick="onButtonClick"
             android:text="@string/select_device" />
+        <Button
+            android:id="@+id/add_oob_bond_dev"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:onClick="onButtonClick"
+            android:text="@string/add_oob_bond_dev" />
     </LinearLayout>
     <LinearLayout
         android:layout_width="wrap_content"
