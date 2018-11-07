@@ -345,25 +345,11 @@ public class MainActivity extends MonkeyActivity {
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
         setBTState();
-/*
-        if (EirSample1 == null)
-        {
-            EirSample1  = new Eir128bitUUIDSample("128UUID_SAMPLE1",  "00112233-4455-6677-8899-aabbccddeeff");
-            EirSample1.start();
-        }
 
-        if (EirSample2 == null)
-        {
-            EirSample2    = new Eir128bitUUIDSample("128UUID_SAMPLE2",  "00000000-2222-2222-3333-555555555559");
-            EirSample2.start();
+        if (mBtAdapter.isEnabled()) {
+            unregister128Uuid();
+            register128Uuid();
         }
-
-        if (EirSample3 == null)
-        {
-            EirSample3 = new Eir128bitUUIDSample("128UUID_SAMPLE3",  "11112222-8877-aabb-ccdd-666666666666");
-            EirSample3.start();
-        }
-*/
     }
 
     @Override
@@ -391,6 +377,50 @@ public class MainActivity extends MonkeyActivity {
         }
 
         Logger.v(TAG, "onDestroy");
+    }
+
+
+    void register128Uuid() {
+        Logger.v(TAG, "register128Uuid");
+        if (EirSample1 == null)
+        {
+            Logger.v(TAG, "128UUID_SAMPLE1, 00112233-4455-6677-8899-aabbccddeeff");
+            EirSample1  = new Eir128bitUUIDSample("128UUID_SAMPLE1",  "00112233-4455-6677-8899-aabbccddeeff");
+            EirSample1.start();
+        }
+
+        if (EirSample2 == null)
+        {
+            Logger.v(TAG, "128UUID_SAMPLE2, 00000000-2222-2222-3333-555555555559");
+            EirSample2    = new Eir128bitUUIDSample("128UUID_SAMPLE2",  "00000000-2222-2222-3333-555555555559");
+            EirSample2.start();
+        }
+
+        if (EirSample3 == null)
+        {
+            Logger.v(TAG, "128UUID_SAMPLE3, 11112222-8877-aabb-ccdd-666666666666");
+            EirSample3 = new Eir128bitUUIDSample("128UUID_SAMPLE3",  "11112222-8877-aabb-ccdd-666666666666");
+            EirSample3.start();
+        }
+
+    }
+
+    void unregister128Uuid() {
+        Logger.v(TAG, "unregister128Uuid");
+        if (EirSample1 != null) {
+            EirSample1.cancel();
+            EirSample1 = null;
+        }
+
+        if (EirSample2 != null) {
+            EirSample2.cancel();
+            EirSample2 = null;
+        }
+
+        if (EirSample3 != null) {
+            EirSample3.cancel();
+            EirSample3 = null;
+        }
     }
 
     public void onButtonClick(View v) {
