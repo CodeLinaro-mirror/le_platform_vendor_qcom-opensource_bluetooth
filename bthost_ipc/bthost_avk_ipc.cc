@@ -102,8 +102,8 @@ typedef struct {
 } audio_aac_decoder_config;
 
 typedef struct {
-    uint32_t      sampling_rate;
     uint16_t      channels;
+    uint32_t      sampling_rate;
 } audio_sbc_decoder_config;
 
 /*****************************************************************************
