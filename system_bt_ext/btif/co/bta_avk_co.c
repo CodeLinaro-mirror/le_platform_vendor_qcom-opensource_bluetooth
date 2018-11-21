@@ -1479,7 +1479,7 @@ static BOOLEAN bta_avk_co_audio_supports_config(UINT8 codec_type, const UINT8 *p
         pthread_mutex_lock(&sink_codec_q_lock);
         if (bta_avk_sbc_cfg_in_cap((UINT8 *)p_codec_cfg,
             (tA2D_SBC_CIE *)&bta_avk_supp_codec_cap[BTIF_SV_AVK_AA_SBC_INDEX]
-            .codec_cap.aac_caps))
+            .codec_cap.sbc_caps))
         {
             pthread_mutex_unlock(&sink_codec_q_lock);
             return FALSE;
