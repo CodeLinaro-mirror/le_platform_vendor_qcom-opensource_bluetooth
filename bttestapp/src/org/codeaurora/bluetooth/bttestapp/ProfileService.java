@@ -355,11 +355,11 @@ public class ProfileService extends Service {
         mDevice = device;
 
         if (mDevice != null) {
-            Log.v(TAG,
+            Log.d(TAG,
                     "Current device: address=" + mDevice.getAddress() + " name="
                             + mDevice.getName());
         } else {
-            Log.v(TAG, "Current device: none");
+            Log.e(TAG, "Current device: none");
         }
     }
 
@@ -426,5 +426,9 @@ public class ProfileService extends Service {
         Intent intent = new Intent(ACTION_CUSTOM_ACTION);
         intent.putExtra(EXTRA_CUSTOM_ACTION, extras);
         mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+    }
+
+    public BluetoothDevice getDevice() {
+        return mDevice;
     }
 }

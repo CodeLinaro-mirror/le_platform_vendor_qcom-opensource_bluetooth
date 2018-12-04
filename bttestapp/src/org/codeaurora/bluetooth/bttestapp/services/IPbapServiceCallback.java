@@ -38,7 +38,7 @@ public interface IPbapServiceCallback {
 
     void onSetPhoneBookDone();
 
-    void onPullPhoneBookDone(int phonebookSize, int missedCalls);
+    void onPullPhoneBookDone(String pbName, int phonebookSize, int missedCalls);
 
     void onPullVcardListingDone(ArrayList<String> vcardListing, int phonebookSize, int missedCalls);
 
@@ -48,7 +48,7 @@ public interface IPbapServiceCallback {
 
     void onSetPhoneBookError(int result);
 
-    void onPullPhoneBookError(int result);
+    void onPullPhoneBookError(String pbName, int result);
 
     void onPullVcardListingError(int result);
 
