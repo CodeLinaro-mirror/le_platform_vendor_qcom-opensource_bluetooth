@@ -229,15 +229,6 @@ public class PbapProfile {
 
     public static final String KEY_VCARD_ENTRY = "vcard_entry";
 
-    // Result code
-    public static final int RESULT_SUCCESS = 0;
-    public static final int RESULT_ERROR = 1;
-    public static final int RESULT_INVALID_PARAMETER = 2;
-    public static final int RESULT_NOT_SUPPORTED = 3;
-    public static final int RESULT_TIMEOUT = 4;
-    public static final int RESULT_BUSY = 5;
-    public static final int RESULT_NOT_FOUND = 6;
-
     // - Response for custom action
 
     // --- Custom action definition for PBAP client
@@ -298,10 +289,14 @@ public class PbapProfile {
         }
     }
 
-    public boolean pullPhoneBook(BluetoothDevice device, String pbName, long filter,
-            byte format, int maxListCount, int listStartOffset) {
-        // TODO
-        return false;
+    public boolean pullPhoneBook(BluetoothDevice device, String pbName,
+            long filter, int listStartOffset, int maxListCount) {
+        if (mPbapClient != null) {
+            return mPbapClient.pullPhonebook(device, pbName,
+                    filter, listStartOffset, maxListCount);
+        } else {
+            return false;
+        }
     }
 
     public boolean pullVcardListing(BluetoothDevice device, String path, byte order, byte searchProp,
@@ -324,6 +319,6 @@ public class PbapProfile {
     }
 
     public static boolean isSuccess(int result) {
-        return (result == RESULT_SUCCESS) ? true : false;
+        return (result == BluetoothPbapClient.RESULT_SUCCESS) ? true : false;
     }
 }

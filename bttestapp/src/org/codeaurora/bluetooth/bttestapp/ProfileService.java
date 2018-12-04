@@ -713,11 +713,11 @@ public class ProfileService extends Service {
         mDevice = device;
 
         if (mDevice != null) {
-            Logger.v(TAG,
+            Logger.d(TAG,
                     "Current device: address=" + mDevice.getAddress() + " name="
                             + mDevice.getName());
         } else {
-            Logger.v(TAG, "Current device: none");
+            Logger.e(TAG, "Current device: none");
         }
 
         // mMapClients = new HashMap<Integer, BluetoothMasClient>();
@@ -807,5 +807,9 @@ public class ProfileService extends Service {
         Intent intent = new Intent(ACTION_CUSTOM_ACTION);
         intent.putExtra(EXTRA_CUSTOM_ACTION, extras);
         mContext.sendBroadcast(intent, BLUETOOTH_PERM);
+    }
+
+    public BluetoothDevice getDevice() {
+        return mDevice;
     }
 }

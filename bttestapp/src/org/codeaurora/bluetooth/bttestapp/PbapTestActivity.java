@@ -100,8 +100,8 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private static final int MSG_SET_PHONEBOOK_RESP = 83;
     private static final int MSG_ABORT_RESP = 84;
 
-    // "telecom/cch.vcf"
-    private static final int DEFAULT_PHONEBOOK_POSITION = 4;
+    // "telecom/pb.vcf"
+    private static final int DEFAULT_PHONEBOOK_POSITION = 0;
 
     /*
      * Class constants.
@@ -241,13 +241,13 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
 
         @Override
-        public void onPullPhoneBookDone(int phonebookSize, int missedCalls) {
+        public void onPullPhoneBookDone(String pbName, int phonebookSize, int missedCalls) {
             // vCard has been stored into Contact DB.
             storeResponse(phonebookSize, missedCalls);
 
             stopProgressBarDownload();
 
-            showToastLong("PhonebookSize=" + phonebookSize + ", NewMissedCalls=" + missedCalls);
+            showToastLong(pbName + ", size: " + phonebookSize);
 
             cleanResponse();
         }
@@ -292,11 +292,11 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
 
         @Override
-        public void onPullPhoneBookError(int result) {
+        public void onPullPhoneBookError(String pbName, int result) {
             Logger.e(TAG, "Received from PBAP pull phone book error.");
             stopProgressBarDownload();
             mListViewDownloadContacts.setVisibility(View.GONE);
-            showResult("PullPhoneBook", result);
+            showResult("PullPhoneBook " + pbName, result);
             new MonkeyEvent("pbap-pullphonebook", false).send();
         }
 
@@ -361,6 +361,9 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
             mPbap = profileService.getPbapProfile();
 
+            mDevice = profileService.getDevice();
+            Logger.d(TAG, "onServiceConnected device: " + mDevice);
+
             setButtonsVisible(true);
         }
 
@@ -378,8 +381,8 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
             Log.i(TAG, "action " + action);
             if (BluetoothPbapClient.ACTION_CONNECTION_STATE_CHANGED.equals(action)) {
                 handleActionConnectionStateChanged(intent);
-            } else if (PbapProfile.ACTION_CUSTOM_ACTION_RESULT.equals(action)) {
-                handleActionCustomActionResult(intent);
+            } else if (BluetoothPbapClient.ACTION_PHONEBOOK_DOWNLOAD_STATE_CHANGED.equals(action)) {
+                handlePhonebookDownloadStateChanged(intent);
             }
         }
     };
@@ -399,7 +402,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
                     break;
 
                 case MSG_PULL_PHONEBOOK_RESP:
-                    processPullPhonebookResp(msg.arg1, (Bundle) msg.obj);
+                    processPullPhonebookResp((String) msg.obj, msg.arg1, msg.arg2);
                     break;
 
                 case MSG_PULL_VCARD_LISTING_RESP:
@@ -446,7 +449,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private void initIntentFilter() {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothPbapClient.ACTION_CONNECTION_STATE_CHANGED);
-        filter.addAction(PbapProfile.ACTION_CUSTOM_ACTION_RESULT);
+        filter.addAction(BluetoothPbapClient.ACTION_PHONEBOOK_DOWNLOAD_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
     }
 
@@ -819,8 +822,8 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         mDownloadValueMaxCount = getIntValue(mEditTextDownloadMaxListCount, MAX_COUNT_DEFAULT_VALUE);
         mDownloadValueOffset = getIntValue(mEditTextDownloadOffsetValue, OFFSET_DEFAULT_VALUE);
 
-        Logger.d(TAG, "runPbapTestDownload maxCount: " + mDownloadValueMaxCount +
-              ", offset: " + mDownloadValueOffset);
+        Logger.d(TAG, "runPbapTestDownload offset: " + mDownloadValueOffset +
+                ", maxCount: " + mDownloadValueMaxCount);
 
         // Refresh UI EditTexts value if some are blank after edit.
         mEditTextDownloadMaxListCount.setText(String.valueOf(mDownloadValueMaxCount));
@@ -831,8 +834,8 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         try {
             setPhoneBookRoot();
 
-            if (pullPhoneBook(pbName, mDownloadValueFilter, mDownloadValueCardType,
-                mDownloadValueMaxCount, mDownloadValueOffset)) {
+            if (pullPhoneBook(pbName, mDownloadValueFilter, mDownloadValueOffset,
+                    mDownloadValueMaxCount)) {
                 startProgressBarDownload();
             }
         } catch (IllegalArgumentException e) {
@@ -1206,7 +1209,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void handleActionConnectionStateChanged(Intent intent) {
         int currState = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
-            BluetoothProfile.STATE_DISCONNECTED);
+                BluetoothProfile.STATE_DISCONNECTED);
         BluetoothDevice device = (BluetoothDevice) intent.getExtra(BluetoothDevice.EXTRA_DEVICE);
         Logger.d(TAG, "handleActionConnectionStateChanged device: " + device + ", currState: " + currState);
 
@@ -1221,17 +1224,16 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
     }
 
-    private void handleActionCustomActionResult(Intent intent) {
-        Bundle extras = (Bundle) intent.getExtra(PbapProfile.EXTRA_CUSTOM_ACTION_RESULT);
-        Logger.d(TAG, "handleActionCustomActionResult extras=" + extras);
-        if (extras == null) {
-            return;
-        }
+    private void handlePhonebookDownloadStateChanged(Intent intent) {
+        Logger.d(TAG, "handlePhonebookDownloadStateChanged");
 
-        String cmd = extras.getString(PbapProfile.KEY_COMMAND);
-        int result = extras.getInt(PbapProfile.KEY_RESULT);
-        int what = getMessage(cmd);
-        mHandler.sendMessage(mHandler.obtainMessage(what, result, 0, extras));
+        String pbName = intent.getStringExtra(BluetoothPbapClient.EXTRA_PHONEBOOK_PATH);
+        int state = intent.getIntExtra(BluetoothPbapClient.EXTRA_DOWNLOAD_STATE,
+                BluetoothPbapClient.DOWNLOAD_FAILED);
+        int result = intent.getIntExtra(BluetoothPbapClient.EXTRA_DOWNLOAD_RESULT,
+                BluetoothPbapClient.RESULT_FAILURE);
+
+        mHandler.sendMessage(mHandler.obtainMessage(MSG_PULL_PHONEBOOK_RESP, state, result, pbName));
     }
 
     private void processDisconnected() {
@@ -1244,15 +1246,17 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         mPbapServiceCallback.onSessionConnected();
     }
 
-    private void processPullPhonebookResp(int result, Bundle extras) {
-        int phonebookSize = extras.getInt(PbapProfile.KEY_PHONEBOOK_SIZE);
-        int newMissedCalls = extras.getInt(PbapProfile.KEY_NEW_MISSED_CALLS);
-        Logger.d(TAG, "processPullPhonebookResp");
-
-        if (PbapProfile.isSuccess(result)) {
-            mPbapServiceCallback.onPullPhoneBookDone(phonebookSize, newMissedCalls);
-        } else {
-            mPbapServiceCallback.onPullPhoneBookError(result);
+    private void processPullPhonebookResp(String pbName, int state, int result) {
+        if (state == BluetoothPbapClient.DOWNLOAD_COMPLETED) {
+            Log.i(TAG, "processPullPhonebookResp download completed, pbName: " +
+                    pbName + ", phonebook size: " + result);
+            mPbapServiceCallback.onPullPhoneBookDone(pbName, result, 0);
+        } else if (state == BluetoothPbapClient.DOWNLOAD_FAILED) {
+            Logger.e(TAG, "processPullPhonebookResp download failed, pbName: " +
+                    pbName + ", error: " + result);
+            mPbapServiceCallback.onPullPhoneBookError(pbName, BluetoothPbapClient.RESULT_FAILURE);
+        } else if (state == BluetoothPbapClient.DOWNLOAD_IN_PROGRESS) {
+            Logger.d(TAG, "processPullPhonebookResp download in-progress, pbName: " + pbName);
         }
     }
 
@@ -1345,18 +1349,20 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         return mPbap.getConnectionState(mDevice);
     }
 
-    private boolean pullPhoneBook(String pbName, long filter, byte format,
-        int maxListCount, int listStartOffset) {
-        Logger.d(TAG, "pullPhoneBook pbName: " + pbName + ", filter: " +
-            Long.toHexString(filter) + ", format: " + format + ", maxListCount: " +
-            maxListCount + ", listStartOffset: " + listStartOffset);
+    private boolean pullPhoneBook(String pbName, long filter,
+            int listStartOffset, int maxListCount) {
+        Logger.d(TAG, "pullPhoneBook pbName: " + pbName +
+                ", filter: " + Long.toHexString(filter) +
+                ", listStartOffset: " + listStartOffset +
+                ", maxListCount: " + maxListCount);
+
         if (!verifyPbapDevice()) {
             return false;
         }
 
         try {
             return mPbap.pullPhoneBook(mDevice, pbName,
-                filter, format, maxListCount, listStartOffset);
+                    filter, listStartOffset, maxListCount);
         } catch (Exception e) {
             Logger.e(TAG, e.toString());
             e.printStackTrace();
@@ -1367,8 +1373,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private void pullPhoneBookSize(String path) {
         Logger.d(TAG, "pullPhoneBookSize path: " + path);
         // Get phonebook size with MaxListCount = 0
-        pullPhoneBook(path, PbapProfile.PBAP_REQUESTED_FIELDS,
-                PbapProfile.VCARD_TYPE_30, 0, 0);
+        pullPhoneBook(path, PbapProfile.PBAP_REQUESTED_FIELDS, 0, 0);
     }
 
     private boolean pullVcardListing(String path, byte order, byte searchProp, String searchValue,
@@ -1482,7 +1487,24 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void showResult(String msg, int result) {
         StringBuilder sb = new StringBuilder();
-        String resultString = "succeed";
+        String resultString;
+
+        switch (result) {
+            case BluetoothPbapClient.RESULT_SUCCESS:
+                resultString = "success";
+                break;
+            case BluetoothPbapClient.RESULT_CANCELED:
+                resultString = "cancelled";
+                break;
+            case BluetoothPbapClient.RESULT_INVALID_PARAMETER:
+                resultString = "invalid parameter";
+                break;
+            case BluetoothPbapClient.RESULT_FAILURE:
+            // pass-through
+            default:
+                resultString = "fail";
+                break;
+        }
 
         sb.append(msg).append(" ").append(resultString);
 
