@@ -6,6 +6,16 @@ android_app {
         "src/**/*.java",
     ],
 
+    exclude_srcs: [
+        "src/org/codeaurora/bluetooth/bttestapp/services/IMapServiceCallback.java",
+	"src/org/codeaurora/bluetooth/bttestapp/MapTestActivity.java",
+        "src/org/codeaurora/bluetooth/bttestapp/DipTestActivity.java",
+    ],
+
+    static_libs: [
+        "com.android.vcard",
+    ],
+
     certificate: "platform",
 
     owner: "qti",

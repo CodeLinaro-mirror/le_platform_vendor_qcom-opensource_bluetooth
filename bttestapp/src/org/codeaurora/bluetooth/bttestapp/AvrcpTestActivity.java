@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,12 +28,20 @@
 
 package org.codeaurora.bluetooth.bttestapp;
 
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.util.Log;
+import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
+
 import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothAvrcpPlayerSettings;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothA2dpSink;
+import android.bluetooth.BluetoothCodecConfig;
+import android.bluetooth.BluetoothAudioConfig;
 import android.bluetooth.BluetoothProfile;
-import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -41,12 +49,35 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.session.PlaybackState;
+import android.media.browse.MediaBrowser;
+import android.media.browse.MediaBrowser.MediaItem;
+import android.media.MediaDescription;
+import android.media.MediaMetadata;
+import android.media.AudioFormat;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Parcelable;
 import android.util.Log;
+import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.View.OnTouchListener;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.SpinnerAdapter;
+import android.widget.TextView;
+import android.widget.RadioGroup;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Iterator;
 
 import android.media.browse.MediaBrowser;
 import android.media.browse.MediaBrowser.MediaItem;
@@ -56,43 +87,141 @@ import android.media.session.MediaSession;
 import android.media.session.MediaSession.QueueItem;
 import android.widget.TextClock;
 
-public class AvrcpTestActivity extends Activity implements OnClickListener {
+public class AvrcpTestActivity extends MonkeyActivity implements
+    OnClickListener, IBluetoothConnectionObserver, OnItemSelectedListener,
+    OnTouchListener, RadioGroup.OnCheckedChangeListener {
 
-    private final String TAG = "BtTestAvrcp";
+    private final String TAG = "AvrcpTestActivity";
     private Button mBtnPlayPause;
-    private final String STATUS_PLAY = "play";
-    private final String STATUS_PAUSE = "pause";
+    private Button mBtnStop;
+    private Button mBtnFastforward;
+    private Button mBtnRewind;
+    private Button mBtnVolumeDown;
+    private Button mBtnVolumeUp;
+    private Button mBtnPreviousGroup;
+    private Button mBtnNextGroup;
 
-    private static final String ACTION_TRACK_EVENT =
-            "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
+    private Button mBtnTestCmd;
+    private Spinner mSpTestCmd;
+    private EditText mEditTestResp;
+    private TextView mScopesTextView;
+    private RadioGroup mScopes;
+    private TextView mAttributesTextView;
+    private RadioGroup mAttributes;
+    private TextView mEditFolderTextView;
+    private EditText mEditFolder;
+    private TextView mEditItemPositionTextView;
+    private EditText mEditItemPosition;
+    private TextView mEditValueTextView;
+    private EditText mEditValue;
 
-    private static final String EXTRA_PLAYBACK =
-            "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
+    private Button mBtnGetCurrentPas;
+    private Spinner mSpEqualizer;
+    private Spinner mSpRepeat;
+    private Spinner mSpShuffle;
+    private Spinner mSpScan;
 
-    /* Object used to connect to MediaBrowseService of BT-AVRCP app */
-    private MediaBrowser mMediaBrowser = null;
-    private MediaController mMediaController = null;
-    private BluetoothAvrcpController mAvrcpController = null;
+    private final String STATUS_PLAY = "Play";
+    private final String STATUS_PAUSE = "Pause";
 
-    private Context mContext;
+    private AvrcpProfile mAvrcp;
+    private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
+    private BluetoothDevice mDevice;
 
-    /* Browse connection state callback handler */
-    private MediaBrowser.ConnectionCallback browseMediaConnectionCallback =
-            new MediaBrowser.ConnectionCallback() {
+    // Hash for storing A2DP codec type
+    private HashMap<BluetoothDevice, Integer> mA2dpCodecType =
+        new HashMap<BluetoothDevice, Integer>();
+    private boolean mGetItemAttr = false;
+    private List<MediaItem> mPlayerItems = new ArrayList<MediaItem>();
+    private HashMap<String, List<MediaItem>> mFolderItems =
+        new HashMap<String, List<MediaItem>>();
+    private List<MediaItem> mSearchItems = new ArrayList<MediaItem>();
+    private List<MediaItem> mNowPlayingItems = new ArrayList<MediaItem>();
+    private boolean mGetPlayStatus = false;
+
+    /*
+     * Hash map. key: pas attribute value, value: pas attribute value in string
+     */
+    private Map<Integer, String> mPasText = new HashMap<Integer, String>();
+    /*
+     * Hash map. key: pas attribute value in string, value: pas attribute value
+     */
+    private Map<String, Integer> mPasValue = new HashMap<String, Integer>();
+
+    private static final int FASTFORWARD_PRESSED = 0;
+    private static final int REWIND_PRESSED = 1;
+
+    private static final int TIMEOUT_IN_MS = 1000;
+
+    private static final int INVALID_ITEM_POSITION = -1;
+    private static final int INVALID_PDU_ID = -1;
+
+    private static final String TEST_FOLDER = "Songs";
+    private static final String TEST_ITEM_POSITION = "0";  // The 1st item
+    private static final String TEST_QUERY = "You";
+    private static final String TEST_PDU_ID = "20";    // PDU ID for GetElementAttributes (0x20)
+
+    // Test command definition
+    enum TestCmd {
+        INVALID_TEST_CMD,
+
+        // AbortContinuingResponse
+        TEST_CMD_ABORT_CONTINUING_RESPONSE,
+
+        // AddToNowPlaying
+        TEST_CMD_ADD_TO_NOW_PLAYING,
+
+        // ChangePath(FolderUp)
+        TEST_CMD_BROWSE_UP,
+
+        // GetAudioConfig
+        TEST_CMD_GET_AUDIO_CONFIG,
+
+        // GetItemAttributes
+        TEST_CMD_GET_ITEM_ATTRIBUTES,
+
+        // GetElementAttributes
+        TEST_CMD_GET_ELEMENT_ATTRIBUTES,
+
+        // GetFolderItems
+        TEST_CMD_GET_FOLDER_ITEMS,
+
+        // GetPlayStatus
+        TEST_CMD_GET_PLAY_STATUS,
+
+        // GetSupportedFeatures
+        TEST_CMD_GET_SUPPORTED_FEATTURES,
+
+        // GetTotalNumberOfItems
+        TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS,
+
+        // ReleaseConnection
+        TEST_CMD_RELEASE_CONNECTION,
+
+        // RequestContinuingResponse
+        TEST_CMD_REQUEST_CONTINUING_RESPONSE,
+
+        // Search
+        TEST_CMD_SEARCH,
+
+        // SetAddressedPlayer
+        TEST_CMD_SET_ADDRESSED_PLAYER,
+    }
+
+    private final ServiceConnection mAvrcpConnection = new ServiceConnection() {
+
         @Override
-        public void onConnected() {
-            Log.d(TAG, "mediaBrowser CONNECTED");
-            mMediaController = new MediaController(mContext, mMediaBrowser.getSessionToken());
+        public void onServiceDisconnected(ComponentName name) {
+            Log.i(TAG, "onServiceDisconnected()");
+            mAvrcp = null;
+            if (mBtnPlayPause != null) mBtnPlayPause.setText(STATUS_PLAY);
         }
 
         @Override
-        public void onConnectionFailed() {
-            Log.e(TAG, "mediaBrowser Connection failed");
-        }
-
-        @Override
-        public void onConnectionSuspended() {
-            Log.e(TAG, "mediaBrowser SUSPENDED");
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.i(TAG, "onServiceConnected()");
+            ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
+            mAvrcp = profileService.getAvrcpProfile();
         }
     };
 
@@ -101,113 +230,1786 @@ public class AvrcpTestActivity extends Activity implements OnClickListener {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             Log.i(TAG, "action " + action);
-            if (action.equals(ACTION_TRACK_EVENT)) {
-               PlaybackState ps = intent.getParcelableExtra(EXTRA_PLAYBACK);
-               if (ps != null && mBtnPlayPause != null
-                   && (ps.getState() == PlaybackState.STATE_PAUSED
-                   || ps.getState() == PlaybackState.STATE_STOPPED)) {
-                   mBtnPlayPause.setText(STATUS_PLAY);
-                   Log.i(TAG, " button status play ");
-               } else if (ps != null && mBtnPlayPause != null
-                   && ps.getState() == PlaybackState.STATE_PLAYING) {
-                   mBtnPlayPause.setText(STATUS_PAUSE);
-                   Log.i(TAG, " button status pause ");
-               }
+            if (action.equals(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED)) {
+                handleActionConnectionStateChanged(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_TRACK_EVENT)) {
+                handleActionTrackEvent(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_FOLDER_LIST)) {
+                handleActionFolderList(intent);
+            } else if (action.equals(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT)) {
+                handleActionCustomActionResult(intent);
+            } else if (action.equals(BluetoothAvrcpController.ACTION_PLAYER_SETTING)) {
+                handleActionPlayerSetting(intent);
+            } /*else if (action.equals(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED)) {
+                handleActionAudioConfigChanged(intent);
+            }*/
+        }
+    };
+
+    private Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            if (msg.what == FASTFORWARD_PRESSED) {
+                fastForward(true);
+                sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
+            } else if (msg.what == REWIND_PRESSED) {
+                rewind(true);
+                sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
+            } else {
+                Logger.e(TAG, "Unknown msg: " + msg.what);
             }
         }
     };
-    private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
-    TextClock te;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.layout_avrcp);
-        Log.i(TAG, "onCreate ");
-        mBtnPlayPause = (Button) findViewById(R.id.id_btn_play_pause);
-        mBtnPlayPause.setText(STATUS_PLAY);
-        mBtnPlayPause.setOnClickListener(this);
-        mContext = getApplicationContext();
-        mAdapter.getProfileProxy(getApplicationContext(), mAvrcpControllerServiceListener,
-                BluetoothProfile.AVRCP_CONTROLLER);
-        te=(TextClock)findViewById(R.id.textClock);
-        mMediaBrowser = new MediaBrowser(mContext,
-                new ComponentName("com.android.bluetooth",
-                       "com.android.bluetooth.avrcpcontroller.BluetoothMediaBrowserService"),
-                       browseMediaConnectionCallback, null);
-        mMediaBrowser.connect();
-        // receive playback state change
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_TRACK_EVENT);
-        registerReceiver(mReceiver, filter);
+        Logger.d(TAG, "onCreate");
+        ActivityHelper.initialize(this, R.layout.layout_avrcp); //use layout_avrcp.xml
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
+
+        initPasMaps();
+
+        mBtnPlayPause = initButton(R.id.id_btn_play_pause);
+        mBtnStop = initButton(R.id.id_btn_stop);
+        mBtnFastforward = initButton(R.id.id_btn_fast_forward, null, this);
+        mBtnRewind = initButton(R.id.id_btn_rewind, null, this);
+        mBtnVolumeDown = initButton(R.id.id_btn_volume_down);
+        mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
+        mBtnPreviousGroup = initButton(R.id.id_btn_previous_group);
+        mBtnNextGroup = initButton(R.id.id_btn_next_group);
+
+        mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
+        mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
+        mEditTestResp = (EditText) initEditText(R.id.id_test_resp, "");
+
+        mScopesTextView = (TextView) findViewById(R.id.id_tv_scope);
+        mScopes = (RadioGroup) findViewById(R.id.id_rg_scope);
+        mAttributesTextView = (TextView) findViewById(R.id.id_tv_attribute);
+        mAttributes = (RadioGroup) findViewById(R.id.id_rg_attribute);
+        mScopes.setOnCheckedChangeListener(this);
+        mEditFolderTextView = (TextView) findViewById(R.id.id_tv_edit_folder);
+        mEditFolder = (EditText) initEditText(R.id.id_edit_folder, TEST_FOLDER);
+        mEditItemPositionTextView = (TextView) findViewById(R.id.id_tv_edit_item_position);
+        mEditItemPosition = (EditText) initEditText(R.id.id_edit_item_position, TEST_ITEM_POSITION);
+        mEditValueTextView = (TextView) findViewById(R.id.id_tv_edit_value);
+        mEditValue = initEditText(R.id.id_edit_value, "");
+
+        mBtnGetCurrentPas = initButton(R.id.id_btn_get_current_pas);
+        mSpEqualizer = initSpinner(R.id.id_sp_equalizer);
+        mSpRepeat = initSpinner(R.id.id_sp_repeat);
+        mSpShuffle = initSpinner(R.id.id_sp_shuffle);
+        mSpScan = initSpinner(R.id.id_sp_scan);
+
+        BluetoothConnectionReceiver.registerObserver(this);
+
+        // bind to app service
+        Intent intent = new Intent(this, ProfileService.class);
+        bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
+
+        initIntentFilter();
+
+        Logger.d(TAG, "onCreate leave");
     }
-
-    private final ServiceListener mAvrcpControllerServiceListener = new ServiceListener() {
-        @Override
-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
-            Log.i(TAG," onServiceConnected");
-            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
-                mAvrcpController = (BluetoothAvrcpController) proxy;
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(int profile) {
-            Log.i(TAG," onServiceDisconnected");
-            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
-                mAvrcpController = null;
-            }
-        }
-    };
 
     @Override
     protected void onDestroy() {
-        Log.i(TAG, "onDestroy ");
         super.onDestroy();
+        unbindService(mAvrcpConnection);
         unregisterReceiver(mReceiver);
     }
 
     @Override
+    public void onDeviceChanged(BluetoothDevice device) {
+        Logger.d(TAG, "onDeviceChanged()");
+
+        mDevice = device;
+
+        // Initialize A2DP codec type
+        mA2dpCodecType.put(device, AvrcpProfile.UNKNOWN_CODEC_TYPE);
+    }
+
+    @Override
+    public void onDeviceDisconected() {
+        Logger.v(TAG, "onDeviceDisconected");
+
+        invalidateOptionsMenu();
+    }
+
+    private void initIntentFilter() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAvrcpController.ACTION_CONNECTION_STATE_CHANGED);
+        filter.addAction(AvrcpProfile.ACTION_TRACK_EVENT);
+        filter.addAction(AvrcpProfile.ACTION_FOLDER_LIST);
+        filter.addAction(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT);
+        filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
+        /*filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);*/
+        registerReceiver(mReceiver, filter);
+    }
+
+    private Button initButton(int id) {
+        return initButton(id, this, null);
+    }
+
+    private Button initButton(int id, OnClickListener clickListener,
+                              OnTouchListener touchListener) {
+        Button btn = (Button) findViewById(id);
+        if (btn != null) {
+            if (clickListener != null) {
+                btn.setOnClickListener(clickListener);
+            }
+            if (touchListener != null) {
+                btn.setOnTouchListener(touchListener);
+            }
+            return btn;
+        } else {
+            Logger.w(TAG, "initButton can't find id " + id);
+            return null;
+        }
+    }
+
+    private EditText initEditText(int id, String str) {
+        EditText editText = (EditText) findViewById(id);
+        if (editText != null) {
+            if (str != null) {
+                editText.setText(str);
+            }
+            editText.setVisibility(View.VISIBLE);
+            editText.setEnabled(true);
+            return editText;
+        } else {
+            Logger.w(TAG, "initEditText can't find id " + id);
+            return null;
+        }
+    }
+
+    private Spinner initSpinner(int id) {
+        return initSpinner(id, 0);
+    }
+
+    private Spinner initSpinner(int id, int pos) {
+        Spinner spinner = (Spinner) findViewById(id);
+        if (spinner != null) {
+            spinner.setOnItemSelectedListener(this);
+            spinner.setSelection(pos, true);
+            spinner.setEnabled(true);
+            return spinner;
+        } else {
+            Logger.w(TAG, "initSpinner can't find id " + id);
+            return null;
+        }
+    }
+
+    @Override
     public void onClick(View v) {
-        Log.i(TAG," time :"+te.getText());
-        mBtnPlayPause.setEnabled(false);
-        sendCommand();
-        mBtnPlayPause.setEnabled(true);
+        if (v == mBtnPlayPause) {
+            Logger.d(TAG, "onClick mBtnPlayPause");
+            sendCommand();
+        } else if (v == mBtnStop) {
+            Logger.d(TAG, "onClick mBtnStop");
+            sendStopCommand();
+        } else if (v == mBtnVolumeDown) {
+            Logger.d(TAG, "onClick mBtnVolumeDown");
+            volumeDown();
+        } else if (v == mBtnVolumeUp) {
+            Logger.d(TAG, "onClick mBtnVolumeUp");
+            volumeUp();
+         } else if (v == mBtnPreviousGroup) {
+            Logger.d(TAG, "onClick mBtnPreviousGroup");
+            previousGroup();
+        } else if (v == mBtnNextGroup) {
+            Logger.d(TAG, "onClick mBtnNextGroup");
+            nextGroup();
+        } else if (v == mBtnTestCmd) {
+            Logger.d(TAG, "onClick mBtnTestCmd");
+            handleClickBtnTestCmd();
+        } else if (v == mBtnGetCurrentPas) {
+            Logger.d(TAG, "onClick mBtnGetCurrentPas");
+            handleClickBtnGetCurrentPas();
+        } else {
+            Logger.d(TAG, "onClick View: " + v);
+        }
+    }
+
+    private void handleClickBtnTestCmd() {
+        TestCmd cmd = getTestCmd();
+        Logger.d(TAG, "handleClickBtnTestCmd " + cmd);
+
+        clearTestResult();
+
+        switch (cmd) {
+            case TEST_CMD_ABORT_CONTINUING_RESPONSE:
+                handleAbortContinuingResponse();
+                break;
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+                handleAddToNowPlaying();
+                break;
+            case TEST_CMD_BROWSE_UP:
+                handleBrowseUp();
+                break;
+            case TEST_CMD_GET_AUDIO_CONFIG:
+                handleGetAudioConfig();
+                break;
+            case TEST_CMD_GET_ITEM_ATTRIBUTES:
+                handleGetItemAttributes();
+                break;
+            case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
+                handleGetElementAttributes();
+                break;
+            case TEST_CMD_GET_FOLDER_ITEMS:
+                handleGetFolderItems();
+                break;
+            case TEST_CMD_GET_SUPPORTED_FEATTURES:
+                handleGetSupportedFeatures();
+                break;
+            case TEST_CMD_GET_PLAY_STATUS:
+                handleGetPlayStatus();
+                break;
+            case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
+                handleGetTotalNumOfItems();
+                break;
+            case TEST_CMD_RELEASE_CONNECTION:
+                handleReleaseConnection();
+                break;
+            case TEST_CMD_REQUEST_CONTINUING_RESPONSE:
+                handleRequestContinuingResponse();
+                break;
+            case TEST_CMD_SEARCH:
+                handleSearch();
+                break;
+            case TEST_CMD_SET_ADDRESSED_PLAYER:
+                handleSetAddressedPlayer();
+                break;
+            default:
+                Logger.w(TAG, "handleClickBtnTestCmd unknown cmd: " + cmd);
+                break;
+        }
+    }
+
+    private void handleAbortContinuingResponse() {
+        int pduId = getPduId();
+        Logger.d(TAG, "handleAbortContinuingResponse pduId: " + pduId);
+        abortContinuingResponse(pduId);
+    }
+
+    private void handleRequestContinuingResponse() {
+        int pduId = getPduId();
+        Logger.d(TAG, "handleRequestContinuingResponse pduId: " + pduId);
+        if (pduId != INVALID_PDU_ID) {
+            requestContinuingResponse(pduId);
+        }
+    }
+
+    private void handleAddToNowPlaying() {
+        boolean result = false;
+        String folder = getFolder();
+        int scope = getScope();
+        int position = getItemPosition();
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Logger.d(TAG, "Add VFS item into NowPlaying, folder: " +
+                    folder + ", position: " + position);
+                result = addToNowPlaying(scope, mFolderItems, folder, position);
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_SEARCH:
+                Logger.d(TAG, "Add search item into NowPlaying, position: " + position);
+                result = addToNowPlaying(scope, mSearchItems, position);
+                break;
+
+            default:
+                Logger.w(TAG, "Ignore to add to now playing in scope: " + scope);
+                break;
+        }
+
+        if (!result) {
+            Logger.e(TAG, "handleAddToNowPlaying fail");
+        }
+    }
+
+    private void handleBrowseUp() {
+        String folder = getFolder();
+        int scope = getScope();
+
+        Logger.d(TAG, "handleBrowseUp scope: " + scope + ", folder: " + folder);
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Logger.d(TAG, "handleBrowseUp in VFS");
+                browseUp(mFolderItems, folder);
+                break;
+
+            default:
+                Logger.w(TAG, "Ignore to browse up in scope: " + scope);
+                break;
+        }
+    }
+
+    private void handleGetItemAttributes() {
+        boolean result = false;
+        String folder = getFolder();
+        int scope = getScope();
+        int position = getItemPosition();
+        mGetItemAttr = true;
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                if ((folder != null) && !folder.isEmpty()) {
+                    Logger.d(TAG, "Get item attributes in VFS, folder: " +
+                        folder + ", position: " + position);
+                    result = getItemAttributes(scope, mFolderItems, folder, position);
+                } else {
+                    // Send GetElementAttributes for PLAYING
+                    getItemAttributes(scope, null);
+                    result = true;
+                }
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_SEARCH:
+                Logger.d(TAG, "Get item attributes in search folder, position: " + position);
+                result = getItemAttributes(scope, mSearchItems, position);
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
+                Logger.d(TAG, "Get item attributes in now playing, position: " + position);
+                result = getItemAttributes(scope, mNowPlayingItems, position);
+                break;
+
+            default:
+                Logger.w(TAG, "Ignore to get item attributes in scope: " + scope);
+                mGetItemAttr = false;
+                break;
+        }
+
+        if (!result) {
+            Logger.e(TAG, "handleGetItemAttributes fail");
+        }
+    }
+
+    private void handleGetElementAttributes() {
+        getElementAttributes();
+    }
+
+    private void handleGetFolderItems() {
+        getFolderItems();
+    }
+
+    private void handleGetPlayStatus() {
+        Logger.d(TAG, "handleGetPlayStatus");
+        mGetPlayStatus = true;
+        getPlayStatus();
+    }
+
+    private void handleGetTotalNumOfItems() {
+        int scope = getScope();
+        Logger.d(TAG, "handleGetTotalNumOfItems scope: " + scope);
+        getTotalNumberOfItems(scope);
+    }
+
+    private void handleReleaseConnection() {
+        Logger.d(TAG, "handleReleaseConnection");
+        releaseConnection(mDevice);
+    }
+
+    private void handleSearch() {
+        String query = mEditValue.getText().toString();
+        Logger.d(TAG, "handleSearch, query: " + query);
+        if ((query != null) && !query.isEmpty()) {
+            search(query);
+        } else {
+            Logger.w(TAG, "handleSearch, but query string empty");
+        }
+    }
+
+    private void handleSetAddressedPlayer() {
+        int position = getItemPosition();
+        Logger.d(TAG, "handleSetAddressedPlayer position: " + position);
+        setAddressedPlayer(mPlayerItems, position);
+    }
+
+    private void handleGetAudioConfig() {
+        Logger.d(TAG, "handleGetAudioConfig device: " + mDevice);
+        BluetoothAudioConfig audioConfig = getAudioConfig(mDevice);
+        showA2dpCodec(audioConfig);
+    }
+
+    private void handleGetSupportedFeatures() {
+        Logger.d(TAG, "handleGetSupportedFeatures device: " + mDevice);
+        int features = getSupportedFeatures(mDevice);
+        showSupportedFeatures(mDevice, features);
+    }
+
+    private void handleClickBtnGetCurrentPas() {
+        Logger.d(TAG, "handleClickBtnGetCurrentPas ");
+
+        mPlayerAppSetting = getPlayerSettings(mDevice);
+        if (mPlayerAppSetting == null) {
+            Logger.e(TAG, "handleClickBtnGetCurrentPas player app setting null ");
+            return;
+        }
+
+        Logger.d(TAG, "handleClickBtnGetCurrentPas update player app setting");
+        updatePlayerAppSettingUI(mPlayerAppSetting);
+    }
+
+    private TestCmd getTestCmd() {
+        String str = mSpTestCmd.getSelectedItem().toString();
+        TestCmd cmd = TestCmd.INVALID_TEST_CMD;
+
+        if (str.equals(this.getString(R.string.avrcp_abort_conti_resp))) {
+            cmd = TestCmd.TEST_CMD_ABORT_CONTINUING_RESPONSE;
+        } else if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
+            cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
+        } else if (str.equals(this.getString(R.string.avrcp_browse_up))) {
+            cmd = TestCmd.TEST_CMD_BROWSE_UP;
+        } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
+            cmd = TestCmd.TEST_CMD_GET_AUDIO_CONFIG;
+        } else if (str.equals(this.getString(R.string.avrcp_get_item_attr))) {
+            cmd = TestCmd.TEST_CMD_GET_ITEM_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_element_attr))) {
+            cmd = TestCmd.TEST_CMD_GET_ELEMENT_ATTRIBUTES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_folder_item))) {
+            cmd = TestCmd.TEST_CMD_GET_FOLDER_ITEMS;
+        } else if (str.equals(this.getString(R.string.avrcp_get_play_status))) {
+            cmd = TestCmd.TEST_CMD_GET_PLAY_STATUS;
+        } else if (str.equals(this.getString(R.string.avrcp_get_supported_features))) {
+            cmd = TestCmd.TEST_CMD_GET_SUPPORTED_FEATTURES;
+        } else if (str.equals(this.getString(R.string.avrcp_get_total_num))) {
+            cmd = TestCmd.TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS;
+        } else if (str.equals(this.getString(R.string.avrcp_release_connection))) {
+            cmd = TestCmd.TEST_CMD_RELEASE_CONNECTION;
+        } else if (str.equals(this.getString(R.string.avrcp_request_conti_resp))) {
+            cmd = TestCmd.TEST_CMD_REQUEST_CONTINUING_RESPONSE;
+        } else if (str.equals(this.getString(R.string.avrcp_search))) {
+            cmd = TestCmd.TEST_CMD_SEARCH;
+        } else if (str.equals(this.getString(R.string.avrcp_set_addr_player))) {
+            cmd = TestCmd.TEST_CMD_SET_ADDRESSED_PLAYER;
+        }
+
+        Logger.d(TAG, "getTestCmd " + cmd);
+        return cmd;
+    }
+
+    private String getFolder() {
+        return mEditFolder.getText().toString();
+    }
+
+    private int getScope() {
+        int scope = 0;
+        int btnId = mScopes.getCheckedRadioButtonId();
+
+        switch (btnId) {
+            case R.id.id_rb_player:
+                scope = AvrcpProfile.BROWSE_SCOPE_PLAYER_LIST;
+                break;
+
+            case R.id.id_rb_vfs:
+                scope = AvrcpProfile.BROWSE_SCOPE_VFS;
+                break;
+
+            case R.id.id_rb_search:
+                scope = AvrcpProfile.BROWSE_SCOPE_SEARCH;
+                break;
+
+            case R.id.id_rb_now_playing:
+                scope = AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING;
+                break;
+
+            default:
+                Logger.w(TAG, "Unknown btnId: " + btnId);
+                break;
+        }
+
+        Logger.d(TAG,"getScope " + scope);
+        return scope;
+    }
+
+    private int getAttributes() {
+        int scope = 0;
+        int btnId = mAttributes.getCheckedRadioButtonId();
+
+        switch (btnId) {
+            case R.id.id_rb_title:
+                scope = AvrcpProfile.ATTRIBUTE_ID_TITLE;
+                break;
+
+            case R.id.id_rb_cover_art:
+                scope = AvrcpProfile.ATTRIBUTE_ID_COVER_ART;
+                break;
+
+            case R.id.id_rb_all:
+                scope = AvrcpProfile.ATTRIBUTE_ID_ALL;
+                break;
+
+            default:
+                scope = AvrcpProfile.ATTRIBUTE_ID_ALL;
+                Logger.w(TAG, "Unknown btnId: " + btnId);
+                break;
+        }
+
+        Logger.d(TAG,"getScope " + scope);
+        return scope;
+    }
+
+    private int getItemPosition() {
+        String str = mEditItemPosition.getText().toString();
+        int position = INVALID_ITEM_POSITION;
+
+        if ((str != null) && !str.isEmpty()) {
+            position = Integer.parseInt(str);
+        }
+
+        return position;
+    }
+
+    private int getPduId() {
+        String str = mEditValue.getText().toString();
+        int pduId = INVALID_PDU_ID;
+
+        if ((str != null) && !str.isEmpty()) {
+            pduId = Integer.parseInt(str, 16);
+        }
+
+        return pduId;
+    }
+
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        if (v == mBtnFastforward) {
+            handleTouchBtnFastforward(event);
+        } else if (v == mBtnRewind) {
+            handleTouchBtnRewind(event);
+        }
+        return false;
+    }
+
+    private void handleTouchBtnFastforward(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                Logger.d(TAG, "BtnFastforward, key pressed");
+                fastForward(true);
+                mHandler.sendEmptyMessageDelayed(FASTFORWARD_PRESSED, TIMEOUT_IN_MS);
+                break;
+
+            case MotionEvent.ACTION_UP:
+                Logger.d(TAG, "BtnFastforward, key released");
+                mHandler.removeMessages(FASTFORWARD_PRESSED);
+                fastForward(false);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    private void handleTouchBtnRewind(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                Logger.d(TAG, "BtnRewind, key pressed");
+                rewind(true);
+                mHandler.sendEmptyMessageDelayed(REWIND_PRESSED, TIMEOUT_IN_MS);
+                break;
+
+            case MotionEvent.ACTION_UP:
+                Logger.d(TAG, "BtnRewind, key released");
+                mHandler.removeMessages(REWIND_PRESSED);
+                rewind(false);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        Logger.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id);
+
+        if (parent == mSpTestCmd) {
+            updateTestCmdUI();
+            return;
+        }
+
+        // PAS
+        mPlayerAppSetting = getPlayerSettings(mDevice);
+        if (mPlayerAppSetting == null) {
+            Logger.e(TAG, "player app setting null ");
+            return;
+        }
+
+        boolean result = true;
+        if (parent == mSpEqualizer) {
+            String equalizer = mSpEqualizer.getSelectedItem().toString(); 
+            Logger.d(TAG, "Set equalizer " + equalizer);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER, equalizer, mPlayerAppSetting);
+        } else if (parent == mSpRepeat) {
+            String repeat = mSpRepeat.getSelectedItem().toString();
+            Logger.d(TAG, "Set repeat " + repeat);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_REPEAT, repeat, mPlayerAppSetting);
+        } else if (parent == mSpShuffle) {
+            String shuffle = mSpShuffle.getSelectedItem().toString();
+            Logger.d(TAG, "Set shuffle " + shuffle);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE, shuffle, mPlayerAppSetting);
+        } else if (parent == mSpScan) {
+            String scan = mSpScan.getSelectedItem().toString();
+            Logger.d(TAG, "Set scan " + scan);
+            addPasValue(BluetoothAvrcpPlayerSettings.SETTING_SCAN, scan, mPlayerAppSetting);
+        } else {
+            Logger.e(TAG, "Unknown item");
+            result = false;
+        }
+
+        if (result) {
+            Logger.d(TAG, "setPlayerApplicationSetting");
+            mAvrcp.setPlayerApplicationSetting(mPlayerAppSetting);
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
+                return true;
+            default:
+                Logger.w(TAG, "Unknown item selected.");
+                break;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void updateTestCmdUI() {
+        boolean enableScope = false;
+        boolean enableAttributes = false;
+        boolean enableFolder = false;
+        boolean enableItemPosition = false;
+        boolean enableValue = false;
+        String value = "";
+        String folder = "";
+        TestCmd cmd = getTestCmd();
+        Logger.d(TAG, "updateTestCmdUI " + cmd);
+
+        clearTestResult();
+
+        switch (cmd) {
+            case TEST_CMD_ABORT_CONTINUING_RESPONSE:
+            case TEST_CMD_REQUEST_CONTINUING_RESPONSE:
+                enableValue = true;
+                value = TEST_PDU_ID;
+                break;
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+            case TEST_CMD_GET_ITEM_ATTRIBUTES:
+            case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
+            case TEST_CMD_GET_FOLDER_ITEMS:
+                enableScope = true;
+                enableAttributes = true;
+                enableFolder = true;
+                folder = TEST_FOLDER;
+                enableItemPosition = true;
+                break;
+            case TEST_CMD_GET_TOTAL_NUMBER_OF_ITEMS:
+                enableScope = true;
+                break;
+            case TEST_CMD_SEARCH:
+                enableValue = true;
+                value = TEST_QUERY;
+                break;
+            case TEST_CMD_SET_ADDRESSED_PLAYER:
+                enableItemPosition = true;
+                break;
+            case TEST_CMD_BROWSE_UP:
+                enableScope = true;
+                enableFolder = true;
+                folder = TEST_FOLDER;
+                break;
+            case TEST_CMD_GET_PLAY_STATUS:
+            case TEST_CMD_RELEASE_CONNECTION:
+            case TEST_CMD_GET_AUDIO_CONFIG:
+            case TEST_CMD_GET_SUPPORTED_FEATTURES:
+            default:
+                break;
+        }
+
+        if (enableScope) {
+            Logger.d(TAG, "Enable scope ");
+            mScopesTextView.setVisibility(View.VISIBLE);
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mScopes.getChildAt(i).setEnabled(true);
+                mScopes.getChildAt(i).setVisibility(View.VISIBLE);
+            }
+            mScopes.check(R.id.id_rb_vfs);
+        } else {
+            Logger.d(TAG, "Disable scope ");
+            mScopes.clearCheck();
+            mScopesTextView.setVisibility(View.GONE);
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mScopes.getChildAt(i).setEnabled(false);
+                mScopes.getChildAt(i).setVisibility(View.GONE);
+            }
+        }
+
+        if(enableAttributes) {
+            Logger.d(TAG, "Enable attributes ");
+            mAttributesTextView.setVisibility(View.VISIBLE);
+            for (int i = 0; i < mAttributes.getChildCount(); i++) {
+                mAttributes.getChildAt(i).setEnabled(true);
+                mAttributes.getChildAt(i).setVisibility(View.VISIBLE);
+            }
+            mAttributes.check(R.id.id_rb_title);
+        } else {
+            Logger.d(TAG, "Disable attributes ");
+            mAttributesTextView.setVisibility(View.GONE);
+            mAttributes.clearCheck();
+            mAttributesTextView.setVisibility(View.GONE);
+            for (int i = 0; i < mScopes.getChildCount(); i++) {
+                mAttributes.getChildAt(i).setEnabled(false);
+                mAttributes.getChildAt(i).setVisibility(View.GONE);
+            }
+        }
+
+        if (enableFolder) {
+            Logger.d(TAG, "Enable folder ");
+            mEditFolderTextView.setVisibility(View.VISIBLE);
+            mEditFolder.setEnabled(true);
+            mEditFolder.setText(folder);
+            mEditFolder.setVisibility(View.VISIBLE);
+        } else {
+            Logger.d(TAG, "Disable folder ");
+            mEditFolderTextView.setVisibility(View.GONE);
+            mEditFolder.setText("");
+            mEditFolder.setEnabled(false);
+            mEditFolder.setVisibility(View.GONE);
+        }
+
+        if (enableItemPosition) {
+            Logger.d(TAG, "Enable item position ");
+            mEditItemPositionTextView.setVisibility(View.VISIBLE);
+            mEditItemPosition.setEnabled(true);
+            mEditItemPosition.setText(TEST_ITEM_POSITION);
+            mEditItemPosition.setVisibility(View.VISIBLE);
+        } else {
+            Logger.d(TAG, "Disable item position ");
+            mEditItemPosition.setText("");
+            mEditItemPosition.setEnabled(false);
+            mEditItemPosition.setVisibility(View.GONE);
+            mEditItemPositionTextView.setVisibility(View.GONE);
+        }
+
+        if (enableValue) {
+            Logger.d(TAG, "Enable value ");
+            mEditValueTextView.setVisibility(View.VISIBLE);
+            mEditValue.setEnabled(true);
+            mEditValue.setText(value);
+            mEditValue.setVisibility(View.VISIBLE);
+        } else {
+            Logger.d(TAG, "Disable value ");
+            mEditValueTextView.setVisibility(View.GONE);
+            mEditValue.setText("");
+            mEditValue.setEnabled(false);
+            mEditValue.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(RadioGroup group, int checkedId) {
+        Logger.d(TAG,"onCheckedChanged");
+
+        if (group == mScopes) {
+            int scope = getScope();
+            boolean enableFolder = (scope == AvrcpProfile.BROWSE_SCOPE_VFS) ? true : false;
+
+            if (enableFolder) {
+                Logger.d(TAG, "Enable folder ");
+                mEditFolder.setEnabled(true);
+                mEditFolder.setText(TEST_FOLDER);
+            } else {
+                Logger.d(TAG, "Disable folder ");
+                mEditFolder.setText("");
+                mEditFolder.setEnabled(false);
+            }
+        }
+    }
+
+    private void initPasMaps() {
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_OFF, "Off");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_ON, "On");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK, "Single");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK, "All");
+        mPasText.put(BluetoothAvrcpPlayerSettings.STATE_GROUP, "Group");
+
+        mPasValue.put("Off", BluetoothAvrcpPlayerSettings.STATE_OFF);
+        mPasValue.put("On", BluetoothAvrcpPlayerSettings.STATE_ON);
+        mPasValue.put("Single", BluetoothAvrcpPlayerSettings.STATE_SINGLE_TRACK);
+        mPasValue.put("All", BluetoothAvrcpPlayerSettings.STATE_ALL_TRACK);
+        mPasValue.put("Group", BluetoothAvrcpPlayerSettings.STATE_GROUP);
+    }
+
+    private void setSelectionByString(Spinner spinner, String setting) {
+        Logger.d(TAG," set " + setting);
+        SpinnerAdapter adapter = spinner.getAdapter();
+        int count= adapter.getCount();
+        for (int i = 0; i < count; i++) {
+            if (setting.equals(adapter.getItem(i).toString())) {
+                Logger.d(TAG," set " + i);
+                spinner.setSelection(i);
+                break;
+            }
+        }
+    }
+
+    private void updatePlayerAppSettingUI(BluetoothAvrcpPlayerSettings pas) {
+        int supportedSetting = getSupportedSetting(pas);
+        if (supportedSetting == 0) {
+            Logger.e(TAG,"updatePlayerAppSettingUI none supported setting");
+            return;
+        }
+
+        Logger.d(TAG,"updatePlayerAppSettingUI supported setting: " + supportedSetting);
+
+        // Disable spinner
+        mSpEqualizer.setEnabled(false);
+        mSpRepeat.setEnabled(false);
+        mSpShuffle.setEnabled(false);
+        mSpScan.setEnabled(false);
+
+        // Enable equalizer (if available)
+        enableSpinner(mSpEqualizer, R.id.id_avrcp_equalizer_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_EQUALIZER,
+                      supportedSetting, pas);
+
+        // Enable repeat (if available)
+        enableSpinner(mSpRepeat, R.id.id_avrcp_repeat_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_REPEAT,
+                      supportedSetting, pas);
+
+        // Enable shuffle (if available)
+        enableSpinner(mSpShuffle, R.id.id_avrcp_shuffle_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_SHUFFLE,
+                      supportedSetting, pas);
+
+        // Enable scan (if available)
+        enableSpinner(mSpScan, R.id.id_avrcp_scan_value,
+                      BluetoothAvrcpPlayerSettings.SETTING_SCAN,
+                      supportedSetting, pas);
     }
 
     private void sendCommand() {
-        if (mMediaController == null || mAvrcpController ==null) {
-            Log.i(TAG, "mMediaController :" + mMediaController
-                    +" mAvrcpController :" + mAvrcpController);
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
             return;
         }
+
         String status = mBtnPlayPause.getText().toString().trim();
+
         try {
             if (status.equals(STATUS_PLAY)) {
-                sendPlay();
+                mAvrcp.play();
+                mBtnPlayPause.setText(STATUS_PAUSE);
             } else if (status.equals(STATUS_PAUSE)) {
-                sendPause();
+                mAvrcp.pause();
+                mBtnPlayPause.setText(STATUS_PLAY);
             }
         } catch (Exception e) {
-            Log.e(TAG, e.toString());
+            Logger.e(TAG, e.toString());
             e.printStackTrace();
         }
     }
 
-    private void sendPlay() {
-        Log.d(TAG, "sendPlay");
-        if (mMediaController != null) {
-            Log.d(TAG, "calling play()");
-            mMediaController.getTransportControls().play();
-            Log.d(TAG, "sendPlay complete ");
+    private void sendStopCommand() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.stop();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
         }
     }
 
-    private void sendPause() {
-        Log.d(TAG, "sendPause");
-        if (mMediaController != null) {
-            Log.d(TAG, "calling pause()");
-            mMediaController.getTransportControls().pause();
-            Log.d(TAG, "sendpause complete ");
+    private void fastForward(boolean pressed) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
         }
+
+        try {
+            mAvrcp.fastForward(pressed);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void rewind(boolean pressed) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.rewind(pressed);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void volumeDown() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.volumeDown();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void volumeUp() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.volumeUp();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void previousGroup() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.sendPreviousGroupCmd(mDevice);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void nextGroup() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.sendNextGroupCmd(mDevice);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void search(String query) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.search(query);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private String getMediaId(HashMap<String, List<MediaItem>> folderItems,
+        String folder) {
+        boolean found = false;
+        String mediaId = null;
+        Logger.d(TAG, "getMediaId folder: " + folder);
+        if ((folderItems == null) || (folder == null)) {
+            return null;
+        }
+
+        Iterator iter = folderItems.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            String key = (String) entry.getKey();
+            List<MediaItem> val = (List<MediaItem>) entry.getValue();
+
+            if (val != null) {
+                for (int index = 0; index < val.size(); index++) {
+                    MediaItem item = val.get(index);
+                    MediaDescription md = item.getDescription();
+                    if (folder.equals(md.getTitle().toString())) {
+                        mediaId = item.getMediaId();
+                        found = true;
+                    }
+                }
+            }
+
+            if (found) {
+                break;
+            }
+        }
+
+        if (found) {
+            Logger.d(TAG, "getMediaId folder: " + folder + ", mediaId: " + mediaId);
+            return mediaId;
+        } else {
+            Logger.d(TAG, "getMediaId can't find folder item ");
+            return null;
+        }
+    }
+
+    private MediaItem getMediaItem(HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        Logger.d(TAG, "getMediaItem folder: " + folder + ", position: " + position);
+
+        String mediaId = getMediaId(folderItems, folder);
+
+        if (mediaId != null) {
+            Logger.d(TAG, "getMediaItem folder: " + folder + ", mediaId: " + mediaId);
+            return getMediaItem(folderItems.get(mediaId), position);
+        } else {
+            Logger.d(TAG, "getMediaItem can't find folder item ");
+            return null;
+        }
+    }
+
+    private MediaItem getMediaItem(List<MediaItem> list, int position) {
+        Logger.d(TAG, "getMediaItem position: " + position);
+        if ((list == null) ||
+            (position == INVALID_ITEM_POSITION) ||
+            (position >= list.size())) {
+            Logger.w(TAG, "getMediaItem exceed max size");
+            return null;
+        }
+
+        return list.get(position);
+    }
+
+    private boolean getItemAttributes(int scope, HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        String mediaId = null;
+        Logger.d(TAG, "getItemAttributes folder: " + folder + ", position: " + position);
+
+        if (position != INVALID_ITEM_POSITION) {
+            MediaItem item = getMediaItem(folderItems, folder, position);
+            if (item == null) {
+                Logger.e(TAG, "getItemAttributes, item null");
+                showTestResult("Can't find item, position " + position + " exceed max size");
+                return false;
+            }
+            // Get element's MediaId
+            mediaId = item.getMediaId();
+        } else {
+            // Get folder's MediaId
+            mediaId = getMediaId(folderItems, folder);
+        }
+
+        Logger.d(TAG, "getItemAttributes mediaId: " + mediaId);
+        if (mediaId == null) {
+            return false;
+        }
+
+        getItemAttributes(scope, mediaId);
+        return true;
+    }
+
+    private boolean getItemAttributes(int scope, List<MediaItem> list, int position) {
+        Logger.d(TAG, "getItemAttributes position: " + position);
+        MediaItem item = getMediaItem(list, position);
+        if (item == null) {
+            Logger.e(TAG, "getItemAttributes, item null");
+            showTestResult("Can't find item, position " + position + " exceed max size");
+            return false;
+        }
+
+        getItemAttributes(scope, item.getMediaId());
+        return true;
+    }
+
+    private void getItemAttributes(int scope, String mediaId) {
+        int attributes = getAttributes();
+        Logger.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE){
+            int[] titleAttribute = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getItemAttributes(scope, mediaId, titleAttribute);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART){
+            int[] coverArtAttribute = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getItemAttributes(scope, mediaId, coverArtAttribute);
+        } else {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getItemAttributes(scope, mediaId, allAttributes);
+        }
+    }
+
+    private void getElementAttributes() {
+        int attributes = getAttributes();
+        Logger.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE) {
+            int[] titleAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getElementAttributes(titleAttributes);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART) {
+            int[] coverArtAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getElementAttributes(coverArtAttributes);
+        } else {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getElementAttributes(allAttributes);
+        }
+    }
+
+    private void getFolderItems() {
+        int scope = getScope();
+        int attributes = getAttributes();
+        int start = 0, end = 0xFF;
+        Logger.d(TAG, "attributes: " + attributes);
+        if (attributes == AvrcpProfile.ATTRIBUTE_ID_TITLE) {
+            int[] titleAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+            };
+            getFolderItems(scope, start, end, titleAttributes);
+        } else if (attributes == AvrcpProfile.ATTRIBUTE_ID_COVER_ART) {
+            int[] coverArtAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getFolderItems(scope, start, end, coverArtAttributes);
+        } else {
+            int[] allAttributes = {
+                AvrcpProfile.MEDIA_ATTR_ID_TITLE,
+                AvrcpProfile.MEDIA_ATTR_ID_ARTIST,
+                AvrcpProfile.MEDIA_ATTR_ID_ALBUM,
+                AvrcpProfile.MEDIA_ATTR_ID_TRACK_NUM,
+                AvrcpProfile.MEDIA_ATTR_ID_NUM_TRACKS,
+                AvrcpProfile.MEDIA_ATTR_ID_GENRE,
+                AvrcpProfile.MEDIA_ATTR_ID_PLAYING_TIME,
+                AvrcpProfile.MEDIA_ATTR_ID_COVER_ART,
+            };
+            getFolderItems(scope, start, end, allAttributes);
+        }
+    }
+
+    private void getItemAttributes(int scope, String mediaId, int[] attributeId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getItemAttributes(scope, mediaId, attributeId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getElementAttributes(int[] attributeId) {
+        try {
+            mAvrcp.getElementAttributes(attributeId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getFolderItems(int scope, int start, int end, int[] attributeId) {
+        try {
+            mAvrcp.getFolderItems(scope, start, end, attributeId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private boolean addToNowPlaying(int scope, HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        String mediaId = null;
+        Logger.d(TAG, "addToNowPlaying scope: " + scope + ", folder: " + folder + ", position: " + position);
+
+        if (position != INVALID_ITEM_POSITION) {
+            MediaItem item = getMediaItem(folderItems, folder, position);
+            if (item == null) {
+                Logger.e(TAG, "addToNowPlaying, item null");
+                showTestResult("Can't find item, position " + position + " exceed max size");
+                return false;
+            }
+            // Get element's MediaId
+            mediaId = item.getMediaId();
+        } else {
+            // Get folder's MediaId
+            mediaId = getMediaId(folderItems, folder);
+        }
+
+        Logger.d(TAG, "addToNowPlaying mediaId: " + mediaId);
+        if (mediaId == null) {
+            return false;
+        }
+
+        addToNowPlaying(scope, mediaId);
+        return true;
+    }
+
+    private boolean addToNowPlaying(int scope, List<MediaItem> list, int position) {
+        Logger.d(TAG, "addToNowPlaying scope: " + scope + ", position: " + position);
+        MediaItem item = getMediaItem(list, position);
+        if (item == null) {
+            Logger.e(TAG, "addToNowPlaying, item null");
+            showTestResult("Can't find item, position " + position + " exceed max size");
+            return false;
+        }
+
+        addToNowPlaying(scope, item.getMediaId());
+        return true;
+    }
+
+    private void addToNowPlaying(int scope, String mediaId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.addToNowPlaying(scope, mediaId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private boolean browseUp(HashMap<String, List<MediaItem>> folderItems, String folder) {
+        String mediaId = null;
+        Logger.d(TAG, "browseUp folder: " + folder);
+
+        // Get folder's MediaId
+        mediaId = getMediaId(folderItems, folder);
+        Logger.d(TAG, "browseUp mediaId: " + mediaId);
+        if (mediaId == null) {
+            return false;
+        }
+
+        browseUp(mediaId);
+        return true;
+    }
+
+    private void browseUp(String mediaId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.browseUp(mediaId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void setAddressedPlayer(List<MediaItem> playerList, int position) {
+        Logger.d(TAG, "setAddressedPlayer position: " + position);
+        MediaItem item = getMediaItem(playerList, position);
+        if (item == null) {
+            Logger.e(TAG, "setAddressedPlayer, player null");
+            showTestResult("Can't find player, position " + position + " exceed max size");
+            return;
+        }
+
+        String mediaId = item.getMediaId();
+        int id = AvrcpProfile.getPlayerId(mediaId);
+
+        if (id != AvrcpProfile.INVALID_PLAYER_ID) {
+            setAddressedPlayer(id, mediaId);
+        } else {
+            Logger.e(TAG, "setAddressedPlayer, invalid player id");
+            showTestResult("invalid player id");
+        }
+    }
+
+    private void setAddressedPlayer(int id, String mediaId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.setAddressedPlayer(id, mediaId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getPlayStatus() {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getPlayStatus();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void getTotalNumberOfItems(int scope) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.getTotalNumberOfItems(scope);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void requestContinuingResponse(int pduId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.requestContinuingResponse(pduId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void abortContinuingResponse(int pduId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.abortContinuingResponse(pduId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void releaseConnection(BluetoothDevice device) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.releaseConnection(device);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private BluetoothAudioConfig getAudioConfig(BluetoothDevice device) {
+        BluetoothAudioConfig audioConfig = null;
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return null;
+        }
+
+        try {
+            audioConfig = mAvrcp.getAudioConfig(device);
+            Logger.d(TAG, "BluetoothAudioConfig " + audioConfig);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+        return audioConfig;
+    }
+
+    private int getSupportedFeatures(BluetoothDevice device) {
+        int features = 0;
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return 0;
+        }
+
+        try {
+            features = mAvrcp.getSupportedFeatures(device);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+        return features;
+    }
+
+    private void handleActionConnectionStateChanged(Intent intent) {
+        BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int state = (int) intent.getExtra(BluetoothProfile.EXTRA_STATE);
+        Logger.d(TAG, "handleActionConnectionStateChanged device: " + device + ", state: " + state);
+        String result = "";
+
+        if (state == BluetoothProfile.STATE_CONNECTED) {
+            Logger.d(TAG, "handleActionConnectionStateChanged AVRCP connected");
+            result = "AVRCP connected";
+        } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
+            Logger.d(TAG, "handleActionConnectionStateChanged AVRCP disconnected");
+            mSearchItems.clear();
+            mNowPlayingItems.clear();
+            mFolderItems.clear();
+            result = "AVRCP disconnected";
+        } else {
+            result = "AVRCP state: " + state;
+        }
+
+        showTestResult(result);
+    }
+
+    private void handleActionTrackEvent(Intent intent) {
+        PlaybackState ps = intent.getParcelableExtra(AvrcpProfile.EXTRA_PLAYBACK);
+        if (ps != null) {
+            int state = ps.getState();
+            Logger.d(TAG, "handleActionTrackEvent state: " + state);
+            if (mBtnPlayPause != null) {
+                if (state == PlaybackState.STATE_PAUSED ||
+                    state == PlaybackState.STATE_STOPPED) {
+                    mBtnPlayPause.setText(STATUS_PLAY);
+                } else if (state == PlaybackState.STATE_PLAYING) {
+                    mBtnPlayPause.setText(STATUS_PAUSE);
+                }
+            }
+
+            if (mGetPlayStatus) {
+                mGetPlayStatus = false;
+                long position = ps.getPosition() / 1000; // in second
+                String result = "Current play position: " + position + " sec";
+                showTestResult(result);
+            }
+        }
+
+        if (mGetItemAttr) {
+            MediaMetadata mmd = intent.getParcelableExtra(AvrcpProfile.EXTRA_METADATA);
+            showMediaMetadata(mmd);
+            mGetItemAttr = false;
+        }
+    }
+
+    private void handleActionFolderList(Intent intent) {
+        String id = intent.getStringExtra(AvrcpProfile.EXTRA_FOLDER_ID);
+        List<Parcelable> extraParcelableList = (ArrayList<Parcelable>)
+            intent.getParcelableArrayListExtra(AvrcpProfile.EXTRA_FOLDER_LIST);
+        List<MediaItem> folderList = new ArrayList<MediaItem>();
+        for (Parcelable p : extraParcelableList) {
+            folderList.add((MediaItem) p);
+        }
+
+        Logger.d(TAG, "handleActionFolderList id " + id);
+
+        if (AvrcpProfile.isRoot(id)) {
+            Logger.d(TAG, "handleActionFolderList root items " + folderList);
+            storeMediaItems(mPlayerItems, folderList);
+        } else if (AvrcpProfile.isSearch(id)) {
+            Logger.d(TAG, "handleActionFolderList search items " + folderList);
+            storeMediaItems(mSearchItems, folderList);
+        } else if (AvrcpProfile.isNowPlaying(id)) {
+            Logger.d(TAG, "handleActionFolderList now playing items " + folderList);
+            storeMediaItems(mNowPlayingItems, folderList);
+        } else {
+            // Store folder
+            Logger.d(TAG, "handleActionFolderList store folder id " + id);
+            mFolderItems.put(id, folderList);
+        }
+    }
+
+    private void handleActionPlayerSetting(Intent intent) {
+        mPlayerAppSetting = intent.getParcelableExtra(BluetoothAvrcpController.EXTRA_PLAYER_SETTING);
+        Logger.d(TAG, "handleActionPlayerSetting mPlayerAppSetting: " + mPlayerAppSetting);
+        updatePlayerAppSettingUI(mPlayerAppSetting);
+    }
+/*
+    private void handleActionAudioConfigChanged(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        BluetoothAudioConfig audioConfig = intent.getParcelableExtra(BluetoothA2dpSink.EXTRA_AUDIO_CONFIG);
+        int codecType = intent.getIntExtra(AvrcpProfile.EXTRA_CODEC_TYPE, BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC);
+
+        Logger.d(TAG, "handleActionAudioConfigChanged device: " + device + ", audioConfig: " +
+            audioConfig + ", codecType: " + codecType);
+
+        mA2dpCodecType.put(device, codecType);
+
+        showA2dpCodec(audioConfig);
+    }
+*/
+    private void handleActionCustomActionResult(Intent intent) {
+        String cmd = intent.getStringExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION);
+        int result = intent.getIntExtra(AvrcpProfile.EXTRA_CUSTOM_ACTION_RESULT, 0);
+        Logger.d(TAG, "handleActionCustomActionResult cmd: " + cmd + ", result: " + result);
+
+        if (cmd != null) {
+            if (result == AvrcpProfile.RESULT_SUCCESS) {
+                if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_SEARCH)) {
+                    handleSearchResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_ADD_TO_NOW_PLAYING)) {
+                    handleAddToNowPlayingResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS)) {
+                    handleGetTotalNumOfItemsResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_SET_ADDRESSED_PLAYER)) {
+                    handleSetAddressedPlayerResp(intent);
+                } else if (cmd.equals(AvrcpProfile.CUSTOM_ACTION_BROWSE_UP)) {
+                    handleBrowseUpResp(intent);
+                }
+            } else {
+                String str = getCustomActionResult(cmd, result);
+                showTestResult(str);
+            }
+        }
+    }
+
+    private void handleSearchResp(Intent intent) {
+        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
+        Logger.d(TAG, "handleSearchResp " + items);
+        String result = "Found " + items +
+                        ". Use Bluetooth Audio App to browse search result";
+        showTestResult(result);
+    }
+
+    private void handleAddToNowPlayingResp(Intent intent) {
+        Logger.d(TAG, "handleAddToNowPlayingResp " + intent);
+        showTestResult("Check NowPlaying in Bluetooth Audio App");
+    }
+
+    private void handleGetTotalNumOfItemsResp(Intent intent) {
+        int items = intent.getIntExtra(AvrcpProfile.EXTRA_NUM_OF_ITEMS, 0);
+        Logger.d(TAG, "handleActionGetTotalNumOfItems " + items);
+        showTestResult(Integer.toString(items));
+    }
+
+    private void handleSetAddressedPlayerResp(Intent intent) {
+        Logger.d(TAG, "handleSetAddressedPlayerResp " + intent);
+        showTestResult("SetAddressedPlayer succeed");
+    }
+
+    private void handleBrowseUpResp(Intent intent) {
+        Logger.d(TAG, "handleBrowseUpResp " + intent);
+        showTestResult("ChangePath(FolderUp) succeed");
+    }
+
+    private int getSupportedSetting(BluetoothAvrcpPlayerSettings pas) {
+        return pas != null ? pas.getSettings() : 0;
+    }
+
+    private BluetoothAvrcpPlayerSettings getPlayerSettings(BluetoothDevice device) {
+        return mAvrcp != null ? mAvrcp.getPlayerSettings(device) : null;
+    }
+
+    private void addPasValue(int setting, String valueString, BluetoothAvrcpPlayerSettings pas) {
+        if (valueString != null) {
+            int value = mPasValue.get(valueString);
+            Logger.d(TAG, "addPasValue setting: " + setting +", value: " + value + "(" + valueString + ")");
+
+            int supportedSetting = getSupportedSetting(pas);
+
+            if ((setting & supportedSetting) != 0) {
+                pas.addSettingValue(setting, value);
+            } else {
+                Logger.w(TAG, "addPasValue setting " + setting + "not in supported list " + supportedSetting);
+            }
+        } else {
+            Logger.w(TAG, "addPasValue value null");
+        }
+    }
+
+    private void enableSpinner(Spinner spinner, int textViewId, int setting, int supportedSetting,
+                               BluetoothAvrcpPlayerSettings pas) {
+        if ((setting & supportedSetting) != 0) {
+            TextView textView = (TextView) findViewById(textViewId);
+
+            int value = pas.getSettingValue(setting);
+            String text = mPasText.get(value);
+            textView.setText(text);
+
+            spinner.setEnabled(true);
+        } else {
+            Logger.w(TAG, "enableSpinner setting " + setting + "not in supported list " + supportedSetting);
+        }
+    }
+
+    private void storeMediaItems(List<MediaItem> dstList,
+                                 List<MediaItem> srcList) {
+        if ((dstList == null) || (srcList == null)) {
+            return;
+        }
+        dstList.clear();
+        dstList.addAll(srcList);
+    }
+
+    private String getCustomActionResult(String cmd, int result) {
+        String customAction = AvrcpProfile.getCustomActionCmd(cmd);
+        String resultStr = AvrcpProfile.getCustomActionResult(result);
+        String fullStr = customAction + " " + resultStr;
+        return fullStr;
+    }
+
+    private void showA2dpCodec(BluetoothAudioConfig audioConfig) {
+        if (audioConfig == null) {
+            Logger.e(TAG, "audioConfig null");
+            return;
+        }
+
+        int sampleRate = audioConfig.getSampleRate();
+        int channelConfig = audioConfig.getChannelConfig();
+        int audioFormat = audioConfig.getAudioFormat();
+        int codecType = AvrcpProfile.UNKNOWN_CODEC_TYPE;
+
+        codecType = mA2dpCodecType.containsKey(mDevice) ?
+                    mA2dpCodecType.get(mDevice) : AvrcpProfile.UNKNOWN_CODEC_TYPE;
+        Logger.d(TAG, "BluetoothAudioConfig codecType: " + codecType);
+
+        String codecTypeString = "";
+        switch (codecType) {
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC:
+                codecTypeString = "sbc";
+                break;
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC:
+                codecTypeString = "aac";
+                break;
+            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX:
+                codecTypeString = "aptx";
+                break;
+            default:
+                codecTypeString = "unknown";
+                break;
+        }
+
+        String channelConfigString = "";
+        switch (channelConfig) {
+            case AudioFormat.CHANNEL_IN_STEREO:
+                channelConfigString = "stereo";
+                break;
+            case AudioFormat.CHANNEL_IN_MONO:
+                channelConfigString = "mono";
+                break;
+            default:
+                channelConfigString = "unknown";
+                break;
+        }
+
+        String audioFormatString = "";
+        switch (audioFormat) {
+            case AudioFormat.ENCODING_PCM_16BIT:
+                audioFormatString = "pcm 16bit";
+                break;
+            case AudioFormat.ENCODING_PCM_8BIT:
+                audioFormatString = "pcm 8bit";
+                break;
+            default:
+                audioFormatString = "unknown";
+                break;
+        }
+
+        String str = "A2DP Codec: type =  " + codecType +
+                     " (" + codecTypeString + ")" +
+                     ", sample_rate = " + sampleRate +
+                     ", channel_config = " + channelConfig +
+                     " (" + channelConfigString + ")" +
+                     ", audio_format = " + audioFormat +
+                     " (" + audioFormatString + ")";
+
+        showTestResult(str);
+    }
+
+    private void showSupportedFeatures(BluetoothDevice device, int features) {
+        Log.i(TAG, "Device: " + device + ", AVRCP supported features: " + features);
+
+        String val = "AVRCP Features: " + features + " (";
+
+        if (features != 0) {
+            if ((features & AvrcpProfile.BTRC_FEAT_METADATA) != 0) {
+                val += " metadata, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_ABSOLUTE_VOLUME) != 0) {
+                val += " absolute_volume, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_BROWSE) != 0) {
+                val += " browse, ";
+            }
+
+            if ((features & AvrcpProfile.BTRC_FEAT_COVER_ART) != 0) {
+                val += " cover_art, ";
+            }
+        } else {
+            val += "none";
+        }
+
+        val += ")";
+
+        showTestResult(val);
+    }
+
+    private void showMediaMetadata(MediaMetadata mmd) {
+        if (mmd == null) {
+            return;
+        }
+
+        Logger.d(TAG, "showMediaMetadata " + mmd);
+
+        String str = mmd.getString(MediaMetadata.METADATA_KEY_TITLE) + "  " +
+                     mmd.getString(MediaMetadata.METADATA_KEY_ARTIST) + "  " +
+                     mmd.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        showTestResult(str);
+    }
+
+    private void clearTestResult() {
+        showTestResult("");
+    }
+
+    private void showTestResult(String result) {
+        if (result == null) {
+            return;
+        }
+
+        mEditTestResp.setText(result);
     }
 }

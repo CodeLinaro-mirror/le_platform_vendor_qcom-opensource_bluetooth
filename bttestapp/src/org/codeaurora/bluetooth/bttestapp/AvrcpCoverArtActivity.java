@@ -30,6 +30,9 @@ package org.codeaurora.bluetooth.bttestapp;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -37,46 +40,43 @@ import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadata;
-import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Spinner;
 
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
+
 public class AvrcpCoverArtActivity extends Activity
         implements OnClickListener, OnItemSelectedListener {
 
-    private final String TAG = "BtTestCoverArt";
+    private final String TAG = "AvrcpCoverArtActivity";
     private final String ACTION_TRACK_EVENT =
             "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
     private final String EXTRA_METADATA =
             "android.bluetooth.avrcp-controller.profile.extra.METADATA";
-    private final String EXTRA_PLAYBACK =
-            "android.bluetooth.avrcp-controller.profile.extra.PLAYBACK";
-    private final String EXTRA_METADATA_IS_INVALID_HANDLE = "is_invalid_handle";
-    private final String KEY_IMGTYPE = "persist.vendor.service.bt.avrcpct.imgtype";
-    private final String KEY_IMG_ENCODE = "persist.vendor.service.bt.avrcpct.imgencode";
-    private final String KEY_IMG_WIDTH = "persist.vendor.service.bt.avrcpct.imgwidth";
-    private final String KEY_IMG_HEIGHT = "persist.vendor.service.bt.avrcpct.imgheight";
-    private final String KEY_IMG_SIZE = "persist.vendor.service.bt.avrcpct.imgsize";
-
-    private String mAlbumTitle = "";
-
-    private boolean isCoverArtSet = false;
-
     private ImageView mIvCoverArt, mIvThumbNail;
     private Spinner mSpImgType, mSpImgEncode, mSpImgWidth, mSpImgSize, mSpImgheight;
     private Button mBtnConfig, mBtnConfigBase;
 
-    private BluetoothAdapter mAdapter;
+    private final BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    BluetoothAvrcpController mAvrcpController;
+
+    private static final String MIMETYPE_DEFAULT = "JPEG";
+    private static final String IMAGETYPE_DEFAULT = "Image";
+    private static final int IMAGE_HEIGHT_DEFAULT = 500;
+    private static final int IMAGE_WIDTH_DEFAULT = 500;
+    private static final int THUMBNAIL_IMAGE_HEIGHT_DEFAULT = 200;
+    private static final int THUMBNAIL_IMAGE_WIDTH_DEFAULT = 200;
+    private static final int MAXSIZE_DEFAULT = 200000;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
@@ -86,27 +86,41 @@ public class AvrcpCoverArtActivity extends Activity
             Log.i(TAG, "action " + action);
             if (action.equals(ACTION_TRACK_EVENT)) {
                 MediaMetadata metaData = intent.getParcelableExtra(EXTRA_METADATA);
-                PlaybackState state = intent.getParcelableExtra(EXTRA_PLAYBACK);
-                boolean isInvalid = intent.getBooleanExtra
-                        (EXTRA_METADATA_IS_INVALID_HANDLE, false);
-                if (metaData != null && state == null) {
-                    setCoverArt(metaData, isInvalid);
+                if (metaData != null) {
+                    setCoverArt(metaData);
                 }
-            } else if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)
-                    && (mAdapter.getState() == BluetoothAdapter.STATE_OFF
-                      || mAdapter.getState() == BluetoothAdapter.STATE_TURNING_OFF )) {
-                setCoverArt(new MediaMetadata.Builder().build(), true);
             }
         }
     };
+
+    private final ServiceListener mAvrcpControllerServiceListener = new ServiceListener() {
+        @Override
+        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+            Logger.v(TAG, "onServiceConnected() profile = " + profile);
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = (BluetoothAvrcpController) proxy;
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(int profile) {
+            Logger.v(TAG, "onServiceDisconnected() profile = " + profile);
+            if (profile == BluetoothProfile.AVRCP_CONTROLLER) {
+                mAvrcpController = null;
+            }
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_avrcp_coverart);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        /* Add back button */
+        getActionBar().setDisplayHomeAsUpEnabled(true);
         mIvCoverArt = (ImageView) findViewById(R.id.id_iv_fullimage);
         mIvThumbNail = (ImageView) findViewById(R.id.id_iv_thumbnail);
+        mIvCoverArt.setImageResource(R.drawable.ic_bt_connected);
         mBtnConfig = (Button) findViewById(R.id.id_btn_config);
         mBtnConfigBase = (Button) findViewById(R.id.id_btn_config_reset);
         mSpImgType = (Spinner) findViewById(R.id.id_sp_img_type);
@@ -120,97 +134,108 @@ public class AvrcpCoverArtActivity extends Activity
         mIvCoverArt.setVisibility(ImageView.GONE);
         mIvThumbNail.setVisibility(ImageView.GONE);
         setSpinners();
-        Log.i(TAG, " onCreate");
+        mBluetoothAdapter.getProfileProxy(this, mAvrcpControllerServiceListener,
+                BluetoothProfile.AVRCP_CONTROLLER);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        mAdapter = BluetoothAdapter.getDefaultAdapter();
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TRACK_EVENT);
-        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(mReceiver, filter);
-        Log.i(TAG, " onResume");
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         unregisterReceiver(mReceiver);
-        Log.i(TAG, " onPause");
     }
 
-    private void setCoverArt(MediaMetadata metaData, boolean isInvalid) {
+    private void setCoverArt(MediaMetadata metaData) {
         String path = metaData.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI);
         Bitmap bitMapThumbNail = metaData
                 .getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
-        String albumTitle = metaData.getString(MediaMetadata.METADATA_KEY_ALBUM);
-        Log.i(TAG, "bitMapThumbNail :" + bitMapThumbNail + " Cover art path :" + path
-                +" isInvalid :" + isInvalid +" Album title :" + albumTitle
-                +" mAlbumTitle :" + mAlbumTitle + " isCoverArtSet :" + isCoverArtSet);
-        if (mAlbumTitle.equalsIgnoreCase(albumTitle) && isCoverArtSet) {
-            Log.v(TAG, " Already set Ignore "); return;
-        }
+        Log.i(TAG, "bitMapThumbNail :" + bitMapThumbNail + " Cover art path :" + path);
 
         if (bitMapThumbNail != null) {
             mIvThumbNail.setVisibility(ImageView.VISIBLE);
             mIvCoverArt.setVisibility(ImageView.GONE);
             mIvThumbNail.setImageBitmap(bitMapThumbNail);
-            isCoverArtSet = true;
-            mAlbumTitle = albumTitle;
-            Log.i(TAG, " BitMap");
-        } else if (!TextUtils.isEmpty(path)) {
-            mIvThumbNail.setVisibility(ImageView.GONE);
-            mIvCoverArt.setVisibility(ImageView.VISIBLE);
-            Bitmap bitMap = BitmapFactory.decodeFile(path);
-            Log.i(TAG, "CoverArt :");
-            mIvCoverArt.setImageBitmap(bitMap);
-            isCoverArtSet = true;
-            mAlbumTitle = albumTitle;
-        } else if (isInvalid) {
-            mIvCoverArt.setVisibility(ImageView.GONE);
-            mIvThumbNail.setVisibility(ImageView.GONE);
-            isCoverArtSet = false;
-            mAlbumTitle = "";
+            return;
         }
+        if (path == null || path.trim().length() == 0) {
+            return;
+        }
+
+        mIvThumbNail.setVisibility(ImageView.GONE);
+        mIvCoverArt.setVisibility(ImageView.VISIBLE);
+        Bitmap bitMap = BitmapFactory.decodeFile(path);
+        Log.i(TAG, "setCoverArt path :" + path + " bitMap :" + bitMap);
+        mIvCoverArt.setImageBitmap(bitMap);
     }
 
     @Override
     public void onClick(View v) {
         if (v == mBtnConfig) {
-            SystemProperties.set(KEY_IMGTYPE, getValue(mSpImgType));
-            SystemProperties.set(KEY_IMG_ENCODE, getValue(mSpImgEncode));
-            SystemProperties.set(KEY_IMG_WIDTH, getValue(mSpImgWidth));
-            SystemProperties.set(KEY_IMG_HEIGHT, getValue(mSpImgheight));
-            SystemProperties.set(KEY_IMG_SIZE, getValue(mSpImgSize));
+            SystemProperties.set("persist.service.bt.avrcpct.imgtype",
+                    getValue(mSpImgType));
+            SystemProperties.set("persist.service.bt.avrcpct.imgencode",
+                    getValue(mSpImgEncode));
+            SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                    getValue(mSpImgWidth));
+            SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                    getValue(mSpImgheight));
+            SystemProperties.set("persist.service.bt.avrcpct.imgsize",
+                    getValue(mSpImgSize));
         } else if (v == mBtnConfigBase) {
-            SystemProperties.set(KEY_IMGTYPE, "Image");
-            SystemProperties.set(KEY_IMG_ENCODE, "JPEG");
-            SystemProperties.set(KEY_IMG_WIDTH, "500");
-            SystemProperties.set(KEY_IMG_HEIGHT, "500");
-            SystemProperties.set(KEY_IMG_SIZE, "200000");
+            SystemProperties.set("persist.service.bt.avrcpct.imgtype", IMAGETYPE_DEFAULT);
+            SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
+            SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                IMAGE_WIDTH_DEFAULT + "");
+            SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                IMAGE_HEIGHT_DEFAULT + "");
+            SystemProperties.set("persist.service.bt.avrcpct.imgsize",
+                MAXSIZE_DEFAULT + "");
             setSpinners();
         }
     }
 
+    public void getCoveArtImage(View v) {
+        Log.i(TAG, "Start Fetching Album art");
+        String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype",
+            IMAGETYPE_DEFAULT);
+        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+            IMAGE_HEIGHT_DEFAULT);
+        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+            IMAGE_WIDTH_DEFAULT);
+        int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
+            MAXSIZE_DEFAULT);
+        // mAvrcpController.startFetchingAlbumArt(type, height, width, maxSize);
+    }
+
     private void setSpinners() {
-        String type = SystemProperties.get(KEY_IMGTYPE);
-        if (TextUtils.isEmpty(type) || type.equalsIgnoreCase("Image")) {
+        String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype");
+        if (TextUtils.isEmpty(type) || type.equalsIgnoreCase(IMAGETYPE_DEFAULT)) {
             mSpImgType.setSelection(0);
         } else {
             mSpImgType.setSelection(1);
         }
-        String mime = SystemProperties.get(KEY_IMG_ENCODE);
-        if (TextUtils.isEmpty(mime) || mime.equalsIgnoreCase("JPEG")) {
-            mSpImgEncode.setSelection(0);
-        } else {
+        String mime = SystemProperties.get("persist.service.bt.avrcpct.imgencode");
+        if ("PNG".equalsIgnoreCase(mime)){
             mSpImgEncode.setSelection(1);
+        } else if ("GIF".equalsIgnoreCase(mime)){
+            mSpImgEncode.setSelection(2);
+        } else {
+            mSpImgEncode.setSelection(0);
         }
 
-        int height = SystemProperties.getInt(KEY_IMG_HEIGHT, 500);
-        int width = SystemProperties.getInt(KEY_IMG_WIDTH, 500);
-        int maxSize = SystemProperties.getInt(KEY_IMG_SIZE, 200000);
+        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+            IMAGE_HEIGHT_DEFAULT);
+        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+            IMAGE_WIDTH_DEFAULT);
+        int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
+            MAXSIZE_DEFAULT);
         Log.i(TAG, " Type :" + type + " Mime :" + mime + " Height:" + height + ": width :"
                 + width + " Max size:" + maxSize);
         mSpImgWidth.setSelection(getIndex(mSpImgWidth, width + ""));
@@ -234,19 +259,42 @@ public class AvrcpCoverArtActivity extends Activity
 
     @Override
     public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
-        if(mSpImgType.getSelectedItem().toString().equals("Image")) {
+        if(mSpImgType.getSelectedItem().toString().equals(IMAGETYPE_DEFAULT)) {
             mSpImgEncode.setEnabled(true);
             mSpImgheight.setEnabled(true);
             mSpImgSize.setEnabled(true);
             mSpImgWidth.setEnabled(true);
-            Log.v(TAG," Image");
-        }else {
+            Logger.v(TAG," Image");
+        } else {
+            Logger.v(TAG," Thumbnail");
+            if(mSpImgType.getSelectedItem().toString().equals("ThumbnailImage")) {
+                SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
+                SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                    THUMBNAIL_IMAGE_HEIGHT_DEFAULT + "");
+                SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                    THUMBNAIL_IMAGE_WIDTH_DEFAULT + "");
+                mSpImgEncode.setSelection(getIndex(mSpImgEncode, MIMETYPE_DEFAULT));
+                mSpImgWidth.setSelection(getIndex(mSpImgheight,
+                    THUMBNAIL_IMAGE_HEIGHT_DEFAULT + ""));
+                mSpImgheight.setSelection(getIndex(mSpImgWidth,
+                    THUMBNAIL_IMAGE_WIDTH_DEFAULT + ""));
+            }
             mSpImgEncode.setEnabled(false);
             mSpImgheight.setEnabled(false);
             mSpImgSize.setEnabled(false);
             mSpImgWidth.setEnabled(false);
-            Log.v(TAG," Not image");
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                Logger.d(TAG, "Go back");
+                finish();
+                return true;
+        }
+        return false;
     }
 
     @Override
