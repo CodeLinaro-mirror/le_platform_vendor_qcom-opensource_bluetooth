@@ -52,7 +52,7 @@ import android.widget.TextView;
 
 public class MonkeyActivity extends Activity {
 
-    private static final String TAG = "BtTestMonkeyActivity";
+    private static final String TAG = "MonkeyActivity";
 
     public static final String ACTION_MONKEY = "org.codeaurora.bluetooth.action.MONKEY";
 
