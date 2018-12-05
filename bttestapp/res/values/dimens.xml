@@ -30,8 +30,15 @@
 <resources>
 
     <!-- Default screen margins, per the Android Design guidelines. -->
-    <dimen name="activity_horizontal_margin">16dp</dimen>
+    <dimen name="activity_horizontal_margin">40dp</dimen>
     <dimen name="activity_vertical_margin">16dp</dimen>
 
     <dimen name="activity_base_margin">5dp</dimen>
+
+    <dimen name="layout_vertical_margin">32dp</dimen>
+
+    <!-- Use fix width for title text view to make value text align -->
+    <dimen name="activity_dip_title_width">250dp</dimen>
+    <!-- Use fix width for two text view  -->
+    <dimen name="activity_avrcp_textview_width">250dp</dimen>
 </resources>
