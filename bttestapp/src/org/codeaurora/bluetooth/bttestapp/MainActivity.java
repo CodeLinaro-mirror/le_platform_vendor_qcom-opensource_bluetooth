@@ -64,6 +64,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.ArrayList;
+import java.util.UUID;
+import java.io.IOException;
 
 public class MainActivity extends MonkeyActivity {
 
@@ -324,20 +326,23 @@ public class MainActivity extends MonkeyActivity {
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
         setBTState();
 
-        // if (EirSample1 == null) {
-        //     EirSample1 = new Eir128bitUUIDSample("128UUID_SAMPLE1",  "00112233-4455-6677-8899-aabbccddeeff");
-        //     EirSample1.start();
-        // }
+        if (EirSample1 == null)
+        {
+            EirSample1  = new Eir128bitUUIDSample("128UUID_SAMPLE1",  "00112233-4455-6677-8899-aabbccddeeff");
+            EirSample1.start();
+        }
 
-        // if (EirSample2 == null) {
-        //     EirSample2 = new Eir128bitUUIDSample("128UUID_SAMPLE2",  "00000000-2222-2222-3333-555555555555");
-        //     EirSample2.start();
-        // }
+        if (EirSample2 == null)
+        {
+            EirSample2    = new Eir128bitUUIDSample("128UUID_SAMPLE2",  "00000000-2222-2222-3333-555555555559");
+            EirSample2.start();
+        }
 
-        // if (EirSample3 == null) {
-        //     EirSample3 = new Eir128bitUUIDSample("128UUID_SAMPLE3",  "11112222-8877-aabb-ccdd-666666666666");
-        //     EirSample3.start();
-        // }
+        if (EirSample3 == null)
+        {
+            EirSample3 = new Eir128bitUUIDSample("128UUID_SAMPLE3",  "11112222-8877-aabb-ccdd-666666666666");
+            EirSample3.start();
+        }
     }
 
     @Override
