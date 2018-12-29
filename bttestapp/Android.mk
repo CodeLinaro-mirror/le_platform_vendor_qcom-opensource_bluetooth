@@ -6,7 +6,7 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
         $(call all-java-files-under, src)
 
-LOCAL_PACKAGE_NAME := BTTestApp
+LOCAL_PACKAGE_NAME := BTPTSApp
 LOCAL_CERTIFICATE := platform
 
 LOCAL_MODULE_OWNER := qti
