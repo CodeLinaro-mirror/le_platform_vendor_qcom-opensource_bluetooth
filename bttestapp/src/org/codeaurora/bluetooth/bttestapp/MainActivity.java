@@ -161,7 +161,7 @@ public class MainActivity extends MonkeyActivity {
                     mDevice.sdpSearch(BluetoothUuid.MAS);
                 }
 
-            } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
+            } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
                 BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
@@ -171,7 +171,7 @@ public class MainActivity extends MonkeyActivity {
                 boolean sent = true ? bondState == BluetoothDevice.BOND_BONDED : false;
 
                 Toast.makeText(MainActivity.this, "added bond device " + sent, Toast.LENGTH_SHORT).show();
-            } else if (action.equals(BluetoothDevice.ACTION_SDP_RECORD)){
+            } else if (action.equals(BluetoothDevice.ACTION_SDP_RECORD)) {
                 BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (!dev.equals(mDevice)) {
                     return;
@@ -182,20 +182,18 @@ public class MainActivity extends MonkeyActivity {
                 Log.v(TAG, "expected UUID: " +
                         BluetoothUuid.MAS.toString());
                 Log.v(TAG, "mDiscoveryInProgress: " + mDiscoveryInProgress);
-                // if (uuid.equals(BluetoothUuid.MAS)){
-                //     SdpMasRecord masrec = intent.getParcelableExtra(BluetoothDevice.EXTRA_SDP_RECORD);
-                //     Log.v(TAG, "masrec: " + masrec);
-                //
-                //     if (masrec != null) {
-                //         mProfileService.setMasInstances(masrec);
-                //         mServicesFragment.addService(ServicesFragment.Service.Type.MAP, masrec);
-                //     }
-                //
-                //     mServicesFragment.persistServices();
-                //
-                //     mDiscoveryInProgress = false;
-                // }
-            } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
+                if (uuid.equals(BluetoothUuid.MAS)) {
+                    SdpMasRecord masrec = intent.getParcelableExtra(BluetoothDevice.EXTRA_SDP_RECORD);
+                    Log.v(TAG, "masrec: " + masrec);
+
+                    if (masrec != null) {
+                        mServicesFragment.addService(ServicesFragment.Service.Type.MAP, masrec);
+                    }
+
+                    mServicesFragment.persistServices();
+                    mDiscoveryInProgress = false;
+                }
+            } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
                 BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
@@ -393,6 +391,7 @@ public class MainActivity extends MonkeyActivity {
 
         } else if (v.getId() == R.id.discover_services) {
             if (mDevice == null || mDiscoveryInProgress) {
+                Log.e(TAG, "mDevice " + mDevice + " mDiscoveryInProgress " + mDiscoveryInProgress);
                 return;
             }
 

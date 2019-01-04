@@ -93,7 +93,7 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
             BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
             if (device.equals(selectedDevice)) {
-                Logger.v(TAG, "Received bluetooth disconected.");
+                Logger.v(TAG, "Received bluetooth disconected. " + device);
 
                 notifyObserversDeviceDisconected();
             }

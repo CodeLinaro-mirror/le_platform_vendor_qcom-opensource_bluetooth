@@ -539,10 +539,9 @@ public class ServicesFragment extends ListFragment {
                     return;
                 }
                 break;
-            // case MAP:
-            //     intent = new Intent(getActivity(), MapTestActivity.class);
-            //     intent.putExtra(ProfileService.EXTRA_MAP_INSTANCE_ID, srv.mSdpMasRecord.getMasInstanceId());
-            //     break;
+            case MAP:
+                intent = new Intent(getActivity(), MapTestActivity.class);
+                break;
             default:
                 // this should never happen!
                 throw new IllegalArgumentException();
