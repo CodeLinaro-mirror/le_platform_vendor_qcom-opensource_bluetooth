@@ -63,13 +63,14 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
         observers.remove(observer);
     }
 
-    private void notifyObserversDeviceChanged(BluetoothDevice device) {
+    public static void notifyObserversDeviceChanged(BluetoothDevice device) {
+        selectedDevice = device;//notifyObserversDeviceChanged is called from MainActivity now.
         for (IBluetoothConnectionObserver observer : observers) {
             observer.onDeviceChanged(device);
         }
     }
 
-    private void notifyObserversDeviceDisconected() {
+    public static void notifyObserversDeviceDisconected() {
         for (IBluetoothConnectionObserver observer : observers) {
             observer.onDeviceDisconected();
         }
@@ -93,7 +94,7 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
             BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
             if (device.equals(selectedDevice)) {
-                Logger.v(TAG, "Received bluetooth disconected.");
+                Logger.v(TAG, "Received bluetooth disconected. " + device);
 
                 notifyObserversDeviceDisconected();
             }
