@@ -53,25 +53,25 @@
                 android:id="@+id/map_filter_type_sms_gsm"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/map_msg_type_sms_gsm" />
+                android:text="@string/map_msg_type_no_sms_gsm" />
 
             <CheckBox
                 android:id="@+id/map_filter_type_sms_cdma"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/map_msg_type_sms_cdma" />
+                android:text="@string/map_msg_type_no_sms_cdma" />
 
             <CheckBox
                 android:id="@+id/map_filter_type_email"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/map_msg_type_email" />
+                android:text="@string/map_msg_type_no_email" />
 
             <CheckBox
                 android:id="@+id/map_filter_type_mms"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/map_msg_type_mms" />
+                android:text="@string/map_msg_type_no_mms" />
 
         </LinearLayout>
 
