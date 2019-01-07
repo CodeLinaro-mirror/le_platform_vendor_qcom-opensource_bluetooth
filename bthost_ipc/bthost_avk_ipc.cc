@@ -106,6 +106,11 @@ typedef struct {
     uint32_t      sampling_rate;
 } audio_sbc_decoder_config;
 
+typedef struct {
+    uint32_t sampling_rate;
+    uint8_t  channel_mode;
+} audio_aptx_ad_decoder_config;
+
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -119,6 +124,8 @@ struct a2dp_avk_stream_common audio_stream;
 audio_aptx_default_config aptx_codec;
 audio_aac_decoder_config aac_codec;
 audio_sbc_decoder_config sbc_codec;
+audio_aptx_ad_decoder_config aptxad_codec;
+
 /*****************************************************************************
 **  Externs
 ******************************************************************************/
@@ -298,18 +305,83 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
     }
     else if (codec_cfg[CODEC_AVK_OFFSET] == NON_A2DP_CODEC_TYPE)
     {
-        if (codec_cfg[VENDOR_ID_OFFSET] == VENDOR_APTX &&
-            codec_cfg[CODEC_ID_OFFSET] == APTX_CODEC_ID)
+        if (codec_cfg[VENDOR_ID_OFFSET - 1] == VENDOR_APTX &&
+            codec_cfg[CODEC_ID_OFFSET - 1] == APTX_CODEC_ID)
         {
             INFO("AptX-classic codec");
             *codec_type = AUDIO_FORMAT_APTX;
         }
-        if (codec_cfg[VENDOR_ID_OFFSET] == VENDOR_APTX_HD &&
-            codec_cfg[CODEC_ID_OFFSET] == APTX_HD_CODEC_ID)
+        if (codec_cfg[VENDOR_ID_OFFSET - 1] == VENDOR_APTX_HD &&
+            codec_cfg[CODEC_ID_OFFSET - 1] == APTX_HD_CODEC_ID)
         {
             INFO("AptX-HD codec");
             *codec_type = AUDIO_FORMAT_APTX_HD;
         }
+        if (codec_cfg[VENDOR_ID_OFFSET - 1] == VENDOR_APTX_ADAPTIVE &&
+            codec_cfg[CODEC_ID_OFFSET - 1] == APTX_ADAPTIVE_CODEC_ID)
+        {
+            INFO("AptX-Adaptive codec");
+            *codec_type = AUDIO_FORMAT_APTX_ADAPTIVE;
+
+            memset(&aptxad_codec, 0, sizeof(audio_aptx_ad_decoder_config));
+            len = *p_cfg++;//LOSC
+            p_cfg++; // Skip media type
+            len--;
+            p_cfg++; //codec_type
+            len--;
+            p_cfg += 4;//skip vendor id
+            len -= 4;
+            p_cfg += 2; //skip codec id
+            len -= 2;
+
+            switch(*p_cfg++ & A2D_APTX_ADAPTIVE_SAMP_FREQ_MASK)
+            {
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_44100:
+                     aptxad_codec.sampling_rate = 1;
+                     break;
+                case A2DP_APTX_ADAPTIVE_SAMPLERATE_48000:
+                     aptxad_codec.sampling_rate = 0;
+                     break;
+                default:
+                     ERROR("Unknown sampling rate");
+            }
+            len--;
+
+            switch(*p_cfg++ & A2D_APTX_ADAPTIVE_CHAN_MASK)
+            {
+                case A2DP_APTX_ADAPTIVE_CHANNELS_MONO:
+                     aptxad_codec.channel_mode = 1;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_TWS_MONO:
+                     aptxad_codec.channel_mode = 2;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO:
+                     aptxad_codec.channel_mode = 0;
+                     break;
+                case A2DP_APTX_ADAPTIVE_CHANNELS_TWS_STEREO:
+                     aptxad_codec.channel_mode = 4;
+                     break;
+                default:
+                     ERROR("Unknown channel id");
+            }
+            len--;
+            len -= 6; //skip latency info
+
+            p_cfg += 3; // ignoring eoc bits
+            len -= 3;
+            p_cfg += APTX_ADAPTIVE_RESERVED_BITS;
+            len -= APTX_ADAPTIVE_RESERVED_BITS;
+            INFO("%s: ## aptXAdaptive ## sampleRate 0x%x", __func__, aptxad_codec.sampling_rate);
+            INFO("%s: ## aptXAdaptive ## channelMode 0x%x", __func__, aptxad_codec.channel_mode);
+
+            if(len == 0)
+                INFO("%s: Aptx AD: codec config copied", __func__);
+            else
+                INFO("%s: Aptx AD: codec config length error: %d", __func__, len);
+
+            return ((void *)&aptxad_codec);
+        }
+
         memset(&aptx_codec,0,sizeof(audio_aptx_default_config));
         len = *p_cfg++;//LOSC
         p_cfg++; // Skip media type
