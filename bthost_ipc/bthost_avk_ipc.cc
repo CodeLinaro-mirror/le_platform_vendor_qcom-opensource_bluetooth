@@ -519,14 +519,11 @@ int a2dp_avk_read_codec_config(struct a2dp_avk_stream_common *common)
     INFO("%s",__func__);
     memset(p_codec_cfg,0,MAX_CODEC_CFG_SIZE);
 
-    pthread_mutex_lock(&audio_stream.lock);
     if (a2dp_avk_command(&audio_stream, A2DP_AVK_CTRL_GET_CODEC_CONFIG) != 0)
     {
         INFO("%s: FAIL",__func__);
-        pthread_mutex_unlock(&audio_stream.lock);
         return -1;
     }
-    pthread_mutex_unlock(&audio_stream.lock);
 
     if ((a2dp_avk_ctrl_receive(common, &len, 1) < 0) ||
         (len <= 0) || (len > MAX_CODEC_CFG_SIZE))
@@ -658,18 +655,10 @@ int audio_sink_start_capture()
 {
     int i;
     a2dp_avk_stream_common_init(&audio_stream);
+    pthread_mutex_lock(&audio_stream.lock);
     a2dp_avk_open_ctrl_path(&audio_stream);
     INFO("%s: state = %s",__func__,dump_a2dp_hal_state(audio_stream.state));
 
-    /*if (check_a2dp_open_ready(&audio_stream) < 0)
-    {
-        if (audio_stream.ctrl_fd != AUDIO_SKT_DISCONNECTED)
-        {
-            ERROR("BTIF is not ready to start stream");
-            return -1;
-        }
-        Try to start stream to recover from ctrl skt disconnect
-    }*/
     for (i = 0; i < STREAM_START_MAX_RETRY_COUNT; i++)
     {
         if (start_audio_avk_datapath(&audio_stream) == 0)
@@ -688,33 +677,41 @@ int audio_sink_start_capture()
     if (audio_stream.state != AUDIO_A2DP_AVK_STATE_STARTED_CAPTURE)
     {
         ERROR("Failed to start a2dp stream");
+        pthread_mutex_unlock(&audio_stream.lock);
         return -1;
     }
+    pthread_mutex_unlock(&audio_stream.lock);
     return 0;
 }
 
 int audio_sink_stop_capture()
 {
+    int ret = -1;
     INFO("%s",__func__);
+    pthread_mutex_lock(&audio_stream.lock);
     if (suspend_audio_avk_datapath(&audio_stream) == 0)
     {
         INFO("audio stop stream successful");
-        return 0;
+        ret = 0;
     }
     skt_disconnect(audio_stream.ctrl_fd);
     audio_stream.ctrl_fd = AUDIO_SKT_DISCONNECTED;
     audio_stream.state = AUDIO_A2DP_AVK_STATE_STOPPED;
-    return -1;
+    pthread_mutex_unlock(&audio_stream.lock);
+    return ret;
 }
 
 void* audio_get_decoder_config(audio_format_t *codec_type)
 {
     INFO("%s: state = %s",__func__,dump_a2dp_hal_state(audio_stream.state));
 
+    pthread_mutex_lock(&audio_stream.lock);
     if (a2dp_avk_read_codec_config(&audio_stream) == 0)
     {
+        pthread_mutex_unlock(&audio_stream.lock);
         return (a2dp_codec_parser(&audio_stream.codec_cfg[0], codec_type));
     }
+    pthread_mutex_unlock(&audio_stream.lock);
     return NULL;
 }
 
