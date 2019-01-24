@@ -444,8 +444,8 @@ public class MainActivity extends MonkeyActivity {
     }
 
     public void showDipTestActivity(View v) {
-        // Log.i(TAG," showDipTestActivity");
-        // startActivity(new Intent(this, DipTestActivity.class));
+        Log.i(TAG," showDipTestActivity");
+        startActivity(new Intent(this, DipTestActivity.class));
     }
 
     private BluetoothProfile.ServiceListener ma2dpSinkServiceListener =
