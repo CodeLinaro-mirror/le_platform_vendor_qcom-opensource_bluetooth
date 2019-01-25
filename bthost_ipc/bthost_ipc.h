@@ -63,6 +63,9 @@ codec specific definitions
 #ifndef VENDOR_APTX_HD
 #define VENDOR_APTX_HD 0xD7
 #endif
+#ifndef VENDOR_APTX_ADAPTIVE
+#define VENDOR_APTX_ADAPTIVE 0xD7
+#endif
 #ifndef VENDOR_APTX_LL
 #define VENDOR_APTX_LL 0x0A
 #endif
@@ -71,6 +74,15 @@ codec specific definitions
 #endif
 #ifndef APTX_HD_CODEC_ID
 #define APTX_HD_CODEC_ID 0x24
+#endif
+#ifndef APTX_ADAPTIVE_CODEC_ID
+#define APTX_ADAPTIVE_CODEC_ID 0xAD
+#endif
+#ifndef APTX_ADAPTIVE_RESERVED_BITS
+#define APTX_ADAPTIVE_RESERVED_BITS 23
+#endif
+#ifndef APTX_TWS_CODEC_ID
+#define APTX_TWS_CODEC_ID 0x25
 #endif
 
 #define A2D_SBC_FREQ_MASK 0xF0
@@ -102,6 +114,20 @@ codec specific definitions
 #define A2D_APTX_CHAN_MASK       0x0F
 #define A2D_APTX_CHAN_STEREO     0x02
 #define A2D_APTX_CHAN_MONO       0x01
+#define A2D_APTX_TWS_CHAN_MODE   0x08
+
+/* APTX Adaptive bitmask helper */
+#define A2D_APTX_ADAPTIVE_SAMP_FREQ_MASK           (0xF8)
+#define A2D_APTX_ADAPTIVE_CHAN_MASK                (0x1F)
+#define A2DP_APTX_ADAPTIVE_SAMPLERATE_44100        (0x08)
+#define A2DP_APTX_ADAPTIVE_SAMPLERATE_48000        (0x10)
+#define A2DP_APTX_ADAPTIVE_SAMPLERATE_88000        (0x20)
+#define A2DP_APTX_ADAPTIVE_SAMPLERATE_192000       (0x40)
+#define A2DP_APTX_ADAPTIVE_CHANNELS_MONO          (0x01)
+#define A2DP_APTX_ADAPTIVE_CHANNELS_STEREO        (0x02)
+#define A2DP_APTX_ADAPTIVE_CHANNELS_TWS_STEREO    (0x04)
+#define A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO  (0x08)
+#define A2DP_APTX_ADAPTIVE_CHANNELS_TWS_MONO      (0x10)
 
 
 #define A2D_AAC_IE_OBJ_TYPE_MSK                0xF0    /* b7-b4 Object Type */
@@ -168,6 +194,7 @@ typedef struct {
     void (*clear_a2dpsuspend_flag)(void);
     void*(*audio_get_next_codec_config)(uint8_t idx, audio_format_t *codec_type);
     int (*audio_check_a2dp_ready)(void);
+    uint16_t (*audio_get_a2dp_sink_latency)(void);
 } bt_host_ipc_interface_t;
 
 extern "C" int audio_stream_open(void);
@@ -179,5 +206,5 @@ extern "C" void* audio_get_codec_config(uint8_t *mcast, uint8_t *num_dev, audio_
 extern "C" void audio_handoff_triggered(void);
 extern "C" void clear_a2dpsuspend_flag(void);
 extern "C" int audio_check_a2dp_ready(void);
-
+extern "C" uint16_t audio_get_a2dp_sink_latency(void);
 #endif

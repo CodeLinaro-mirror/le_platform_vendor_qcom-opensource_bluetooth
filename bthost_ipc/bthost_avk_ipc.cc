@@ -116,7 +116,7 @@ struct a2dp_avk_stream_common audio_stream;
 **  Static functions
 ******************************************************************************/
 
-audio_aptx_encoder_config aptx_codec;
+audio_aptx_default_config aptx_codec;
 audio_aac_decoder_config aac_codec;
 audio_sbc_decoder_config sbc_codec;
 /*****************************************************************************
@@ -310,7 +310,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             INFO("AptX-HD codec");
             *codec_type = AUDIO_FORMAT_APTX_HD;
         }
-        memset(&aptx_codec,0,sizeof(audio_aptx_encoder_config));
+        memset(&aptx_codec,0,sizeof(audio_aptx_default_config));
         len = *p_cfg++;//LOSC
         p_cfg++; // Skip media type
         len--;
