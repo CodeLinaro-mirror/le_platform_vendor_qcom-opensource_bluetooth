@@ -485,7 +485,6 @@ int read_hci_event(int fd, unsigned char* buf, int size)
 {
 	int remain, r;
 	int count = 0;
-
 	if (size <= 0)
 		return -1;
 
@@ -494,9 +493,19 @@ int read_hci_event(int fd, unsigned char* buf, int size)
 	while (1) {
 		r = read(fd, buf, 1);
 		if (r <= 0)
-			return -1;
+		{
+            printf("HCI Event read-> return %d \n",r);
+            return -1;
+		}
 		if (buf[0] == 0x04) {
 			break;
+		}
+		else if(buf[0] == 0xfb || buf[0] == 0xfd)
+            return 1;
+		else
+		{
+             printf("HCI Event ->read continue\n");
+             sleep(10);
 		}
 	}
 	count++;
@@ -6189,7 +6198,10 @@ static int qca_reset_req(int fd)
 	int err;
 
 	printf("HCI Reset\n");
-
+#ifdef QCA_DEBUG
+	printf("SEND -> ");
+	qca_debug_dump(cmd, sizeof(cmd));
+#endif
 	err = write(fd, cmd, sizeof(cmd));
 	if (err != sizeof(cmd)) {
 		fprintf(stderr, "Send failed with ret value %d\n", err);
@@ -6197,6 +6209,11 @@ static int qca_reset_req(int fd)
 	}
 
 	err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+#ifdef QCA_DEBUG
+	printf("RECV <- ");
+	qca_debug_dump(rsp, err);
+#endif
+
 	if (err < 7) {
 		fprintf(stderr, "Failed to reset, invalid HCI event\n");
 		return -1;
@@ -6210,10 +6227,10 @@ static int qca_reset_req(int fd)
 	return 0;
 }
 
-static int qca_vs_send_cmd(int fd, uint8_t *cmd, uint8_t *rsp, int size)
+static int qca_vs_send_cmd(int fd, uint8_t *cmd, uint8_t *rsp, int size, bool wt_evt)
 {
 	int ret, count;
-
+	count = 0;
 #ifdef QCA_DEBUG
 	printf("SEND -> ");
 	qca_debug_dump(cmd, size);
@@ -6224,6 +6241,9 @@ static int qca_vs_send_cmd(int fd, uint8_t *cmd, uint8_t *rsp, int size)
 		return -1;
 	}
 
+	if(wt_evt)
+	{
+
 	/* check for response from the chipset */
 	count = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
 	if (count < 0)
@@ -6233,9 +6253,15 @@ static int qca_vs_send_cmd(int fd, uint8_t *cmd, uint8_t *rsp, int size)
 	printf("RECV <- ");
 	qca_debug_dump(rsp, count);
 #endif
+	if(count == 1)
+	{
+        printf("====read invalid HCI Event, Drop it!====\n");
+        return 0;
+	}
 	ret = qca_vs_read_event(rsp, count);
 	if (ret < 0)
 		return -1;
+	}
 
 	return count;
 }
@@ -6284,7 +6310,7 @@ static int qca_rome_patch_ver_req(int fd)
 	size = 4 + EDL_PATCH_CMD_LEN;
 
 	/* Send HCI command to controller */
-	err = qca_vs_send_cmd(fd, cmd, rsp, size);
+	err = qca_vs_send_cmd(fd, cmd, rsp, size, true);
 	if (err < 0) {
 		fprintf(stderr, "Failed to read version of soc (%x)\n",
 			err);
@@ -6306,27 +6332,27 @@ static int qca_rome_patch_ver_req(int fd)
 }
 
 static int qca_tlv_dnld_segment(int fd, int idx, int seg_size, uint8_t *data,
-				bool wt_evt)
+				bool wt_vsc, bool wt_cc)
 {
 	int size, err;
 	uint8_t cmd[HCI_MAX_CMD_SIZE];
 	uint8_t rsp[HCI_MAX_EVENT_SIZE];
 
-	printf("Download segment no %d size %d\n", idx, seg_size);
+	printf("Download segment no %d size %d wt_vsc %d wt_cc %d\n", idx, seg_size, wt_vsc, wt_cc);
 
 	/* Frame the HCI CMD PKT to be sent to controller */
 	frame_hci_pkt(cmd, EDL_PATCH_TLV_REQ_CMD, data, seg_size);
 	/* total size of packet: cmd + opcode + len + cmd[3] */
 	size = 4 + cmd[3];
 
-	err = qca_vs_send_cmd(fd, cmd, rsp, size);
+	err = qca_vs_send_cmd(fd, cmd, rsp, size,wt_vsc);
 	if (err < 0) {
 		fprintf(stderr, "Failed to send patch payload to soc %x\n",
 			err);
 		return err;
 	}
 
-	if (wt_evt) {
+	if (wt_cc) {
 		err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
 		if (err < 0) {
 			fprintf(stderr, "Failed to download patch segment %d\n",
@@ -6347,7 +6373,7 @@ static int qca_tlv_dnld_segment(int fd, int idx, int seg_size, uint8_t *data,
 static int qca_tlv_dnld_req(int fd, struct patch_data *pdata)
 {
 	int total_segment, remain_size;
-	int err, w_cmd, i;
+	int err, w_cc, w_vsc, i;
 	uint8_t *buffer;
 
 	if (!pdata)
@@ -6357,20 +6383,24 @@ static int qca_tlv_dnld_req(int fd, struct patch_data *pdata)
 	remain_size = (pdata->len < MAX_SIZE_PER_TLV_SEGMENT)? pdata->len :
 		      pdata->len % MAX_SIZE_PER_TLV_SEGMENT;
 
+	long len = pdata->len;
 	printf("Total size %ld, total segment num %d, remain size %d\n",
-	       pdata->len, total_segment, remain_size);
+	       len, total_segment, remain_size);
 
+	w_cc = w_vsc = true;
 	for (i = 0; i < total_segment; i++) {
 		// Last patch segment does not generate command_complete event
-		if (pdata->type == TLV_TYPE_PATCH && !remain_size &&
-		    i+1 == total_segment)
-			w_cmd = false;
-		else
-			w_cmd = true;
+		if (pdata->type == TLV_TYPE_PATCH)
+		{
+			//w_vsc = false;
+		    //w_cc = false;
+			if(!remain_size && i+1 == total_segment)
+			     w_cc = false;
+		}
 
 		buffer = pdata->data + i * MAX_SIZE_PER_TLV_SEGMENT;
 		err = qca_tlv_dnld_segment(fd, i, MAX_SIZE_PER_TLV_SEGMENT,
-					   buffer, w_cmd);
+					   buffer, w_vsc,w_cc);
 		if (err < 0)
 			return -EIO;
 	}
@@ -6378,13 +6408,14 @@ static int qca_tlv_dnld_req(int fd, struct patch_data *pdata)
 	if (remain_size) {
 		// Last patch segment does not generate command_complete event
 		if (pdata->type == TLV_TYPE_PATCH)
-			w_cmd = false;
-		else
-			w_cmd = true;
+		{
+			w_cc = false;
+			//w_vsc = true;
+		}
 
 		buffer = pdata->data + total_segment * MAX_SIZE_PER_TLV_SEGMENT;
 		err = qca_tlv_dnld_segment(fd, total_segment, remain_size,
-					   buffer, w_cmd);
+					   buffer, w_vsc,w_cc);
 		if (err < 0)
 			return -EIO;
 	}
@@ -6589,6 +6620,8 @@ int qca_rome_init(int fd, int flags, int speed, struct termios *ti)
 	err = qca_download_tlv_file(fd, TLV_TYPE_PATCH, patch_name);
 	if (err < 0)
 		return -1;
+
+	sleep(0.5);
 
 	/* Download NVM file */
 	err = qca_download_tlv_file(fd, TLV_TYPE_NVM, nvm_name);
@@ -6903,6 +6936,9 @@ int main(int argc, char *argv[])
 			argc -=1;
 		}
 	}
+	// skip interface entry
+	argv += 1;
+	argc -= 1;
 
 	disable_soc_logging(fd);
 
@@ -6912,6 +6948,7 @@ int main(int argc, char *argv[])
 		command[i].func(fd, argc, argv);
 		break;
 	}
+
 	close(fd);
 	return 0;
 }
