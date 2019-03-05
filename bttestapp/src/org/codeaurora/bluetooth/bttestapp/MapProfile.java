@@ -43,6 +43,20 @@ public class MapProfile {
 
     private final static String TAG = "MapProfile";
 
+    /* Properties for MAP filter */
+    /* When set to "true", bluetooth process get the filter from the following properties */
+    public static final String BLUETOOTH_MAP_FILTER_USE_PROPERTY = "vendor.bt.mce.filter.useproperty";
+    public static final String BLUETOOTH_MAP_FILTER_MESSAGE_TYPE = "vendor.bt.mce.filter.messagetype";
+    public static final String BLUETOOTH_MAP_FILTER_READ_STATUS = "vendor.bt.mce.filter.readstatus";
+    public static final String BLUETOOTH_MAP_FILTER_PERIODBEGIN = "vendor.bt.mce.filter.periodbegin";
+    public static final String BLUETOOTH_MAP_FILTER_PERIODEND = "vendor.bt.mce.filter.periodend";
+    public static final String BLUETOOTH_MAP_FILTER_RECIPIENT = "vendor.bt.mce.filter.recipient";
+    public static final String BLUETOOTH_MAP_FILTER_ORIGINATOR = "vendor.bt.mce.filter.originator";
+    public static final String BLUETOOTH_MAP_FILTER_PRIORITY = "vendor.bt.mce.filter.priority";
+
+    // Support multiple instances when true
+    public final static String BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE = "vendor.bt.mce.multiinstance";
+
     private final BluetoothAdapter mAdapter = BluetoothAdapter.getDefaultAdapter();
 
     private BluetoothDevice mDevice = null;

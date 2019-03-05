@@ -100,23 +100,12 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     /* Default content len to push message */
     private static final int CONTENT_LEN = 256;
 
-    /* Properties for MAP filter */
-    /* When set to "true", bluetooth process get the filter from the following properties */
-    private static final String BLUETOOTH_MAP_FILTER_USE_PROPERTY = "vendor.bt.mce.useproperty";
-    private static final String BLUETOOTH_MAP_FILTER_MESSAGE_TYPE = "vendor.bt.mce.messagetype";
-    private static final String BLUETOOTH_MAP_FILTER_READ_STATUS = "vendor.bt.mce.readstatus";
-    private static final String BLUETOOTH_MAP_FILTER_PERIODBEGIN = "vendor.bt.mce.periodbegin";
-    private static final String BLUETOOTH_MAP_FILTER_PERIODEND = "vendor.bt.mce.periodend";
-    private static final String BLUETOOTH_MAP_FILTER_RECIPIENT = "vendor.bt.mce.recipient";
-    private static final String BLUETOOTH_MAP_FILTER_ORIGINATOR = "vendor.bt.mce.originator";
-    private static final String BLUETOOTH_MAP_FILTER_PRIORITY = "vendor.bt.mce.priority";
-
-    // Support multiple instances when true
-    private final static String BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE = "vendor.bt.mce.multiinstance";
-
     private static final String TAB_BROWSE = "Browse";
     private static final String TAB_PUSH = "Push";
     private static final String RECIPIENT_TEL = "1234567";
+    private static final String RECIPIENT_EMAIL = "PTS@bluetooth.com";
+    private static final String SCHEME_TEL = "tel:";
+    private static final String SCHEME_EMAIL = "email:";
 
     private String mCurrentTab = TAB_BROWSE;
 
@@ -156,6 +145,8 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private List<MasInstanceInformation> mInstances = new ArrayList<MasInstanceInformation>();
     private RadioGroup mInstanceGroup;
     private CheckBox mCbMultiInstance;
+    // "tel:" to send sms. "email:" to send email
+    private String mMessageScheme = null;
 
     Object mLock = new Object();
 
@@ -366,6 +357,17 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         }
     }
 
+    public void onRadioButtonClicked(View v) {
+        // Select SMS or Email
+        if (v.getId() == R.id.id_scheme_tel) {
+            mMessageScheme = "tel:";
+            mEditRecipient.setText(RECIPIENT_TEL);
+        } else if (v.getId() == R.id.id_scheme_email) {
+            mMessageScheme = "email:";
+            mEditRecipient.setText(RECIPIENT_EMAIL);
+        }
+    }
+
     private void connect() {
         Log.d(TAG, "connect");
         synchronized (mLock) {
@@ -436,14 +438,14 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private void supportMultiInstance(boolean checked) {
         Log.d(TAG, "supportMultiInstance " + checked);
         if (checked) {
-            SystemProperties.set(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, "true");
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE, "true");
         } else {
-            SystemProperties.set(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, "false");
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE, "false");
         }
     }
 
     private boolean isMultiInstanceSupported() {
-        return SystemProperties.getBoolean(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, true);
+        return SystemProperties.getBoolean(MapProfile.BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE, true);
     }
 
     private void prefillMessage() {
@@ -469,17 +471,15 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private void pushMessage() {
         Log.d(TAG, "pushMessage");
         synchronized (mLock) {
-            if (mEditContent.getText().length() == 0) {
-                prefillMessage();
-            }
+            prefillMessage();
 
-            Log.d(TAG, "Recipient :" + mEditRecipient.getText().toString());
+            Log.d(TAG, "Recipient :" + mMessageScheme + mEditRecipient.getText().toString());
             mSentIntent = PendingIntent.getBroadcast(this, 0, new Intent(BluetoothMapClient.ACTION_MESSAGE_SENT_SUCCESSFULLY),
                     PendingIntent.FLAG_ONE_SHOT);
             mDeliveredIntent = PendingIntent.getBroadcast(this, 0, new Intent(BluetoothMapClient.ACTION_MESSAGE_DELIVERED_SUCCESSFULLY),
                     PendingIntent.FLAG_ONE_SHOT);
 
-            Uri[] recipients = new Uri[]{Uri.parse(mEditRecipient.getText().toString())};
+            Uri[] recipients = new Uri[]{Uri.parse(mMessageScheme + mEditRecipient.getText().toString())};
             if (recipients == null) {
                 Log.e(TAG, "recipients is null");
                 return;
@@ -533,11 +533,13 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
                 } else if (action.equals(BluetoothMapClient.ACTION_MESSAGE_RECEIVED)) {
                     HashMap<String, String> attrs = new HashMap<String, String>();
                     attrs.put("handle", intent.getStringExtra(BluetoothMapClient.EXTRA_MESSAGE_HANDLE));
-                    attrs.put("body_content", intent.getStringExtra(android.content.Intent.EXTRA_TEXT));
-                    attrs.put("sender_phone_number", intent.getStringExtra(BluetoothMapClient.EXTRA_SENDER_CONTACT_URI));
-                    attrs.put("sender_name", intent.getStringExtra(BluetoothMapClient.EXTRA_SENDER_CONTACT_NAME));
                     attrs.put("type", intent.getStringExtra(BluetoothMapClient.EXTRA_TYPE));
+                    attrs.put("sender_contact", intent.getStringExtra(BluetoothMapClient.EXTRA_SENDER_CONTACT_URI));
+                    attrs.put("sender_name", intent.getStringExtra(BluetoothMapClient.EXTRA_SENDER_CONTACT_NAME));
+                    attrs.put("recipient_contact", intent.getStringExtra(BluetoothMapClient.EXTRA_RECIPIENT_CONTACT_URI));
+                    attrs.put("recipient_name", intent.getStringExtra(BluetoothMapClient.EXTRA_RECIPIENT_CONTACT_NAME));
                     attrs.put("read_status", intent.getStringExtra(BluetoothMapClient.EXTRA_READ_STATUS));
+                    attrs.put("body_content", intent.getStringExtra(android.content.Intent.EXTRA_TEXT));
                     BluetoothMapMessage message = new BluetoothMapMessage(attrs);
                     Log.d(TAG, mDevice + " received message " + message);
                     onGetMessage(message);
@@ -704,8 +706,10 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     public static class BluetoothMapMessage {
         private String mHandle;
         private String mBodyContent;
-        private String mSenderPhoneNumber;
+        private String mSenderContact;
         private String mSenderName;
+        private String mRecipientContact;
+        private String mRecipientName;
         private String mType;
         private String mReadStatus;
 
@@ -726,8 +730,10 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
             }
 
             mBodyContent = attrs.get("body_content");
-            mSenderPhoneNumber = attrs.get("sender_phone_number");
+            mSenderContact = attrs.get("sender_contact");
             mSenderName = attrs.get("sender_name");
+            mRecipientContact = attrs.get("recipient_contact");
+            mRecipientName = attrs.get("recipient_name");
             mReadStatus = attrs.get("read_status");
             mType = attrs.get("type");
         }
@@ -749,19 +755,35 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         }
 
         /**
-         * @return value corresponding to TEL of <code>VCARD</code> parameter in MAP
+         * @return value corresponding to TEL(for SMS) or EMAIL(for email) of <code>VCARD</code> parameter in MAP
          *         specification
          */
-        public String getSenderPhoneNumber() {
-            return mSenderPhoneNumber;
+        public String getSenderContact() {
+            return mSenderContact;
         }
 
         /**
-         * @return value corresponding to Name of <code>VCARD</code> parameter in MAP
+         * @return value corresponding to N of <code>VCARD</code> parameter in MAP
          *         specification
          */
         public String getSenderName() {
             return mSenderName;
+        }
+
+        /**
+         * @return value corresponding to EMAIL of <code>VCARD</code> parameter in MAP
+         *         specification
+         */
+        public String getRecipientContact() {
+            return mRecipientContact;
+        }
+
+        /**
+         * @return value corresponding to N of <code>VCARD</code> parameter in MAP
+         *         specification
+         */
+        public String getRecipientName() {
+            return mRecipientName;
         }
 
         /**
@@ -818,10 +840,12 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
 
             try {
                 json.put("handle", mHandle);
-                json.put("BodyContent", mBodyContent);
-                json.put("SenderPhoneNumber", mSenderPhoneNumber);
-                json.put("sender name", mSenderName);
                 json.put("read status", mReadStatus);
+                json.put("sender contact", mSenderContact);
+                json.put("sender name", mSenderName);
+                json.put("recipient contact", mRecipientContact);
+                json.put("recipient name", mRecipientName);
+                json.put("body content", mBodyContent);
             } catch (JSONException e) {
                 // do nothing
             }
@@ -844,8 +868,25 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
 
             BluetoothMapMessage msg = mModelMessages.get(position);
 
-            ((TextView) v.findViewById(R.id.message_row_sender)).setText(msg.getSenderName());
-            ((TextView) v.findViewById(R.id.message_row_phone_number)).setText(msg.getSenderPhoneNumber());
+            ((TextView) v.findViewById(R.id.message_row_sender_name)).setText(msg.getSenderName());
+
+            switch (msg.getType()) {
+                case "EMAIL":
+                    ((TextView) v.findViewById(R.id.message_row_sender_contact_prompt)).setText("Address:");
+                    break;
+                case "SMS_GSM":
+                case "SMS_CDMA":
+                case "MMS":
+                    ((TextView) v.findViewById(R.id.message_row_sender_contact_prompt)).setText("Phone:");
+                    break;
+                default:
+                    Log.e(TAG, "Unknown type " + msg.getType());
+                    break;
+            }
+
+            ((TextView) v.findViewById(R.id.message_row_sender_contact)).setText(msg.getSenderContact());
+            ((TextView) v.findViewById(R.id.message_row_recipient_name)).setText(msg.getRecipientName());
+            ((TextView) v.findViewById(R.id.message_row_recipient_contact)).setText(msg.getRecipientContact());
             ((TextView) v.findViewById(R.id.message_row_type)).setText(msg.getType());
             ((TextView) v.findViewById(R.id.message_row_flag_read_status)).setText(msg.getReadStatus());
             ((TextView) v.findViewById(R.id.message_row_flag_read_status))
@@ -853,6 +894,13 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
             ((TextView) v.findViewById(R.id.message_row_handle)).setText(msg.getHandle());
             ((TextView) v.findViewById(R.id.message_row_body)).setText(msg.getBodyContent());
             Button mBtnRead = (Button) v.findViewById(R.id.message_row_btn_read);
+            if ((position & 0x1) == 0) {
+                // darkslategray
+                v.setBackgroundColor(Color.parseColor("#2F4F4F"));
+            } else {
+                // dimgray
+                v.setBackgroundColor(Color.parseColor("#696969"));
+            }
             mBtnRead.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -887,7 +935,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     }
 
     private void onMessageRead(String handle, String read) {
-        Log.d(TAG, "onMessageRead " + handle);
+        Log.d(TAG, "onMessageRead " + handle + " " + read);
         BluetoothMapMessage message = mMessagesMap.get(handle);
         if (message != null) {
             if (read != null && !read.isEmpty()) {
@@ -1177,38 +1225,38 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     }
 
     private void save2Properties() {
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_MESSAGE_TYPE + "  " + mMessageType);
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_MESSAGE_TYPE, mMessageType + "");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_MESSAGE_TYPE + "  " + mMessageType);
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_MESSAGE_TYPE, mMessageType + "");
 
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_READ_STATUS + "  " + mReadStatus);
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_READ_STATUS, mReadStatus + "");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_READ_STATUS + "  " + mReadStatus);
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_READ_STATUS, mReadStatus + "");
 
         if (mPeriodBegin != null) {
-            Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_PERIODBEGIN + "  " + mSimpleDateFormat.format(mPeriodBegin));
-            SystemProperties.set(BLUETOOTH_MAP_FILTER_PERIODBEGIN, mSimpleDateFormat.format(mPeriodBegin));
+            Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_PERIODBEGIN + "  " + mSimpleDateFormat.format(mPeriodBegin));
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_PERIODBEGIN, mSimpleDateFormat.format(mPeriodBegin));
         } else {
-            Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_PERIODBEGIN + "  " );
-            SystemProperties.set(BLUETOOTH_MAP_FILTER_PERIODBEGIN, "");
+            Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_PERIODBEGIN + "  " );
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_PERIODBEGIN, "");
         }
 
         if (mPeriodEnd != null) {
-            Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_PERIODEND + "  " + mSimpleDateFormat.format(mPeriodEnd));
-            SystemProperties.set(BLUETOOTH_MAP_FILTER_PERIODEND, mSimpleDateFormat.format(mPeriodEnd));
+            Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_PERIODEND + "  " + mSimpleDateFormat.format(mPeriodEnd));
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_PERIODEND, mSimpleDateFormat.format(mPeriodEnd));
         } else {
-            Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_PERIODEND + "  ");
-            SystemProperties.set(BLUETOOTH_MAP_FILTER_PERIODEND, "");
+            Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_PERIODEND + "  ");
+            SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_PERIODEND, "");
         }
 
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_RECIPIENT + "  " + mRecipient);
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_RECIPIENT, mRecipient + "");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_RECIPIENT + "  " + mRecipient);
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_RECIPIENT, mRecipient + "");
 
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_ORIGINATOR + "  " + mOriginator);
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_ORIGINATOR, mOriginator + "");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_ORIGINATOR + "  " + mOriginator);
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_ORIGINATOR, mOriginator + "");
 
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_PRIORITY + "  " + mPriority);
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_PRIORITY, mPriority + "");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_PRIORITY + "  " + mPriority);
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_PRIORITY, mPriority + "");
 
-        Log.d(TAG, "Set " + BLUETOOTH_MAP_FILTER_USE_PROPERTY + " true");
-        SystemProperties.set(BLUETOOTH_MAP_FILTER_USE_PROPERTY, "true");
+        Log.d(TAG, "Set " + MapProfile.BLUETOOTH_MAP_FILTER_USE_PROPERTY + " true");
+        SystemProperties.set(MapProfile.BLUETOOTH_MAP_FILTER_USE_PROPERTY, "true");
     }
 }
