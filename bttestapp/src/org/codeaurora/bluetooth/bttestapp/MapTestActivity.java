@@ -43,6 +43,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothMapClient;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.SdpMasRecord;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -50,7 +51,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -102,18 +102,21 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
 
     /* Properties for MAP filter */
     /* When set to "true", bluetooth process get the filter from the following properties */
-    private final static String BLUETOOTH_MAP_FILTER_USE_PROPERTY = "vendor.bt.mce.useproperty";
-    private final static String BLUETOOTH_MAP_FILTER_MESSAGE_TYPE = "vendor.bt.mce.messagetype";
-    private final static String BLUETOOTH_MAP_FILTER_READ_STATUS = "vendor.bt.mce.readstatus";
-    private final static String BLUETOOTH_MAP_FILTER_PERIODBEGIN = "vendor.bt.mce.periodbegin";
-    private final static String BLUETOOTH_MAP_FILTER_PERIODEND = "vendor.bt.mce.periodend";
-    private final static String BLUETOOTH_MAP_FILTER_RECIPIENT = "vendor.bt.mce.recipient";
-    private final static String BLUETOOTH_MAP_FILTER_ORIGINATOR = "vendor.bt.mce.originator";
-    private final static String BLUETOOTH_MAP_FILTER_PRIORITY = "vendor.bt.mce.priority";
+    private static final String BLUETOOTH_MAP_FILTER_USE_PROPERTY = "vendor.bt.mce.useproperty";
+    private static final String BLUETOOTH_MAP_FILTER_MESSAGE_TYPE = "vendor.bt.mce.messagetype";
+    private static final String BLUETOOTH_MAP_FILTER_READ_STATUS = "vendor.bt.mce.readstatus";
+    private static final String BLUETOOTH_MAP_FILTER_PERIODBEGIN = "vendor.bt.mce.periodbegin";
+    private static final String BLUETOOTH_MAP_FILTER_PERIODEND = "vendor.bt.mce.periodend";
+    private static final String BLUETOOTH_MAP_FILTER_RECIPIENT = "vendor.bt.mce.recipient";
+    private static final String BLUETOOTH_MAP_FILTER_ORIGINATOR = "vendor.bt.mce.originator";
+    private static final String BLUETOOTH_MAP_FILTER_PRIORITY = "vendor.bt.mce.priority";
 
-    private final String TAB_BROWSE = "Browse";
-    private final String TAB_PUSH = "Push";
-    private final String RECIPIENT_URI = "tel:1234567";
+    // Support multiple instances when true
+    private final static String BLUETOOTH_MAP_SUPPORT_MULTI_INSTANCE = "vendor.bt.mce.multiinstance";
+
+    private static final String TAB_BROWSE = "Browse";
+    private static final String TAB_PUSH = "Push";
+    private static final String RECIPIENT_TEL = "1234567";
 
     private String mCurrentTab = TAB_BROWSE;
 
@@ -129,6 +132,8 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private ViewFlipper mViewFlipper = null;
     private Button mBtnBack, mBtnGetUnreadMessages, mBtnConnect, mBtnAbort, mBtnFilter, mBtnPushPrefill, mBtnPushMessage;
     private ListView mListViewMessages;
+    private TextView mInstance0Text;
+    private TextView mInstance1Text;
 
     /* For push message */
     private EditText mEditRecipient, mEditPrefillLen, mEditContent;
@@ -147,6 +152,10 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private String mOriginator = null;
     private byte mPriority = MessagesFilter.PRIORITY_ANY;
     private final SimpleDateFormat mSimpleDateFormat = new SimpleDateFormat(MESSAGES_FILTER_DATE_FORMAT);
+
+    private List<MasInstanceInformation> mInstances = new ArrayList<MasInstanceInformation>();
+    private RadioGroup mInstanceGroup;
+    private CheckBox mCbMultiInstance;
 
     Object mLock = new Object();
 
@@ -177,11 +186,31 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         mBtnPushMessage = (Button) findViewById(R.id.map_push);
         mBtnPushMessage.setOnClickListener(this);
         mEditRecipient = (EditText) findViewById(R.id.map_push_rcpt_edit);
-        mEditRecipient.setText(RECIPIENT_URI);
         mEditPrefillLen = (EditText) findViewById(R.id.map_push_prefill_len_edit);
         mEditPrefillLen.setText(Integer.toString(CONTENT_LEN));
         mEditContent = (EditText) findViewById(R.id.map_push_content_edit);
-
+        mCbMultiInstance = (CheckBox) findViewById(R.id.multi_instance);
+        mCbMultiInstance.setChecked(isMultiInstanceSupported());
+        mInstanceGroup = (RadioGroup) findViewById(R.id.instance_group);
+        mInstanceGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                for (int i = 0; i < mInstanceGroup.getChildCount(); i++) {
+                    RadioButton rBtn = (RadioButton)mInstanceGroup.getChildAt(i);
+                    if (rBtn.getId() == checkedId) {
+                        Log.d(TAG, "Found radio button at " + i);
+                        MasInstanceInformation instance = null;
+                        Log.d(TAG, "mInstances.size() " + mInstances.size());
+                        if (mInstances.size() > i) {
+                            instance = mInstances.get(i);
+                        }
+                        if (instance != null) {
+                            mMap.setActiveInstance(mDevice, (byte)instance.getInstance());
+                        }
+                    }
+                }
+            }
+        });
         // Create list view for messages
         mListViewMessages = (ListView) findViewById(R.id.msglist_lv);
         mListViewMessages.setEmptyView(findViewById(R.id.msglist_empty));
@@ -244,7 +273,8 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         filter.addAction(BluetoothMapClient.ACTION_MESSAGE_DELIVERED_SUCCESSFULLY);
         filter.addAction(BluetoothMapClient.ACTION_MESSAGE_RECEIVED);
         filter.addAction(BluetoothMapClient.ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED);
-        filter.addAction(BluetoothMapClient.ACTION_MESSAGE_READ_STATUS_CHANGED);
+        filter.addAction(BluetoothMapClient.ACTION_EXT_MESSAGE_READ_STATUS_CHANGED);
+        filter.addAction(BluetoothMapClient.ACTION_EXT_INSTANCE_INFORMATION);
         registerReceiver(mReceiver, filter);
     }
 
@@ -286,7 +316,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     @Override
     public void onDeviceDisconected() {
         Log.v(TAG, "onDeviceDisconected");
-        setButtons(false);
+        updateUi(false);
     }
 
     private final ServiceConnection mMapConnection = new ServiceConnection() {
@@ -295,7 +325,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         public void onServiceDisconnected(ComponentName name) {
             Log.i(TAG, "onServiceDisconnected()");
             mMap = null;
-            setButtons(false);
+            updateUi(false);
         }
 
         @Override
@@ -307,7 +337,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
             if (mMap.isConnected(mDevice)) {
                 mConnected = true;
             }
-            setButtons(mConnected);
+            updateUi(mConnected);
         }
     };
 
@@ -396,6 +426,26 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         }
     }
 
+    public void onCheckBoxClick(View v) {
+        Log.d(TAG, "onCheckBoxClick ");
+        if (v == mCbMultiInstance) {
+           supportMultiInstance(mCbMultiInstance.isChecked());
+        }
+    }
+
+    private void supportMultiInstance(boolean checked) {
+        Log.d(TAG, "supportMultiInstance " + checked);
+        if (checked) {
+            SystemProperties.set(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, "true");
+        } else {
+            SystemProperties.set(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, "false");
+        }
+    }
+
+    private boolean isMultiInstanceSupported() {
+        return SystemProperties.getBoolean(BLUETOOTH_MAP_CONNECT_MULTI_INSTANCE, true);
+    }
+
     private void prefillMessage() {
         Log.d(TAG, "prefillMessage");
         synchronized (mLock) {
@@ -450,13 +500,13 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
                     BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                     if (dev.equals(mDevice)) {
                         mConnected = false;
-                        setButtons(mConnected);
+                        updateUi(mConnected);
                     }
                 } else if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
                     int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
                     if (state == BluetoothAdapter.STATE_TURNING_OFF) {
                         mConnected = false;
-                        setButtons(mConnected);
+                        updateUi(mConnected);
                     }
                 } else if (action.equals(BluetoothMapClient.ACTION_CONNECTION_STATE_CHANGED)) {
                     BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
@@ -468,12 +518,12 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
                             == BluetoothProfile.STATE_CONNECTED) {
                         Log.d(TAG, mDevice + " connected");
                         mConnected = true;
-                        setButtons(mConnected);
+                        updateUi(mConnected);
                     } else if (intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0)
                                 == BluetoothProfile.STATE_DISCONNECTED) {
                         Log.d(TAG, mDevice + " disconnected");
                         mConnected = false;
-                        setButtons(mConnected);
+                        updateUi(mConnected);
                     }
                 } else if (action.equals(BluetoothMapClient.ACTION_MESSAGE_SENT_SUCCESSFULLY)) {
                     Log.d(TAG, mDevice + " ");
@@ -494,16 +544,53 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
                 } else if (action.equals(BluetoothMapClient.ACTION_EXT_MESSAGE_DELETED_STATUS_CHANGED)) {
                     Log.d(TAG, mDevice + " Set delete staus successfully");
                     onRemoveMessage(intent.getStringExtra(BluetoothMapClient.EXTRA_MESSAGE_HANDLE));
-                } else if (action.equals(BluetoothMapClient.ACTION_MESSAGE_READ_STATUS_CHANGED)) {
+                } else if (action.equals(BluetoothMapClient.ACTION_EXT_MESSAGE_READ_STATUS_CHANGED)) {
                     /* Cannot know message is set to "read" or "unread" in Event Report v1.1 */
                     Log.d(TAG, "Read status changed for handle " + intent.getStringExtra(BluetoothMapClient.EXTRA_MESSAGE_HANDLE)
                             + " in folder " + intent.getStringExtra(BluetoothMapClient.EXTRA_FOLDER));
                     onMessageRead(intent.getStringExtra(BluetoothMapClient.EXTRA_MESSAGE_HANDLE),
                             intent.getStringExtra(BluetoothMapClient.EXTRA_READ_STATUS));
+                } else if (action.equals(BluetoothMapClient.ACTION_EXT_INSTANCE_INFORMATION)) {
+                    MasInstanceInformation instance = new MasInstanceInformation();
+                    instance.setInstance(intent.getIntExtra(BluetoothMapClient.EXTRA_INSTANCE_ID, -1));
+                    instance.setSupportedType(intent.getIntExtra(BluetoothMapClient.EXTRA_SUPPORTED_TYPE, 0));
+                    instance.setOwnerUci(intent.getStringExtra(BluetoothMapClient.EXTRA_OWNER_UCI));
+                    instance.setInstanceName(intent.getStringExtra(BluetoothMapClient.EXTRA_INSTANCE_NAME));
+                    Log.d(TAG, "ACTION_EXT_INSTANCE_INFORMATION Received "  + instance.toString());
+                    mInstances.add(instance);
+                    updateInstanceRadioGroup(true);
                 }
             }
         }
     };
+
+    private void updateUi(boolean connected) {
+        setButtons(connected);
+        updateInstanceRadioGroup(connected);
+    }
+
+    private void updateInstanceRadioGroup(boolean connected) {
+
+        if (!connected) {
+            mInstanceGroup.clearCheck();
+            mInstances.clear();
+        }
+
+        for (int i = 0; i < mInstanceGroup.getChildCount(); i++) {
+            RadioButton rBtn = (RadioButton)mInstanceGroup.getChildAt(i);
+            MasInstanceInformation instance = null;
+            if (mInstances.size() > i) {
+                instance = mInstances.get(i);
+            }
+            if (connected && instance != null) {
+                Log.d(TAG, "Update instance:" + instance.toString());
+                rBtn.setText(instance.toString());
+            } else {
+                rBtn.setText(getResources().getString(R.string.not_available));
+            }
+        }
+
+    }
 
     /* set buttons status according to connected status */
     private void setButtons(boolean connected) {
@@ -554,6 +641,64 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
 
     public enum Status {
         READ, UNREAD
+    }
+
+    public static class MasInstanceInformation {
+        private int mInstance = -1;
+        private int mSupportedType = 0;
+        private String mOwnerUci = null;
+        private String mInstanceName = null;
+
+        public void setInstance(int instance) {
+            mInstance = instance;
+        }
+
+        public void setSupportedType(int type) {
+            mSupportedType = type;
+        }
+
+        public void setOwnerUci(String uci) {
+            mOwnerUci = uci;
+        }
+
+        public void setInstanceName(String name) {
+            mInstanceName = name;
+        }
+
+        public int getInstance() {
+            return mInstance;
+        }
+
+        public int getSupportedType() {
+            return mSupportedType;
+        }
+
+        public String getOwnerUci() {
+            return mOwnerUci;
+        }
+
+        public String getInstanceName() {
+            return mInstanceName;
+        }
+
+        public String toString() {
+            String type = "";
+
+            if ((mSupportedType & SdpMasRecord.MessageType.EMAIL) != 0) {
+                type = type + "EMAIL ";
+            }
+            if ((mSupportedType & SdpMasRecord.MessageType.SMS_GSM) != 0) {
+                type = type + "SMS_GSM ";
+            }
+            if ((mSupportedType & SdpMasRecord.MessageType.SMS_CDMA) != 0) {
+                type = type + "SMS_CDMA ";
+            }
+            if ((mSupportedType & SdpMasRecord.MessageType.MMS) != 0) {
+                type = type + "MMS";
+            }
+
+            return "instance: " + mInstance + " type: " + type + " uci: " + mOwnerUci + " instance name: " + mInstanceName;
+        }
     }
 
     public static class BluetoothMapMessage {

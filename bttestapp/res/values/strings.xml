@@ -43,6 +43,8 @@
     <string name="ppl_add">+</string>
     <string name="ppl_del">-</string>
 
+    <string name="not_available">Not Available</string>
+
     <!-- Main -->
     <string name="services_header">Available services</string>
     <string name="select_device">Select</string>
@@ -426,6 +428,7 @@
   <string name="map_get_unread_messages">Get Unread Messages</string>
   <string name="map_connect">Connect</string>
   <string name="map_disconnect">Disconnect</string>
+  <string name="map_multi_instance">Support Multi Instance</string>
   <string name="map_messages_empty">No messages found!</string>
   <string name="map_message_sender_title">Sender:</string>
   <string name="map_message_phone_number_title">Phone Number:</string>

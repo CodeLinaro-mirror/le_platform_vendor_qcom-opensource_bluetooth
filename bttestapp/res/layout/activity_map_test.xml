@@ -39,19 +39,43 @@
         <Button
             android:id="@+id/connect"
             android:layout_width="wrap_content"
-            android:layout_height="100dip"
+            android:layout_height="50dip"
             android:layout_weight="1"
             android:layout_margin="@dimen/activity_base_margin"
             style="@style/textview_normal" />
         <Button
             android:id="@+id/abort"
             android:layout_width="wrap_content"
-            android:layout_height="100dip"
+            android:layout_height="50dip"
             android:layout_weight="1"
             android:layout_margin="@dimen/activity_base_margin"
             style="@style/textview_normal"
             android:text="@string/map_abort"/>
+        <CheckBox
+            android:id="@+id/multi_instance"
+            android:layout_width="wrap_content"
+            android:layout_height="50dip"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_base_margin"
+            style="@style/textview_normal"
+            android:text="@string/map_multi_instance"
+            android:onClick="onCheckBoxClick" />
     </LinearLayout>
+
+    <RadioGroup
+        android:id="@+id/instance_group"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="start"
+        android:paddingRight="5dp">
+        <RadioButton
+            android:id="@+id/id_instance0"
+            style="@style/textview_normal" />
+        <RadioButton
+            android:id="@+id/id_instance1"
+            style="@style/textview_normal" />
+    </RadioGroup>
 
     <ViewFlipper
         android:id="@+id/maptest_viewflipper"

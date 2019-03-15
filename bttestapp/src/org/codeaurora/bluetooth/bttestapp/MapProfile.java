@@ -142,4 +142,13 @@ public class MapProfile {
             return false;
         }
     }
+
+    public boolean setActiveInstance(BluetoothDevice device, byte instance) {
+        Log.d(TAG, "setActiveInstance " + instance);
+        if (mMapClient != null) {
+            return mMapClient.setActiveInstance(device, instance);
+        } else {
+            return false;
+        }
+    }
 }
