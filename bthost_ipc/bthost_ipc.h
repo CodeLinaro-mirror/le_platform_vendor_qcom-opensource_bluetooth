@@ -36,8 +36,6 @@
 ******************************************************************************/
 
 #define BT_AUDIO_HARDWARE_INTERFACE "libbthost"
-#define A2DP_CTRL_PATH "/data/misc/bluetooth/.a2dp_ctrl"
-#define A2DP_DATA_PATH "/data/misc/bluetooth/.a2dp_data"
 
 typedef enum {
   A2DP_CTRL_GET_CODEC_CONFIG = 15,
