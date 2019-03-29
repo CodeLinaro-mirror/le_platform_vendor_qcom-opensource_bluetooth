@@ -56,6 +56,15 @@ typedef void (* btav_audio_state_callback)(btav_audio_state_t state,
 typedef void (* btav_audio_config_callback)(bt_bdaddr_t *bd_addr,
                                                 uint32_t sample_rate,
                                                 uint8_t channel_count);
+
+/** Callback for get avdtp capabilities response.
+ *  seid: SEP ID
+ *  psc_mask: service capabilities mask
+ */
+typedef void (* btav_avdt_cap)(bt_bdaddr_t *bd_addr,
+                                uint8_t seid,
+                                uint16_t psc_mask);
+
 /** BT-AV callback structure. */
 typedef struct {
     /** set to sizeof(btav_callbacks_t) */
@@ -63,6 +72,7 @@ typedef struct {
     btav_connection_state_callback  connection_state_cb;
     btav_audio_state_callback audio_state_cb;
     btav_audio_config_callback audio_config_cb;
+    btav_avdt_cap peer_avdt_cap;
 } btav_callbacks_t;
 
 /**
