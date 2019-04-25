@@ -273,17 +273,17 @@ namespace
 }
 #else
 
-static bool init_cb(android::hardware::bluetooth::V1_0::implementation::Status status) {
+static void init_cb(android::hardware::bluetooth::V1_0::implementation::Status status) {
     callbacks = new BluetoothHciCallbacks();
     callbacks->initializationComplete(status);
 }
-static bool hci_evt_rcvd_cb(const hidl_vec<uint8_t>& data) {
+static void hci_evt_rcvd_cb(const hidl_vec<uint8_t>& data) {
     callbacks->hciEventReceived(data);
 }
-static bool acl_cmd_rcvd_cb(const hidl_vec<uint8_t>& data) {
+static void acl_cmd_rcvd_cb(const hidl_vec<uint8_t>& data) {
     callbacks->aclDataReceived(data);
 }
-static bool sco_data_rcvd_cb(const hidl_vec<uint8_t>& data) {
+static void sco_data_rcvd_cb(const hidl_vec<uint8_t>& data) {
     callbacks->scoDataReceived(data);
 }
 
