@@ -534,6 +534,9 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index
     tA2D_AAC_CIE    src_cap;
     tA2D_AAC_CIE    pref_cap;
     UINT8           status = 0;
+
+    memset(&pref_cap, 0x00, sizeof(pref_cap));
+
     pthread_mutex_lock(&sink_codec_q_lock);
     tA2D_AAC_CIE    *local_cap = &p_bta_avk_codec_pri_list[index].codec_cap.aac_caps;
     pthread_mutex_unlock(&sink_codec_q_lock);
