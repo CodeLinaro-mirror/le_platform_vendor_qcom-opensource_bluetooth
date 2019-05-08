@@ -7,7 +7,6 @@ LOCAL_SRC_FILES := \
         $(call all-java-files-under, src)
 LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/services/IMapServiceCallback.java, $(LOCAL_SRC_FILES))
 LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/MapTestActivity.java, $(LOCAL_SRC_FILES))
-LOCAL_SRC_FILES := $(filter-out src/org/codeaurora/bluetooth/bttestapp/DipTestActivity.java, $(LOCAL_SRC_FILES))
 
 LOCAL_PACKAGE_NAME := BTTestApp
 LOCAL_CERTIFICATE := platform
