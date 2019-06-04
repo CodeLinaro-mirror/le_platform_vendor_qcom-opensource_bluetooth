@@ -38,6 +38,7 @@
 #include <cutils/properties.h>
 
 #include "bta_avk_int.h"
+#include "bta_av_int.h"
 #include "avdt_api.h"
 #include "utl.h"
 #include "l2c_api.h"
@@ -1219,6 +1220,7 @@ void bta_avk_config_ind (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
     tAVDT_CFG            *p_evt_cfg = &p_data->str_msg.cfg;
     UINT8   psc_mask = (p_evt_cfg->psc_mask | p_scb->cfg.psc_mask);
     UINT8 local_sep;    /* sep type of local handle on which connection was received */
+    UINT8   sep_type;
     tBTA_AVK_STR_MSG  *p_msg = (tBTA_AVK_STR_MSG *)p_data;
     UNUSED(p_data);
 
@@ -1240,7 +1242,12 @@ void bta_avk_config_ind (tBTA_AVK_SCB *p_scb, tBTA_AVK_DATA *p_data)
         APPL_TRACE_WARNING(" bta_avk_config_ind config_ind called before Open");
         p_scb->coll_mask |= BTA_AVK_COLL_SETCONFIG_IND;
     }
+
+    APPL_TRACE_DEBUG("%s sep_type: 0x%x  ", __func__, sep_type);
     alarm_cancel(bta_avk_cb.accept_signalling_timer);
+    sep_type = get_remote_sep_type(p_data->str_msg.bd_addr);
+    if((sep_type & BTA_AR_EXT_AV_MASK) && (sep_type & BTA_AR_EXT_AVK_MASK))
+        alarm_cancel(bta_av_cb.accept_signalling_timer);
 
     /* if no codec parameters in configuration, fail */
     if ((p_evt_cfg->num_codec == 0) ||

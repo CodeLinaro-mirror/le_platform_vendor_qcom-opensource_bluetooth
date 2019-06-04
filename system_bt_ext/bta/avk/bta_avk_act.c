@@ -1716,7 +1716,6 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
     tBTA_AVK_CB   *p_cb = &bta_avk_cb;
     int     xx;
     UINT8   mask;
-    UINT8   sep_type;
     tBTA_AVK_LCB *p_lcb = NULL;
 
     BTIF_TRACE_IMP("%s bta_avk_sig_chg event: %d",
@@ -1833,8 +1832,6 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
         /* disconnected. */
         int is_lcb_used = bta_avk_cb.conn_lcb;
         APPL_TRACE_DEBUG(" is_lcb_used is %d",is_lcb_used);
-        sep_type = get_remote_sep_type(p_data->str_msg.bd_addr);
-        if(!(sep_type & BTA_AR_EXT_AV_MASK))
             dealloc_ar_device_info(p_data->str_msg.bd_addr);
         p_lcb = bta_avk_find_lcb(p_data->str_msg.bd_addr, BTA_AVK_LCB_FREE);
         if (p_lcb && (p_lcb->conn_msk || is_lcb_used))
