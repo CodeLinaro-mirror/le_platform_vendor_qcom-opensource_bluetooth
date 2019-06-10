@@ -65,6 +65,12 @@ typedef struct{
     bt_sdp_did_get_record  rec;
 }bt_sdp_did_info;
 
+typedef struct{
+    uint8_t                status;       /* success or fail */
+    uint8_t                role;         /* role */
+    bt_bdaddr_t            bd_addr;      /* BD address peer device. */
+}bt_dm_role_info;
+
 /** Callback when bredr cleanup is done.
  */
 typedef void (*  btvendor_bredr_cleanup_callback)(bool status);
@@ -84,6 +90,9 @@ typedef void (*btvendor_acl_state_changed_with_reason_callback)(bt_status_t stat
 /** Callback to notify DID info to app.*/
 typedef void (*btvendor_did_info_callback)(bt_sdp_did_info di_info);
 
+/** Callback to notify role info to app.*/
+typedef void (*btvendor_role_info_callback)(bt_dm_role_info role_info);
+
 /** BT-Vendor callback structure. */
 typedef struct {
     /** set to sizeof(BtVendorCallbacks) */
@@ -92,6 +101,7 @@ typedef struct {
     btvendor_ssr_cleanup_callback    ssr_cleanup_cb;
     btvendor_acl_state_changed_with_reason_callback acl_state_changed_with_reason_cb;
     btvendor_did_info_callback did_info_cb;
+    btvendor_role_info_callback role_info_cb;
 } btvendor_callbacks_t;
 
 /** Represents the standard BT-Vendor interface.
@@ -120,6 +130,8 @@ typedef struct {
     /** Sets the Scan Mode with parameter to ignore LE Scan mode*/
     void (*setScanMode)(bt_scan_mode_t mode, bool ignoreLeScanModes);
 
+    /** Get role of dut with a given remote device */
+    void (*get_role_req)(const bt_bdaddr_t *bd_addr);
 } btvendor_interface_t;
 
 __END_DECLS
