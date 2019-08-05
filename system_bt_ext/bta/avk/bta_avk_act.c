@@ -1825,6 +1825,26 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
 #if( defined BTA_AR_INCLUDED ) && (BTA_AR_INCLUDED == TRUE)
     else if (event == BTA_AR_AVDT_CONN_EVT)
     {
+        sep_type = get_remote_sep_type(p_data->str_msg.bd_addr);
+        if((sep_type & BTA_AR_EXT_AV_MASK) && (sep_type & BTA_AR_EXT_AVK_MASK))
+        {
+            p_lcb = bta_avk_find_lcb(p_data->str_msg.bd_addr, BTA_AVK_LCB_FREE);
+            if (p_lcb)
+            {
+                /* clean up ssm  */
+                for(xx=0; xx < BTA_AVK_NUM_STRS; xx++)
+                {
+                    APPL_TRACE_DEBUG("conn_idx: 0x%x", xx);
+                    if ((p_cb->p_scb[xx]) &&
+                        (bdcmp(p_cb->p_scb[xx]->peer_addr, p_data->str_msg.bd_addr) == 0))
+                    {
+                        APPL_TRACE_DEBUG("Sending AVDT_DISCONNECT_EVT");
+                        bta_avk_ssm_execute(p_cb->p_scb[xx], BTA_AVK_AVDT_DISCONNECT_EVT, NULL);
+                        bta_avk_str_closed(p_cb->p_scb[xx], p_data);
+                    }
+                }
+            }
+        }
         alarm_cancel(bta_avk_cb.link_signalling_timer);
     }
 #endif
@@ -1833,8 +1853,6 @@ void bta_avk_sig_chg(tBTA_AVK_DATA *p_data)
         /* disconnected. */
         int is_lcb_used = bta_avk_cb.conn_lcb;
         APPL_TRACE_DEBUG(" is_lcb_used is %d",is_lcb_used);
-        sep_type = get_remote_sep_type(p_data->str_msg.bd_addr);
-        if(!(sep_type & BTA_AR_EXT_AV_MASK))
             dealloc_ar_device_info(p_data->str_msg.bd_addr);
         p_lcb = bta_avk_find_lcb(p_data->str_msg.bd_addr, BTA_AVK_LCB_FREE);
         if (p_lcb && (p_lcb->conn_msk || is_lcb_used))
