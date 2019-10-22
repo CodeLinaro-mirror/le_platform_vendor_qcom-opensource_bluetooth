@@ -31,16 +31,20 @@ package org.codeaurora.bluetooth.bttestapp;
 
 import android.app.Activity;
 import android.app.Fragment;
+import android.bluetooth.BluetoothAssignedNumbers;
 import android.bluetooth.BluetoothHeadsetClient;
 import android.bluetooth.BluetoothProfile;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
@@ -65,6 +69,8 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
     private TextView mIndInbandState;
 
+    private TextView mIndAtCommand;
+
     private TextView mIndSignalLevel;
 
     private TextView mIndBatteryLevel;
@@ -76,6 +82,10 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
     private TextView mIndManfId;
 
     private TextView mIndManfModel;
+
+    private EditText mIndAtInput;
+
+    private Button mIndAtSend;
 
     private int mDefaultColor;
 
@@ -93,6 +103,8 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
         mIndRoamingState = (TextView) view.findViewById(R.id.ind_roaming_state);
         mIndInbandState = (TextView) view.findViewById(R.id.ind_inband_state);
 
+        mIndAtCommand = (TextView) view.findViewById(R.id.ind_at_command);
+
         mIndSignalLevel = (TextView) view.findViewById(R.id.ind_signal_level);
         mIndBatteryLevel = (TextView) view.findViewById(R.id.ind_battery_level);
 
@@ -101,6 +113,15 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
         mIndManfId = (TextView) view.findViewById(R.id.ind_manfid);
         mIndManfModel = (TextView) view.findViewById(R.id.ind_manfmodel);
+
+        mIndAtInput = (EditText) view.findViewById(R.id.ind_at_input);
+        mIndAtInput.setText("+XAPL=");
+        mIndAtInput.setVisibility(View.VISIBLE);
+        mIndAtInput.setEnabled(true);
+
+        mIndAtSend = (Button) view.findViewById(R.id.ind_at_send);
+        mIndAtSend.setEnabled(false);
+        mIndAtSend.setOnClickListener(this);
 
         mDefaultColor = mIndOperator.getTextColors().getDefaultColor();
 
@@ -131,6 +152,8 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
                 mIndAudioState.setEnabled(false);
                 mIndVrState.setEnabled(false);
                 mIndVrState.setChecked(false);
+
+                mIndAtSend.setEnabled(false);
                 break;
 
             case BluetoothProfile.STATE_CONNECTING:
@@ -149,6 +172,8 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
 
                 mIndAudioState.setEnabled(true);
                 mIndVrState.setEnabled(mActivity.mFeatVoiceRecognition);
+
+                mIndAtSend.setEnabled(true);
 
                 resetIndicators(false);
                 break;
@@ -352,6 +377,13 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
          //* so since we need before-click state, it's always opposite of current
          //* state
          ///
+
+        if (view == mIndAtSend) {
+            Log.d(TAG, "onClick mIndAtSend");
+            onClickSend();
+            return;
+        }
+
         boolean state = !((CompoundButton) view).isChecked();
 
         switch (view.getId()) {
@@ -408,4 +440,20 @@ public class IndicatorsFragment extends Fragment implements OnClickListener {
         }
         mIndVrState.setEnabled(false);
     }
+
+    private void onClickSend() {
+        BluetoothHeadsetClient headsetClient = mActivity.mBluetoothHeadsetClient;
+        if (headsetClient == null) {
+            return;
+        }
+
+        String command = mIndAtInput.getText().toString();
+        Log.d(TAG, "onClickSend, command: " + command);
+        if ((command != null) && !command.isEmpty()) {
+            headsetClient.sendVendorAtCommand(mActivity.mDevice, BluetoothAssignedNumbers.APPLE, command);
+        } else {
+            Log.w(TAG, "onClickSend, but command string empty");
+        }
+    }
+
 }
