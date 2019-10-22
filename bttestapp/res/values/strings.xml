@@ -232,6 +232,8 @@
     <string name="ind_inband_state">IN-BAND</string>
     <string name="ind_network_state">NETWORK</string>
     <string name="ind_roaming_state">ROAMING</string>
+    <string name="ind_at_command">AT CMD</string>
+    <string name="ind_at_send">Send</string>
     <string name="ind_signal_level">signal</string>
     <string name="ind_battery_level">battery</string>
     <string name="ind_operator_unknown">no operator info</string>
