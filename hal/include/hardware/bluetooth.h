@@ -112,6 +112,13 @@ typedef struct {
 } __attribute__((packed))bt_activity_energy_info;
 
 typedef struct {
+    uint8_t status; /*BT_STATUS_BUSY, BT_STATUS_PARM_INVALID, or BT_STATUS_SUCCESS*/
+    uint16_t handle;
+    uint32_t clock;
+    uint16_t accuracy;
+} __attribute__((packed))bt_clock_info;
+
+typedef struct {
     int32_t app_uid;
     uint64_t tx_bytes;
     uint64_t rx_bytes;
@@ -399,6 +406,8 @@ typedef void (*le_test_mode_callback)(bt_status_t status, uint16_t num_packets);
 typedef void (*energy_info_callback)(bt_activity_energy_info *energy_info,
                                      bt_uid_traffic_t *uid_data);
 
+typedef void(*read_clock_callback) (bt_clock_info *clock_info);
+
 /** TODO: Add callbacks for Link Up/Down and other generic
   *  notifications/callbacks */
 
@@ -420,6 +429,7 @@ typedef struct {
     le_test_mode_callback le_test_mode_cb;
     energy_info_callback energy_info_cb;
     hci_event_recv_callback hci_event_recv_cb;
+    read_clock_callback read_clock_cb;
 } bt_callbacks_t;
 
 typedef void (*alarm_cb)(void *data);
@@ -603,6 +613,7 @@ typedef struct {
     void (*interop_database_add)(uint16_t feature, const bt_bdaddr_t *addr, size_t len);
     /** BT stack Test interface */
     const void* (*get_testapp_interface)(int test_app_profile);
+    int (*read_clock)(const bt_bdaddr_t *bd_addr, int which_clock);
 } bt_interface_t;
 
 /** TODO: Need to add APIs for Service Discovery, Service authorization and
