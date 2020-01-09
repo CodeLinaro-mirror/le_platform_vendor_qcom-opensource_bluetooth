@@ -47,6 +47,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
 // Activity for hid host qualification.
 public class HidTestApp extends Activity implements OnClickListener {
     private static final String TAG = "HidTestApp";
@@ -90,7 +91,7 @@ public class HidTestApp extends Activity implements OnClickListener {
         boolean isValid = true;
         String address = mEtBtAddress.getText().toString().trim();
         String command = mEtBtCommand.getText().toString().trim();
-        Log.e(TAG, "address = " + address + ", command = " + command);
+        Logger.e(TAG, "address = " + address + ", command = " + command);
         if (address.length() != 17) {
             mEtBtAddress.setError("Enter Proper Address");
             isValid = false;
@@ -105,7 +106,7 @@ public class HidTestApp extends Activity implements OnClickListener {
             address = addSplit[0].toUpperCase() + ":" + addSplit[1].toUpperCase() + ":" +
                 addSplit[2].toUpperCase() + ":" + addSplit[3].toUpperCase() + ":" +
                 addSplit[4].toUpperCase() + ":" + addSplit[5].toUpperCase();
-            Log.e(TAG, "address = " + address);
+            Logger.e(TAG, "address = " + address);
             try {
                 mRemoteDevice = mAdapter.getRemoteDevice(address);
             } catch (IllegalArgumentException e) {
@@ -125,7 +126,7 @@ public class HidTestApp extends Activity implements OnClickListener {
                             int reportType = Integer.parseInt(separated[1]);
                             int reportId = Integer.parseInt(separated[2]);
                             int bufferSize = Integer.parseInt(separated[3]);
-                            Log.v(TAG," reportType " + reportType+ ", reportId " + reportId
+                            Logger.v(TAG," reportType " + reportType+ ", reportId " + reportId
                                     + ", bufferSize " + bufferSize);
                             getReport(mRemoteDevice, (byte)reportType, (byte)reportId, bufferSize);
                             toast("getreport command sent");
@@ -140,7 +141,7 @@ public class HidTestApp extends Activity implements OnClickListener {
                     } else {
                         try {
                             int reportType = Integer.parseInt(separated[1]);
-                            Log.v(TAG," reportType " + reportType + ", report " + separated[2]);
+                            Logger.v(TAG," reportType " + reportType + ", report " + separated[2]);
                             setReport(mRemoteDevice, (byte)reportType, separated[2]);
                             toast("setreport command sent");
                         } catch(NumberFormatException e) {
@@ -170,7 +171,7 @@ public class HidTestApp extends Activity implements OnClickListener {
                     } else {
                         try {
                             int mode = Integer.parseInt(separated[1]);
-                            Log.v(TAG," mode " + mode);
+                            Logger.v(TAG," mode " + mode);
                             setProtocolMode(mRemoteDevice, mode);
                             toast("setprotocolmode command sent");
                         } catch(NumberFormatException e) {
@@ -192,7 +193,7 @@ public class HidTestApp extends Activity implements OnClickListener {
                     } else {
                         try {
                             int idleTime = Integer.parseInt(separated[1]);
-                            Log.v(TAG," idleTime " + idleTime);
+                            Logger.v(TAG," idleTime " + idleTime);
                             setIdleTime(mRemoteDevice, (byte)idleTime);
                             toast("setidle command sent");
                         } catch(NumberFormatException e) {
@@ -204,13 +205,13 @@ public class HidTestApp extends Activity implements OnClickListener {
                         toast("Invalid senddata command");
                         isValid = false;
                     } else {
-                        Log.v(TAG," report " + separated[1]);
+                        Logger.v(TAG," report " + separated[1]);
                         sendData(mRemoteDevice, separated[1]);
                         toast("senddata command sent");
                     }
                 } else {
                     toast("Invalid command");
-                    Log.v(TAG," Invalid command " + separated[0]);
+                    Logger.v(TAG," Invalid command " + separated[0]);
                     isValid = false;
                 }
             }
@@ -225,7 +226,7 @@ public class HidTestApp extends Activity implements OnClickListener {
     public void init() {
         if (!mAdapter.getProfileProxy(mContext, mServiceListener,
                 BluetoothProfile.HID_HOST)) {
-            Log.w(TAG, "Cannot obtain profile proxy");
+            Logger.w(TAG, "Cannot obtain profile proxy");
             return;
         }
     }
