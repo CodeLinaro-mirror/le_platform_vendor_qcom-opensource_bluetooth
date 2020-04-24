@@ -112,7 +112,7 @@ typedef struct {
 } audio_aptx_ad_decoder_config;
 
 typedef struct {
-    uint32_t sampling_rate;/*0x0(48k) and 0x1(44.1k)*/
+    uint32_t sampling_rate;/*48k and 44.1k*/
     uint8_t channel_mode;/*Stereo*/
 } audio_aptx_decoder_config;
 
@@ -402,11 +402,11 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         switch (byte & A2D_APTX_SAMP_FREQ_MASK)
         {
             case A2D_APTX_SAMP_FREQ_48:
-                 aptx_codec.sampling_rate = 0x0;
+                 aptx_codec.sampling_rate = 48000;
                  INFO(" aptx samp freq: 48k");
                  break;
             case A2D_APTX_SAMP_FREQ_44:
-                 aptx_codec.sampling_rate = 0x1;
+                 aptx_codec.sampling_rate = 44100;
                  INFO(" aptx samp freq: 44.1k");
                  break;
             default:
