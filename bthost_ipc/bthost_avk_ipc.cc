@@ -116,6 +116,11 @@ typedef struct {
     uint8_t channel_mode;/*Stereo*/
 } audio_aptx_decoder_config;
 
+typedef struct {
+    uint32_t sampling_rate;/*48k and 44.1k*/
+    uint8_t channel_mode;/*Stereo*/
+} audio_aptx_hd_decoder_config;
+
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -130,6 +135,7 @@ audio_aptx_decoder_config aptx_codec;
 audio_aac_decoder_config aac_codec;
 audio_sbc_decoder_config sbc_codec;
 audio_aptx_ad_decoder_config aptxad_codec;
+audio_aptx_hd_decoder_config aptx_hd_codec;
 
 /*****************************************************************************
 **  Externs
@@ -315,12 +321,94 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         {
             INFO("AptX-classic codec");
             *codec_type = AUDIO_FORMAT_APTX;
+            memset(&aptx_codec,0,sizeof(audio_aptx_decoder_config));
+            len = *p_cfg++;//LOSC
+            p_cfg++; // Skip media type
+            len--;
+            p_cfg++; //codec_type
+            len--;
+            p_cfg+=4;//skip vendor id
+            len -= 4;
+            p_cfg += 2; //skip codec id
+            len -= 2;
+            byte = *p_cfg++;
+            len--;
+            switch (byte & A2D_APTX_SAMP_FREQ_MASK)
+            {
+                case A2D_APTX_SAMP_FREQ_48:
+                     aptx_codec.sampling_rate = 48000;
+                     INFO(" aptx samp freq: %d",aptx_codec.sampling_rate);
+                     break;
+                case A2D_APTX_SAMP_FREQ_44:
+                     aptx_codec.sampling_rate = 44100;
+                     INFO(" aptx samp freq: %d",aptx_codec.sampling_rate);
+                     break;
+                default:
+                     ERROR("Unknown sampling rate");
+            }
+            switch (byte & A2D_APTX_CHAN_MASK)
+            {
+                case A2D_APTX_CHAN_STEREO:
+                     aptx_codec.channel_mode = 2;
+                     break;
+                case A2D_APTX_CHAN_MONO:
+                     ERROR("Mono is not supported");
+                     aptx_codec.channel_mode = 1;
+                     break;
+                default:
+                     ERROR("Unknown channel mode");
+            }
+            INFO(" aptx channels : %d",aptx_codec.channel_mode);
+
+            INFO("APTx: Done copying full codec config");
+            return ((void *)&aptx_codec);
         }
         if (codec_cfg[VENDOR_ID_OFFSET - 1] == VENDOR_APTX_HD &&
             codec_cfg[CODEC_ID_OFFSET - 1] == APTX_HD_CODEC_ID)
         {
             INFO("AptX-HD codec");
             *codec_type = AUDIO_FORMAT_APTX_HD;
+            memset(&aptx_hd_codec,0,sizeof(audio_aptx_hd_decoder_config));
+            len = *p_cfg++;//LOSC
+            p_cfg++; // Skip media type
+            len--;
+            p_cfg++; //codec_type
+            len--;
+            p_cfg+=4;//skip vendor id
+            len -= 4;
+            p_cfg += 2; //skip codec id
+            len -= 2;
+            byte = *p_cfg++;
+            len--;
+            switch (byte & A2D_APTX_HD_SAMP_FREQ_MASK)
+            {
+                case A2D_APTX_HD_SAMP_FREQ_48:
+                     aptx_hd_codec.sampling_rate = 48000;
+                     INFO(" aptx_hd samp freq: %d",aptx_hd_codec.sampling_rate);
+                     break;
+                case A2D_APTX_HD_SAMP_FREQ_44:
+                     aptx_hd_codec.sampling_rate = 44100;
+                     INFO(" aptx_hd samp freq: %d",aptx_hd_codec.sampling_rate);
+                     break;
+                default:
+                     ERROR("Unknown sampling rate");
+            }
+            switch (byte & A2D_APTX_HD_CHAN_MASK)
+            {
+                case A2D_APTX_HD_CHAN_STEREO:
+                     aptx_hd_codec.channel_mode = 2;
+                     break;
+                case A2D_APTX_HD_CHAN_MONO:
+                     ERROR("Mono is not supported");
+                     aptx_hd_codec.channel_mode = 1;
+                     break;
+                default:
+                     ERROR("Unknown channel mode");
+            }
+            INFO("aptx_hd channels : %d",aptx_hd_codec.channel_mode);
+
+            INFO("APTX_HD: Done copying full codec config");
+            return ((void *)&aptx_hd_codec);
         }
         if (codec_cfg[VENDOR_ID_OFFSET - 1] == VENDOR_APTX_ADAPTIVE &&
             codec_cfg[CODEC_ID_OFFSET - 1] == APTX_ADAPTIVE_CODEC_ID)
@@ -386,48 +474,6 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
 
             return ((void *)&aptxad_codec);
         }
-
-        memset(&aptx_codec,0,sizeof(audio_aptx_decoder_config));
-        len = *p_cfg++;//LOSC
-        p_cfg++; // Skip media type
-        len--;
-        p_cfg++; //codec_type
-        len--;
-        p_cfg+=4;//skip vendor id
-        len -= 4;
-        p_cfg += 2; //skip codec id
-        len -= 2;
-        byte = *p_cfg++;
-        len--;
-        switch (byte & A2D_APTX_SAMP_FREQ_MASK)
-        {
-            case A2D_APTX_SAMP_FREQ_48:
-                 aptx_codec.sampling_rate = 48000;
-                 INFO(" aptx samp freq: 48k");
-                 break;
-            case A2D_APTX_SAMP_FREQ_44:
-                 aptx_codec.sampling_rate = 44100;
-                 INFO(" aptx samp freq: 44.1k");
-                 break;
-            default:
-                 ERROR("Unknown sampling rate");
-        }
-        switch (byte & A2D_APTX_CHAN_MASK)
-        {
-            case A2D_APTX_CHAN_STEREO:
-                 aptx_codec.channel_mode = 2;
-                 break;
-            case A2D_APTX_CHAN_MONO:
-                 ERROR("Mono is not supported");
-                 aptx_codec.channel_mode = 1;
-                 break;
-            default:
-                 ERROR("Unknown channel mode");
-        }
-        INFO(" aptx channels : %d",aptx_codec.channel_mode);
-
-        INFO("APTx: Done copying full codec config");
-        return ((void *)&aptx_codec);
     }
     return NULL;
 }

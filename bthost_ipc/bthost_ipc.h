@@ -114,6 +114,14 @@ codec specific definitions
 #define A2D_APTX_CHAN_MONO       0x01
 #define A2D_APTX_TWS_CHAN_MODE   0x08
 
+/* APTX_HD bitmask helper */
+#define A2D_APTX_HD_SAMP_FREQ_MASK  0xF0
+#define A2D_APTX_HD_SAMP_FREQ_48    0x10
+#define A2D_APTX_HD_SAMP_FREQ_44    0x20
+#define A2D_APTX_HD_CHAN_MASK       0x0F
+#define A2D_APTX_HD_CHAN_STEREO     0x02
+#define A2D_APTX_HD_CHAN_MONO       0x01
+
 /* APTX Adaptive bitmask helper */
 #define A2D_APTX_ADAPTIVE_SAMP_FREQ_MASK           (0xF8)
 #define A2D_APTX_ADAPTIVE_CHAN_MASK                (0x1F)
