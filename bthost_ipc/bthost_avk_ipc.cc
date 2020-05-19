@@ -111,6 +111,11 @@ typedef struct {
     uint8_t  channel_mode;
 } audio_aptx_ad_decoder_config;
 
+typedef struct {
+    uint32_t sampling_rate;/*48k and 44.1k*/
+    uint8_t channel_mode;/*Stereo*/
+} audio_aptx_decoder_config;
+
 /*****************************************************************************
 **  Local type definitions
 ******************************************************************************/
@@ -121,7 +126,7 @@ struct a2dp_avk_stream_common audio_stream;
 **  Static functions
 ******************************************************************************/
 
-audio_aptx_default_config aptx_codec;
+audio_aptx_decoder_config aptx_codec;
 audio_aac_decoder_config aac_codec;
 audio_sbc_decoder_config sbc_codec;
 audio_aptx_ad_decoder_config aptxad_codec;
@@ -382,7 +387,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             return ((void *)&aptxad_codec);
         }
 
-        memset(&aptx_codec,0,sizeof(audio_aptx_default_config));
+        memset(&aptx_codec,0,sizeof(audio_aptx_decoder_config));
         len = *p_cfg++;//LOSC
         p_cfg++; // Skip media type
         len--;
@@ -398,9 +403,11 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         {
             case A2D_APTX_SAMP_FREQ_48:
                  aptx_codec.sampling_rate = 48000;
+                 INFO(" aptx samp freq: 48k");
                  break;
             case A2D_APTX_SAMP_FREQ_44:
                  aptx_codec.sampling_rate = 44100;
+                 INFO(" aptx samp freq: 44.1k");
                  break;
             default:
                  ERROR("Unknown sampling rate");
@@ -408,27 +415,16 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         switch (byte & A2D_APTX_CHAN_MASK)
         {
             case A2D_APTX_CHAN_STEREO:
-                 aptx_codec.channels = 2;
+                 aptx_codec.channel_mode = 2;
                  break;
             case A2D_APTX_CHAN_MONO:
-                 aptx_codec.channels = 1;
+                 ERROR("Mono is not supported");
+                 aptx_codec.channel_mode = 1;
                  break;
             default:
                  ERROR("Unknown channel mode");
         }
-        if (*codec_type == AUDIO_FORMAT_APTX_HD) {
-            p_cfg += 4;
-            len -= 4;//ignore 4 bytes not used
-        }
-        if (len == 0)
-            INFO("Codec config copied");
-
-        p_cfg += 2; //skip mtu
-
-        aptx_codec.bitrate = *p_cfg++;
-        aptx_codec.bitrate |= (*p_cfg++ << 8);
-        aptx_codec.bitrate |= (*p_cfg++ << 16);
-        aptx_codec.bitrate |= (*p_cfg++ << 24);
+        INFO(" aptx channels : %d",aptx_codec.channel_mode);
 
         INFO("APTx: Done copying full codec config");
         return ((void *)&aptx_codec);
