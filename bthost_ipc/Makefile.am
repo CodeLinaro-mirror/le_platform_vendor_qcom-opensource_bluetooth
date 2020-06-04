@@ -14,11 +14,6 @@ AM_CPPFLAGS= \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/types \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/utils/include \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
-        -I${WORKSPACE}/frameworks/system/media/audio/include \
-        -I${WORKSPACE}/frameworks/include \
-        -I${WORKSPACE}/frameworks/include/media \
-        -I${WORKSPACE}/hardware/libhardware/include \
-        -I${WORKSPACE}/system/core/include \
         -I$(bdroid_C_INCLUDES)
 
 common_LDFLAGS = -lpthread  -lrt -llog @GLIB_LIBS@
