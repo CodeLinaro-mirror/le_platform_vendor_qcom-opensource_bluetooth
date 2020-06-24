@@ -347,6 +347,9 @@
     <string name="avrcp_repeat_title">Repeat:</string>
     <string name="avrcp_shuffle_title">Shuffle:</string>
     <string name="avrcp_scan_title">Scan:</string>
+		<string name="avrcp_set_active_device">SetActiveDevice</string>
+		<string name="avrcp_active_device_help_text">Active device:</string>
+		<string name="avrcp_set_active_device_help_text">Select a device to set to be active</string>
     <string-array name="array_test_cmd">
         <item>@string/avrcp_abort_conti_resp</item>
         <item>@string/avrcp_add_to_now_playing</item>
