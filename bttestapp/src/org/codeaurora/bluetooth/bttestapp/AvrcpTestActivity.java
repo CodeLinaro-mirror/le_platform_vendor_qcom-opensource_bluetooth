@@ -30,7 +30,10 @@ package org.codeaurora.bluetooth.bttestapp;
 
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
+import android.app.ActionBar;
+import android.app.ActionBar.Tab;
 import android.app.Activity;
+import android.app.FragmentTransaction;
 import android.bluetooth.BluetoothAdapter;
 import android.util.Log;
 import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
@@ -42,6 +45,7 @@ import android.bluetooth.BluetoothA2dpSink;
 import android.bluetooth.BluetoothCodecConfig;
 import android.bluetooth.BluetoothAudioConfig;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.BluetoothDevicePicker;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -73,6 +77,8 @@ import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 import android.widget.RadioGroup;
+import android.widget.ViewFlipper;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
@@ -92,6 +98,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     OnTouchListener, RadioGroup.OnCheckedChangeListener {
 
     private final String TAG = "AvrcpTestActivity";
+    private ActionBar mActionBar;
+    private ViewFlipper mViewFlipper = null;
     private Button mBtnPlayPause;
     private Button mBtnStop;
     private Button mBtnFastforward;
@@ -100,6 +108,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnVolumeUp;
     private Button mBtnPreviousGroup;
     private Button mBtnNextGroup;
+    private Button mBtnSetActiveDevice;
 
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
@@ -114,6 +123,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private EditText mEditItemPosition;
     private TextView mEditValueTextView;
     private EditText mEditValue;
+    private TextView mActiveDeviceNameTextView;
+    private TextView mActiveDeviceAddressTextView;
 
     private Button mBtnGetCurrentPas;
     private Spinner mSpEqualizer;
@@ -160,6 +171,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private static final String TEST_ITEM_POSITION = "0";  // The 1st item
     private static final String TEST_QUERY = "You";
     private static final String TEST_PDU_ID = "20";    // PDU ID for GetElementAttributes (0x20)
+
+    private final String TAB_1 = "Tab1";
+    private final String TAB_2 = "Tab2";
+    private final String[] mActionBarTabsNames = {
+            TAB_1, TAB_2
+    };
+    private String mCurrentTab = TAB_2;
 
     // Test command definition
     enum TestCmd {
@@ -222,6 +240,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Log.i(TAG, "onServiceConnected()");
             ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
             mAvrcp = profileService.getAvrcpProfile();
+            updateActiveDevice(mAvrcp.getActiveDevice());
         }
     };
 
@@ -242,6 +261,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 handleActionPlayerSetting(intent);
             } else if (action.equals(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED)) {
                 handleActionAudioConfigChanged(intent);
+            } else if (action.equals(BluetoothAvrcpController.ACTION_ACTIVE_DEVICE_CHANGED)) {
+                handleActionActiveDeviceChanged(intent);
             }
         }
     };
@@ -267,7 +288,15 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         Logger.d(TAG, "onCreate");
         ActivityHelper.initialize(this, R.layout.layout_avrcp); //use layout_avrcp.xml
         /* Add back button */
-        getActionBar().setDisplayHomeAsUpEnabled(true);
+        ActionBar mActionBar = getActionBar();
+        if (mActionBar != null) {
+            mActionBar.setDisplayHomeAsUpEnabled(true);
+        } else {
+            Logger.w(TAG, "getActionBar() null");
+        }
+
+        mActionBar.setNavigationMode(ActionBar.NAVIGATION_MODE_TABS);
+        mViewFlipper = (ViewFlipper) findViewById(R.id.avrcptest_viewflipper);
 
         initPasMaps();
 
@@ -279,6 +308,10 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
         mBtnPreviousGroup = initButton(R.id.id_btn_previous_group);
         mBtnNextGroup = initButton(R.id.id_btn_next_group);
+
+        mBtnSetActiveDevice= initButton(R.id.id_btn_set_active_device);
+        mActiveDeviceNameTextView = (TextView)findViewById(R.id.id_active_device_name);
+        mActiveDeviceAddressTextView = (TextView)findViewById(R.id.id_active_device_address);
 
         mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
@@ -309,6 +342,35 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         bindService(intent, mAvrcpConnection, BIND_AUTO_CREATE);
 
         initIntentFilter();
+
+        ActionBar.TabListener tabListener = new ActionBar.TabListener() {
+            @Override
+            public void onTabUnselected(Tab tab, FragmentTransaction ft) {
+            }
+
+            @Override
+            public void onTabSelected(Tab tab, FragmentTransaction ft) {
+                mCurrentTab = tab.getText().toString();
+
+                if (mCurrentTab.equals(TAB_1)) {
+                    mViewFlipper.setDisplayedChild(0);
+                } else if (mCurrentTab.equals(TAB_2)) {
+                    mViewFlipper.setDisplayedChild(1);
+                }
+                invalidateOptionsMenu();
+            }
+
+            @Override
+            public void onTabReselected(Tab tab, FragmentTransaction ft) {
+            }
+        };
+
+        for (String tab : mActionBarTabsNames) {
+            mActionBar.addTab(
+                mActionBar.newTab()
+                    .setText(tab)
+                    .setTabListener(tabListener));
+        }
 
         Logger.d(TAG, "onCreate leave");
     }
@@ -345,6 +407,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         filter.addAction(AvrcpProfile.ACTION_CUSTOM_ACTION_RESULT);
         filter.addAction(BluetoothAvrcpController.ACTION_PLAYER_SETTING);
         filter.addAction(BluetoothA2dpSink.ACTION_AUDIO_CONFIG_CHANGED);
+        filter.addAction(BluetoothAvrcpController.ACTION_ACTIVE_DEVICE_CHANGED);
         registerReceiver(mReceiver, filter);
     }
 
@@ -427,6 +490,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetCurrentPas) {
             Logger.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
+        } else if (v == mBtnSetActiveDevice) {
+            Logger.d(TAG, "onClick mBtnSetActiveDevice");
+            handleClickBtnSetActiveDevice();
         } else {
             Logger.d(TAG, "onClick View: " + v);
         }
@@ -652,6 +718,41 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         Logger.d(TAG, "handleClickBtnGetCurrentPas update player app setting");
         updatePlayerAppSettingUI(mPlayerAppSetting);
+    }
+
+    private final BroadcastReceiver mPickerReceiver = new BroadcastReceiver() {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            Logger.v(TAG, "mPickerReceiver got " + action);
+
+            if (BluetoothDevicePicker.ACTION_DEVICE_SELECTED.equals(action)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                mAvrcp.setActiveDevice(device);
+                unregisterReceiver(this);
+            }
+        }
+    };
+
+    private void updateActiveDevice(BluetoothDevice device) {
+        Logger.d(TAG, "updateActiveDevice device: " + device);
+        if (device != null) {
+            Logger.d(TAG, "updateActiveDevice device name " + device.getName());
+            mActiveDeviceNameTextView.setText("Name: "  + device.getName());
+            mActiveDeviceAddressTextView.setText("Address: " + device.getAddress());
+        }
+    }
+
+    private void handleClickBtnSetActiveDevice() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothDevicePicker.ACTION_DEVICE_SELECTED);
+        registerReceiver(mPickerReceiver, filter);
+
+        Intent intent = new Intent(BluetoothDevicePicker.ACTION_LAUNCH);
+        intent.setFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        startActivity(intent);
     }
 
     private TestCmd getTestCmd() {
@@ -1778,6 +1879,18 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mA2dpCodecType.put(device, codecType);
 
         showA2dpCodec(audioConfig);
+    }
+
+    private void handleActionActiveDeviceChanged(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int result = intent.getIntExtra(BluetoothAvrcpController.EXTRA_RESULT, BluetoothAvrcpController.RESULT_FAILURE);
+
+        Logger.d(TAG, "handleActionActiveDeviceChanged device: " + device + ", result: " + result);
+
+        if (result == BluetoothAvrcpController.RESULT_SUCCESS) {
+            // update active device
+            updateActiveDevice(device);
+        }
     }
 
     private void handleActionCustomActionResult(Intent intent) {

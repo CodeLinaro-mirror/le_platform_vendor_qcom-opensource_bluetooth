@@ -74,8 +74,8 @@ public class AvrcpProfile {
 
     public static final String BLUETOOTH_PACKAGE = "com.android.bluetooth";
 
-    public static final String A2DP_MEDIA_BROWSER_SERVICE =
-        "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService";
+    public static final String BluetoothMediaBrowserService =
+        "com.android.bluetooth.avrcpcontroller.BluetoothMediaBrowserService";
 
     public static final String ACTION_TRACK_EVENT =
         "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
@@ -535,7 +535,7 @@ public class AvrcpProfile {
                 BluetoothProfile.A2DP_SINK);
 
         mMediaBrowser = new MediaBrowser(mContext, new ComponentName(BLUETOOTH_PACKAGE,
-                                         A2DP_MEDIA_BROWSER_SERVICE), mBrowseMediaConnectionCallback, null);
+                                         BluetoothMediaBrowserService), mBrowseMediaConnectionCallback, null);
 
         mMediaBrowser.connect();
     }
@@ -766,6 +766,24 @@ public class AvrcpProfile {
         } else {
             Logger.e(TAG, "mAvrcpController null");
             return false;
+        }
+    }
+
+    public boolean setActiveDevice(BluetoothDevice device) {
+        if (mAvrcpController != null) {
+            return mAvrcpController.setActiveDevice(device);
+        } else {
+            Logger.e(TAG, "mAvrcpController null");
+            return false;
+        }
+    }
+
+    public BluetoothDevice getActiveDevice() {
+        if (mAvrcpController != null) {
+            return mAvrcpController.getActiveDevice();
+        } else {
+            Logger.e(TAG, "mAvrcpController null");
+            return null;
         }
     }
 
