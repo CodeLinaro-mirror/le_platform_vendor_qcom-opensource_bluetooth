@@ -3,6 +3,7 @@ include $(CLEAR_VARS)
 
 TMP_LOCAL_PATH := $(LOCAL_PATH)
 
+include $(TMP_LOCAL_PATH)/testApp/Android.mk
 
 ifeq ($(TARGET_USE_QTI_BT_STACK),true)
 #include $(TMP_LOCAL_PATH)/wipower-host/Android.mk
