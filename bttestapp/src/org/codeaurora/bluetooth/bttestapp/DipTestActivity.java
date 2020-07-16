@@ -71,7 +71,7 @@ public class DipTestActivity extends Activity
 
                 if (DBG) {
                     Logger.d(TAG, "Received UUID: " + uuid.toString());
-                    Logger.d(TAG, "expected UUID: " + BluetoothUuid.ObexObjectPush.toString());
+                    Logger.d(TAG, "expected UUID: " + BluetoothUuid.OBEX_OBJECT_PUSH.toString());
                 }
                 if (uuid.equals(BluetoothUuid.DIP)) {
                     int status = intent.getIntExtra(BluetoothDevice.EXTRA_SDP_SEARCH_STATUS, -1);

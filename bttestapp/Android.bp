@@ -9,7 +9,6 @@ android_app {
     exclude_srcs: [
         "src/org/codeaurora/bluetooth/bttestapp/services/IMapServiceCallback.java",
 	"src/org/codeaurora/bluetooth/bttestapp/MapTestActivity.java",
-        "src/org/codeaurora/bluetooth/bttestapp/DipTestActivity.java",
     ],
 
     static_libs: [
