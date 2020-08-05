@@ -25,6 +25,15 @@ fi
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 
+AC_ARG_ENABLE(target,
+  [AS_HELP_STRING([--enable-target=TARGET], [Specify the target product to build])],
+  [TARGET=$enableval],
+  [TARGET=none]
+)
+
+# Use new audio hal for qrb5165
+AM_CONDITIONAL([RB5_AUDIO_HAL], [test "x$TARGET" = "xqrb5165"])
+
 AC_HEADER_STDBOOL
 AC_C_INLINE
 AC_TYPE_INT16_T
