@@ -21,7 +21,11 @@
 #include <sys/cdefs.h>
 
 #include <cutils/native_handle.h>
+#ifdef ANDROID
 #include <system/graphics.h>
+#else
+#include <stddef.h>
+#endif
 
 __BEGIN_DECLS
 
