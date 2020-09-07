@@ -59,7 +59,7 @@ public class TextParse {
                 String[] a = data.split("\n");
                 if (a[0].equals("*****************************************************"))
                     continue;
-                String[] b = a[0].split(":");
+                String[] b = a[0].split(":",2);
                 if(b[0].equals("adv")) {
                     arr[i]=1;
                     i++;
@@ -97,6 +97,7 @@ public class TextParse {
                     i++;
                 } else if(b[0].equals("Pair")) {
                     arr[i]=12;
+                    MainActivity.pairFlag = true;
                     i++;
                 } else {
                     if(b.length==2) {
@@ -231,7 +232,7 @@ public class TextParse {
                 s=Parameters.poll();
                 mdataRx.rxChar=s;
                 s=Parameters.poll();
-                mdataRx.numNotifications=Integer.parseInt(s);
+                mdataRx.NotificationsTime=Long.parseLong(s);
                 objects.add("DataRxflag");
                 Log.d(TAG, "Data Rx flag");
                 objects.add(mdataRx);

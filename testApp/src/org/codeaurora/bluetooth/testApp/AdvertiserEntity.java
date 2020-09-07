@@ -55,6 +55,7 @@ public class AdvertiserEntity {
     public static final int ADV_STOPPED = 0x01;
     public static final int ADV_FAILED = 0x02;
 
+    private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
     private int PERIODIC_INTERVAL = 200;//TODO: currently default 200 millisecs
 
     Adv adv_info;
@@ -197,7 +198,7 @@ public class AdvertiserEntity {
         this.mAdvServiceCb = mAdvServiceCb;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
+            mAdvertiser = mBTAdapter.getBluetoothLeAdvertiser();
         }
         //Set ADV callback
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -277,7 +278,7 @@ public class AdvertiserEntity {
                             .setAdvertiseMode(adv_info.AdvertiseMode)
                             .setTxPowerLevel(adv_info.TxPower)
                             .setConnectable(adv_info.Connectable)
-                            .setTimeout(adv_info.Interval)
+                            .setTimeout(adv_info.TimeOutLegacy)
                             .build();
                     Log.d(TAG,"BuildAdvertisementParameters Legacy done");
                     return true;
@@ -333,8 +334,8 @@ public class AdvertiserEntity {
                             .setIncludeTxPowerLevel(adv_info.IncludePower)
                             .addManufacturerData(adv_info.ManufacturerId,
                                 adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")))
-                            //.addServiceData(pUuid,
-                            //adv_info.ServiceData.getBytes(Charset.forName("UTF-8")))
+                            .addServiceData(pUuid,
+                            adv_info.ServiceData.getBytes(Charset.forName("UTF-8")))
                             .build();
                     Log.d(TAG,"BuildAdvertisementData done");
                     return true;
@@ -381,6 +382,9 @@ public class AdvertiserEntity {
         Log.d(TAG,"SetScanResponseData");
         if(adv_info.Scannable){
             mScanResponseData = mAdvData;
+            if(!adv_info.Legacy){
+                mAdvData = null;
+            }
         } else {
             mScanResponseData = null;
         }
@@ -420,13 +424,12 @@ public class AdvertiserEntity {
             return status;
         }
 
-        if(adv_info.Scannable) {
-           status = SetScanResponseData();
-           if(!status) {
-               Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
-               return status;
-           }
+       status = SetScanResponseData();
+       if(!status) {
+           Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
+           return status;
         }
+
         try {
             if(adv_info.Legacy){
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

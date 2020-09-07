@@ -57,7 +57,7 @@ TxChar:0000FF04-0000-1000-8000-00805F9B34FB
 DataRx:true
 RxService:0000FF01-0000-1000-8000-00805F9B34FB
 RxChar:0000FF03-0000-1000-8000-00805F9B34FB
-numNotifications:3
+NotificationsTime:2
 ConnUpdate:true
 ConnIntervalMin:20
 ConnIntervalMax:20

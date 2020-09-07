@@ -86,6 +86,9 @@ public final class ScanParams {
         SvcMaskUuid = srvcMaskUUID;
         ServiceData = SrvcData;
         SvcDataMask = srvcDataMask;
+        ManufacturerId = ManuId;
+        ManufacturerData = ManuData;
+        ManuMaskData = ManuMaskData;
         ScanMode = scanMode;
         CallbackType = cbType;
         ResultType = resultType;
@@ -285,7 +288,8 @@ public final class ScanParams {
     }
 
     public ScanSettings getScanSettings() {
-        return new ScanSettings.Builder()
+       try {
+        mscanSettings = new ScanSettings.Builder()
                 .setCallbackType(this.CallbackType)
                 .setReportDelay(this.ReportDelay)
                 .setNumOfMatches(this.NumOfAdvMatches)
@@ -293,6 +297,11 @@ public final class ScanParams {
                 .setMatchMode(this.MatchMode)
                 .setScanResultType(this.ResultType)
                 .build();
+        return mscanSettings;
+      }catch (Exception e) {
+            Log.e(TAG,"Exception : " + e.toString());
+        }
+        return null;
     }
 }
 
