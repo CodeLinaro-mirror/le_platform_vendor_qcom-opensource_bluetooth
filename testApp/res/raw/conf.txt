@@ -37,6 +37,7 @@ ResultType:0
 NumOfAdvMatches:3
 MatchMode:1
 ReportDelay:0
+Legacy:false
 ScanTO:5000000
 *****************************************************
 Connect:true

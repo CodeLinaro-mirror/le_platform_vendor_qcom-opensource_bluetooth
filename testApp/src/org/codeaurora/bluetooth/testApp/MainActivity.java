@@ -707,14 +707,16 @@ public class MainActivity extends Activity {
                 ScanParams params = new ScanParams(scn.DeviceName, scn.DeviceAddress,
                                                     scn.ServiceUuid, scn.SvcMaskUuid,
                                                     scn.ManufacturerId, scn.ManufacturerData,
-                                                    scn.ManuMaskData, scn.ServiceDataUuid,
+                                                    scn.ManufacturerMaskData, scn.ServiceDataUuid,
                                                     scn.ServiceData, scn.SvcDataMask,
                                                     scn.ScanMode, scn.CallbackType, scn.ResultType,
                                                     scn.NumOfAdvMatches, scn.MatchMode,
-                                                    scn.ReportDelay, scn.ScanTO);
+                                                    scn.ReportDelay, scn.ScanTO, scn.legacy);
                 Log.i(TAG, "cbtpe:" + scn.CallbackType + "scan mode:" + scn.ScanMode +
-                        "noOfadvmatches:" + scn.NumOfAdvMatches + "match mode:" + scn.MatchMode +
-                        "result type:" + scn.ResultType + "report delay:" + scn.ReportDelay);
+                     "noOfadvmatches:" + scn.NumOfAdvMatches + "match mode:" + scn.MatchMode +
+                     "result type:" + scn.ResultType + "report delay:" + scn.ReportDelay +
+                     "manu id:"+scn.ManufacturerId + "mandu data:"+scn.ManufacturerData +
+                     "manu data mask:" + scn.ManufacturerMaskData);
                 if(params == null) {
                     Log.i(TAG, "params NULL");
                 }

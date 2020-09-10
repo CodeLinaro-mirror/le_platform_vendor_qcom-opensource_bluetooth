@@ -172,7 +172,7 @@ public class TextParse {
                 s=Parameters.poll();
                 scn.ManufacturerData=s;
                 s=Parameters.poll();
-                scn.ManuMaskData=s;
+                scn.ManufacturerMaskData=s;
                 s=Parameters.poll();
                 scn.ServiceDataUuid=s;
                 s=Parameters.poll();
@@ -191,6 +191,8 @@ public class TextParse {
                 scn.MatchMode=Integer.parseInt(s);
                 s=Parameters.poll();
                 scn.ReportDelay=Integer.parseInt(s);
+                s=Parameters.poll();
+                scn.legacy=Boolean.parseBoolean(s);
                 s=Parameters.poll();
                 scn.ScanTO=Integer.parseInt(s);
                 objects.add("scanflag");

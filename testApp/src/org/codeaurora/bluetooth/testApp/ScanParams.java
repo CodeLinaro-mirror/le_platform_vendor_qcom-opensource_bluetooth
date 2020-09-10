@@ -36,12 +36,15 @@ import android.os.ParcelUuid;
 import android.os.Parcelable;
 import android.telecom.Call;
 import android.util.Log;
+import java.lang.annotation.Target;
+import java.nio.charset.Charset;
 import android.widget.Toast;
 
 import java.util.ArrayList;
 
 public final class ScanParams {
     private static final String TAG = "ScanParams";
+    private ScanSettings mscanSettings;
 
     public String invalidParam = "XX";
 
@@ -61,6 +64,7 @@ public final class ScanParams {
     public int NumOfAdvMatches;
     public int MatchMode;
     public int ReportDelay;
+    public boolean Legacy;
     public static int ScanTO;
 
     private String mDeviceName;
@@ -72,23 +76,24 @@ public final class ScanParams {
     private byte[] mServiceDataMask;
     private int manufacturerId;
     private byte[] manufacturerData;
-    private byte[] manufacturerDataMask;
+    private byte[] manuDataMask;
 
     public ArrayList<ScanFilter> mScanFilters;
 
     public ScanParams(String devName, String DevAddress, String ServUUID, String srvcMaskUUID,
-            String ManuId, String ManuData, String ManuMaskData, String SrvcDataUUID,
+            String ManuId, String ManuData, String ManufacturerMaskData, String SrvcDataUUID,
             String SrvcData, String srvcDataMask, int scanMode, int cbType, int resultType,
-            int NumAdvMatches, int matchMode, int reportDelay, int scanTO) {
+            int NumAdvMatches, int matchMode, int reportDelay, int scanTO, boolean legacy) {
         DeviceName = devName;
         DeviceAddress = DevAddress;
         ServiceUuid = ServUUID;
         SvcMaskUuid = srvcMaskUUID;
         ServiceData = SrvcData;
         SvcDataMask = srvcDataMask;
+        ServiceDataUuid = SrvcDataUUID;
         ManufacturerId = ManuId;
         ManufacturerData = ManuData;
-        ManuMaskData = ManuMaskData;
+        ManuMaskData = ManufacturerMaskData;
         ScanMode = scanMode;
         CallbackType = cbType;
         ResultType = resultType;
@@ -96,43 +101,43 @@ public final class ScanParams {
         MatchMode = matchMode;
         ReportDelay = reportDelay;
         ScanTO = scanTO;
+        Legacy = legacy;
     }
 
     public void parseScanParams() {
         Log.d(TAG, "parseScanParams");
-        if(this.DeviceName != null && (this.DeviceName.length() > 2)
-          && (this.DeviceName != invalidParam)) {
+        if(this.DeviceName != null && (!(this.DeviceName.equalsIgnoreCase(invalidParam)))) {
             Log.d(TAG, "DeviceName::" + this.DeviceName);
             mDeviceName = this.DeviceName;
         }
 
-        if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2)
-          && (this.DeviceAddress != invalidParam)) {
+        if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2) &&
+            (!(this.DeviceAddress.equalsIgnoreCase(invalidParam)))) {
             Log.d(TAG, "DeviceAddress::" + this.DeviceAddress);
             mDeviceAddress = this.DeviceAddress;
         }
 
-        if(this.ServiceUuid != null && (this.ServiceUuid.length() > 2)
-          && (this.ServiceUuid != invalidParam)) {
+        if(this.ServiceUuid != null &&
+            (!(this.ServiceUuid.equalsIgnoreCase(invalidParam)))) {
             Log.d(TAG, "mServiceUuid ::"+this.ServiceUuid );
             mUuid = ParcelUuid.fromString(this.ServiceUuid );
         }
 
-        if(this.SvcMaskUuid != null && (this.SvcMaskUuid.length() > 2)
-          && (this.SvcMaskUuid != invalidParam)) {
+        if(this.SvcMaskUuid != null &&
+            (!(this.SvcMaskUuid.equalsIgnoreCase(invalidParam)))) {
             Log.d(TAG, "mServiceUuidMask ::"+this.SvcMaskUuid );
             mUuidMask = ParcelUuid.fromString(this.SvcMaskUuid );
         }
 
-        if(this.ManufacturerId != null && (this.ManufacturerId.length() > 2)
-          && (this.ManufacturerId != invalidParam)) {
+        if(this.ManufacturerId != null && (!(this.ManufacturerId.equalsIgnoreCase(invalidParam)))) {
             Log.d(TAG, "ManufacturerId  ::"+this.ManufacturerId );
             manufacturerId = Integer.parseInt(this.ManufacturerId );
         }
 
-        if(this.ManufacturerData != null && (this.ManufacturerData.length() > 2)
-          && (this.ManufacturerData != invalidParam)) {
+        if(this.ManufacturerData != null &&
+            (!(this.ManufacturerData.equalsIgnoreCase(invalidParam)))) {
             String[] manuData = this.ManufacturerData.split(",");
+            Log.d(TAG, "this.manudata:"+this.ManufacturerData);
             if(manuData!= null && manuData.length>0) {
                 manufacturerData = new byte[manuData.length];
                 for(int i=0; i< manuData.length; i++) {
@@ -146,30 +151,31 @@ public final class ScanParams {
             }
         }
 
-        if(this.ManuMaskData != null && (this.ManuMaskData.length() > 2)
-          && (this.ManuMaskData != invalidParam)) {
-            String[] manuDataMask = this.ManuMaskData.split(",");
-            if(manuDataMask!= null && manuDataMask.length>0) {
-                manufacturerDataMask = new byte[manuDataMask.length];
+        if(this.ManuMaskData != null &&
+            (!(this.ManuMaskData.equalsIgnoreCase(invalidParam)))) {
+            Log.d(TAG, "this.manudatamask:"+this.ManuMaskData);
+            String[] manufacturerDataMask = this.ManuMaskData.split(",");
+            if(manufacturerDataMask!= null && manufacturerDataMask.length>0) {
+                manuDataMask = new byte[manufacturerDataMask.length];
                 for(int i=0; i< manuDataMask.length; i++) {
-                    manufacturerDataMask[i] = Byte.parseByte(manuDataMask[i]);
+                    manuDataMask[i] = Byte.parseByte(manufacturerDataMask[i],16);
                 }
-                if(manufacturerDataMask != null && manufacturerDataMask.length >0) {
-                    for(int j=0; j< manufacturerDataMask.length; j++) {
-                        Log.d(TAG, "manufacturerDataMask::"+manufacturerDataMask[j]);
+                if(manuDataMask != null && manuDataMask.length >0) {
+                    for(int j=0; j< manuDataMask.length; j++) {
+                        Log.d(TAG, "manufacturerDataMask::"+manuDataMask[j]);
                     }
                 }
             }
         }
 
-        if(this.ServiceDataUuid != null && (this.ServiceDataUuid.length() > 2)
-          && (this.ServiceDataUuid != invalidParam)) {
-            Log.d(TAG, "parsedData::"+this.ServiceDataUuid);
+        if(this.ServiceDataUuid != null &&
+            (!(this.ServiceDataUuid.equalsIgnoreCase(invalidParam)))) {
+            Log.d(TAG, "ServiceDataUUID::"+this.ServiceDataUuid);
             mServiceDataUuid = ParcelUuid.fromString(this.ServiceDataUuid);
         }
 
-        if(this.ServiceData != null && (this.ServiceData .length() > 2)
-          && (this.ServiceData != invalidParam)) {
+        if(this.ServiceData != null &&
+            (!(this.ServiceData.equalsIgnoreCase(invalidParam)))) {
             String[] svcData = this.ServiceData.split(",");
             if(svcData!= null && svcData.length>0) {
                 mServiceData = new byte[svcData.length];
@@ -182,19 +188,21 @@ public final class ScanParams {
                     }
                 }
             }
+
         }
 
-        if(this.SvcDataMask != null && (this.SvcDataMask.length() > 2)
-          && (this.SvcDataMask != invalidParam)) {
-            String[] svcDataMask = this.SvcDataMask.split(",");
-            if(svcDataMask!= null && svcDataMask.length>0) {
-                mServiceDataMask = new byte[svcDataMask.length];
-                for(int i=0; i< svcDataMask.length; i++) {
-                    mServiceDataMask[i] = Byte.parseByte(svcDataMask[i]);
+        if(this.SvcDataMask != null &&
+            (!(this.SvcDataMask.equalsIgnoreCase(invalidParam)))) {
+            Log.d(TAG, "this.srvcudatamask:"+this.SvcDataMask);
+            String[] svcMaskData = this.SvcDataMask.split(",");
+            if(svcMaskData!= null && svcMaskData.length>0) {
+                mServiceDataMask = new byte[svcMaskData.length];
+                for(int i=0; i< mServiceDataMask.length; i++) {
+                    mServiceDataMask[i] = Byte.parseByte(svcMaskData[i],16);
                 }
                 if(mServiceDataMask != null && mServiceDataMask.length >0) {
                     for(int j=0; j< mServiceDataMask.length; j++) {
-                        Log.d(TAG, "mServiceDataMask::"+mServiceDataMask[j]);
+                        Log.d(TAG, "ServiceDataMask::"+mServiceDataMask[j]);
                     }
                 }
             }
@@ -209,7 +217,8 @@ public final class ScanParams {
             try {
                 if(ScannerService.LOG_LEVEL >= 2)
                     Log.d(TAG, "Device address filter set to " + mDeviceAddress.toUpperCase());
-                mScanFilters.add(new ScanFilter.Builder().setDeviceAddress(mDeviceAddress.toUpperCase()).build());
+                mScanFilters.add(new ScanFilter.Builder().
+                        setDeviceAddress(mDeviceAddress.toUpperCase()).build());
             }
             catch(IllegalArgumentException exe){
                 if(ScannerService.LOG_LEVEL >= 1)
@@ -226,8 +235,13 @@ public final class ScanParams {
         if(mUuid != null) {
             try {
                 if(ScannerService.LOG_LEVEL >= 2)
-                    //Log.d(TAG, "mUuidMask::"+mUuidMask);
-                mScanFilters.add(new ScanFilter.Builder().setServiceUuid(mUuid).build());
+                    Log.d(TAG, "mUuidMask::"+mUuidMask);
+                if(mUuidMask != null) {
+                    mScanFilters.add(new ScanFilter.Builder().
+                        setServiceUuid(mUuid,mUuidMask).build());
+                } else if (mUuidMask == null) {
+                    mScanFilters.add(new ScanFilter.Builder().setServiceUuid(mUuid).build());
+                }
             }
             catch(IllegalArgumentException exe){
                 if(ScannerService.LOG_LEVEL >= 1)
@@ -240,8 +254,15 @@ public final class ScanParams {
             try {
                 if(ScannerService.LOG_LEVEL >= 2)
                     Log.d(TAG, "manufacturerId >0:: Applying filter for Manufacturer data");
-                mScanFilters.add(new ScanFilter.Builder().setManufacturerData(manufacturerId,
-                  manufacturerData, manufacturerDataMask).build());
+                if(manuDataMask != null){
+                    Log.d(TAG, "with mask");
+                    mScanFilters.add(new ScanFilter.Builder().setManufacturerData(
+                         manufacturerId, manufacturerData, manuDataMask).build());
+                } else if (manuDataMask == null) {
+                    Log.d(TAG, "no mask");
+                    mScanFilters.add(new ScanFilter.Builder().
+                        setManufacturerData(manufacturerId, manufacturerData).build());
+                }
             }
             catch(IllegalArgumentException exe){
                 if(ScannerService.LOG_LEVEL >= 1)
@@ -269,8 +290,13 @@ public final class ScanParams {
                             Log.d(TAG, "mServiceDataMask::" + mServiceDataMask[j]);
                     }
                 }
-                mScanFilters.add(new ScanFilter.Builder().setServiceData(mServiceDataUuid,
-                  mServiceData, mServiceDataMask).build());
+                if(mServiceDataMask != null) {
+                    mScanFilters.add(new ScanFilter.Builder().
+                        setServiceData(mServiceDataUuid, mServiceData, mServiceDataMask).build());
+                } else if (mServiceDataMask == null) {
+                    mScanFilters.add(new ScanFilter.Builder().
+                        setServiceData(mServiceDataUuid, mServiceData).build());
+                }
             }
             catch (IllegalArgumentException exe){
                 if(ScannerService.LOG_LEVEL >= 1)
@@ -288,17 +314,18 @@ public final class ScanParams {
     }
 
     public ScanSettings getScanSettings() {
-       try {
-        mscanSettings = new ScanSettings.Builder()
-                .setCallbackType(this.CallbackType)
-                .setReportDelay(this.ReportDelay)
-                .setNumOfMatches(this.NumOfAdvMatches)
-                .setScanMode(this.ScanMode)
-                .setMatchMode(this.MatchMode)
-                .setScanResultType(this.ResultType)
-                .build();
-        return mscanSettings;
-      }catch (Exception e) {
+        try {
+            mscanSettings = new ScanSettings.Builder()
+                    .setCallbackType(this.CallbackType)
+                    .setReportDelay(this.ReportDelay)
+                    .setNumOfMatches(this.NumOfAdvMatches)
+                    .setScanMode(this.ScanMode)
+                    .setMatchMode(this.MatchMode)
+                    .setScanResultType(this.ResultType)
+                    .setLegacy(this.Legacy)
+                    .build();
+            return mscanSettings;
+        }catch (Exception e) {
             Log.e(TAG,"Exception : " + e.toString());
         }
         return null;
