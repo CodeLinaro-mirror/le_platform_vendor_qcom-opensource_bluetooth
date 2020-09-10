@@ -208,8 +208,8 @@ public final class ScanParams {
         if(mDeviceAddress != null && mDeviceAddress.length() > 0) {
             try {
                 if(ScannerService.LOG_LEVEL >= 2)
-                    Log.d(TAG, "Device address filter set to " + mDeviceAddress);
-                mScanFilters.add(new ScanFilter.Builder().setDeviceAddress(mDeviceAddress).build());
+                    Log.d(TAG, "Device address filter set to " + mDeviceAddress.toUpperCase());
+                mScanFilters.add(new ScanFilter.Builder().setDeviceAddress(mDeviceAddress.toUpperCase()).build());
             }
             catch(IllegalArgumentException exe){
                 if(ScannerService.LOG_LEVEL >= 1)
