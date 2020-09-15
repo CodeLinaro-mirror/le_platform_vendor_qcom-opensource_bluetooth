@@ -3,6 +3,7 @@ adv:true
 TxPower:1
 Legacy:true
 Periodic:false
+PerAdvInterval:200
 Connectable:false
 Scannable:false
 Anonymous:false

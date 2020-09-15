@@ -35,6 +35,7 @@ public class Adv {
     int TxPower;
     boolean Legacy;
     boolean Periodic;
+    int PerAdvInterval;
     boolean Connectable;
     boolean Scannable;
     boolean Anonymous;

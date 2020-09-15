@@ -123,6 +123,8 @@ public class TextParse {
                 s=Parameters.poll();
                 adv.Periodic=Boolean.parseBoolean(s);
                 s=Parameters.poll();
+                adv.PerAdvInterval=Integer.parseInt(s);
+                s=Parameters.poll();
                 adv.Connectable=Boolean.parseBoolean(s);
                 s=Parameters.poll();
                 adv.Scannable=Boolean.parseBoolean(s);

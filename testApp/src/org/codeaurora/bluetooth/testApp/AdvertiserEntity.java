@@ -56,7 +56,6 @@ public class AdvertiserEntity {
     public static final int ADV_FAILED = 0x02;
 
     private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
-    private int PERIODIC_INTERVAL = 200;//TODO: currently default 200 millisecs
 
     Adv adv_info;
     Timer advStopTimer = new Timer();
@@ -354,7 +353,7 @@ public class AdvertiserEntity {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     mPeriodicAdvParams = new PeriodicAdvertisingParameters.Builder()
                             .setIncludeTxPower(adv_info.IncludePower)
-                            .setInterval(PERIODIC_INTERVAL)
+                            .setInterval(adv_info.PerAdvInterval)
                             .build();
                     return true;
                 }
