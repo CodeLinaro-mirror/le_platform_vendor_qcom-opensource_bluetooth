@@ -152,6 +152,7 @@ public class MainActivity extends Activity {
     private boolean boundA=false;
     private boolean boundS=false;
     private boolean statMachinestarted=false;
+    private static final int  MAX_ADV_SETS_SUPPORTED = 16;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -632,26 +633,31 @@ public class MainActivity extends Activity {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter ");
-                if(!txtParse.objects.isEmpty()) {
-                   /* according to the flag send the message to
-                      respective service along with class obj */
-                    if("advflag".equals((String)txtParse.objects.peek())){
-                        txtParse.objects.remove();
-                        Log.i(TAG, "advflag set, service bound:" + boundA);
-                        Adv adv = (Adv)txtParse.objects.remove();
-                        mAdvertiseService.startAdvertising(adv);
-                        showMessage("Enabling Advertising!");
-                   }
+                for(int i=1; i <= MAX_ADV_SETS_SUPPORTED; i++){
+                    if(!txtParse.objects.isEmpty()) {
+                        String flag = (String)txtParse.objects.peek();
+                       /* according to the flag send the message to
+                          respective service along with class obj */
+                       if("advflag".equals(flag)){
+                           txtParse.objects.remove();
+                           Log.i(TAG, "advflag set, service bound:" + boundA);
+                           Adv adv = (Adv)txtParse.objects.remove();
+                           mAdvertiseService.startAdvertising(adv);
+                           showMessage("Enabling Advertising!");
+                       }
+                    }
                 }
                 if(!txtParse.objects.isEmpty()) {
-                    if("scanflag".equals((String)txtParse.objects.peek())){
-                        txtParse.objects.remove();
-                        Log.i(TAG, "scanflag set,service bound: " + boundS);
-                        Scan scn = (Scan)txtParse.objects.remove();
-                        set_scan_parameters(scn);
-                        mScannerService.startScan(mfilter, settings);
-                    }
-                } else {
+                    String flag = (String)txtParse.objects.peek();
+                   if("scanflag".equals(flag)){
+                       txtParse.objects.remove();
+                       Log.i(TAG, "scanflag set,service bound: " + boundS);
+                       Scan scn = (Scan)txtParse.objects.remove();
+                       set_scan_parameters(scn);
+                       mScannerService.startScan(mfilter, settings);
+                   }
+                }
+                else {
                     Log.d(TAG, "Queue is Empty. Nothing more to do!");
                 }
             }

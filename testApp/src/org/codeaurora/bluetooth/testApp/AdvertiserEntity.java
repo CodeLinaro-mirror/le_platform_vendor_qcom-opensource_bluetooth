@@ -54,6 +54,7 @@ public class AdvertiserEntity {
     public static final int ADV_STARTED = 0x00;
     public static final int ADV_STOPPED = 0x01;
     public static final int ADV_FAILED = 0x02;
+    private String invalidParam = "XX";
 
     private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
 
@@ -310,32 +311,44 @@ public class AdvertiserEntity {
         try {
             if(adv_info.Legacy){
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                    mAdvData = new AdvertiseData.Builder()
-                            .setIncludeDeviceName(true)
-                            .addServiceUuid(pUuid)
-                            .setIncludeTxPowerLevel(adv_info.IncludePower)
-                            //For legacy mode don't add service data and service UUID?
-                            //.addManufacturerData(adv_info.ManufacturerId,
-                            //adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")))
-                            //.addServiceData(pUuid,adv_info.ServiceData.getBytes(
-                            //Charset.forName("UTF-8")))
-                            .build();
+                if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
+                  ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                  mAdvData = new AdvertiseData.Builder()
+                          .setIncludeDeviceName(true)
+                          .addServiceUuid(pUuid)
+                          .setIncludeTxPowerLevel(adv_info.IncludePower)
+                          .build();
+                } else {
+                  mAdvData = new AdvertiseData.Builder()
+                          .setIncludeDeviceName(true)
+                          .setIncludeTxPowerLevel(adv_info.IncludePower)
+                          .build();
+                }
                     Log.d(TAG,"BuildAdvertisementData done");
                     return true;
                 }
             } else {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                    mAdvData = new AdvertiseData.Builder()
-                            .setIncludeDeviceName(true)
-                            .addServiceUuid(pUuid)
-                            .setIncludeTxPowerLevel(adv_info.IncludePower)
-                            .addManufacturerData(adv_info.ManufacturerId,
-                                adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")))
-                            .addServiceData(pUuid,
-                            adv_info.ServiceData.getBytes(Charset.forName("UTF-8")))
-                            .build();
+                     AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
+                     dataBuilder.setIncludeDeviceName(true);
+                     dataBuilder.setIncludeTxPowerLevel(adv_info.IncludePower);
+                     if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
+                        Log.d(TAG,"Setting Service UUID");
+                        ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                        dataBuilder.addServiceUuid(pUuid);
+                        if(!(adv_info.ServiceData.equalsIgnoreCase(invalidParam))) {
+                            Log.d(TAG,"Setting Service data");
+                            dataBuilder.addServiceData(pUuid,
+                                    adv_info.ServiceData.getBytes(Charset.forName("UTF-8")));
+                        }
+                    }
+                    if((adv_info.ManufacturerId != 0) ||
+                        (!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam)))) {
+                        Log.d(TAG,"Setting Manufacture data");
+                        dataBuilder.addManufacturerData(adv_info.ManufacturerId,
+                                adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")));
+                    }
+                    mAdvData = dataBuilder.build();
                     Log.d(TAG,"BuildAdvertisementData done");
                     return true;
                 }
