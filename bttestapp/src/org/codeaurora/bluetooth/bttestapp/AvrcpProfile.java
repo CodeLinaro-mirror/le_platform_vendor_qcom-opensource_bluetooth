@@ -49,6 +49,10 @@ import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
+import android.support.v4.media.session.MediaControllerCompat;
+import android.support.v4.media.MediaBrowserCompat;
 import android.util.Log;
 
 import org.codeaurora.bluetooth.bttestapp.R;
@@ -75,7 +79,7 @@ public class AvrcpProfile {
     public static final String BLUETOOTH_PACKAGE = "com.android.bluetooth";
 
     public static final String A2DP_MEDIA_BROWSER_SERVICE =
-        "com.android.bluetooth.a2dpsink.mbs.A2dpMediaBrowserService";
+        "com.android.bluetooth.avrcpcontroller.BluetoothMediaBrowserService";
 
     public static final String ACTION_TRACK_EVENT =
         "android.bluetooth.avrcp-controller.profile.action.TRACK_EVENT";
@@ -463,8 +467,8 @@ public class AvrcpProfile {
     private BluetoothA2dpSink mA2dpSink = null;
 
     /* Object used to connect to MediaBrowseService of BT-AVRCP app */
-    private MediaBrowser mMediaBrowser = null;
-    private MediaController mMediaController = null;
+    private MediaBrowserCompat mMediaBrowser = null;
+    private MediaControllerCompat mMediaController = null;
 
     private Context mContext;
 
@@ -501,12 +505,12 @@ public class AvrcpProfile {
     };
 
     /* Browse connection state callback handler */
-    private MediaBrowser.ConnectionCallback mBrowseMediaConnectionCallback =
-            new MediaBrowser.ConnectionCallback() {
+    private MediaBrowserCompat.ConnectionCallback mBrowseMediaConnectionCallback =
+            new MediaBrowserCompat.ConnectionCallback() {
         @Override
         public void onConnected() {
             Logger.d(TAG, "mediaBrowser CONNECTED");
-            mMediaController = new MediaController(mContext, mMediaBrowser.getSessionToken());
+            mMediaController = new MediaControllerCompat(mContext, mMediaBrowser.getSessionToken());
         }
 
         @Override
@@ -519,6 +523,10 @@ public class AvrcpProfile {
             Logger.e(TAG, "mediaBrowser SUSPENDED");
         }
     };
+
+    protected synchronized MediaControllerCompat getMediaController () {
+        return mMediaController;
+    }
 
     public AvrcpProfile(Context context) {
         mContext = context;
@@ -534,8 +542,8 @@ public class AvrcpProfile {
         mAdapter.getProfileProxy(mContext, mA2dpSinkServiceListener,
                 BluetoothProfile.A2DP_SINK);
 
-        mMediaBrowser = new MediaBrowser(mContext, new ComponentName(BLUETOOTH_PACKAGE,
-                                         A2DP_MEDIA_BROWSER_SERVICE), mBrowseMediaConnectionCallback, null);
+        mMediaBrowser = new MediaBrowserCompat(mContext, new ComponentName(BLUETOOTH_PACKAGE,
+                                               A2DP_MEDIA_BROWSER_SERVICE), mBrowseMediaConnectionCallback, null);
 
         mMediaBrowser.connect();
     }
@@ -562,6 +570,40 @@ public class AvrcpProfile {
             Logger.d(TAG, "calling stop()");
             mMediaController.getTransportControls().stop();
         }
+    }
+
+    public void setShuffleMode(int mode) {
+        Logger.d(TAG, "setShuffleMode");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling stop()");
+            mMediaController.getTransportControls().setShuffleMode(mode);
+        }
+    }
+
+    public void setRepeatMode(int mode) {
+        Logger.d(TAG, "setRepeatMode");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling stop()");
+            mMediaController.getTransportControls().setRepeatMode(mode);
+        }
+    }
+
+    public int getShuffleMode() {
+        Logger.d(TAG, "getShuffleMode");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling stop()");
+            return mMediaController.getShuffleMode();
+        }
+        return PlaybackStateCompat.SHUFFLE_MODE_NONE;
+    }
+
+    public int getRepeatMode() {
+        Logger.d(TAG, "getRepeatMode");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling stop()");
+            return mMediaController.getRepeatMode();
+        }
+        return PlaybackStateCompat.REPEAT_MODE_NONE;
     }
 
     public void volumeUp() {
