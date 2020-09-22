@@ -129,6 +129,22 @@
                 android:onClick="onButtonClick"
                 android:text="@string/get_link_key" />
 
+            <Button
+                android:id="@+id/read_local_oob_data"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="onButtonClick"
+                android:text="@string/read_local_oob_data" />
+
+            <Button
+                android:id="@+id/create_oob_bond"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="onButtonClick"
+                android:text="@string/create_oob_bond" />
+
         </LinearLayout>
         <Button
             android:layout_width="wrap_content"
