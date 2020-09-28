@@ -73,6 +73,15 @@
             android:layout_margin="@dimen/activity_vertical_margin"
             android:textAllCaps="false"
             android:text="@string/avrcp_fastforward" />
+        <Button
+            android:id="@+id/id_btn_set_shuffle_mode"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_setshufflemode" />
     </LinearLayout>
 
     <LinearLayout
@@ -115,6 +124,15 @@
             android:layout_weight="1"
             android:textAllCaps="false"
             android:text="@string/avrcp_volume_up" />
+        <Button
+            android:id="@+id/id_btn_set_repeat_mode"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_setrepeatmode" />
     </LinearLayout>
 
     <LinearLayout

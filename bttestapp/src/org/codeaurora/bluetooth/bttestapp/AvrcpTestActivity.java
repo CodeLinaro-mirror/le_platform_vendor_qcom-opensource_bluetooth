@@ -34,6 +34,10 @@ import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.util.Log;
 import org.codeaurora.bluetooth.bttestapp.AvrcpProfile;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
+import android.support.v4.media.session.MediaControllerCompat;
+import android.support.v4.media.MediaBrowserCompat;
 
 import android.bluetooth.BluetoothAvrcpController;
 import android.bluetooth.BluetoothAvrcpPlayerSettings;
@@ -100,6 +104,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnVolumeUp;
     private Button mBtnPreviousGroup;
     private Button mBtnNextGroup;
+    private Button mBtnSetShuffleMode;
+    private Button mBtnSetRepeatMode;
 
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
@@ -123,6 +129,17 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
     private final String STATUS_PLAY = "Play";
     private final String STATUS_PAUSE = "Pause";
+
+    private final String SHUFFLE_MODE_OFF = "Shuffle(Off)";
+    private final String SHUFFLE_MODE_ALL = "Shuffle(All)";
+    private final String SHUFFLE_MODE_GROUP = "Shuffle(Group)";
+    private final String SHUFFLE_MODE_INVLID = "Shuffle(Invalid)";
+
+    private final String REPEAT_MODE_OFF = "Repeat(Off)";
+    private final String REPEAT_MODE_ONE = "Repeat(One)";
+    private final String REPEAT_MODE_ALL = "Repeat(All)";
+    private final String REPEAT_MODE_GROUP = "Repeat(Group)";
+    private final String REPEAT_MODE_INVLID = "Repeat(Invalid)";
 
     private AvrcpProfile mAvrcp;
     private BluetoothAvrcpPlayerSettings mPlayerAppSetting;
@@ -222,6 +239,28 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Log.i(TAG, "onServiceConnected()");
             ProfileService profileService = ((ProfileService.LocalBinder) service).getService();
             mAvrcp = profileService.getAvrcpProfile();
+            if (mAvrcp.getMediaController() != null) {
+                mAvrcp.getMediaController().registerCallback(mMediaControllerCallback);
+            }
+            int shuffleMode = mAvrcp.getShuffleMode();
+            if (shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_ALL) {
+                mBtnSetShuffleMode.setText(SHUFFLE_MODE_ALL);
+            } else if (shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_GROUP) {
+                mBtnSetShuffleMode.setText(SHUFFLE_MODE_GROUP);
+            } else if (shuffleMode == PlaybackStateCompat.SHUFFLE_MODE_NONE) {
+                mBtnSetShuffleMode.setText(SHUFFLE_MODE_OFF);
+            }
+
+            int repeatMode = mAvrcp.getRepeatMode();
+            if (repeatMode == PlaybackStateCompat.REPEAT_MODE_ALL) {
+                mBtnSetRepeatMode.setText(REPEAT_MODE_ALL);
+            } else if (repeatMode == PlaybackStateCompat.REPEAT_MODE_ONE) {
+                mBtnSetRepeatMode.setText(REPEAT_MODE_ONE);
+            } else if (repeatMode == PlaybackStateCompat.REPEAT_MODE_GROUP) {
+                mBtnSetRepeatMode.setText(REPEAT_MODE_GROUP);
+            } else if (repeatMode == PlaybackStateCompat.REPEAT_MODE_NONE) {
+                mBtnSetRepeatMode.setText(REPEAT_MODE_OFF);
+            }
         }
     };
 
@@ -279,6 +318,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mBtnVolumeUp = initButton(R.id.id_btn_volume_up);
         mBtnPreviousGroup = initButton(R.id.id_btn_previous_group);
         mBtnNextGroup = initButton(R.id.id_btn_next_group);
+        mBtnSetShuffleMode = initButton(R.id.id_btn_set_shuffle_mode);
+        mBtnSetRepeatMode = initButton(R.id.id_btn_set_repeat_mode);
 
         mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
@@ -427,6 +468,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnGetCurrentPas) {
             Logger.d(TAG, "onClick mBtnGetCurrentPas");
             handleClickBtnGetCurrentPas();
+        } else if (v == mBtnSetShuffleMode) {
+            Logger.d(TAG, "onClick mBtnSetShuffleMode");
+            setShuffleMode();
+        } else if (v == mBtnSetRepeatMode) {
+            Logger.d(TAG, "onClick mBtnSetRepeatMode");
+            setRepeatMode();
         } else {
             Logger.d(TAG, "onClick View: " + v);
         }
@@ -1123,6 +1170,105 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             e.printStackTrace();
         }
     }
+
+    private void setShuffleMode() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        String status = mBtnSetShuffleMode.getText().toString().trim();
+
+        Logger.d(TAG, " before shuffle mode: " + mAvrcp.getShuffleMode());
+
+        try {
+            if (status.equals(SHUFFLE_MODE_OFF)) {
+                mAvrcp.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_ALL);
+            } else if (status.equals(SHUFFLE_MODE_ALL)) {
+                mAvrcp.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE);
+            } else if (status.equals(SHUFFLE_MODE_GROUP)) {
+                mAvrcp.setShuffleMode(PlaybackStateCompat.SHUFFLE_MODE_NONE);
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+        Logger.d(TAG, " after shuffle mode: " + mAvrcp.getShuffleMode());
+    }
+
+    private void setRepeatMode() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        String status = mBtnSetRepeatMode.getText().toString().trim();
+
+        try {
+            if (status.equals(REPEAT_MODE_OFF)) {
+                mAvrcp.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_ONE);
+            } else if (status.equals(REPEAT_MODE_ONE)) {
+                mAvrcp.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_ALL);
+            } else if (status.equals(REPEAT_MODE_ALL)) {
+                mAvrcp.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_NONE);
+            } else if (status.equals(REPEAT_MODE_GROUP)) {
+                mAvrcp.setRepeatMode(PlaybackStateCompat.REPEAT_MODE_NONE);
+            }
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private final MediaControllerCompat.Callback mMediaControllerCallback =
+        new MediaControllerCompat.Callback() {
+
+            @Override
+            public void onPlaybackStateChanged(PlaybackStateCompat state) {
+                Logger.d(TAG, "onPlaybackStateChanged");
+            }
+
+            @Override
+            public void onShuffleModeChanged(int shuffleMode) {
+                Logger.d(TAG, "onShuffleModeChanged: " + shuffleMode);
+                switch (shuffleMode) {
+                    case PlaybackStateCompat.SHUFFLE_MODE_NONE:
+                        mBtnSetShuffleMode.setText(SHUFFLE_MODE_OFF);
+                        break;
+                    case PlaybackStateCompat.SHUFFLE_MODE_ALL:
+                        mBtnSetShuffleMode.setText(SHUFFLE_MODE_ALL);
+                        break;
+                    case PlaybackStateCompat.SHUFFLE_MODE_GROUP:
+                        mBtnSetShuffleMode.setText(SHUFFLE_MODE_GROUP);
+                        break;
+                    default:
+                        mBtnSetShuffleMode.setText(SHUFFLE_MODE_INVLID);
+                        break;
+                }
+            }
+
+            @Override
+            public void onRepeatModeChanged(int repeatMode) {
+                Logger.d(TAG, "onRepeatModeChanged: " + repeatMode);
+                switch (repeatMode) {
+                    case PlaybackStateCompat.REPEAT_MODE_NONE:
+                        mBtnSetRepeatMode.setText(REPEAT_MODE_OFF);
+                        break;
+                    case PlaybackStateCompat.REPEAT_MODE_ONE:
+                        mBtnSetRepeatMode.setText(REPEAT_MODE_ONE);
+                        break;
+                    case PlaybackStateCompat.REPEAT_MODE_ALL:
+                        mBtnSetRepeatMode.setText(REPEAT_MODE_ALL);
+                        break;
+                    case PlaybackStateCompat.REPEAT_MODE_GROUP:
+                        mBtnSetRepeatMode.setText(REPEAT_MODE_GROUP);
+                        break;
+                    default:
+                        mBtnSetRepeatMode.setText(REPEAT_MODE_INVLID);
+                        break;
+                }
+            }
+        };
 
     private void sendStopCommand() {
         if (mAvrcp == null) {
