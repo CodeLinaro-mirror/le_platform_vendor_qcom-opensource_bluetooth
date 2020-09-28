@@ -449,7 +449,7 @@ public class MainActivity extends MonkeyActivity {
 
                 if (isValidLinkKey()) {
                     // get dev info from saved variable
-                    //mDevice.addOutOfBandBondDevice(mLinkKey, mKeyType, 0);
+                    mDevice.addOutOfBandBondDevice(mLinkKey, mKeyType, 0);
                     Toast.makeText(MainActivity.this, "Adding oob bond device, linkkey " + mLinkKey,
                                        Toast.LENGTH_SHORT).show();
                 } else {
@@ -475,7 +475,7 @@ public class MainActivity extends MonkeyActivity {
                                        Toast.LENGTH_SHORT).show();
 
                     Logger.d(TAG, "linkKey " + linkKey + " keyType " + dev[0] + " pinLen " + dev[1]);
-                    //mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
+                    mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
                 }
             }
         } else if (v.getId() == R.id.get_link_key) {
