@@ -374,14 +374,15 @@ public class MainActivity extends Activity {
                 Log.i(TAG, "onConnectionStateChange device :" + gatt.getDevice() +
                       " status :" + status + " newState :" + newState);
                 mState = newState;
-                if (gatt.getDevice() == null || status != GATT_SUCCESS) {
+                int bondState = mDevice.getBondState();
+                if (gatt.getDevice() == null || (status != GATT_SUCCESS)&&
+                      (mStateMachine.getCurrentState() == mStateMachine.mTAConnectPending)) {
                     Log.e(TAG, "onConnectionStateChange:Unexpected error! mstate: " +  mState);
                     mStateMachine.sendMessage(
                                     TestAppConnectionStateMachine.TA_REM_DEV_FAILED_TO_CONNECT);
                     return;
                 }
-                int bondState = mDevice.getBondState();
-                if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                if (status != GATT_SUCCESS || newState == BluetoothProfile.STATE_DISCONNECTED) {
                     Log.i(TAG, "onConnectionStateChange:DISCONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
                     /*Send Message to SM */
@@ -543,6 +544,8 @@ public class MainActivity extends Activity {
                 if(!mDevice.createBond(TRANSPORT_LE)) {
                     Log.i(TAG, "couldn't start pairing");
                 }
+            } else {
+                Log.i(TAG, "Already Paired!");
             }
         }
 
