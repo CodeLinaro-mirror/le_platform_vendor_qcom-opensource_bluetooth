@@ -3599,7 +3599,7 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
           * be initiated by the app/audioflinger layers */
         if(enable_delay_reporting) {
          BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
-                                            BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|BTA_AVK_FEAT_BROWSE|
+                                            BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
                 BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG|BTA_AVK_FEAT_DELAY_RPT,
                 bte_avk_callback);
         BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
@@ -3607,7 +3607,7 @@ bt_status_t btif_avk_sink_execute_service(BOOLEAN b_enable)
         else
         {
             BTA_AvkEnable(BTA_SEC_AUTHENTICATE, BTA_AVK_FEAT_NO_SCO_SSPD|BTA_AVK_FEAT_RCCT|
-                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|BTA_AVK_FEAT_BROWSE|
+                BTA_AVK_FEAT_METADATA|BTA_AVK_FEAT_VENDOR|
                                             BTA_AVK_FEAT_ADV_CTRL|BTA_AVK_FEAT_RCTG,
                                                                         bte_avk_callback);
             BTIF_TRACE_DEBUG("%s ~~ BTA_AvkEnable NOT Added BTA_AVk_FEAT_DELAY_RPT!", __FUNCTION__);
