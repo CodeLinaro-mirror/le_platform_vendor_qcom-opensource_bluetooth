@@ -172,7 +172,7 @@ public class ScannerService extends Service {
             final int i = result.getRssi();
             final ScanResult r = result;
             byte[] bytes = result.getScanRecord().getBytes();
-            Log.d(TAG, "Device found, devName: ");
+            Log.d(TAG, "Device found, devName: "+devName);
             if(!mScanstatus)
                 return;
 

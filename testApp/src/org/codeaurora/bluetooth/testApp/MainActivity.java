@@ -117,9 +117,12 @@ public class MainActivity extends Activity {
     public static final int MTU_SIZE_MAX = 512;
     public static final int TRANSPORT_LE = 2;
     public static final int TA_SM_DEV_FOUND = 2;
-    /* Macros to update connection interval before Data Tx */
-    public static int required_conn_interval = 0x28;
-    public static int required_sup_to = 0xc80;
+
+    /* Macros required for phy update */
+    public static int txPhyReq;
+    public static int rxPhyReq;
+    public static int LE_CODED_PHY = 4;
+    public static int ALL_PHY = 7;
 
     public BluetoothManager mBluetoothManager;
     public BleConnectionClass mBleConnect;
@@ -439,7 +442,12 @@ public class MainActivity extends Activity {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
-                    mStateMachine.sendMessage(TestAppConnectionStateMachine.TA_PHY_UPDATED);
+                    /* Comparing Requested PHY with the PHY received in Phy Update Complete Event
+                       since SOC might do a PHY Update to fastest PHY after feature exchange */
+                    if((txPhyReq == txPhy && rxPhyReq == rxPhy) || (txPhyReq == ALL_PHY && rxPhyReq == ALL_PHY)){
+                        mStateMachine.sendMessage(TestAppConnectionStateMachine.TA_PHY_UPDATED);
+                        txPhyReq = rxPhyReq = 0;
+                    }
                 } else {
                     Log.i(TAG, "phy update failed");
                 }
@@ -866,6 +874,14 @@ public class MainActivity extends Activity {
                 /* Pop Connection update parameters */
                 PhyUpdate phyUpdate = (PhyUpdate)txtParse.objects.remove();
                 Log.i(TAG, "Phy Update");
+                txPhyReq = phyUpdate.txPhy;
+                rxPhyReq = phyUpdate.rxPhy;
+                /* BIT2(value 4) is set while setting PHY for LE Coded PHY, but
+                   Phy Value for LE Coded Phy is 3 in PHY Update Complete Event  */
+                if(phyUpdate.txPhy == LE_CODED_PHY)
+                    txPhyReq -= 1;
+                if(phyUpdate.rxPhy == LE_CODED_PHY)
+                    rxPhyReq -= 1;
                 mBleConnect.mBluetoothGatt.setPreferredPhy(phyUpdate.txPhy,
                                             phyUpdate.rxPhy, phyUpdate.phyOpt);
             }
@@ -874,50 +890,45 @@ public class MainActivity extends Activity {
                 if(!txtParse.objects.isEmpty()) {
                     conn_item = (String)txtParse.objects.remove();
                     Log.d(TAG,"conn_item_flag: " + conn_item.toString());
-                 } else {
-                    Log.d(TAG, "Queue is Empty!");
-                }
 
-                switch(conn_item)
-                {
-                    case "DataTxflag":
-                        Log.d(TAG,"DataTxflag");
-                        /* Change Connection Interval required for Data Tx */
-                        mBleConnect.mBluetoothGatt.requestLeConnectionUpdate(
-                                                required_conn_interval,required_conn_interval,0,
-                                                required_sup_to, 0, 0);
-                        Log.d(TAG, "Conn Update requested");
-                        connIntervalReq = required_conn_interval;
-                        transitionTo(mTADataTx);
-                        break;
-                    case "DataRxflag":
-                        Log.d(TAG,"DataRxflag");
-                        transitionTo(mTADataRx);
-                        break;
-                    case "LatencyTestflag":
-                        Log.d(TAG,"LatencyTestflag");
-                        transitionTo(mTALatencyMeasurement);
-                        break;
-                    case "ConnUpdateflag":
-                        Log.d(TAG,"ConnUpdateflag");
-                        processConnUpdateReq();
-                        break;
-                    case "PhyUpdateflag":
-                        Log.d(TAG,"PhyUpdateflag");
-                        processPhyUpdateReq();
-                        break;
-                    case "ReadPhyflag":
-                        Log.d(TAG,"ReadPhyflag");
-                        processReadPhyReq();
-                        break;
-                    case "Disconnectflag":
-                        /*Disconnect*/
-                        Log.d(TAG,"Disconnectflag");
-                        transitionTo(mTADisconnect);
-                        break;
-                    default:
-                        Log.i(TAG, "Unknown Operation");
-                        break;
+                    switch(conn_item)
+                    {
+                        case "DataTxflag":
+                            Log.d(TAG,"DataTxflag");
+                            transitionTo(mTADataTx);
+                            break;
+                        case "DataRxflag":
+                            Log.d(TAG,"DataRxflag");
+                            transitionTo(mTADataRx);
+                            break;
+                        case "LatencyTestflag":
+                            Log.d(TAG,"LatencyTestflag");
+                            transitionTo(mTALatencyMeasurement);
+                            break;
+                        case "ConnUpdateflag":
+                            Log.d(TAG,"ConnUpdateflag");
+                            processConnUpdateReq();
+                            break;
+                        case "PhyUpdateflag":
+                            Log.d(TAG,"PhyUpdateflag");
+                            processPhyUpdateReq();
+                            break;
+                        case "ReadPhyflag":
+                            Log.d(TAG,"ReadPhyflag");
+                            processReadPhyReq();
+                            break;
+                        case "Disconnectflag":
+                            /*Disconnect*/
+                            Log.d(TAG,"Disconnectflag");
+                            transitionTo(mTADisconnect);
+                            break;
+                        default:
+                            Log.i(TAG, "Unknown Operation");
+                            break;
+                    }
+                } else {
+                        Log.d(TAG, "Queue is Empty!");
+                        return;
                 }
             }
         }
@@ -925,14 +936,16 @@ public class MainActivity extends Activity {
         private class TADataTx extends State {
             private static final String TAG = "TADataTx";
             DataTx DataTxClass;
-            DataTxthread tt = new DataTxthread();
-            Thread t = new Thread(tt);
 
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
                 /* read parameters */
                 DataTxClass = (DataTx)txtParse.objects.remove();
+                /* MTU Exchange */
+                if(mBleConnect.mBluetoothGatt.requestMtu(DataTxClass.Mtu_Size)) {
+                    Log.i(TAG, "MTU size requested to max size");
+                }
             }
 
             @Override
@@ -961,19 +974,14 @@ public class MainActivity extends Activity {
                     case TA_MTU_EXCHANGE_DONE:
                         Log.d(TAG,"MTU size exchanged");
                         /* Start the thread */
-                        if(!t.isAlive()) {
-                            t.start();
-                            showMessage("Data Tx Thread Started");
-                        } else {
-                            Log.i(TAG, "Thread is already running");
-                        }
-                        break;
-                     case TA_CONNECTION_UPDATED:
-                        Log.d(TAG, "CONNECTION PARAM UPDATED. MTU size:"+DataTxClass.Mtu_Size);
-                        /*MTU exchange*/
-                        if(mBleConnect.mBluetoothGatt.requestMtu(DataTxClass.Mtu_Size)) {
-                            Log.i(TAG, "MTU size requested to max size");
-                        }
+                          DataTxthread tt = new DataTxthread();
+                          Thread t = new Thread(tt);
+                            if(!t.isAlive()) {
+                                t.start();
+                                showMessage("Data Tx Thread Started");
+                            } else {
+                                Log.i(TAG, "Thread is already running");
+                            }
                         break;
                     default:
                         return NOT_HANDLED;
@@ -1016,7 +1024,7 @@ public class MainActivity extends Activity {
                             try {
                                 Process proc =
                                     Runtime.getRuntime().exec("/system/bin/getprop"+" "
-                                                            + "bt.tx_test.enable");
+                                                            +"persist.bluetooth.tx_test.enable");
                                 BufferedReader reader =
                                                 new BufferedReader(
                                                     new InputStreamReader(proc.getInputStream()));
@@ -1024,6 +1032,7 @@ public class MainActivity extends Activity {
                                 /* If system property is set to false,
                                    continue with sending the data from the app */
                                 if(readLine.equals("false")) {
+                                    Log.d(TAG, "system property is false");
                                     long tx_start_time_stamp = SystemClock.elapsedRealtime();
                                     mCharacteristic.setWriteType(
                                             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
@@ -1090,6 +1099,7 @@ public class MainActivity extends Activity {
                                 } else {
                                     /* If Property is set to true, send one packet from app,
                                        rest of the packets from bta */
+                                     Log.d(TAG, "system property is true");
                                     mCharacteristic.setWriteType(
                                               BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
                                     mCharacteristic.setValue(String.valueOf(str));
