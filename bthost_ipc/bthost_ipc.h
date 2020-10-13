@@ -167,6 +167,7 @@ typedef struct {
     uint32_t bitrate;
 }tA2DP_APTX_CODEC;
 
+#if 0
 #ifdef USE_RB5_AUDIO_HAL
 typedef struct {
     uint16_t sampling_rate;
@@ -233,6 +234,7 @@ typedef struct {
     uint8_t sync_mode;
     uint32_t bits_per_sample;
 } audio_aptx_dual_mono_config;
+#endif
 #endif
 
 typedef struct {
