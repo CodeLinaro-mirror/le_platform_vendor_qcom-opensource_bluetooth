@@ -56,6 +56,7 @@ public class AdvertiserEntity {
     public static final int ADV_FAILED = 0x02;
     private String invalidParam = "XX";
 
+    private byte[] manuData;
     private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
 
     Adv adv_info;
@@ -301,19 +302,31 @@ public class AdvertiserEntity {
         Log.d(TAG,"BuildAdvertisementData");
         try {
             if(adv_info.Legacy){
+                AdvertiseData.Builder legacyData = new AdvertiseData.Builder();
+                legacyData.setIncludeDeviceName(true);
+                legacyData.setIncludeTxPowerLevel(adv_info.IncludePower);
                 if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
-                  ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                  mAdvData = new AdvertiseData.Builder()
-                          .setIncludeDeviceName(true)
-                          .addServiceUuid(pUuid)
-                          .setIncludeTxPowerLevel(adv_info.IncludePower)
-                          .build();
-                } else {
-                  mAdvData = new AdvertiseData.Builder()
-                          .setIncludeDeviceName(true)
-                          .setIncludeTxPowerLevel(adv_info.IncludePower)
-                          .build();
+                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                    legacyData.addServiceUuid(pUuid);
+                    Log.d(TAG, "service uuid added");
                 }
+                if(!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam))) {
+                  String[] manufacturerData = adv_info.ManufacturerData.split(",");
+                  if(manufacturerData!= null && (manufacturerData).length>0) {
+                      manuData = new byte[manufacturerData.length];
+                      for(int i=0; i< manuData.length; i++) {
+                          manuData[i] = Byte.parseByte(manufacturerData[i],16);
+                      }
+                  }
+                  if(manuData != null && manuData.length >0) {
+                    for(int j=0; j< manuData.length; j++) {
+                        Log.d(TAG, "manufacturerData::"+manuData[j]);
+                    }
+                }
+                  legacyData.addManufacturerData(adv_info.ManufacturerId,manuData);
+                  Log.d(TAG, "manu data added");
+                }
+                mAdvData = legacyData.build();
                 Log.d(TAG,"BuildAdvertisementData done");
                 return true;
             } else {
