@@ -137,6 +137,8 @@ public class TextParse {
                 s=Parameters.poll();
                 adv.SecondaryPhy=Integer.parseInt(s);
                 s=Parameters.poll();
+                adv.MaxAdvEvents=Integer.parseInt(s);
+                s=Parameters.poll();
                 adv.Interval=Integer.parseInt(s);
                 s=Parameters.poll();
                 adv.TimeOutLegacy=Integer.parseInt(s);

@@ -42,6 +42,7 @@ public class Adv {
     boolean IncludePower;
     int PrimaryPhy;
     int SecondaryPhy;
+    int MaxAdvEvents;
     int Interval;
     int TimeOutLegacy;
     int AdvertiseMode;

@@ -444,9 +444,10 @@ public class AdvertiserEntity {
             if(adv_info.Legacy){
                 mAdvertiser.startAdvertising(mAdvSettings,mAdvData,mAdvCallback);
             } else {
+                Log.d(TAG, "Max Adv Events:"+adv_info.MaxAdvEvents);
                 mAdvertiser.startAdvertisingSet(mAdvParams,mAdvData,
                                                 mScanResponseData,mPeriodicAdvParams,
-                                                mPeriodicData,mAdvSetCallback);
+                                                mPeriodicData,0,adv_info.MaxAdvEvents,mAdvSetCallback);
             }
             //timer has started
             mStopAdvTimer.schedule(mStopAdvTimerTask,adv_info.AdvTO);
