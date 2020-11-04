@@ -598,8 +598,8 @@ void bta_avk_build_aac_src_cfg (UINT8 *p_pref_cfg, UINT8 *p_src_cap, UINT8 index
     else if (src_cap.channels & A2D_AAC_IE_CHANNELS_1)
         pref_cap.channels = A2D_AAC_IE_CHANNELS_1;
 
-    pref_cap.bit_rate = src_cap.bit_rate;
-    pref_cap.vbr = src_cap.vbr;
+    pref_cap.bit_rate = local_cap->bit_rate;
+    pref_cap.vbr = local_cap->vbr;
 
     APPL_TRACE_DEBUG("%s: obj type %x freq %x channel %x", __func__,
         pref_cap.object_type, pref_cap.samp_freq, pref_cap.channels);
