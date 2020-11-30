@@ -124,11 +124,7 @@ UINT8 bta_avk_aac_cfg_in_cap(UINT8 *p_cfg, tA2D_AAC_CIE *p_cap)
     {
         status = A2D_NS_CHANNEL;
     }
-    /* block length */
-    else if ((cfg_cie.bit_rate & p_cap->bit_rate) == 0)
-    {
-        status = A2D_NS_BIT_RATE;
-    }
+    /* bypass block length check for IOT isssue*/
     APPL_TRACE_DEBUG("bta_av_aac_cfg_in_cap can't return  %d", status);
     return status;
 }
