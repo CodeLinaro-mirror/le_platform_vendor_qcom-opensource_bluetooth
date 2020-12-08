@@ -41,11 +41,11 @@ import android.bluetooth.le.PeriodicAdvertisingParameters;
 import android.os.Build;
 import android.os.ParcelUuid;
 import android.util.Log;
+import android.os.Message;
+
 
 import java.lang.annotation.Target;
 import java.nio.charset.Charset;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.UUID;
 
 public class AdvertiserEntity {
@@ -60,13 +60,6 @@ public class AdvertiserEntity {
     private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
 
     Adv adv_info;
-    Timer advStopTimer = new Timer();
-    TimerTask advStopTimerTask = new TimerTask() {
-        @Override
-        public void run() {
-
-        }
-    };
 
     private BluetoothLeAdvertiser mAdvertiser;
     private AdvertiserService.AdvServiceCallback  mAdvServiceCb;
@@ -89,6 +82,7 @@ public class AdvertiserEntity {
 
 
     class AdvSetCallback extends AdvertisingSetCallback {
+        Message msg;
             @Override
             public void onAdvertisingSetStarted(AdvertisingSet advertisingSet,
                                                 int txPower, int status) {
@@ -97,6 +91,9 @@ public class AdvertiserEntity {
             switch (status){
                 case ADVERTISE_SUCCESS:
                     adv_status = ADV_STARTED;
+                    msg = MainActivity.msghandler.obtainMessage(
+                          MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+                    MainActivity.msghandler.sendMessage(msg);
                     break;
                 case ADVERTISE_FAILED_ALREADY_STARTED:
                     break;
@@ -116,6 +113,9 @@ public class AdvertiserEntity {
             //super.onAdvertisingSetStopped(advertisingSet);
             Log.d(TAG,"onAdvertisingSetStopped");
             adv_status = ADV_STOPPED;
+            msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
+            MainActivity.msghandler.sendMessage(msg);
         }
 
             @Override
@@ -168,6 +168,10 @@ public class AdvertiserEntity {
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
             Log.d(TAG, "Advertisemnt sent");
             adv_status = ADV_STARTED;
+            Message msg;
+            msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+            MainActivity.msghandler.sendMessage(msg);
             super.onStartSuccess(settingsInEffect);
         }
 
@@ -178,18 +182,6 @@ public class AdvertiserEntity {
             super.onStartFailure(errorCode);
         }
     };
-
-    class StopAdvTimerTask extends TimerTask {
-        @Override
-        public void run() {
-            //stop advertisement after timer is fired
-            StopAdvertisement();
-        }
-    };
-
-    //Timer to stop advertisements
-    Timer mStopAdvTimer = new Timer();
-    StopAdvTimerTask mStopAdvTimerTask = new StopAdvTimerTask();
 
 
     public AdvertiserEntity(Adv adv_info, int adv_id,
@@ -269,7 +261,7 @@ public class AdvertiserEntity {
         Log.d(TAG,"BuildAdvertisementParameters");
         try {
             if(adv_info.Legacy) {
-                mAdvSettings = new AdvertiseSettings.Builder()//below values should be valid
+                mAdvSettings = new AdvertiseSettings.Builder()
                         .setAdvertiseMode(adv_info.AdvertiseMode)
                         .setTxPowerLevel(adv_info.TxPower)
                         .setConnectable(adv_info.Connectable)
@@ -281,7 +273,7 @@ public class AdvertiserEntity {
                 mAdvParams = new AdvertisingSetParameters.Builder()
                         .setConnectable(adv_info.Connectable)
                         .setScannable(adv_info.Scannable)
-                        .setLegacyMode(adv_info.Legacy)//TODO
+                        .setLegacyMode(adv_info.Legacy)
                         .setAnonymous(adv_info.Anonymous)
                         .setIncludeTxPower(adv_info.IncludePower)
                         .setPrimaryPhy(adv_info.PrimaryPhy)
@@ -305,46 +297,46 @@ public class AdvertiserEntity {
                 AdvertiseData.Builder legacyData = new AdvertiseData.Builder();
                 legacyData.setIncludeDeviceName(true);
                 legacyData.setIncludeTxPowerLevel(adv_info.IncludePower);
-                if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
+                if(adv_info.ServiceUuid != null) {
                     ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
                     legacyData.addServiceUuid(pUuid);
                     Log.d(TAG, "service uuid added");
                 }
-                if(!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam))) {
-                  String[] manufacturerData = adv_info.ManufacturerData.split(",");
-                  if(manufacturerData!= null && (manufacturerData).length>0) {
-                      manuData = new byte[manufacturerData.length];
-                      for(int i=0; i< manuData.length; i++) {
-                          manuData[i] = Byte.parseByte(manufacturerData[i],16);
-                      }
-                  }
-                  if(manuData != null && manuData.length >0) {
-                    for(int j=0; j< manuData.length; j++) {
-                        Log.d(TAG, "manufacturerData::"+manuData[j]);
+                if(adv_info.ManufacturerData != null) {
+                    String[] manufacturerData = adv_info.ManufacturerData.split(",");
+                    if(manufacturerData!= null && (manufacturerData).length>0) {
+                        manuData = new byte[manufacturerData.length];
+                        for(int i=0; i< manuData.length; i++) {
+                            manuData[i] = Byte.parseByte(manufacturerData[i],16);
+                        }
                     }
-                }
-                  legacyData.addManufacturerData(adv_info.ManufacturerId,manuData);
-                  Log.d(TAG, "manu data added");
+                    if(manuData != null && manuData.length >0) {
+                        for(int j=0; j< manuData.length; j++) {
+                            Log.d(TAG, "manufacturerData::"+manuData[j]);
+                        }
+                    }
+                    legacyData.addManufacturerData(adv_info.ManufacturerId,manuData);
+                    Log.d(TAG, "manu data added");
                 }
                 mAdvData = legacyData.build();
                 Log.d(TAG,"BuildAdvertisementData done");
                 return true;
-            } else {
+             } else {
                 AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
                 dataBuilder.setIncludeDeviceName(true);
                 dataBuilder.setIncludeTxPowerLevel(adv_info.IncludePower);
-                if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
-                   Log.d(TAG,"Setting Service UUID");
-                   ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                   dataBuilder.addServiceUuid(pUuid);
-                   if(!(adv_info.ServiceData.equalsIgnoreCase(invalidParam))) {
-                       Log.d(TAG,"Setting Service data");
-                       dataBuilder.addServiceData(pUuid,
+                if(adv_info.ServiceUuid != null) {
+                    Log.d(TAG,"Setting Service UUID");
+                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                    dataBuilder.addServiceUuid(pUuid);
+                    if(adv_info.ServiceData != null) {
+                        Log.d(TAG,"Setting Service data");
+                        dataBuilder.addServiceData(pUuid,
                                adv_info.ServiceData.getBytes(Charset.forName("UTF-8")));
-                   }
+                     }
                 }
                 if((adv_info.ManufacturerId != 0) ||
-                    (!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam)))) {
+                    (adv_info.ManufacturerData != null)) {
                     Log.d(TAG,"Setting Manufacture data");
                     dataBuilder.addManufacturerData(adv_info.ManufacturerId,
                             adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")));
@@ -449,8 +441,6 @@ public class AdvertiserEntity {
                                                 mScanResponseData,mPeriodicAdvParams,
                                                 mPeriodicData,0,adv_info.MaxAdvEvents,mAdvSetCallback);
             }
-            //timer has started
-            mStopAdvTimer.schedule(mStopAdvTimerTask,adv_info.AdvTO);
             return status;
         } catch (Exception e) {
             Log.e(TAG,"Exception : "+ e.toString());
