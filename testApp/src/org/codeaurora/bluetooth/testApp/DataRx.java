@@ -34,4 +34,3 @@ public class DataRx {
     public String rxService;
     public String rxChar;
 }
-

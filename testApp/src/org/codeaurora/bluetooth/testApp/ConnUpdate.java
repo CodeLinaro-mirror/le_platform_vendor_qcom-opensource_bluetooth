@@ -35,4 +35,3 @@ public class ConnUpdate {
     public int ConnSlaveLatency;
     public int ConnSupTO;
 }
-

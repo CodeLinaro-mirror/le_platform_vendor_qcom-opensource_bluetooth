@@ -46,8 +46,6 @@ public final class ScanParams {
     private static final String TAG = "ScanParams";
     private ScanSettings mscanSettings;
 
-    public String invalidParam = "XX";
-
     public String DeviceName;
     public String DeviceAddress;
     public String ServiceUuid;
@@ -65,7 +63,6 @@ public final class ScanParams {
     public int MatchMode;
     public int ReportDelay;
     public boolean Legacy;
-    public static int ScanTO;
 
     private String mDeviceName;
     private String mDeviceAddress;
@@ -83,7 +80,7 @@ public final class ScanParams {
     public ScanParams(String devName, String DevAddress, String ServUUID, String srvcMaskUUID,
             String ManuId, String ManuData, String ManufacturerMaskData, String SrvcDataUUID,
             String SrvcData, String srvcDataMask, int scanMode, int cbType, int resultType,
-            int NumAdvMatches, int matchMode, int reportDelay, int scanTO, boolean legacy) {
+            int NumAdvMatches, int matchMode, int reportDelay, boolean legacy) {
         DeviceName = devName;
         DeviceAddress = DevAddress;
         ServiceUuid = ServUUID;
@@ -100,42 +97,38 @@ public final class ScanParams {
         NumOfAdvMatches = NumAdvMatches;
         MatchMode = matchMode;
         ReportDelay = reportDelay;
-        ScanTO = scanTO;
+//       Phy = phy;
         Legacy = legacy;
     }
 
     public void parseScanParams() {
         Log.d(TAG, "parseScanParams");
-        if(this.DeviceName != null && (!(this.DeviceName.equalsIgnoreCase(invalidParam)))) {
+        if(this.DeviceName != null) {
             Log.d(TAG, "DeviceName::" + this.DeviceName);
             mDeviceName = this.DeviceName;
         }
 
-        if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2) &&
-            (!(this.DeviceAddress.equalsIgnoreCase(invalidParam)))) {
+        if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2)) {
             Log.d(TAG, "DeviceAddress::" + this.DeviceAddress);
             mDeviceAddress = this.DeviceAddress;
         }
 
-        if(this.ServiceUuid != null &&
-            (!(this.ServiceUuid.equalsIgnoreCase(invalidParam)))) {
+        if(this.ServiceUuid != null) {
             Log.d(TAG, "mServiceUuid ::"+this.ServiceUuid );
             mUuid = ParcelUuid.fromString(this.ServiceUuid );
         }
 
-        if(this.SvcMaskUuid != null &&
-            (!(this.SvcMaskUuid.equalsIgnoreCase(invalidParam)))) {
+        if(this.SvcMaskUuid != null) {
             Log.d(TAG, "mServiceUuidMask ::"+this.SvcMaskUuid );
             mUuidMask = ParcelUuid.fromString(this.SvcMaskUuid );
         }
 
-        if(this.ManufacturerId != null && (!(this.ManufacturerId.equalsIgnoreCase(invalidParam)))) {
+        if(this.ManufacturerId != null) {
             Log.d(TAG, "ManufacturerId  ::"+this.ManufacturerId );
             manufacturerId = Integer.parseInt(this.ManufacturerId );
         }
 
-        if(this.ManufacturerData != null &&
-            (!(this.ManufacturerData.equalsIgnoreCase(invalidParam)))) {
+        if(this.ManufacturerData != null) {
             String[] manuData = this.ManufacturerData.split(",");
             Log.d(TAG, "this.manudata:"+this.ManufacturerData);
             if(manuData!= null && manuData.length>0) {
@@ -151,8 +144,7 @@ public final class ScanParams {
             }
         }
 
-        if(this.ManuMaskData != null &&
-            (!(this.ManuMaskData.equalsIgnoreCase(invalidParam)))) {
+        if(this.ManuMaskData != null) {
             Log.d(TAG, "this.manudatamask:"+this.ManuMaskData);
             String[] manufacturerDataMask = this.ManuMaskData.split(",");
             if(manufacturerDataMask!= null && manufacturerDataMask.length>0) {
@@ -168,14 +160,12 @@ public final class ScanParams {
             }
         }
 
-        if(this.ServiceDataUuid != null &&
-            (!(this.ServiceDataUuid.equalsIgnoreCase(invalidParam)))) {
-            Log.d(TAG, "ServiceDataUUID::"+this.ServiceDataUuid);
+        if(this.ServiceDataUuid != null) {
+            Log.d(TAG, "parsedData::"+this.ServiceDataUuid);
             mServiceDataUuid = ParcelUuid.fromString(this.ServiceDataUuid);
         }
 
-        if(this.ServiceData != null &&
-            (!(this.ServiceData.equalsIgnoreCase(invalidParam)))) {
+        if(this.ServiceData != null) {
             String[] svcData = this.ServiceData.split(",");
             if(svcData!= null && svcData.length>0) {
                 mServiceData = new byte[svcData.length];
@@ -191,8 +181,7 @@ public final class ScanParams {
 
         }
 
-        if(this.SvcDataMask != null &&
-            (!(this.SvcDataMask.equalsIgnoreCase(invalidParam)))) {
+        if(this.SvcDataMask != null) {
             Log.d(TAG, "this.srvcudatamask:"+this.SvcDataMask);
             String[] svcMaskData = this.SvcDataMask.split(",");
             if(svcMaskData!= null && svcMaskData.length>0) {
@@ -331,4 +320,3 @@ public final class ScanParams {
         return null;
     }
 }
-
