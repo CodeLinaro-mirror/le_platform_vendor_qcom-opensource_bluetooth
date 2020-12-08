@@ -55,6 +55,7 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Vector;
 
 public class ScannerService extends Service {
@@ -72,7 +73,6 @@ public class ScannerService extends Service {
     public ScannerServiceMessageHandler mScannerHandler = null;
     private static final int MSG_START_BLE_SCAN = 0;
     private static final int MSG_STOP_BLE_SCAN = 1;
-    private static final int MSG_SCAN_TIMEOUT = 2;
     private static final int MSG_SCAN_RESULT = 3;
     private static int count = 0;
 
@@ -80,7 +80,7 @@ public class ScannerService extends Service {
     private ScanSettings mScanSettings;
     private ArrayList<ScanFilter> mScanFilters;
     private List<BluetoothDevice> mDeviceList;
-    private List<ScanResult> mScanResult;
+    public List<ScanResult> mScanResult;
     private List<Integer> mRssiList;
     private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
     private BluetoothLeScanner mBleScanner;
@@ -137,6 +137,39 @@ public class ScannerService extends Service {
         Message msg = mScannerHandler.obtainMessage(MSG_START_BLE_SCAN, null);
         mScannerHandler.sendMessage(msg);
     }
+  
+    public void set_scan_parameters(Scan scn) {
+        ArrayList<ScanFilter> mfilter;
+        ScanSettings settings;
+        ScanParams params = new ScanParams(scn.DeviceName, scn.DeviceAddress,
+                                            scn.ServiceUuid, scn.SvcMaskUuid,
+                                            scn.ManufacturerId, scn.ManufacturerData,
+                                            scn.ManufacturerMaskData, scn.ServiceDataUuid,
+                                            scn.ServiceData, scn.SvcDataMask,
+                                            scn.ScanMode, scn.CallbackType, scn.ResultType,
+                                            scn.NumOfAdvMatches, scn.MatchMode,
+                                            scn.ReportDelay, scn.legacy/*, scn.phy*/);
+        if(ScannerService.LOG_LEVEL >= 2) {
+            Log.d(TAG, "cbtpe:" + scn.CallbackType + "scan mode:" + scn.ScanMode +
+                "noOfadvmatches:" + scn.NumOfAdvMatches + "match mode:" + scn.MatchMode +
+                "result type:" + scn.ResultType + "report delay:" + scn.ReportDelay +
+             "manu id:"+scn.ManufacturerId + "mandu data:"+scn.ManufacturerData +
+             "manu data mask:" + scn.ManufacturerMaskData);
+        }
+        if(params == null) {
+            Log.i(TAG, "params NULL");
+        }
+        mfilter = params.parseScanFilter();
+        if(mfilter == null) {
+            Log.i(TAG, "mfilter NULL");
+        }
+        settings = params.getScanSettings();
+        if(settings == null) {
+            Log.i(TAG, "settings NULL");
+        }
+    
+        startScan(mfilter, settings);
+    }
 
     public void stopScan() {
         Log.d(TAG, "Stop Scan ");
@@ -181,10 +214,17 @@ public class ScannerService extends Service {
                     return;
             }
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
-                mDeviceList.add(bluetoothDevice);
-                mScanResult.add(r);
-                MainActivity.mStateMachine.sendMessage(MainActivity
-                          .TA_SM_DEV_FOUND,bluetoothDevice);
+            mDeviceList.add(bluetoothDevice);
+            mScanResult.add(r);
+      
+            MainActivity.scanList = new MainActivity.ScanList();
+            MainActivity.scanList.devName = devName;
+            MainActivity.scanList.devAddr = bluetoothDevice.getAddress();
+            MainActivity.mScanList.add(MainActivity.scanList);
+        
+            Message msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
+            MainActivity.msghandler.sendMessage(msg);
         }
 
         @Override
@@ -194,6 +234,23 @@ public class ScannerService extends Service {
             if(ScannerService.LOG_LEVEL >= 2) {
                 Log.d(TAG, "current time stamp is " + SystemClock.elapsedRealtimeNanos());
                 Log.d(TAG, "onBatchScanResults - size " + batchResultSize);
+                MainActivity.batch_scan = true;
+                StringBuilder PrintStr = new StringBuilder();
+        
+                if (!results.isEmpty()) {
+                    for(int i=0; i<results.size(); i++){
+                        ScanResult scanRec = results.get(i);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Scan Results: Device Name - ");
+                        PrintStr.append(scanRec.getScanRecord().getDeviceName());
+                        PrintStr.append("Device Address - ");
+                        PrintStr.append(scanRec.getDevice().getAddress());
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    }
+                    Message msg = MainActivity.msghandler.obtainMessage(
+                          MainActivity.MSG_MA_SCAN_DEV_FOUND, results.get(0).getDevice());
+                    MainActivity.msghandler.sendMessage(msg);
+                }
             }
         }
     };
@@ -221,11 +278,6 @@ public class ScannerService extends Service {
                 case MSG_STOP_BLE_SCAN:
                     resetScanParams();
                     scanLeDevice(false);
-                    break;
-                case MSG_SCAN_TIMEOUT:
-                    Message mstop = obtainMessage(MSG_STOP_BLE_SCAN);
-                    mstop.obj = null;
-                    sendMessage(mstop);
                     break;
                 case MSG_SCAN_RESULT:
                     //Need to decide if we can call directly
@@ -256,9 +308,6 @@ public class ScannerService extends Service {
 
                 if(ScannerService.LOG_LEVEL >= 3)
                     Log.d(TAG, "scan started");
-                Message msg = obtainMessage(MSG_SCAN_TIMEOUT);
-                msg.obj = null;
-                sendMessageDelayed(msg, ScanParams.ScanTO);
             }
             else if(!action && mScanstatus){
                 if(mBTAdapter.isEnabled()) {
@@ -275,5 +324,3 @@ public class ScannerService extends Service {
         }
     }
 }
-
-

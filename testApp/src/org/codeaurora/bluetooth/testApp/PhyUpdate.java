@@ -34,4 +34,3 @@ public class PhyUpdate {
     public int rxPhy;
     public int phyOpt;
 }
-

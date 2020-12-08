@@ -51,6 +51,4 @@ public class Adv {
     String ManufacturerData;
     String ServiceDataUuid;
     String ServiceData;
-    int AdvTO;
 }
-
