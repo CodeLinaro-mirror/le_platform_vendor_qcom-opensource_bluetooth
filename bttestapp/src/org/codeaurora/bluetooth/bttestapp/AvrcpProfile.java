@@ -102,7 +102,7 @@ public class AvrcpProfile {
         "android.bluetooth.avrcp-controller.profile.extra.FOLDER_LIST";
 
     public static final String EXTRA_FOLDER_ID =
-        "com.android.bluetooth.avrcp.EXTRA_FOLDER_ID";
+        "android.bluetooth.avrcp-controller.profile.extra.EXTRA_FOLDER_ID";
 
     // [TODO] Unify EXTRA_CODEC_TYPE into BluetoothA2dpSink
     /**
@@ -126,7 +126,7 @@ public class AvrcpProfile {
     private String CUSTOM_ACTION_VOL_UP = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_VOL_UP";
     private String CUSTOM_ACTION_VOL_DN = "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_VOL_DN";
     private String CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_GET_PLAY_STATUS_NATIVE";
 
     // [TODO] Move the common defintion for customer action into framework
     // +++ Custom action definition for AVRCP controller
@@ -168,7 +168,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_SEARCH =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEARCH";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_SEARCH";
     public static final String KEY_SEARCH = "search";
 
     /**
@@ -189,7 +189,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_ADD_TO_NOW_PLAYING =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_ADD_TO_NOW_PLAYING";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_ADD_TO_NOW_PLAYING";
 
     /**
      * Custom action to get item attributes.
@@ -210,7 +210,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_GET_ITEM_ATTR =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_ITEM_ATTR";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_GET_ITEM_ATTR";
     public static final String KEY_BROWSE_SCOPE = "scope";
     public static final String KEY_ATTRIBUTE_ID = "attribute_id";
 
@@ -274,7 +274,7 @@ public class AvrcpProfile {
      * @See {@link android.media.session.MediaController}
      */
     public static final String CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_GET_TOTAL_NUM_OF_ITEMS";
 
     /**
      * Custom action to set addressed player
@@ -294,7 +294,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_SET_ADDRESSED_PLAYER =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SET_ADDRESSED_PLAYER";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_SET_ADDRESSED_PLAYER";
     public static final String KEY_PLAYER_ID = "player_id";
 
     /**
@@ -311,7 +311,7 @@ public class AvrcpProfile {
      * @See {@link android.media.session.MediaController}
      */
     public static final String CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_REQUEST_CONTINUING_RESPONSE";
     public static final String KEY_PDU_ID = "pdu_id";
 
     /**
@@ -328,7 +328,7 @@ public class AvrcpProfile {
      * @See {@link android.media.session.MediaController}
      */
     public static final String CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_ABORT_CONTINUING_RESPONSE";
 
     /**
      * Custom action to browse up.
@@ -346,7 +346,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_BROWSE_UP =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_BROWSE_UP";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_BROWSE_UP";
 
     /**
      * Custom action to release AVRCP connection.
@@ -364,7 +364,7 @@ public class AvrcpProfile {
      *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
      */
     public static final String CUSTOM_ACTION_RELEASE_CONNECTION =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_RELEASE_CONNECTION";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_RELEASE_CONNECTION";
 
     // + Response for custom action
 
@@ -387,16 +387,16 @@ public class AvrcpProfile {
      * receive.
      */
     public static final String ACTION_CUSTOM_ACTION_RESULT =
-        "com.android.bluetooth.a2dpsink.mbs.action.CUSTOM_ACTION_RESULT";
+        "com.android.bluetooth.avrcpcontroller.action.CUSTOM_ACTION_RESULT";
 
     public static final String EXTRA_CUSTOM_ACTION =
-        "com.android.bluetooth.a2dpsink.mbs.extra.CUSTOM_ACTION";
+        "com.android.bluetooth.avrcpcontroller.extra.CUSTOM_ACTION";
 
     public static final String EXTRA_CUSTOM_ACTION_RESULT =
-        "com.android.bluetooth.a2dpsink.mbs.extra.CUSTOM_ACTION_RESULT";
+        "com.android.bluetooth.avrcpcontroller.extra.CUSTOM_ACTION_RESULT";
 
     public static final String EXTRA_NUM_OF_ITEMS =
-        "com.android.bluetooth.a2dpsink.mbs.extra.NUM_OF_ITEMS";
+        "com.android.bluetooth.avrcpcontroller.extra.NUM_OF_ITEMS";
 
     // Result code
     public static final int RESULT_SUCCESS = 0;
