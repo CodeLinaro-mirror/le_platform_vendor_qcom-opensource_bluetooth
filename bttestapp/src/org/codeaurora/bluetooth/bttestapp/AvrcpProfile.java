@@ -145,7 +145,7 @@ public class AvrcpProfile {
      * @See {@link android.media.session.MediaController}
      */
     public static final String CUSTOM_ACTION_SEND_PASS_THRU_CMD =
-        "com.android.bluetooth.a2dpsink.mbs.CUSTOM_ACTION_SEND_PASS_THRU_CMD";
+        "com.android.bluetooth.avrcpcontroller.CUSTOM_ACTION_SEND_PASS_THRU_CMD";
     public static final String KEY_CMD = "cmd";
     public static final String KEY_STATE = "state";
 

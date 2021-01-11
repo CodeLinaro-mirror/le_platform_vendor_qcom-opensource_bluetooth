@@ -204,6 +204,11 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
                 new MonkeyEvent("hfp-receive-phonenumber", true)
                         .addReplyParam("number", number)
                         .send();
+            } else if (action.equals(BluetoothHeadsetClient.ACTION_VENDOR_SPECIFIC_HEADSETCLIENT_EVENT)) {
+                String vendorEventCode = intent.getStringExtra(BluetoothHeadsetClient.EXTRA_VENDOR_EVENT_CODE);
+                String vendorResponse = intent.getStringExtra(BluetoothHeadsetClient.EXTRA_VENDOR_EVENT_FULL_ARGS);
+                Toast.makeText(HfpTestActivity.this, "vendor specific event received: " + vendorEventCode + ", " + vendorResponse,
+                        Toast.LENGTH_LONG).show();
             }
         }
 
@@ -366,6 +371,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
         filter.addAction(BluetoothHeadsetClient.ACTION_AUDIO_STATE_CHANGED);
         filter.addAction(BluetoothHeadsetClient.ACTION_RESULT);
         filter.addAction(BluetoothHeadsetClient.ACTION_LAST_VTAG);
+        filter.addAction(BluetoothHeadsetClient.ACTION_VENDOR_SPECIFIC_HEADSETCLIENT_EVENT);
         registerReceiver(mHfpClientReceiver, filter);
         if (mBluetoothHeadsetClient != null &&
                 mBluetoothHeadsetClient.getConnectionState(mDevice) !=
