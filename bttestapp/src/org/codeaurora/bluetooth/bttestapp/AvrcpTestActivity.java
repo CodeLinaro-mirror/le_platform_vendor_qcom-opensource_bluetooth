@@ -1007,12 +1007,13 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 enableValue = true;
                 value = TEST_PDU_ID;
                 break;
-            case TEST_CMD_ADD_TO_NOW_PLAYING:
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
             case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
             case TEST_CMD_GET_FOLDER_ITEMS:
-                enableScope = true;
                 enableAttributes = true;
+            // fallthrough
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+                enableScope = true;
                 enableFolder = true;
                 folder = TEST_FOLDER;
                 enableItemPosition = true;
