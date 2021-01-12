@@ -196,6 +196,26 @@ public class AvrcpProfile {
         "android.bluetooth.avrcp-controller.profile.action.CUSTOM_ACTION_ADD_TO_NOW_PLAYING";
 
     /**
+     * Custom action to play item.
+     *
+     * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
+     *
+     * <p>This is an asynchronous call: it will return immediately.
+     *
+     * <p>Intent {@link #ACTION_CUSTOM_ACTION_RESULT} will be broadcast to notify the result.
+     * {@link AvrcpControllerService} will update NowPlaying list if succeed.
+     *
+     * @param Bundle wrapped with {@link #MediaMetadata.METADATA_KEY_MEDIA_ID}
+     *
+     * @return void
+     *
+     * @See {@link android.media.session.MediaController}
+     *      {@link com.android.bluetooth.avrcpcontroller.AvrcpControllerService}
+     */
+    public static final String CUSTOM_ACTION_PLAY_ITEM =
+        "android.bluetooth.avrcp-controller.profile.action.CUSTOM_ACTION_PLAY_ITEM";
+
+    /**
      * Custom action to get item attributes.
      *
      * <p>This is called in {@link MediaController.TransportControls.sendCustomAction}
@@ -655,6 +675,14 @@ public class AvrcpProfile {
         extras.putInt(KEY_BROWSE_SCOPE, scope);
         extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
         sendCustomAction(CUSTOM_ACTION_ADD_TO_NOW_PLAYING, extras);
+    }
+
+    public void playItem(int scope, String mediaId) {
+        Logger.d(TAG, "playItem scope: " + scope + ", mediaId: " + mediaId);
+        Bundle extras = new Bundle();
+        extras.putInt(KEY_BROWSE_SCOPE, scope);
+        extras.putString(MediaMetadata.METADATA_KEY_MEDIA_ID, mediaId);
+        sendCustomAction(CUSTOM_ACTION_PLAY_ITEM, extras);
     }
 
     public void getItemAttributes(int scope, String mediaId, int[] attributeId) {
