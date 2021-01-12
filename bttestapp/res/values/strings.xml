@@ -338,6 +338,7 @@
     <string name="avrcp_query">Query</string>
     <string name="avrcp_get_total_num">GetTotalNumberOfItems</string>
     <string name="avrcp_add_to_now_playing">AddToNowPlaying</string>
+    <string name="avrcp_play_item">PlayItem</string>
     <string name="avrcp_browse_up">BrowseUp</string>
     <string name="avrcp_request_conti_resp">RequestContinuingResponse</string>
     <string name="avrcp_abort_conti_resp">AbortContinuingResponse</string>
@@ -353,6 +354,7 @@
     <string-array name="array_test_cmd">
         <item>@string/avrcp_abort_conti_resp</item>
         <item>@string/avrcp_add_to_now_playing</item>
+        <item>@string/avrcp_play_item</item>
         <item>@string/avrcp_browse_up</item>
         <item>@string/avrcp_get_audio_config</item>
         <item>@string/avrcp_get_item_attr</item>
