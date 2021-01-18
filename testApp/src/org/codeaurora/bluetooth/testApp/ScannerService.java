@@ -137,9 +137,9 @@ public class ScannerService extends Service {
         Message msg = mScannerHandler.obtainMessage(MSG_START_BLE_SCAN, null);
         mScannerHandler.sendMessage(msg);
     }
-  
-    public void set_scan_parameters(Scan scn) {
-        ArrayList<ScanFilter> mfilter;
+
+    public void set_scan_parameters(Scan scn) {
+        ArrayList<ScanFilter> mfilter;
         ScanSettings settings;
         ScanParams params = new ScanParams(scn.DeviceName, scn.DeviceAddress,
                                             scn.ServiceUuid, scn.SvcMaskUuid,
@@ -167,8 +167,8 @@ public class ScannerService extends Service {
         if(settings == null) {
             Log.i(TAG, "settings NULL");
         }
-    
-        startScan(mfilter, settings);
+
+        startScan(mfilter, settings);
     }
 
     public void stopScan() {
@@ -216,14 +216,14 @@ public class ScannerService extends Service {
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
             mDeviceList.add(bluetoothDevice);
             mScanResult.add(r);
-      
-            MainActivity.scanList = new MainActivity.ScanList();
-            MainActivity.scanList.devName = devName;
-            MainActivity.scanList.devAddr = bluetoothDevice.getAddress();
-            MainActivity.mScanList.add(MainActivity.scanList);
-        
-            Message msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
+            
+            MainActivity.scanList = new MainActivity.ScanList();
+            MainActivity.scanList.devName = devName;
+            MainActivity.scanList.devAddr = bluetoothDevice.getAddress();
+            MainActivity.mScanList.add(MainActivity.scanList);
+
+            Message msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
             MainActivity.msghandler.sendMessage(msg);
         }
 
@@ -234,24 +234,37 @@ public class ScannerService extends Service {
             if(ScannerService.LOG_LEVEL >= 2) {
                 Log.d(TAG, "current time stamp is " + SystemClock.elapsedRealtimeNanos());
                 Log.d(TAG, "onBatchScanResults - size " + batchResultSize);
-                MainActivity.batch_scan = true;
-                StringBuilder PrintStr = new StringBuilder();
-        
-                if (!results.isEmpty()) {
-                    for(int i=0; i<results.size(); i++){
-                        ScanResult scanRec = results.get(i);
-                        PrintStr.setLength(0);
-                        PrintStr.append("Scan Results: Device Name - ");
-                        PrintStr.append(scanRec.getScanRecord().getDeviceName());
-                        PrintStr.append("Device Address - ");
-                        PrintStr.append(scanRec.getDevice().getAddress());
-                        SocketServer.sendSocketData(PrintStr.toString());
+                MainActivity.batch_scan = true;
+                StringBuilder PrintStr = new StringBuilder();
+
+                if (!results.isEmpty()) {
+                    for(int i=0; i<results.size(); i++){
+                        ScanResult scanRec = results.get(i);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Scan Results: Device Name - ");
+                        PrintStr.append(scanRec.getScanRecord().getDeviceName());
+                        PrintStr.append("Device Address - ");
+                        PrintStr.append(scanRec.getDevice().getAddress());
+                        SocketServer.sendSocketData(PrintStr.toString());
                     }
-                    Message msg = MainActivity.msghandler.obtainMessage(
-                          MainActivity.MSG_MA_SCAN_DEV_FOUND, results.get(0).getDevice());
+                    Message msg = MainActivity.msghandler.obtainMessage(
+                          MainActivity.MSG_MA_SCAN_DEV_FOUND, results.get(0).getDevice());
                     MainActivity.msghandler.sendMessage(msg);
                 }
             }
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            if(ScannerService.LOG_LEVEL >= 2) {
+                Log.d(TAG, "Failed to start scan " + errorCode);
+            }
+            StringBuilder PrintStr = new StringBuilder();
+
+            PrintStr.setLength(0);
+            PrintStr.append("Failed to start scanning with error: ");
+            PrintStr.append(errorCode);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
     };
 

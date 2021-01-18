@@ -126,18 +126,18 @@ public class ThroughputStateMachine {
 
     /* Variables to update connection interval before Data Tx */
     public static int connIntervalReq;
-    public static final int CONN_INTERVAL_MIN = 6;
+    public static final int CONN_INTERVAL_MIN = 6;
     public static final int CONN_INTERVAL_MIN_COEX = 16;
 
-    /* Macros required for phy update */
+    /* Macros required for phy update */
     public static int txPhyReq;
     public static int rxPhyReq;
     public static int LE_CODED_PHY = 4;
     public static int ALL_PHY = 7;
 
-    private static DataTx DataTxClass;
-    private static DataRx DataRxClass;
-    private static LatencyTest LatencyTestClass;
+    private static DataTx DataTxClass;
+    private static DataRx DataRxClass;
+    private static LatencyTest LatencyTestClass;
 
     public static WakeLock wl;
 
@@ -146,11 +146,6 @@ public class ThroughputStateMachine {
         /* Initialize classes */
         mBleConnect = new BleConnectionClass(mcontext);
         mStateMachine = new TestAppThroughputStateMachine(mcontext);
-    }
-
-    /* function to print the message on display */
-    private void showMessage(String msg) {
-        Toast.makeText(mcontext, msg, Toast.LENGTH_SHORT).show();
     }
 
     /* Connection Class */
@@ -165,8 +160,9 @@ public class ThroughputStateMachine {
         private int mState;
         private int GATT_SUCCESS = 0x00;
 
-        PhyUpdate tmp_phy;
-        Message msg;
+        PhyUpdate tmp_phy;
+        Message msg;
+        StringBuilder PrintStr = new StringBuilder();
 
         public BleConnectionClass(Context context) {
             this.context = context;
@@ -184,7 +180,7 @@ public class ThroughputStateMachine {
                 mState = newState;
                 int bondState = mDevice.getBondState();
                 if (gatt.getDevice() == null || (status != GATT_SUCCESS)&&
-                (mStateMachine.getCurrentState() == mStateMachine.mTAConnectPending)) {
+                    (mStateMachine.getCurrentState() == mStateMachine.mTAConnectPending)) {
                     Log.e(TAG, "onConnectionStateChange:Unexpected error! mstate: " +  mState);
                     mStateMachine.sendMessage(
                                     TestAppThroughputStateMachine.MSG_TA_SM_DEV_FAILED_TO_CONNECT);
@@ -200,9 +196,9 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "onConnectionStateChange:CONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
                     /*Send Message to SM*/
-                    String name = (String) gatt.getDevice().getName();
-                    msg = mStateMachine.obtainMessage(
-                    mStateMachine.MSG_TA_SM_REM_DEV_CONNECTED, name);
+                    String name = (String) gatt.getDevice().getName();
+                    msg = mStateMachine.obtainMessage(
+                    mStateMachine.MSG_TA_SM_REM_DEV_CONNECTED, name);
                     mStateMachine.sendMessage(msg);
                     if (bondState == BluetoothDevice.BOND_BONDED) {
                        Log.i(TAG, "Device paired");
@@ -225,7 +221,10 @@ public class ThroughputStateMachine {
                         service_discovery_mutex.notify();
                     }
                 } else {
-                        Log.d(TAG, "onServicesDiscovered received: " + status);
+                    Log.d(TAG, "onServicesDiscovered received: " + status);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Service discovery failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
 
@@ -240,14 +239,17 @@ public class ThroughputStateMachine {
                        (connIntervalReq <= CONN_INTERVAL_MIN_COEX) &&
                        (interval == CONN_INTERVAL_MIN_COEX)) ||connIntervalReq == 0xFF) {
                         Log.d(TAG, "Conn Update Interval matched");
-                        String name = (String) gatt.getDevice().getName();
-                        msg = mStateMachine.obtainMessage(
-                        mStateMachine.MSG_TA_SM_CONNECTION_UPDATED,Integer.toString(interval));
+                        String name = (String) gatt.getDevice().getName();
+                        msg = mStateMachine.obtainMessage(
+                        mStateMachine.MSG_TA_SM_CONNECTION_UPDATED,Integer.toString(interval));
                         mStateMachine.sendMessage(msg);
-                      connIntervalReq = 0;
+                        connIntervalReq = 0;
                     }
                 } else {
                     Log.i(TAG, "conn update failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Connection Update failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
 
@@ -258,17 +260,20 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
                     if((txPhyReq == txPhy && rxPhyReq == rxPhy) ||
-                          (txPhyReq == ALL_PHY && rxPhyReq == ALL_PHY)){
-                        PhyUpdate tmp_phy = new PhyUpdate();
-                        tmp_phy.txPhy = txPhy;
-                        tmp_phy.rxPhy = rxPhy;
-                        msg = mStateMachine.obtainMessage(
-                                       mStateMachine.MSG_TA_SM_PHY_UPDATED, tmp_phy);
+                        (txPhyReq == ALL_PHY && rxPhyReq == ALL_PHY)){
+                        PhyUpdate tmp_phy = new PhyUpdate();
+                        tmp_phy.txPhy = txPhy;
+                        tmp_phy.rxPhy = rxPhy;
+                        msg = mStateMachine.obtainMessage(
+                                       mStateMachine.MSG_TA_SM_PHY_UPDATED, tmp_phy);
                         mStateMachine.sendMessage(msg);
                         txPhyReq = rxPhyReq = 0;
                     }
                 } else {
                     Log.i(TAG, "phy update failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Phy Update failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
 
@@ -280,6 +285,9 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "onCharacteristicWrite: " + status);
                 } else {
                     Log.i(TAG, "write characteristic failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Write Characteristic failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
                 /* Release write mutex */
                 synchronized (write_mutex) {
@@ -295,6 +303,9 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "onDescriptorWrite: " + status);
                 } else {
                     Log.i(TAG, "write descriptor failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Write Descriptor failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
                 /* Release write mutex */
                 synchronized (write_mutex) {
@@ -308,17 +319,20 @@ public class ThroughputStateMachine {
             public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
                 if(status == GATT_SUCCESS){
                     Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
-                    PhyUpdate tmp_phy = new PhyUpdate();
-                    tmp_phy.txPhy = txPhy;
-                    tmp_phy.rxPhy = rxPhy;
+                    PhyUpdate tmp_phy = new PhyUpdate();
+                    tmp_phy.txPhy = txPhy;
+                    tmp_phy.rxPhy = rxPhy;
                     /* Send Message to SM */
-                    tmp_phy.txPhy = txPhy;
-                    tmp_phy.rxPhy = rxPhy;
-                    msg = mStateMachine.obtainMessage(
-                               mStateMachine.MSG_TA_SM_PHY_READ_DONE, tmp_phy);
+                    tmp_phy.txPhy = txPhy;
+                    tmp_phy.rxPhy = rxPhy;
+                    msg = mStateMachine.obtainMessage(
+                               mStateMachine.MSG_TA_SM_PHY_READ_DONE, tmp_phy);
                     mStateMachine.sendMessage(msg);
                 } else{
                     Log.i(TAG, "Read Phy failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Read Phy failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
 
@@ -344,12 +358,17 @@ public class ThroughputStateMachine {
 
             @Override
             public void onMtuChanged (BluetoothGatt gatt, int mtu, int status) {
-               if (status == GATT_SUCCESS) {
+                if (status == GATT_SUCCESS) {
                     Log.i(TAG, "Gatt updated MTU" + mtu);
                     mtu_size = mtu;
                     /* Send Message to SM */
                     mStateMachine.sendMessage(
                         TestAppThroughputStateMachine.MSG_TA_SM_MTU_EXCHANGE_DONE);
+                } else {
+                    Log.d(TAG, "onMtuChanged failed " + status);
+                    PrintStr.setLength(0);
+                    PrintStr.append("MTU Exchange failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
         };
@@ -368,7 +387,7 @@ public class ThroughputStateMachine {
                 if(!mDevice.createBond(TRANSPORT_LE)) {
                     Log.i(TAG, "couldn't start pairing");
                 }
-                MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_THROUGHPUT_SM;
+                MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_THROUGHPUT_SM;
             }
             else {
                 Log.i(TAG, "Already Paired!");
@@ -380,11 +399,11 @@ public class ThroughputStateMachine {
                 Log.i(TAG, "Unpairing!");
                 mDevice.removeBond();
                 Log.i(TAG, "Device unpaired");
-                StringBuilder PrintStr = new StringBuilder();
-                PrintStr.setLength(0);
-                PrintStr.append("Device unpaired");
-                SocketServer.sendSocketData(PrintStr.toString());
-                MainActivity.pairing_called = 0;
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("Device unpaired");
+                SocketServer.sendSocketData(PrintStr.toString());
+                MainActivity.pairing_called = 0;
             }
         }
 
@@ -451,7 +470,7 @@ public class ThroughputStateMachine {
         private TADisconnect mTADisconnect;
         private Context mContext;
 
-        StringBuilder PrintStr = new StringBuilder();
+        StringBuilder PrintStr = new StringBuilder();
 
         private TestAppThroughputStateMachine(Context context) {
             super("TestAppThroughputStateMachine");
@@ -508,13 +527,13 @@ public class ThroughputStateMachine {
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
                         break;
-                    case MSG_TA_SM_CONNECT:
-                        Scan scn = (Scan)message.obj;
-                        MainActivity.mScannerService.set_scan_parameters(scn);
-                        PrintStr.setLength(0);
-                        PrintStr.append("Scanning Started!");
-                        SocketServer.sendSocketData(PrintStr.toString());
-                        break;
+                    case MSG_TA_SM_CONNECT:
+                        Scan scn = (Scan)message.obj;
+                        MainActivity.mScannerService.set_scan_parameters(scn);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Scanning Started!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
                     case MSG_TA_SM_DEV_FOUND:
                         BluetoothDevice device = (BluetoothDevice) message.obj;
                         processSMDevFoundEvent(device);
@@ -555,19 +574,19 @@ public class ThroughputStateMachine {
                         Log.i(TAG, "BT Adapter is off");
                         break;
                     case MSG_TA_SM_REM_DEV_CONNECTED:
-                        PrintStr.setLength(0);
-                        String name = (String) message.obj;
-                        PrintStr.append("Connected to ");
-                        PrintStr.append(name);
-                        SocketServer.sendSocketData(PrintStr.toString());
-                        MainActivity.mScannerService.stopScan();
+                        PrintStr.setLength(0);
+                        String name = (String) message.obj;
+                        PrintStr.append("Connected to ");
+                        PrintStr.append(name);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        MainActivity.mScannerService.stopScan();
                         transitionTo(mTAConnected);
                         break;
                     case MSG_TA_SM_DEV_FAILED_TO_CONNECT:
                         Log.i(TAG, "Connection failed to establish, please try again");
-                        PrintStr.setLength(0);
-                        PrintStr.append("Connection failed to establish, please try again!!");
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.setLength(0);
+                        PrintStr.append("Connection failed to establish, please try again!!");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         transitionTo(mTAIdle);
                         break;
                     default:
@@ -596,57 +615,57 @@ public class ThroughputStateMachine {
 
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_CONN_UPDATE:
-                        ConnUpdate ConnUpdateObj = (ConnUpdate) message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                    case MSG_TA_SM_CONN_UPDATE:
+                        ConnUpdate ConnUpdateObj = (ConnUpdate) message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"ConnUpdateflag");
                         processConnUpdateReq(ConnUpdateObj);
-                        break;
-                    case MSG_TA_SM_PAIR_DEV:
-                        mBleConnect.pair();
-                        break;
-                    case MSG_TA_SM_UNPAIR_DEV:
-                        mBleConnect.unpair();
-                        break;
-                    case MSG_TA_SM_PHY_UPDATE:
-                        PhyUpdate phyUpdateObj = (PhyUpdate) message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                        break;
+                    case MSG_TA_SM_PAIR_DEV:
+                        mBleConnect.pair();
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_PHY_UPDATE:
+                        PhyUpdate phyUpdateObj = (PhyUpdate) message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"PhyUpdateflag");
                         processPhyUpdateReq(phyUpdateObj);
-                        break;
-                    case MSG_TA_SM_READ_PHY:
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                        break;
+                    case MSG_TA_SM_READ_PHY:
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"ReadPhyflag");
                         processReadPhyReq();
-                        break;
-                    case MSG_TA_SM_DATA_TX_TEST:
-                        DataTxClass = (DataTx)message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                        break;
+                    case MSG_TA_SM_DATA_TX_TEST:
+                        DataTxClass = (DataTx)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"DataTxflag");
                         transitionTo(mTADataTx);
-                        break;
-                    case MSG_TA_SM_DATA_RX_TEST:
-                        DataRxClass = (DataRx)message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                        break;
+                    case MSG_TA_SM_DATA_RX_TEST:
+                        DataRxClass = (DataRx)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"DataRxflag");
                         transitionTo(mTADataRx);
-                        break;
-                    case MSG_TA_SM_LATENCY_TEST:
-                        LatencyTestClass = (LatencyTest)message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                        break;
+                    case MSG_TA_SM_LATENCY_TEST:
+                        LatencyTestClass = (LatencyTest)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"LatencyTestflag");
                         transitionTo(mTALatencyMeasurement);
-                        break;
-                    case MSG_TA_SM_DISCONNECT:
-                    /*Disconnect*/
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                        /*Disconnect*/
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"Disconnectflag");
                         transitionTo(mTADisconnect);
-                        break;
+                        break;
                     case MSG_TA_SM_REM_DEV_PAIRED:
-                        PrintStr.setLength(0);
-                        PrintStr.append("Remote device paired");
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.setLength(0);
+                        PrintStr.append("Remote device paired");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
@@ -654,34 +673,34 @@ public class ThroughputStateMachine {
                         break;
                     case MSG_TA_SM_CONNECTION_UPDATED:
                         Log.d(TAG, "CONNECTION PARAM UPDATED");
-                        PrintStr.setLength(0);
-                        String interal = (String) message.obj;
-                        PrintStr.append("Connection Updated to");
-                        PrintStr.append(interal);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.setLength(0);
+                        String interal = (String) message.obj;
+                        PrintStr.append("Connection Updated to");
+                        PrintStr.append(interal);
+                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     case MSG_TA_SM_PHY_UPDATED:
                         Log.d(TAG, "PHY UPDATED");
-                        PrintStr.setLength(0);
-                        PhyUpdate phyUpdate = (PhyUpdate) message.obj;
-                        PrintStr.append("Phy Update done, Tx Phy :");
-                        PrintStr.append(phyUpdate.txPhy);
+                        PrintStr.setLength(0);
+                        PhyUpdate phyUpdate = (PhyUpdate) message.obj;
+                        PrintStr.append("Phy Update done, Tx Phy :");
+                        PrintStr.append(phyUpdate.txPhy);
                         PrintStr.append(" Rx Phy :");
-                        PrintStr.append(phyUpdate.rxPhy);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.append(phyUpdate.rxPhy);
+                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     case MSG_TA_SM_PHY_READ_DONE:
                         Log.d(TAG, "PHY READ Done");
-                        PrintStr.setLength(0);
-                        PhyUpdate readphy = (PhyUpdate) message.obj;
-                        PrintStr.append("Current Phy: Tx Phy :");
-                        PrintStr.append(readphy.txPhy);
+                        PrintStr.setLength(0);
+                        PhyUpdate readphy = (PhyUpdate) message.obj;
+                        PrintStr.append("Current Phy: Tx Phy :");
+                        PrintStr.append(readphy.txPhy);
                         PrintStr.append(" Rx Phy :");
-                        PrintStr.append(readphy.rxPhy);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.append(readphy.rxPhy);
+                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     default:
-                        Log.d(TAG, "Not handled");
+                        Log.d(TAG, "Not handled");
                         return NOT_HANDLED;
                 }
                 return retValue;
@@ -698,7 +717,7 @@ public class ThroughputStateMachine {
                                                     ConnUpdateClass.ConnSlaveLatency,
                                                     ConnUpdateClass.ConnSupTO, 0, 0);
                         if (ConnUpdateClass.ConnIntervalMin == ConnUpdateClass.ConnIntervalMax) {
-                             connIntervalReq = ConnUpdateClass.ConnIntervalMin;
+                            connIntervalReq = ConnUpdateClass.ConnIntervalMin;
                         } else {
                             connIntervalReq = 0xFF;
                         }
@@ -753,21 +772,21 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
-                        break;
+                        break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
                         break;
-                    case MSG_TA_SM_UNPAIR_DEV:
-                        mBleConnect.unpair();
-                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
                     case MSG_TA_SM_TX_TEST_DONE:
                         wl.release();
                         Log.d(TAG,"Release wakelock");
-                        PrintStr.setLength(0);
-                        String tput = (String) message.obj;
-                        PrintStr.append("Data Tx Throughput in kbps:");
+                        PrintStr.setLength(0);
+                        String tput = (String) message.obj;
+                        PrintStr.append("Data Tx Throughput in kbps:");
                         PrintStr.append(tput);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        SocketServer.sendSocketData(PrintStr.toString());
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG, "Data Tx done, state change to connected");
                         transitionTo(mTAConnected);
@@ -775,19 +794,19 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_MTU_EXCHANGE_DONE:
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"MTU size exchanged");
-                         /* Start tx thread */
-                         DataTxthread tt = new DataTxthread();
-                         Thread t = new Thread(tt);
-                         if(!t.isAlive()) {
-                             t.start();
-                             wl.acquire();
-                             Log.d(TAG,"acquire wakelock");
-                             PrintStr.setLength(0);
-                             PrintStr.append("Data Tx Thread Started");
-                             SocketServer.sendSocketData(PrintStr.toString());
-                         } else {
-                             Log.i(TAG, "Thread is already running");
-                         }
+                            /* Start tx thread */
+                            DataTxthread tt = new DataTxthread();
+                            Thread t = new Thread(tt);
+                            if(!t.isAlive()) {
+                                t.start();
+                                wl.acquire();
+                                Log.d(TAG,"acquire wakelock");
+                                PrintStr.setLength(0);
+                                PrintStr.append("Data Tx Thread Started");
+                                SocketServer.sendSocketData(PrintStr.toString());
+                            } else {
+                                Log.i(TAG, "Thread is already running");
+                            }
                         break;
                     default:
                         return NOT_HANDLED;
@@ -802,7 +821,7 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "data tx thread start");
                     final UUID UUID_TX_SERVICE = UUID.fromString(DataTxClass.txService);
                     final UUID UUID_TX_CHAR = UUID.fromString(DataTxClass.txChar);
-                    float txTputkr = 0;
+                    float txTputkr = 0;
 
                     wait_for_gatt_service_discovery();
                     /* wait for 500ms for DLE event to be received */
@@ -929,8 +948,8 @@ public class ThroughputStateMachine {
                                     }
                                 }
                                 /* Signal SM that TX Test is done*/
-                          Message msg = mStateMachine.obtainMessage(
-                          mStateMachine.MSG_TA_SM_TX_TEST_DONE,Float.toString(txTputkr));
+                                Message msg = mStateMachine.obtainMessage(
+                                mStateMachine.MSG_TA_SM_TX_TEST_DONE,Float.toString(txTputkr));
                                 mStateMachine.sendMessage(msg);
                             } catch (IOException e) {
                                 Log.e(TAG, "Exception handling");;
@@ -956,9 +975,9 @@ public class ThroughputStateMachine {
                 Thread t = new Thread(rt);
                 if(!t.isAlive()) {
                     t.start();
-                    PrintStr.setLength(0);
-                    PrintStr.append("Data Rx Thread Started");
-                    SocketServer.sendSocketData(PrintStr.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Data Rx Thread Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "Thread is already running");
                 }
@@ -977,19 +996,19 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
-                        break;
+                        break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
                         break;
-                    case MSG_TA_SM_UNPAIR_DEV:
-                        mBleConnect.unpair();
-                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
                     case MSG_TA_SM_RX_TEST_DONE:
-                        PrintStr.setLength(0);
-                        String rxtput = (String) message.obj;
-                        PrintStr.append("Data Rx Throughput in kbps:");
+                        PrintStr.setLength(0);
+                        String rxtput = (String) message.obj;
+                        PrintStr.append("Data Rx Throughput in kbps:");
                         PrintStr.append(rxtput);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        SocketServer.sendSocketData(PrintStr.toString());
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG, "Rx Data Done, state change to connected");
                         transitionTo(mTAConnected);
@@ -1105,8 +1124,8 @@ public class ThroughputStateMachine {
                             rx_end_time_stamp = 0;
                             num_of_notifications = 0;
                             /* Signal SM that RX Test is done*/
-                          Message msg = mStateMachine.obtainMessage(
-                          mStateMachine.MSG_TA_SM_RX_TEST_DONE,Float.toString(rxTputk));
+                            Message msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_RX_TEST_DONE,Float.toString(rxTputk));
                             mStateMachine.sendMessage(msg);
                         } else {
                             Log.d(TAG, "Characteristic is null!");
@@ -1129,9 +1148,9 @@ public class ThroughputStateMachine {
                 Thread t = new Thread(lt);
                 if(!t.isAlive()) {
                     t.start();
-          PrintStr.setLength(0);
-            PrintStr.append("Latency Measurement Started");
-          SocketServer.sendSocketData(PrintStr.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Latency Measurement Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "Thread is already running");
                 }
@@ -1150,19 +1169,19 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
-                        break;
+                        break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
                         break;
-                    case MSG_TA_SM_UNPAIR_DEV:
-                        mBleConnect.unpair();
-                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
                     case MSG_TA_SM_LAT_TEST_DONE:
-                        PrintStr.setLength(0);
-                        String latency = (String) message.obj;
-                        PrintStr.append("Latency in ms:");
+                        PrintStr.setLength(0);
+                        String latency = (String) message.obj;
+                        PrintStr.append("Latency in ms:");
                         PrintStr.append(latency);
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        SocketServer.sendSocketData(PrintStr.toString());
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG, "Latency test done, state change to connected");
                         transitionTo(mTAConnected);
@@ -1206,8 +1225,8 @@ public class ThroughputStateMachine {
                             float latency = (float) (latency_end_time_stamp -
                                                         latency_start_time_stamp);
                             Log.i(TAG, "Latency in msec " + latency);
-                            Message msg = mStateMachine.obtainMessage(
-                            mStateMachine.MSG_TA_SM_LAT_TEST_DONE,Float.toString(latency));
+                            Message msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_LAT_TEST_DONE,Float.toString(latency));
                             mStateMachine.sendMessage(msg);
                         } else {
                             Log.e(TAG, "Characteristic is null!");
@@ -1245,15 +1264,15 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
-                        break;
-                    case MSG_TA_SM_UNPAIR_DEV:
-                        mBleConnect.unpair();
-                        break;
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
                     case MSG_TA_SM_DEV_DISCONNECTED:
                         transitionTo(mTAIdle);
-                        PrintStr.setLength(0);
-                        PrintStr.append("Device disconnected");
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        PrintStr.setLength(0);
+                        PrintStr.append("Device disconnected");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     default:
                         return NOT_HANDLED;
