@@ -232,8 +232,9 @@ public class ThroughputStateMachine {
                     Log.i(TAG, "on Conn updated:"
                          + " interval=" + interval + " latency=" + latency
                         + " timeout=" + timeout + " status=" + status);
-                    if((interval == connIntervalReq)/* || (connIntervalReq == CONN_INTERVAL_MIN
-                       && interval == CONN_INTERVAL_MIN_COEX)*/){
+                    if((interval == connIntervalReq)|| ((connIntervalReq >= CONN_INTERVAL_MIN) &&
+                       (connIntervalReq <= CONN_INTERVAL_MIN_COEX) &&
+                       (interval == CONN_INTERVAL_MIN_COEX)) ||connIntervalReq == 0xFF) {
                         Log.d(TAG, "Conn Update Interval matched");
                         String name = (String) gatt.getDevice().getName();
                         msg = mStateMachine.obtainMessage(
@@ -692,7 +693,11 @@ public class ThroughputStateMachine {
                                                     ConnUpdateClass.ConnIntervalMax,
                                                     ConnUpdateClass.ConnSlaveLatency,
                                                     ConnUpdateClass.ConnSupTO, 0, 0);
-                        connIntervalReq = ConnUpdateClass.ConnIntervalMin;
+                        if (ConnUpdateClass.ConnIntervalMin == ConnUpdateClass.ConnIntervalMax) {
+                             connIntervalReq = ConnUpdateClass.ConnIntervalMin;
+                        } else {
+                            connIntervalReq = 0xFF;
+                        }
                     } else {
                         Log.d(TAG, "Conn Update can't be done");
                     }
