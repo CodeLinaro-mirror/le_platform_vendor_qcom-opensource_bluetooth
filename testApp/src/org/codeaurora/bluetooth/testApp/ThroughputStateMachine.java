@@ -51,6 +51,8 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.os.Message;
 import android.os.RemoteException;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 
 import java.util.List;
 import java.util.UUID;
@@ -136,6 +138,8 @@ public class ThroughputStateMachine {
     private static DataTx DataTxClass;
     private static DataRx DataRxClass;
     private static LatencyTest LatencyTestClass;
+
+    public static WakeLock wl;
 
     public ThroughputStateMachine(Context mcontext) {
         this.mcontext = mcontext;
@@ -757,6 +761,8 @@ public class ThroughputStateMachine {
                         mBleConnect.unpair();
                         break;
                     case MSG_TA_SM_TX_TEST_DONE:
+                        wl.release();
+                        Log.d(TAG,"Release wakelock");
                         PrintStr.setLength(0);
                         String tput = (String) message.obj;
                         PrintStr.append("Data Tx Throughput in kbps:");
@@ -774,6 +780,8 @@ public class ThroughputStateMachine {
                          Thread t = new Thread(tt);
                          if(!t.isAlive()) {
                              t.start();
+                             wl.acquire();
+                             Log.d(TAG,"acquire wakelock");
                              PrintStr.setLength(0);
                              PrintStr.append("Data Tx Thread Started");
                              SocketServer.sendSocketData(PrintStr.toString());
