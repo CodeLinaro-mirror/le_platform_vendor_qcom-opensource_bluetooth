@@ -265,8 +265,10 @@ public class InputParse {
             if(tmp2.length == 2) {
                 if (tmp2[0].equals("Mtu_Size")) {
                     dataRxParam.Mtu_Size = Integer.parseInt(tmp2[1]);
-                } else if (tmp2[0].equals("NotificationsTime")) {
-                    dataRxParam.NotificationsTime = Long.parseLong(tmp2[1]);
+                } else if (tmp2[0].equals("NotificationsTimeInSec")) {
+                    dataRxParam.NotificationsTimeInSec = Long.parseLong(tmp2[1]);
+                } else if (tmp2[0].equals("NotificationsTimeInMin")) {
+                    dataRxParam.NotificationsTimeInMin = Long.parseLong(tmp2[1]);
                 } else if (tmp2[0].equals("RxService")) {
                     dataRxParam.rxService = tmp2[1];
                 } else if (tmp2[0].equals("RxChar")) {
