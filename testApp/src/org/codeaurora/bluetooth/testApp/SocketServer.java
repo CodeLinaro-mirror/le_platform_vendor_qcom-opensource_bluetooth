@@ -255,7 +255,7 @@ public class SocketServer {
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     Tx             (Ex: Tx Mtu_Size:512;Packet_Size:244;Num_Packets:50;\n");
                     sendStr.append("                                            TxService:0000FF01-0000-1000-8000-00805F9B34FB;TxChar:0000FF04-0000-1000-8000-00805F9B34FB)\n");
-                    sendStr.append("                     Rx             (Ex: Rx RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB;NotificationsTime:2;MtuSize:512)\n");
+                    sendStr.append("                     Rx             (Ex: Rx RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB;NotificationsTimeInSec:2;NotificationsTimeInMin:5;MtuSize:512)\n");
                     sendStr.append("                     Latency        (Ex: Latency LatencyService:0000FF01-0000-1000-8000-00805F9B34FB;LatencyChar:0000FF02-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");

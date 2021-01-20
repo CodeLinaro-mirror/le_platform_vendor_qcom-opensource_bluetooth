@@ -1078,9 +1078,11 @@ public class ThroughputStateMachine {
                             } else {
                                 Log.e(TAG, "Descriptor not found");
                             }
+                            long NotificationsTime = ((DataRxClass.NotificationsTimeInMin * 60) +
+                                                    DataRxClass.NotificationsTimeInSec);
                             /* write notifications time to the characteristic */
                             mreadChar.setValue(
-                                    (int)DataRxClass.NotificationsTime,
+                                    (int)NotificationsTime,
                                     BluetoothGattCharacteristic.FORMAT_UINT32,0);
                             mBleConnect.mBluetoothGatt.writeCharacteristic(mreadChar);
                             synchronized (write_mutex) {
@@ -1098,10 +1100,10 @@ public class ThroughputStateMachine {
                                before disabling notifications */
                             try {
                                 if(ThroughputStateMachine.LOG_LEVEL >= 2) {
-                                    Log.d(TAG, "Sleep for :"+DataRxClass.NotificationsTime+
+                                    Log.d(TAG, "Sleep for :"+NotificationsTime+
                                         " in sec");
                                 }
-                                Thread.sleep((DataRxClass.NotificationsTime)*1000);
+                                Thread.sleep((NotificationsTime)*1000);
                                 }
                             catch(InterruptedException e){
                                 Log.e(TAG, "error in thread sleep");
