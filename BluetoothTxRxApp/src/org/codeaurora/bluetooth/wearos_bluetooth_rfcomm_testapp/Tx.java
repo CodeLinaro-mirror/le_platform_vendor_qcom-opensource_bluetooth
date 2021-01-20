@@ -29,8 +29,6 @@
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
-import android.bluetooth.BluetoothSocket;
-
-public class Send {
-    String BDaddress;
+public class Tx {
+    int chunkSize;
 }
