@@ -29,6 +29,6 @@
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
-public class Disconnect {
-    String BDaddress;
+public class Cacheable {
+    int timer;
 }

@@ -29,6 +29,6 @@
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
-public class Discoverability {
-    int time;
+public class Actionable {
+    int timer;
 }

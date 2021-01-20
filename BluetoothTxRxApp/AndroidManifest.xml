@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--Copyright (c) 2020, The Linux Foundation. All rights reserved.
+<!--
+    Copyright (c) 2020, The Linux Foundation. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are
@@ -44,22 +45,23 @@
         android:minSdkVersion="16"
         android:targetSdkVersion="23" />
 
-
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
-        android:label="@string/app_name">
-
-        <activity android:name=".MainActivity"
-        android:screenOrientation="portrait" >
+        android:label="@string/app_name" >
+        <activity
+            android:name=".AppControlActivity"
+            android:screenOrientation="portrait" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-
-
+        <service
+            android:name="AppControlService"
+            android:exported="false" >
+        </service>
     </application>
-</manifest>
 
+</manifest>
