@@ -467,20 +467,21 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             }
             len--;
 
-            aptx_adaptive_codec.min_sink_buffering_LL = 20; // gghai temp setting to default value
-            aptx_adaptive_codec.max_sink_buffering_LL = 50;
-            aptx_adaptive_codec.min_sink_buffering_HQ = 20;
-            aptx_adaptive_codec.max_sink_buffering_HQ = 50;
-            aptx_adaptive_codec.min_sink_buffering_TWS = 20;
-            aptx_adaptive_codec.max_sink_buffering_TWS = 50;
-
-            aptx_adaptive_codec.TTP_LL_low = *(p_cfg ++);
-            aptx_adaptive_codec.TTP_LL_high = *(p_cfg ++);
-            aptx_adaptive_codec.TTP_HQ_low = *(p_cfg ++);
-            aptx_adaptive_codec.TTP_HQ_high = *(p_cfg ++);
-            aptx_adaptive_codec.TTP_TWS_low = *(p_cfg ++);
-            aptx_adaptive_codec.TTP_TWS_high = *(p_cfg ++);
+            //Update remote TTP values
+            aptx_adaptive_codec.min_sink_buffering_LL = *(p_cfg ++);
+            aptx_adaptive_codec.max_sink_buffering_LL = *(p_cfg ++);
+            aptx_adaptive_codec.min_sink_buffering_HQ = *(p_cfg ++);
+            aptx_adaptive_codec.max_sink_buffering_HQ = *(p_cfg ++);
+            aptx_adaptive_codec.min_sink_buffering_TWS = *(p_cfg ++);
+            aptx_adaptive_codec.max_sink_buffering_TWS = *(p_cfg ++);
             len -= 6;
+
+            aptx_adaptive_codec.TTP_LL_low = aptx_adaptive_codec.min_sink_buffering_LL;
+            aptx_adaptive_codec.TTP_LL_high = aptx_adaptive_codec.max_sink_buffering_LL;
+            aptx_adaptive_codec.TTP_HQ_low = aptx_adaptive_codec.min_sink_buffering_HQ;
+            aptx_adaptive_codec.TTP_HQ_high = aptx_adaptive_codec.max_sink_buffering_HQ;
+            aptx_adaptive_codec.TTP_TWS_low = aptx_adaptive_codec.min_sink_buffering_TWS;
+            aptx_adaptive_codec.TTP_TWS_high = aptx_adaptive_codec.max_sink_buffering_TWS;
 
             p_cfg += 3; // ignoring eoc bits
             len -= 3;
