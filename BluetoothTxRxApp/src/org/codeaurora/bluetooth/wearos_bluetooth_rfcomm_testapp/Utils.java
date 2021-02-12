@@ -80,6 +80,11 @@ public class Utils {
         static final int STATE_START_DATA_TX_CACHEABLE = 14;
         static final int STATE_END_DATA_TX_CACHEABLE = 15;
 
+        static final int STATE_START_GAP_TEST_CASES = 16;
+        static final int STATE_GAP_TEST_CASE_OFF_ON = 17;
+        static final int STATE_GAP_TEST_CASE_SCAN_MODE = 18;
+        static final int STATE_GAP_TEST_CASE_END_SCAN_MODE = 19;
+
     }
 
     public static class UUIDConstants {
