@@ -494,4 +494,34 @@ public class AppControlService extends Service {
         }
     }
 
+    public void setScanMode(int scanMode){
+        boolean result = false;
+        switch (scanMode) {
+        case 0:
+            SocketServer.sendSocketData("Setting Scan Mode :: SCAN_MODE_NONE");
+            result = bluetoothAdapter.setScanMode(BluetoothAdapter.SCAN_MODE_NONE);
+            break;
+        case 1:
+            SocketServer.sendSocketData("Setting Scan Mode :: SCAN_MODE_CONNECTABLE");
+            result = bluetoothAdapter.setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE);
+            break;
+        case 2:
+            SocketServer.sendSocketData("Setting Scan Mode :: SCAN_MODE_CONNECTABLE_DISCOVERABLE");
+            result = bluetoothAdapter.setScanMode(BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+            break;
+        default:
+            break;
+        }
+        if(true == result){
+            SocketServer.sendSocketData("Set Scan Mode Successful");
+        }else{
+            SocketServer.sendSocketData("Set Scan Mode Failed...Please try again");
+        }
+        Message message = Message.obtain();
+        message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_SCAN_MODE;
+        mAppControlStateMachine.sendMessage(message);
+        SocketServer.processOutputState = SocketServer.CONNECTION_TEST_MENU;
+        SocketServer.updateSocketClient();
+    }
+
 }
