@@ -100,6 +100,7 @@ public class MainActivity extends Activity {
 
     public static ThroughputStateMachine throughputSMClass;
     public static GattClient mgattclient;
+    public static GattServer mgattserver;
     public static MainActivityMessageHandler msghandler;
 
     private Context mAppContext;
@@ -176,6 +177,16 @@ public class MainActivity extends Activity {
     public static final int MSG_SM_START_BLE_LATENCY_TEST = 29;
     public static final int MSG_SM_START_BLE_GATT_DISC = 30;
 
+
+    /* GATT Server Actions */
+
+    public static final int MSG_GS_START_BLE_ADD_SERVICE = 50;
+    public static final int MSG_GS_START_BLE_REMOVE_SERVICES = 51;
+    public static final int MSG_GS_START_BLE_SET_PHY = 52;
+    public static final int MSG_GS_START_BLE_READ_PHY = 33;
+    public static final int MSG_GS_START_BLE_GET_SERVICES = 54;
+    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = 55;
+    public static final int MSG_GS_START_BLE_CONNECT = 56;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -301,7 +312,11 @@ public class MainActivity extends Activity {
         start_testapp_tput_state_machine();
 
          /* start gatt client */
-         mgattclient = new GattClient(mAppContext);
+        mgattclient = new GattClient(mAppContext);
+
+         /*start gatt server*/
+        mgattserver = new GattServer(mAppContext);
+
     }
 
     @Override
@@ -452,6 +467,7 @@ public class MainActivity extends Activity {
             int status;
             ReadWriteOp RdWrClass;
             Scan scnObj;
+            AddServices AddServ;
             PhyUpdate phyUpdateObj;
             ConnUpdate ConnUpdateObj;
 
@@ -650,6 +666,12 @@ public class MainActivity extends Activity {
                     msg = throughputSMClass.mStateMachine.obtainMessage(
                     throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_ADD_SERVICE:
+                    AddServ = (AddServices) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_ADD_SERVICE, AddServ);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 default:
                     Log.e(TAG, "Unknown Operation");

@@ -69,6 +69,7 @@ public class SocketServer {
     static final int INVALID_INPUT = 6;
     static final int SOC_CLOSE_ACK = 7;
     static final int NONE = 8;
+    static final int GATT_SERVER_MENU = 9;
 
     static int mainMenuState = MAIN_MENU;
     static int processOutputState = MAIN_MENU;
@@ -218,6 +219,7 @@ public class SocketServer {
                     sendStr.append("                     GattClient\n");
                     sendStr.append("                     HoldWakeLock\n");
                     sendStr.append("                     ReleaseWakeLock\n");
+                    sendStr.append("                     GattServer\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -290,6 +292,12 @@ public class SocketServer {
                     sendStr.append("                     Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
+                case GATT_SERVER_MENU:
+                    sendStr.append("\n******************** Gatt Server Menu ********************\n");
+                    sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10;Permissions:0x01;Value:0x12)\n");
+                    sendStr.append("                       Back\n");
+                    sendStr.append("**********************************************************\n");
+                    break;
 
                 case INVALID_INPUT:
                     sendStr.append("\nInvalid Input\n");
@@ -343,6 +351,9 @@ public class SocketServer {
                         sendStr.setLength(0);
                         sendStr.append("Wakelock released");
                         SocketServer.sendSocketData(sendStr.toString());
+                    } else if (inputString.equals("GattServer")) {
+                        mainMenuState = GATT_SERVER_MENU;
+                        processOutputState = GATT_SERVER_MENU;
                     } else if (inputString.equals("Close")) {
                         closeReceived = true;
                         mainMenuState = MAIN_MENU;
@@ -661,6 +672,40 @@ public class SocketServer {
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
+                    break;
+
+                case GATT_SERVER_MENU:
+                    tmp = inputString.split(" ", 2);
+                    if(tmp.length == 2) {
+                      if (tmp[0].equals("AddService")) {
+                            AddServices AddServiceParam = parse.AddServicesParse(tmp[1]);
+                            if ( AddServiceParam != null) {
+                                processOutputState = NONE;
+                                msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_ADD_SERVICE,AddServiceParam);
+                                MainActivity.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+
+                    }
+                    else if(tmp.length == 1) {
+
+                         if (tmp[0].equals("Back")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = MAIN_MENU;
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+
+
+                   } else {
+                     processOutputState = INVALID_INPUT;
+                    }
+
                     break;
             }
         }
