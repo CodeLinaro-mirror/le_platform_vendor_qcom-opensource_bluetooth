@@ -169,13 +169,14 @@ public class SocketServer {
                     break;
                 }
 
-                if (bytesRead > 0) {
+                if (bytesRead >= 0) {
                     String inputStr = new String(socRcvBuffer, 0, bytesRead);
                     Log.i(TAG, "Received: " + inputStr);
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    processOutputState = INVALID_INPUT;
+                    processOutputState = NONE;
+                    closeReceived = true;
                 }
 
                 if (processOutputState != NONE) {
