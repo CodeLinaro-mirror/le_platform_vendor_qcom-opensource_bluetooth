@@ -158,12 +158,19 @@ public class GattClient {
     private static final int GATT_OPTYPE_UUID = 1;
     private static final int GATT_OPTYPE_INSID = 2;
 
+    // Connection States
+    public static final int BLE_STATE_CONNECTING = 1;
+    public static final int BLE_STATE_CONNECTED = 2;
+    public static final int BLE_STATE_DISCONNECTING = 3;
+    public static final int BLE_STATE_DISCONNECTED = 4;
+
     private static int length_offset = 0;
     private static String written_value;
     private static String offset_value;
     private boolean reliable_write = false;
     private static int total_length = 0;
     private ReadWriteOp RdWrReliableClass;
+    private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
 
     private List<UUID> mServiceUUID;
     private List<UUID> mCharUUID;
@@ -231,6 +238,7 @@ public class GattClient {
                     if(GattClient.LOG_LEVEL >= 1) {
                         Log.e(TAG, "onConnectionStateChange:Unexpected error! mstate: " +  mState);
                     }
+                    mConnectionStatus = BLE_STATE_DISCONNECTED;
                     /*Send Message to Message Handler */
                     msg = mGattClientHandler.obtainMessage(MSG_REM_DEV_FAILED_TO_CONNECT, null);
                     mGattClientHandler.sendMessage(msg);
@@ -242,11 +250,13 @@ public class GattClient {
                 if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     Log.i(TAG, "onConnectionStateChange:DISCONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
+                    mConnectionStatus = BLE_STATE_DISCONNECTED;
                     msg = mGattClientHandler.obtainMessage(MSG_REM_DEV_DISCONNECTED, null);
                     mGattClientHandler.sendMessage(msg);
                 } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.i(TAG, "onConnectionStateChange:CONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
+                    mConnectionStatus = BLE_STATE_CONNECTED;
                     msg = mGattClientHandler.obtainMessage(
                                MSG_REM_DEV_CONNECTED, gatt.getDevice().getName());
                     mGattClientHandler.sendMessage(msg);
@@ -493,9 +503,10 @@ public class GattClient {
         };
 
         public void connect(BluetoothDevice device){
-            if(MainActivity.bleAdapter!=null) {
+            if((MainActivity.bleAdapter!=null) && (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
+                mConnectionStatus = BLE_STATE_CONNECTING;
                 mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
             }
         }
@@ -560,7 +571,13 @@ public class GattClient {
                 case MSG_START_BLE_CONNECT:
                     /* start scan with filters and initiate conn with the result */
                     Scan scn = (Scan) msg.obj;
-                    processCheckAndStartBleScan(scn);
+                    if(MainActivity.mScannerService.mScanstatus) {
+                        PrintStr.setLength(0);
+                        PrintStr.append("Connect failed, there is an ongoing scan");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    } else {
+                        processCheckAndStartBleScan(scn);
+                    }
                     break;
                 case MSG_BLE_SCAN_DEV_FOUND:
                     BluetoothDevice device = (BluetoothDevice) msg.obj;
@@ -643,7 +660,6 @@ public class GattClient {
                     PrintStr.append("Connected to remote device:");
                     PrintStr.append(name);
                     SocketServer.sendSocketData(PrintStr.toString());
-                    MainActivity.mScannerService.stopScan();
                     break;
                 case MSG_SERVC_DISC_DONE:
                     PrintStr.setLength(0);
@@ -739,6 +755,9 @@ public class GattClient {
 
         private void processScanDevFound(BluetoothDevice device) {
             Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
+            if(MainActivity.mScannerService.mScanstatus) {
+                MainActivity.mScannerService.stopScan();
+            }
             mgattClient.connect(device);
         }
 
@@ -793,6 +812,7 @@ public class GattClient {
 
         private void processDisconnectReq() {
             Log.i(TAG, "Disconnecting!");
+            mConnectionStatus = BLE_STATE_DISCONNECTING;
             mgattClient.disconnect();
         }
 
