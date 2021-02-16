@@ -526,10 +526,16 @@ public class ThroughputStateMachine {
                         break;
                     case MSG_TA_SM_CONNECT:
                         Scan scn = (Scan)message.obj;
-                        MainActivity.mScannerService.set_scan_parameters(scn);
-                        PrintStr.setLength(0);
-                        PrintStr.append("Scanning Started!");
-                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(MainActivity.mScannerService.mScanstatus) {
+                            PrintStr.setLength(0);
+                            PrintStr.append("Connect failed, there is an ongoing scan");
+                            SocketServer.sendSocketData(PrintStr.toString());
+                        }else {
+                            MainActivity.mScannerService.set_scan_parameters(scn);
+                            PrintStr.setLength(0);
+                            PrintStr.append("Scanning Started!");
+                            SocketServer.sendSocketData(PrintStr.toString());
+                        }
                         break;
                     case MSG_TA_SM_DEV_FOUND:
                         BluetoothDevice device = (BluetoothDevice) message.obj;
@@ -543,6 +549,9 @@ public class ThroughputStateMachine {
 
             private void processSMDevFoundEvent(BluetoothDevice device) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
+                if(MainActivity.mScannerService.mScanstatus) {
+                    MainActivity.mScannerService.stopScan();
+                }
                 mBleConnect.connect(device);
                 transitionTo(mTAConnectPending);
             }
@@ -576,7 +585,6 @@ public class ThroughputStateMachine {
                         PrintStr.append("Connected to ");
                         PrintStr.append(name);
                         SocketServer.sendSocketData(PrintStr.toString());
-                        MainActivity.mScannerService.stopScan();
                         transitionTo(mTAConnected);
                         break;
                     case MSG_TA_SM_DEV_FAILED_TO_CONNECT:
