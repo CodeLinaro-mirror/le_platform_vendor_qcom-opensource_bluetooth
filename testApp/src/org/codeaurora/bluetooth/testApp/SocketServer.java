@@ -47,7 +47,7 @@ public class SocketServer {
     private static final String TAG = "SocketServer";
     final String SOCKET_ADDRESS = "BtTestAppSocket";
     static int socSendBufferSize = 4096;
-    int socRcvBufferSize = 512;
+    int socRcvBufferSize = 4096;
     byte[] socRcvBuffer;
     int bytesRead;
     private static boolean socketOpen = false;
