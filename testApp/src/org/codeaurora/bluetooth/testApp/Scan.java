@@ -30,22 +30,21 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class Scan {
-
-    String DeviceName;
-    String DeviceAddress;
-    String ServiceUuid;
-    String SvcMaskUuid;
-    String ManufacturerId;
-    String ManufacturerData;
-    String ManufacturerMaskData;
-    String ServiceDataUuid;
-    String ServiceData;
-    String SvcDataMask;
-    int ScanMode;
-    int CallbackType;
-    int ResultType;
-    int NumOfAdvMatches;
-    int MatchMode;
-    int ReportDelay;
-    boolean legacy;
+    String DeviceName = null;
+    String DeviceAddress = null;
+    String ServiceUuid = null;
+    String SvcMaskUuid = null;
+    String ManufacturerId = null;
+    String ManufacturerData = null;
+    String ManufacturerMaskData = null;
+    String ServiceDataUuid = null;
+    String ServiceData = null;
+    String SvcDataMask = null;
+    int ScanMode = 1;
+    int CallbackType = 1;
+    int ResultType = 0;
+    int NumOfAdvMatches = 3;
+    int MatchMode = 1;
+    int ReportDelay = 0;
+    boolean legacy = true;
 }
