@@ -283,7 +283,6 @@ public class SocketServer {
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:XX;CharUuid:XX)\n");
                     sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:XX;CharUuid:XX;Value:XX;WriteType:2)\n");
                     sendStr.append("                     AbortReliableWrite\n");
-                    sendStr.append("                     ExecuteWrite\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("**********************************************************\n");
@@ -621,11 +620,6 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = MainActivity.msghandler.obtainMessage(
                                     MainActivity.MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
-                            MainActivity.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("ExecuteWrite")) {
-                            processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_EXECUTE_WRITE, null);
                             MainActivity.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Disconnect")) {
                             processOutputState = NONE;
