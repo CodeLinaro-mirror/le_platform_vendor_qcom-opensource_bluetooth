@@ -30,25 +30,23 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class Adv {
-
-    //boolean advflag;
-    int TxPower;
-    boolean Legacy;
-    boolean Periodic;
-    int PerAdvInterval;
-    boolean Connectable;
-    boolean Scannable;
-    boolean Anonymous;
-    boolean IncludePower;
-    int PrimaryPhy;
-    int SecondaryPhy;
-    int MaxAdvEvents;
-    int Interval;
-    int TimeOutLegacy;
-    int AdvertiseMode;
-    String ServiceUuid;
-    int ManufacturerId;
-    String ManufacturerData;
-    String ServiceDataUuid;
-    String ServiceData;
+	int TxPower = 1;
+    boolean Legacy = true;
+    boolean Periodic = false;
+    int PerAdvInterval = 200;
+    boolean Connectable = true;
+    boolean Scannable = false;
+    boolean Anonymous = false;
+    boolean IncludePower = true;
+    int PrimaryPhy = 1;
+    int SecondaryPhy = 1;
+    int MaxAdvEvents = 0;
+    int Interval = 160;
+    int TimeOutLegacy = 10000;
+    int AdvertiseMode = 0;
+    String ServiceUuid = null;
+    int ManufacturerId = 0;
+    String ManufacturerData = null;
+    String ServiceDataUuid = null;
+    String ServiceData = null;
 }
