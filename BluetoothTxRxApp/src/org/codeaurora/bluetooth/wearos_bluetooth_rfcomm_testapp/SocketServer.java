@@ -227,6 +227,7 @@ public class SocketServer {
 
         case CONNECTION_TEST_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     OFF_ON (Ex: OFF_ON count:10)\n");
             sendStr.append("                     Set_Scan (Ex: Set_Scan mode:0/1/2)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
@@ -235,7 +236,7 @@ public class SocketServer {
         case MAIN_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Throughput\n");
-            sendStr.append("                     Close\n");
+            sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
 
@@ -312,10 +313,9 @@ public class SocketServer {
             if (inputString.equals("Throughput")) {
                 mainMenuState = THROUGHPUT_MENU;
                 processOutputState = THROUGHPUT_MENU;
-            } else if (inputString.equals("Close")) {
-                closeReceived = true;
+            } else if (inputString.equals("Back")) {
                 mainMenuState = CONNECT_INIT;
-                processOutputState = SOC_CLOSE_ACK;
+                processOutputState = CONNECT_INIT;
             } else {
                 processOutputState = INVALID_INPUT;
             }
@@ -334,6 +334,7 @@ public class SocketServer {
                         processOutputState = NONE;
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON;
+                        message.obj = connectionTestParam;
                         Utils.appControlStateMachine.sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;
