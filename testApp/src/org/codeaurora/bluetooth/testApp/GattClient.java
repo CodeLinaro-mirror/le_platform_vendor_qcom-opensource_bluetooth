@@ -168,6 +168,7 @@ public class GattClient {
     private static String offset_value;
     private boolean reliable_write = false;
     private static int total_length = 0;
+    private boolean reliable_write_no_more_data = false;
     private ReadWriteOp RdWrReliableClass;
     private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
 
@@ -384,35 +385,42 @@ public class GattClient {
                         /* check the value written is correct or not */
                         if(offset_value.equals(value)) {
                             Log.d(TAG, "Data matched, proceeding!!");
+                            if(!reliable_write_no_more_data) {
+                                /*check if the total data is written, if no write*/
+                                if(total_length > length_offset + mtu_size-5) {
+                                   offset_value = RdWrReliableClass.Value.substring(
+                                          length_offset,(length_offset + mtu_size-5));
+                                   length_offset +=  (mtu_size - 5);
+                                   characteristic.setValue(offset_value.getBytes());
+                                   mgattClient.mBluetoothGatt.writeCharacteristic(
+                                                characteristic);
+                                } else if(total_length < length_offset + mtu_size - 5) {
+                                    /* last chunk */
+                                    offset_value = RdWrReliableClass.Value.substring(length_offset,
+                                          total_length);
+                                    reliable_write_no_more_data = true;
+                                    length_offset = total_length - (mtu_size - 5);
+                                    characteristic.setValue(offset_value.getBytes());
+                                    mgattClient.mBluetoothGatt.writeCharacteristic(
+                                                characteristic);
+                                }
+                            } else {
+                                    /*execute write*/
+                                    if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
+                                        Log.i(TAG, "Execute Write Successful!");
+                                        length_offset = 0;
+                                        reliable_write = false;
+                                        reliable_write_no_more_data = false;
+                                    } else {
+                                        Log.e(TAG, "Execute Write Failed!");
+                                    }
+                            }
                         } else {
-                        /* abort reliable write if the value written doesn't match*/
+                            /* abort reliable write if the value written doesn't match*/
                             Log.e(TAG, "Data doesn't match");
                             /*abort*/
                             mgattClient.mBluetoothGatt.abortReliableWrite();
-                        }
-                       /*check if the total data is written, if no write*/
-                        if(total_length > length_offset + mtu_size-5) {
-                           offset_value = RdWrReliableClass.Value.substring(
-                                  length_offset,(length_offset + mtu_size-5));
-                           length_offset +=  (mtu_size - 5);
-                           characteristic.setValue(offset_value.getBytes());
-                           mgattClient.mBluetoothGatt.writeCharacteristic(
-                                        characteristic);
-                        } else if(total_length < length_offset + mtu_size - 5) {
-                            offset_value = RdWrReliableClass.Value.substring(length_offset,
-                                  total_length);
-                            length_offset = total_length - (mtu_size - 5);
-                            characteristic.setValue(offset_value.getBytes());
-                            mgattClient.mBluetoothGatt.writeCharacteristic(
-                                        characteristic);
-                        } else {
-                        /*execute write*/
-                            if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
-                                Log.i(TAG, "Execute Write Successful!");
-                                length_offset = 0;
-                            } else {
-                                Log.e(TAG, "Execute Write Failed!");
-                            }
+                            reliable_write = false;
                         }
                     }
                 } else {
@@ -1006,9 +1014,16 @@ public class GattClient {
                     BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
             total_length = RdWrReliableClass.Value.length();
             if(total_length >= (mtu_size - 5)) {
+                reliable_write_no_more_data = false;
                 offset_value = RdWrReliableClass.Value.substring(
                         length_offset, (mtu_size - 5));
                 length_offset +=  (mtu_size - 5);
+                mCharacteristic.setValue(offset_value.getBytes());
+            } else {
+                length_offset = total_length;
+                reliable_write_no_more_data = true;
+                offset_value = String.valueOf(RdWrReliableClass.Value);
+                Log.d(TAG, "leng_offset"+length_offset+"offset_value"+offset_value.toString());
                 mCharacteristic.setValue(offset_value.getBytes());
             }
             mgattClient.mBluetoothGatt.writeCharacteristic(
@@ -1017,6 +1032,7 @@ public class GattClient {
 
         private void processGattAbortReliableWrite() {
             mgattClient.mBluetoothGatt.abortReliableWrite();
+            reliable_write = false;
         }
 
         private void processGattReadWriteDescReq(ReadWriteOp RdWrClass) {
