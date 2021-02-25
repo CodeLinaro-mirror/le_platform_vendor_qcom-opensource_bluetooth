@@ -292,6 +292,8 @@ public class ScannerService extends Service {
                     break;
                 case MSG_STOP_BLE_SCAN:
                     resetScanParams();
+                    /* Clear the list while disabling scan */
+                    MainActivity.mScanList.clear();
                     scanLeDevice(false);
                     break;
                 case MSG_SCAN_RESULT:
