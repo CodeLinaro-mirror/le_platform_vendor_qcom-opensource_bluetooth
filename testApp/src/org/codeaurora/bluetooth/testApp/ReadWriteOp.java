@@ -36,4 +36,5 @@ public class ReadWriteOp {
     String Desc_uuid;
     String Value;
     int Write_type;
+    int Format_type;
 }

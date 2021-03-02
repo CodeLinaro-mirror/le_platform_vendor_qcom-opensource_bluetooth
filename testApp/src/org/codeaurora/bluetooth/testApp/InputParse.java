@@ -337,17 +337,19 @@ public class InputParse {
                     readWriteOpParam.Value = tmp2[1];
                 } else if (tmp2[0].equals("WriteType")) {
                     readWriteOpParam.Write_type = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("FormatType")) {
+                    readWriteOpParam.Format_type = Integer.parseInt(tmp2[1]);
                 } else {
                     break;
                 }
-            }else{
+            } else {
                 break;
             }
         }
 
-        if(i == tmp.length){
+        if(i == tmp.length) {
             return readWriteOpParam;
-        }else{
+        } else {
             return null;
         }
     }

@@ -157,6 +157,8 @@ public class GattClient {
     private static final int GATT_READ = 2;
     private static final int GATT_OPTYPE_UUID = 1;
     private static final int GATT_OPTYPE_INSID = 2;
+    private static final int GATT_FORMAT_STRING = 1;
+    private static final int GATT_FORMAT_INT = 2;
 
     // Connection States
     public static final int BLE_STATE_CONNECTING = 1;
@@ -929,10 +931,22 @@ public class GattClient {
                         return;
                     }
                 }
-                mCharacteristic.setValue((RdWrClass.Value).getBytes());
-                written_value = String.valueOf(RdWrClass.Value);
-                mgattClient.mBluetoothGatt.writeCharacteristic(
-                                            mCharacteristic);
+                if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
+                     mCharacteristic.setValue((RdWrClass.Value).getBytes());
+                     written_value = String.valueOf(RdWrClass.Value);
+                     mgattClient.mBluetoothGatt.writeCharacteristic(
+                             mCharacteristic);
+                }
+                else if(RdWrClass.Format_type == GATT_FORMAT_INT){
+                     mCharacteristic.setValue(
+                           Integer.parseInt(RdWrClass.Value),
+                             BluetoothGattCharacteristic.FORMAT_UINT32,0);
+                      mgattClient.mBluetoothGatt.writeCharacteristic(
+                             mCharacteristic);
+                }
+                else{
+                      Log.e(TAG, "invalid format");
+                }
             } else {
                 Log.e(TAG, "invalid operation");
             }
