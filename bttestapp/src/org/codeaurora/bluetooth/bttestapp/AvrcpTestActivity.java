@@ -189,6 +189,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         // AddToNowPlaying
         TEST_CMD_ADD_TO_NOW_PLAYING,
 
+        // PlayItem
+        TEST_CMD_PLAY_ITEM,
+
         // ChangePath(FolderUp)
         TEST_CMD_BROWSE_UP,
 
@@ -511,6 +514,9 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             case TEST_CMD_ADD_TO_NOW_PLAYING:
                 handleAddToNowPlaying();
                 break;
+            case TEST_CMD_PLAY_ITEM:
+                handlePlayItem();
+                break;
             case TEST_CMD_BROWSE_UP:
                 handleBrowseUp();
                 break;
@@ -593,6 +599,37 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         if (!result) {
             Logger.e(TAG, "handleAddToNowPlaying fail");
         }
+    }
+
+    private void handlePlayItem() {
+        boolean result = false;
+        String folder = getFolder();
+        int scope = getScope();
+        int position = getItemPosition();
+
+        switch (scope) {
+            case AvrcpProfile.BROWSE_SCOPE_VFS:
+                Logger.d(TAG, "Play VFS item, folder: " +
+                    folder + ", position: " + position);
+                if (position == INVALID_ITEM_POSITION) {
+                    Logger.w(TAG, "Invalid position");
+                }
+                result = playItem(scope, mFolderItems, folder, position);
+                break;
+
+            case AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING:
+                result = playItem(AvrcpProfile.BROWSE_SCOPE_NOW_PLAYING, null);
+                break;
+
+            default:
+                Logger.w(TAG, "Ignore to play item in scope: " + scope);
+                break;
+        }
+
+        if (!result) {
+            Logger.e(TAG, "handlePlayItem fail");
+        }
+
     }
 
     private void handleBrowseUp() {
@@ -763,6 +800,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             cmd = TestCmd.TEST_CMD_ABORT_CONTINUING_RESPONSE;
         } else if (str.equals(this.getString(R.string.avrcp_add_to_now_playing))) {
             cmd = TestCmd.TEST_CMD_ADD_TO_NOW_PLAYING;
+        } else if (str.equals(this.getString(R.string.avrcp_play_item))) {
+            cmd = TestCmd.TEST_CMD_PLAY_ITEM;
         } else if (str.equals(this.getString(R.string.avrcp_browse_up))) {
             cmd = TestCmd.TEST_CMD_BROWSE_UP;
         } else if (str.equals(this.getString(R.string.avrcp_get_audio_config))) {
@@ -1007,12 +1046,14 @@ public class AvrcpTestActivity extends MonkeyActivity implements
                 enableValue = true;
                 value = TEST_PDU_ID;
                 break;
-            case TEST_CMD_ADD_TO_NOW_PLAYING:
             case TEST_CMD_GET_ITEM_ATTRIBUTES:
             case TEST_CMD_GET_ELEMENT_ATTRIBUTES:
             case TEST_CMD_GET_FOLDER_ITEMS:
-                enableScope = true;
                 enableAttributes = true;
+            // fallthrough
+            case TEST_CMD_ADD_TO_NOW_PLAYING:
+            case TEST_CMD_PLAY_ITEM:
+                enableScope = true;
                 enableFolder = true;
                 folder = TEST_FOLDER;
                 enableItemPosition = true;
@@ -1071,7 +1112,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             mAttributesTextView.setVisibility(View.GONE);
             mAttributes.clearCheck();
             mAttributesTextView.setVisibility(View.GONE);
-            for (int i = 0; i < mScopes.getChildCount(); i++) {
+            for (int i = 0; i < mAttributes.getChildCount(); i++) {
                 mAttributes.getChildAt(i).setEnabled(false);
                 mAttributes.getChildAt(i).setVisibility(View.GONE);
             }
@@ -1616,6 +1657,49 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             Logger.e(TAG, e.toString());
             e.printStackTrace();
         }
+    }
+
+    private boolean playItem(int scope, HashMap<String, List<MediaItem>> folderItems,
+        String folder, int position) {
+        String mediaId = null;
+        Logger.d(TAG, "playItem scope: " + scope + ", folder: " + folder + ", position: " + position);
+
+        if (position != INVALID_ITEM_POSITION) {
+            MediaItem item = getMediaItem(folderItems, folder, position);
+            if (item == null) {
+                Logger.e(TAG, "playItem, item null");
+                showTestResult("Can't find item, position " + position + " exceed max size");
+                return false;
+            }
+            // Get element's MediaId
+            mediaId = item.getMediaId();
+        } else {
+            // Get folder's MediaId
+            mediaId = getMediaId(folderItems, folder);
+        }
+
+        Logger.d(TAG, "playItem mediaId: " + mediaId);
+        if (mediaId == null) {
+            return false;
+        }
+
+        return playItem(scope, mediaId);
+    }
+
+    private boolean playItem(int scope, String mediaId) {
+        if (mAvrcp == null) {
+            Logger.e(TAG, " Service not connected ");
+            return false;
+        }
+
+        try {
+            mAvrcp.playItem(scope, mediaId);
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+
+        return true;
     }
 
     private boolean browseUp(HashMap<String, List<MediaItem>> folderItems, String folder) {
