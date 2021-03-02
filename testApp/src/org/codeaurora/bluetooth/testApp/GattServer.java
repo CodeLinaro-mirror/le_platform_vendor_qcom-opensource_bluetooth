@@ -104,7 +104,7 @@ public class GattServer{
     private Context mcontext;
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
     public static final int MSG_ADD_SERVICE_DONE = 1;
-    public static final int MSG_START_BLE_REMOVE_SERVICES = 2;
+    public static final int MSG_START_BLE_REMOVE_SERVICE = 2;
     public static final int MSG_START_BLE_CLEAR_SERVICES = 3;
     public static final int  MSG_START_BLE_GET_SERVICES = 4;
     public static int LOG_LEVEL = 3;
@@ -192,7 +192,13 @@ public class GattServer{
                     AddServ = (AddServices) msg.obj;
                     processGattAddServiceReq(AddServ);
                     break;
-
+                case MSG_START_BLE_REMOVE_SERVICE:
+                    String uuid= (String)msg.obj;
+                    processGattRemoveServiceReq(uuid);
+                    PrintStr.setLength(0);
+                    PrintStr.append("service removed sucessfully");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -255,5 +261,17 @@ public class GattServer{
             mgattServer.mBluetoothGattserver.addService(lService);
             }
         }
+
+        private void processGattRemoveServiceReq(String srvc_uuid) {
+
+          if(Service_List.containsKey(srvc_uuid.toUpperCase())) {
+            mgattServer.mBluetoothGattserver.removeService(
+                                          Service_List.get(srvc_uuid.toUpperCase()));
+            Service_List.remove(srvc_uuid.toUpperCase());
+            Log.d(TAG, "Service Removed");
+         } else {
+           Log.d(TAG, "Service Not Found");
+         }
+       }
     }
 }
