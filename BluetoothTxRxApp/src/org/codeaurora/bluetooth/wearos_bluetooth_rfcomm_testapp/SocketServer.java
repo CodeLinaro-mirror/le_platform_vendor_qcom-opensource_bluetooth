@@ -229,6 +229,7 @@ public class SocketServer {
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     OFF_ON (Ex: OFF_ON count:10)\n");
             sendStr.append("                     Set_Scan (Ex: Set_Scan mode:0/1/2)\n");
+            sendStr.append("                     Discovery (Ex: Discovery)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -356,7 +357,12 @@ public class SocketServer {
                 if (tmp[0].equals("Back")) {
                     mainMenuState = CONNECT_INIT;
                     processOutputState = CONNECT_INIT;
-                } else {
+                }else if(tmp[0].equals("Discovery")){
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_START_DISCOVERY;
+                    Utils.appControlStateMachine.sendMessage(message);
+                }else {
                     processOutputState = INVALID_INPUT;
                 }
             }
