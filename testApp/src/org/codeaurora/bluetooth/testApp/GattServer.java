@@ -199,6 +199,12 @@ public class GattServer{
                     PrintStr.append("service removed sucessfully");
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
+                case MSG_START_BLE_CLEAR_SERVICES:
+                    processGattClearServiceReq();
+                    PrintStr.setLength(0);
+                    PrintStr.append("All services sucessfully cleared");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -273,5 +279,12 @@ public class GattServer{
            Log.d(TAG, "Service Not Found");
          }
        }
+
+        private void processGattClearServiceReq() {
+
+            Log.d(TAG, "Clearing all the services");
+            mgattServer.mBluetoothGattserver.clearServices();
+            Service_List.clear();
+        }
     }
 }
