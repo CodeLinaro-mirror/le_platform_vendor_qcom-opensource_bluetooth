@@ -412,6 +412,14 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_OFF_ON:
                 break;
 
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_START_DISCOVERY:
+                mAppControlService.startDiscovery();
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_DISCOVERY:
+
+                break;
+
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 break;
 
