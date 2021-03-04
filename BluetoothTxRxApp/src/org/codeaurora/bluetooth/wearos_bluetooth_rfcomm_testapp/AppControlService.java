@@ -31,8 +31,10 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
 import static android.widget.Toast.makeText;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.Set;
 
@@ -143,7 +145,7 @@ public class AppControlService extends Service {
             if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 Log.d(TAG, "Socket Disconnected");
                 SocketServer
-                        .sendSocketData("Connection to Remote Device is Terminated");
+                .sendSocketData("Connection to Remote Device is Terminated");
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
                 mAppControlStateMachine.sendMessage(message);
@@ -164,7 +166,7 @@ public class AppControlService extends Service {
                     .getRemoteDevice(Utils.bdAddressFromConfig);
         } else {
             SocketServer
-                    .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
+            .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
             return;
         }
         startConnectionProcess();
@@ -185,7 +187,7 @@ public class AppControlService extends Service {
             if (device == null) {
                 Log.d(TAG, "ConnectThread: Remote Device is null");
                 SocketServer
-                        .sendSocketData("Remote Device is Null... Please close and restart the Process");
+                .sendSocketData("Remote Device is Null... Please close and restart the Process");
                 return;
             } else {
                 Log.d(TAG, "ConnectThread: Device is not null");
@@ -203,7 +205,7 @@ public class AppControlService extends Service {
             if (tmp == null) {
                 Log.d(TAG, "Socket is null");
                 SocketServer
-                        .sendSocketData("Communication Socket is not created... Please close and restart the Process");
+                .sendSocketData("Communication Socket is not created... Please close and restart the Process");
                 return;
             } else {
                 Log.d(TAG, "Socket is not null");
@@ -224,7 +226,7 @@ public class AppControlService extends Service {
                 } else {
                     Log.d(TAG, "Socket is null");
                     SocketServer
-                            .sendSocketData("Communication Socket is not created... Please close and restart the Process");
+                    .sendSocketData("Communication Socket is not created... Please close and restart the Process");
                     return;
                 }
                 Log.d(TAG, "Socket Connected");
@@ -334,8 +336,8 @@ public class AppControlService extends Service {
 
     public void startRxOperation() {
 
-        Thread txOperation = new Thread(rxOperationRunnable);
-        txOperation.start();
+        Thread rxOperation = new Thread(rxOperationRunnable);
+        rxOperation.start();
     }
 
     Runnable rxOperationRunnable = new Runnable() {
@@ -378,8 +380,8 @@ public class AppControlService extends Service {
                                 "write: Through put (receive) is approximately(in kbps): "
                                         + RxTputk);
                         SocketServer
-                                .sendSocketData("Throughput (receive) is (in kbps): "
-                                        + RxTputk);
+                        .sendSocketData("Throughput (receive) is (in kbps): "
+                                + RxTputk);
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
                         mAppControlStateMachine.sendMessage(message);
@@ -522,6 +524,96 @@ public class AppControlService extends Service {
         mAppControlStateMachine.sendMessage(message);
         SocketServer.processOutputState = SocketServer.CONNECTION_TEST_MENU;
         SocketServer.updateSocketClient();
+    }
+
+    public void startOnOffTestCase(int count){
+        int iterationCount = 1;
+        Log.d(TAG,"startOnOffTestCase onOffCount is ::"+count);
+        if(count > 0){
+            for(int i=count; i>0; i--){
+                try {
+                    SocketServer.sendSocketData("Iteration "+iterationCount);
+                    if(BluetoothAdapter.getDefaultAdapter().isEnabled()){
+                        runCommand(Utils.AppControlConstants.BT_OFF_COMMAND);
+                        SocketServer.sendSocketData("BT is turning Off...Please wait..!!");
+                        Thread.sleep(5000);
+                        checkForDumpsys();
+                        runCommand(Utils.AppControlConstants.BT_ON_COMMAND);
+                        SocketServer.sendSocketData("BT is turning On...Please wait..!!");
+                        Thread.sleep(8000);
+                        checkForDumpsys();
+                    }else{
+                        runCommand(Utils.AppControlConstants.BT_ON_COMMAND);
+                        SocketServer.sendSocketData("BT is turning On...Please wait..!!");
+                        Thread.sleep(8000);
+                        checkForDumpsys();
+                        runCommand(Utils.AppControlConstants.BT_OFF_COMMAND);
+                        SocketServer.sendSocketData("BT is turning Off...Please wait..!!");
+                        Thread.sleep(5000);
+                        checkForDumpsys();
+                    }
+                    iterationCount++;
+                } catch (IOException e) {
+                    Log.e(TAG,
+                            "There is an exception when running command");
+                    e.printStackTrace();
+                    SocketServer.sendSocketData("BT OFF->ON Test case failed. Please check logcat for more Info.");
+                }catch (InterruptedException e) {
+                    Log.e(TAG,
+                            "There is an exception when running command");
+                    e.printStackTrace();
+                    SocketServer.sendSocketData("BT OFF->ON Test case failed. Please check logcat for more Info.");
+                }
+            }
+        }
+        Message message = Message.obtain();
+        message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_OFF_ON;
+        mAppControlStateMachine.sendMessage(message);
+        SocketServer.processOutputState = SocketServer.CONNECTION_TEST_MENU;
+        SocketServer.updateSocketClient();
+    }
+
+    private Process runCommand(String commandToRun) throws IOException, InterruptedException{
+        Log.d(TAG,"Running command ::"+commandToRun);
+        Process pr = Runtime.getRuntime().exec(commandToRun);
+        pr.waitFor();
+        return pr;
+    }
+
+    private void checkForDumpsys() {
+        String generateDumpSys = "dumpsys bluetooth_manager";
+        try {
+            Process dumpsysPr = runCommand(generateDumpSys);
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(dumpsysPr.getInputStream()));
+            String line;
+            while((line=bufferedReader.readLine())!= null){
+                Log.d(TAG,"Data is ::"+line+ "\n");
+                if(line.contains("enabled")){
+                    String tmp[] = line.split(":", 2);
+                    if (tmp.length == 2) {
+                        if (tmp[0].trim().equals("enabled")) {
+                            Log.d(TAG, "status is ::" + tmp[1].trim());
+                            if(tmp[1].trim().equals("false")){
+                                SocketServer.sendSocketData("BT Turned Off Successfully");
+                            }else if(tmp[1].trim().equals("true")){
+                                SocketServer.sendSocketData("BT Turned On Successfully");
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            Log.e(TAG,
+                    "There is an exception while running dumpsys");
+            e.printStackTrace();
+            SocketServer.sendSocketData("BT OFF->ON Test case failed. Please check logcat for more Info.");
+        } catch (InterruptedException e) {
+            Log.e(TAG,
+                    "There is an exception while running dumpsys");
+            e.printStackTrace();
+            SocketServer.sendSocketData("BT OFF->ON Test case failed. Please check logcat for more Info.");
+        }
     }
 
 }

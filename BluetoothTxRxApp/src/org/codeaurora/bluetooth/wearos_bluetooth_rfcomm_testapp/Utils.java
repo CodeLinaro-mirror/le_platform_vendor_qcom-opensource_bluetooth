@@ -47,6 +47,8 @@ public class Utils {
         static final String BD_ADDRESS_NOT_AVAILABLE = "BD_ADDRESS_NOT_AVAILABLE";
         static final String END_TX_OPERATION = "END_TX_OPERATION";
         static final String END_RX_OPERATION = "END_RX_OPERATION";
+        static final String BT_OFF_COMMAND = "service call bluetooth_manager 8";
+        static final String BT_ON_COMMAND = "service call bluetooth_manager 6";
 
         // RFCOMM Use-case Commands
         static final String USE_CASE_RFCOMM_TPUT_TX = "USE_CASE_RFCOMM_TPUT_TX";
@@ -84,6 +86,7 @@ public class Utils {
         static final int STATE_GAP_TEST_CASE_OFF_ON = 17;
         static final int STATE_GAP_TEST_CASE_SCAN_MODE = 18;
         static final int STATE_GAP_TEST_CASE_END_SCAN_MODE = 19;
+        static final int STATE_GAP_TEST_CASE_END_OFF_ON = 20;
 
     }
 

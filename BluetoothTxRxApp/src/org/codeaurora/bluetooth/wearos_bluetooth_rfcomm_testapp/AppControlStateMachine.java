@@ -143,7 +143,7 @@ public class AppControlStateMachine extends StateMachine {
                 mAppControlService.initializeTestSetup();
             }
             SocketServer
-                    .sendSocketData("Connecting Device...Please wait...!!!");
+            .sendSocketData("Connecting Device...Please wait...!!!");
         }
 
         @Override
@@ -164,7 +164,7 @@ public class AppControlStateMachine extends StateMachine {
                 transitionTo(mInitState);
                 Log.d(TAG, "Going to Init state");
                 SocketServer
-                        .sendSocketData("Connection Failed...Please Restart Phone App");
+                .sendSocketData("Connection Failed...Please Restart Phone App");
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
@@ -230,18 +230,18 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to DataTx state");
                 Tx txParam = (Tx) message.obj;
                 SocketServer
-                        .sendSocketData("Tx Operation Started with chunkSize :"
-                                + txParam.chunkSize);
+                .sendSocketData("Tx Operation Started with chunkSize :"
+                        + txParam.chunkSize);
                 mAppControlService.startTxOperation(txParam.chunkSize);
                 break;
             case Utils.StateMachineMessageConstants.STATE_START_DATA_TX_WAKEABLE:
                 transitionTo(mDataTxState);
                 Wakeable wakeableParam = (Wakeable) message.obj;
                 SocketServer
-                        .sendSocketData("Offload Wakeable Usecase Started with timer :"
-                                + wakeableParam.timer);
+                .sendSocketData("Offload Wakeable Usecase Started with timer :"
+                        + wakeableParam.timer);
                 mAppControlService
-                        .startWakeableNotificationOperation(wakeableParam.timer);
+                .startWakeableNotificationOperation(wakeableParam.timer);
                 Log.d(TAG, "Going to DataTx state");
                 break;
             case Utils.StateMachineMessageConstants.STATE_START_DATA_TX_ACTIONABLE:
@@ -249,10 +249,10 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to DataTx state");
                 Actionable actionableParam = (Actionable) message.obj;
                 SocketServer
-                        .sendSocketData("Offload Actionable Usecase Started with timer :"
-                                + actionableParam.timer);
+                .sendSocketData("Offload Actionable Usecase Started with timer :"
+                        + actionableParam.timer);
                 mAppControlService
-                        .startActionableNotificationOperation(actionableParam.timer);
+                .startActionableNotificationOperation(actionableParam.timer);
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_START_DATA_RX:
@@ -397,12 +397,21 @@ public class AppControlStateMachine extends StateMachine {
             switch(message.what)
             {
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON:
-
+                ConnectionTest offOn = (ConnectionTest)message.obj;
+                mAppControlService.startOnOffTestCase(offOn.count);
                 break;
+
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_SCAN_MODE:
                 SetScanMode setScan = (SetScanMode) message.obj;
                 mAppControlService.setScanMode(setScan.scanMode);
                 break;
+
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_SCAN_MODE:
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_OFF_ON:
+                break;
+
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 break;
 
