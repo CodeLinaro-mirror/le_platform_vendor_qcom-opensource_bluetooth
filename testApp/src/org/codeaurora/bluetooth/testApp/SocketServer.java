@@ -271,6 +271,7 @@ public class SocketServer {
                     sendStr.append("                                                    SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                    ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
+                    sendStr.append("                     CancelConnect\n");
                     sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
@@ -640,6 +641,11 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = MainActivity.msghandler.obtainMessage(
                                     MainActivity.MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
+                            MainActivity.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("CancelConnect")) {
+                            processOutputState = NONE;
+                            msg = MainActivity.msghandler.obtainMessage(
+                                    MainActivity.MSG_GC_START_BLE_GATT_CANCEL_CONNECT, null);
                             MainActivity.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Disconnect")) {
                             processOutputState = NONE;
