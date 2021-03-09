@@ -103,8 +103,6 @@ public class MainActivity extends Activity {
     public static MainActivityMessageHandler msghandler;
 
     private Context mAppContext;
-    public static ScanList scanList;
-    public static List<ScanList> mScanList;
 
     /* Location permissions */
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
@@ -124,12 +122,10 @@ public class MainActivity extends Activity {
 
     /* Variable to keep track of calling source of scan
      (MainActivity or Gatt Client or Throughput SM) */
-    private static int scan_called = 0;
-    private static final int SCAN_CALLED_FROM_MAIN_ACTIVITY = 1;
+    public static int scan_called = 0;
+    public static final int SCAN_CALLED_FROM_MAIN_ACTIVITY = 1;
     private static final int SCAN_CALLED_FROM_GATT_CLIENT = 2;
     private static final int SCAN_CALLED_FROM_THROUGHPUT_SM = 3;
-
-    public static boolean batch_scan=false;
 
     public static WakeLock wl;
     public static boolean wl_acquired=false;
@@ -246,11 +242,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static class ScanList {
-        String devName;
-        String devAddr;
-    }
-
     /* function to check if bluetooth is turned on */
     private boolean initAdapter() {
         bleAdapter = mBluetoothManager.getAdapter();
@@ -311,8 +302,6 @@ public class MainActivity extends Activity {
 
          /* start gatt client */
          mgattclient = new GattClient(mAppContext);
-
-         mScanList = new ArrayList<ScanList>();
     }
 
     @Override
@@ -668,7 +657,7 @@ public class MainActivity extends Activity {
             }
         }
     private void processScanCb(BluetoothDevice device) {
-        Log.d(TAG, "processScanCb(main activity)"+scan_called+batch_scan);
+        Log.d(TAG, "processScanCb(main activity)"+scan_called);
         if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
             msg = mgattclient.mGattClientHandler.obtainMessage(
                         mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
@@ -678,23 +667,7 @@ public class MainActivity extends Activity {
                     throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
             throughputSMClass.mStateMachine.sendMessage(msg);
         } else {
-            if(!batch_scan){
-                /* Display scannner queue */
-                for(int i=0; i<mScanList.size(); i++){
-                    Log.d(TAG, "start of loop, processScanCb(main activity)"
-                                +mScanList.size());
-                    ScanList scanRec = mScanList.get(i);
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scan Results: Device Name - ");
-                    PrintStr.append(scanRec.devName);
-                    PrintStr.append("\t Device Address - ");
-                    PrintStr.append(scanRec.devAddr);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-                Log.d(TAG, "End of scan results");
-            } else {
-                Log.d(TAG, "End of Batch scan results");
-            }
+           /* do nothing */
         }
     }
     }

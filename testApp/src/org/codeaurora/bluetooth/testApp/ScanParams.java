@@ -109,8 +109,7 @@ public final class ScanParams {
         }
 
         if(this.ReportDelay != 0) {
-            Log.d(TAG, "Report delay" + this.ReportDelay);
-            MainActivity.batch_scan = true;
+            Log.d(TAG, "Starting batch scan with report delay" + this.ReportDelay);
         }
 
         if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2)) {
