@@ -107,16 +107,21 @@ public class GattServer{
     private BluetoothManager mManager;
     private BluetoothDevice mdevice;
     private Context mcontext;
+
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
-    public static final int MSG_ADD_SERVICE_DONE = 1;
-    public static final int MSG_START_BLE_REMOVE_SERVICE = 2;
-    public static final int MSG_START_BLE_CLEAR_SERVICES = 3;
-    public static final int MSG_START_BLE_GET_SERVICES = 4;
-    public static final int MSG_START_BLE_PHY_UPDATE = 5;
-    public static final int MSG_PHY_UPDATE_DONE = 6;
-    public static final int MSG_START_BLE_READ_PHY = 7;
-    public static final int MSG_PHY_READ_DONE = 8;
-    public static final int MSG_START_GET_CONNECTED_DEVICES = 9;
+    public static final int MSG_START_BLE_REMOVE_SERVICE = 1;
+    public static final int MSG_START_BLE_CLEAR_SERVICES = 2;
+    public static final int MSG_START_BLE_GET_SERVICES = 3;
+    public static final int MSG_START_BLE_PHY_UPDATE = 4;
+    public static final int MSG_START_BLE_READ_PHY = 5;
+    public static final int MSG_START_GET_CONNECTED_DEVICES = 6;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_GET_CONNECTED_DEVICES;
+
+    public static final int MSG_ADD_SERVICE_DONE = MSG_GS_ACTION_MAX_VALUE + 1;
+    public static final int MSG_PHY_UPDATE_DONE = MSG_GS_ACTION_MAX_VALUE + 2;
+    public static final int MSG_PHY_READ_DONE = MSG_GS_ACTION_MAX_VALUE + 3;
+    public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_PHY_READ_DONE;
+
     public static int LOG_LEVEL = 3;
     public static final int GATT_SERVER = 8;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";

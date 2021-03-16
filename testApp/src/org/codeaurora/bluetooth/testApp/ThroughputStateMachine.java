@@ -435,27 +435,27 @@ public class ThroughputStateMachine {
 
         public static final int MSG_TA_SM_DEV_FOUND = 0;
         public static final int MSG_TA_SM_BT_ADAPTER_OFF = 1;
-        public static final int MSG_TA_SM_CONNECT = 3;
-        public static final int MSG_TA_SM_REM_DEV_CONNECTED = 4;
-        public static final int MSG_TA_SM_DEV_FAILED_TO_CONNECT = 5;
-        public static final int MSG_TA_SM_DISCONNECT = 6;
-        public static final int MSG_TA_SM_DEV_DISCONNECTED = 7;
-        public static final int MSG_TA_SM_TX_TEST_DONE = 8;
-        public static final int MSG_TA_SM_RX_TEST_DONE = 9;
-        public static final int MSG_TA_SM_LAT_TEST_DONE = 10;
-        public static final int MSG_TA_SM_CONNECTION_UPDATED = 11;
-        public static final int MSG_TA_SM_PHY_UPDATED = 12;
-        public static final int MSG_TA_SM_PHY_READ_DONE = 13;
-        public static final int MSG_TA_SM_MTU_EXCHANGE_DONE = 14;
-        public static final int MSG_TA_SM_REM_DEV_PAIRED = 15;
-        public static final int MSG_TA_SM_CONN_UPDATE = 16;
-        public static final int MSG_TA_SM_UNPAIR_DEV = 17;
-        public static final int MSG_TA_SM_PHY_UPDATE = 18;
-        public static final int MSG_TA_SM_READ_PHY = 19;
-        public static final int MSG_TA_SM_DATA_TX_TEST = 20;
-        public static final int MSG_TA_SM_DATA_RX_TEST = 21;
-        public static final int MSG_TA_SM_LATENCY_TEST = 22;
-        public static final int MSG_TA_SM_PAIR_DEV = 23;
+        public static final int MSG_TA_SM_CONNECT = 2;
+        public static final int MSG_TA_SM_REM_DEV_CONNECTED = 3;
+        public static final int MSG_TA_SM_DEV_FAILED_TO_CONNECT = 4;
+        public static final int MSG_TA_SM_DISCONNECT = 5;
+        public static final int MSG_TA_SM_DEV_DISCONNECTED = 6;
+        public static final int MSG_TA_SM_TX_TEST_DONE = 7;
+        public static final int MSG_TA_SM_RX_TEST_DONE = 8;
+        public static final int MSG_TA_SM_LAT_TEST_DONE = 9;
+        public static final int MSG_TA_SM_CONNECTION_UPDATED = 10;
+        public static final int MSG_TA_SM_PHY_UPDATED = 11;
+        public static final int MSG_TA_SM_PHY_READ_DONE = 12;
+        public static final int MSG_TA_SM_MTU_EXCHANGE_DONE = 13;
+        public static final int MSG_TA_SM_REM_DEV_PAIRED = 14;
+        public static final int MSG_TA_SM_CONN_UPDATE = 15;
+        public static final int MSG_TA_SM_UNPAIR_DEV = 16;
+        public static final int MSG_TA_SM_PHY_UPDATE = 17;
+        public static final int MSG_TA_SM_READ_PHY = 18;
+        public static final int MSG_TA_SM_DATA_TX_TEST = 19;
+        public static final int MSG_TA_SM_DATA_RX_TEST = 20;
+        public static final int MSG_TA_SM_LATENCY_TEST = 21;
+        public static final int MSG_TA_SM_PAIR_DEV = 22;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
