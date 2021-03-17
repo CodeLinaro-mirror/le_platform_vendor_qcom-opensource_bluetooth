@@ -315,6 +315,9 @@ public class SocketServer {
                 mainMenuState = THROUGHPUT_MENU;
                 processOutputState = THROUGHPUT_MENU;
             } else if (inputString.equals("Back")) {
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                Utils.appControlStateMachine.sendMessage(message);
                 mainMenuState = CONNECT_INIT;
                 processOutputState = CONNECT_INIT;
             } else {
@@ -357,6 +360,9 @@ public class SocketServer {
                 if (tmp[0].equals("Back")) {
                     mainMenuState = CONNECT_INIT;
                     processOutputState = CONNECT_INIT;
+                    gapTestMessage = Message.obtain();
+                    gapTestMessage.what = Utils.StateMachineMessageConstants.STATE_END_GAP_TEST_CASES;
+                    Utils.appControlStateMachine.sendMessage(gapTestMessage);
                 }else if(tmp[0].equals("Discovery")){
                     processOutputState = NONE;
                     Message message = Message.obtain();
@@ -474,6 +480,29 @@ public class SocketServer {
 
     public static void updateSocketClient() {
         sendSocketData(INSTANCE.processOutput());
+    }
+
+    public static void cleanUp(){
+        sendSocketData("Application is Closed... Please restart");
+        if (INSTANCE.client != null) {
+            try {
+                INSTANCE.client.close();
+                Log.i(TAG, "client socket closed");
+            } catch (IOException e) {
+                Log.e(TAG, "client socket close failed");
+                e.printStackTrace();
+            }
+            if (INSTANCE.server != null) {
+                try {
+                    INSTANCE.server.close();
+                    Log.i(TAG, "server closed");
+                } catch (IOException e) {
+                    Log.e(TAG, "server close failed");
+                    e.printStackTrace();
+                }
+            }
+        }
+        INSTANCE.commHandler.interrupt();
     }
 
 }
