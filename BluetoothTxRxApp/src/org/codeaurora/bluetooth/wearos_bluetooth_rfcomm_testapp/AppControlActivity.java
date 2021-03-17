@@ -63,7 +63,8 @@ public class AppControlActivity extends Activity {
         setContentView(R.layout.activity_main);
         socServer = SocketServer.getInstance();
         Intent intent = new Intent(this, AppControlService.class);
-        bindService(intent, appControlServiceConnection, BIND_AUTO_CREATE);
+        //bindService(intent, appControlServiceConnection, BIND_AUTO_CREATE);
+        this.startService(intent);
     }
 
     @Override
@@ -77,6 +78,12 @@ public class AppControlActivity extends Activity {
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "onResume");
+    }
+
+    @Override
+    protected void onNewIntent (Intent intent){
+        super.onNewIntent(intent);
+        Log.d(TAG, "onNewIntent");
     }
 
     @Override
@@ -96,9 +103,16 @@ public class AppControlActivity extends Activity {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
         if (isBound) {
-            unbindService(appControlServiceConnection);
+            //unbindService(appControlServiceConnection);
             isBound = false;
         }
+        Intent intent = new Intent(this, AppControlService.class);
+        this.stopService(intent);
+    }
+
+    @Override
+    public void onBackPressed(){
+        moveTaskToBack(true);
     }
 
     private ServiceConnection appControlServiceConnection = new ServiceConnection() {

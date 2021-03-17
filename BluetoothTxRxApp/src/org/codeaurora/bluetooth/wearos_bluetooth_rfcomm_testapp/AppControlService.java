@@ -40,6 +40,7 @@ import java.util.Set;
 
 import android.Manifest;
 import android.app.IntentService;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -55,6 +56,9 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.util.Log;
 import android.widget.Toast;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import android.app.Notification;
 
 public class AppControlService extends Service {
     private static final String TAG = "BluetoothTxRxApp Service";
@@ -65,6 +69,7 @@ public class AppControlService extends Service {
     private Context mContext;
     ConfigFileParser parser;
     AppControlStateMachine mAppControlStateMachine;
+    private ConnectThread connectThread;
 
     public AppControlService() {
         super();
@@ -76,6 +81,17 @@ public class AppControlService extends Service {
         super.onCreate();
         mContext = this;
         Log.d(TAG, "Service onCreate");
+        Intent notificationIntent = new Intent(this, AppControlActivity.class);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                        notificationIntent, 0);
+
+        Notification notification = new NotificationCompat.Builder(this)
+                        .setContentTitle("RFCOMM Test App")
+                        .setContentText("Running...!!!")
+                        .setContentIntent(pendingIntent).build();
+
+        startForeground(1337, notification);
         if (!initAdapter()) {
             Log.d(TAG, "Unexpected error: Turning off BT");
         } else {
@@ -94,8 +110,14 @@ public class AppControlService extends Service {
 
     @Override
     public void onDestroy() {
+        Log.d(TAG,"onDestroy");
         super.onDestroy();
         mContext = null;
+        unregisterReceiver(eventReceiver);
+        if(mAppControlStateMachine != null){
+            mAppControlStateMachine.cleanUp();
+        }
+        SocketServer.cleanUp();
     }
 
     private final IBinder localBinder = new MyBinder();
@@ -148,9 +170,7 @@ public class AppControlService extends Service {
                 Log.d(TAG, "Socket Disconnected");
                 SocketServer
                 .sendSocketData("Connection to Remote Device is Terminated");
-                Message message = Message.obtain();
-                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
-                mAppControlStateMachine.sendMessage(message);
+                SocketServer.updateSocketClient();
             } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 SocketServer.sendSocketData("Discovery Started");
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED
@@ -184,8 +204,13 @@ public class AppControlService extends Service {
 
     public void startConnectionProcess() {
         Log.d(TAG, "startConnectionProcess");
-        ConnectThread connectThread = new ConnectThread(btDeviceToPair);
+        connectThread = new ConnectThread(btDeviceToPair);
         connectThread.start();
+    }
+
+    public void closeConnection(){
+        Log.d(TAG,"closeConnection");
+        connectThread.cancel();
     }
 
     private class ConnectThread extends Thread {
@@ -262,12 +287,15 @@ public class AppControlService extends Service {
 
         public void cancel() {
             try {
-                mmSocket.close();
-                mmSocket.getInputStream().close();
-                mmSocket.getOutputStream().close();
-                Message message = Message.obtain();
-                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
-                mAppControlStateMachine.sendMessage(message);
+                if(mmSocket != null){
+                    if(mmSocket.getInputStream() != null){
+                        mmSocket.getInputStream().close();
+                    }
+                    if(mmSocket.getOutputStream() != null){
+                        mmSocket.getOutputStream().close();
+                    }
+                    mmSocket.close();
+                }
             } catch (IOException e) {
                 Log.e(TAG, "Could not close the client socket", e);
             }
