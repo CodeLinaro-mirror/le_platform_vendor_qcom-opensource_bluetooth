@@ -86,6 +86,12 @@ public class AppControlStateMachine extends StateMachine {
         setInitialState(mInitState);
     }// end of constructor
 
+    public void cleanUp(){
+        mAppControlService = null;
+        quitNow();
+        Utils.appControlStateMachine = null;
+    }
+
     private class InitState extends State {
         private static final String TAG = "BluetoothTxRxApp Init State";
 
@@ -119,12 +125,6 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to Ready to Connect state");
                 break;
 
-            case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
-                transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
-                SocketServer.updateSocketClient();
-                break;
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
                 break;
@@ -263,10 +263,8 @@ public class AppControlStateMachine extends StateMachine {
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
-                SocketServer.updateSocketClient();
                 break;
             }
             return retvalue;
@@ -418,6 +416,10 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_DISCOVERY:
 
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_END_GAP_TEST_CASES:
+                transitionTo(mInitState);
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:

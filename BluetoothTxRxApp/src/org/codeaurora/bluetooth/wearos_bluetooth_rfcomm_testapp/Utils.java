@@ -89,6 +89,7 @@ public class Utils {
         static final int STATE_GAP_TEST_CASE_END_OFF_ON = 20;
         static final int STATE_GAP_TEST_CASE_START_DISCOVERY = 21;
         static final int STATE_GAP_TEST_CASE_END_DISCOVERY = 22;
+        static final int STATE_END_GAP_TEST_CASES = 23;
 
     }
 
