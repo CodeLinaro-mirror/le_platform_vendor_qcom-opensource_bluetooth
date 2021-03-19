@@ -292,6 +292,9 @@ public class GattClient {
                     mServices = gatt.getServices();
                     if (mServices == null || mServices.size() <= 0) {
                         Log.e(TAG, "no services found");
+                        PrintStr.setLength(0);
+                        PrintStr.append("No services found!");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         return;
                     }
                     for (BluetoothGattService service : mServices) {
@@ -395,7 +398,7 @@ public class GattClient {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "onCharacteristicWrite: " + status);
                     msg = mGattClientHandler.obtainMessage(MSG_CHAR_WRITE_DONE,
-                              characteristic.getValue().toString());
+                            new String(characteristic.getValue()));
                     mGattClientHandler.sendMessage(msg);
                     if(reliable_write) {
                         String value = new String(characteristic.getValue());
@@ -430,6 +433,9 @@ public class GattClient {
                                         reliable_write_no_more_data = false;
                                     } else {
                                         Log.e(TAG, "Execute Write Failed!");
+                                        PrintStr.setLength(0);
+                                        PrintStr.append("Execute Write failed!");
+                                        SocketServer.sendSocketData(PrintStr.toString());
                                     }
                             }
                         } else {
@@ -540,6 +546,9 @@ public class GattClient {
                 Log.i(TAG, "Pairing!");
                 if(!mDevice.createBond(TRANSPORT_LE)) {
                     Log.i(TAG, "couldn't start pairing");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Pairing failed!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
                 MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_GATT_CLIENT;
             }
@@ -554,6 +563,9 @@ public class GattClient {
                 Log.i(TAG, "Unpairing!");
                 if(!mDevice.removeBond()) {
                     Log.i(TAG, "couldn't start unpairing");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Unpairing failed!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             MainActivity.pairing_called = 0;
             }
@@ -814,6 +826,10 @@ public class GattClient {
                                                 ConnUpdateClass.ConnSupTO, 0, 0);
                 } else {
                     Log.d(TAG, "Conn Update can't be done");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Conn update failed: SDK version should be 28 or higher!");
+                    SocketServer.sendSocketData(PrintStr.toString());
+
                 }
             } catch (Exception e) {
                 Log.d(TAG, "Interrupted while waiting for operation to complete");
@@ -837,6 +853,9 @@ public class GattClient {
                     Log.i(TAG, "Execute Write Successful!");
                 } else {
                     Log.e(TAG, "Execute Write Failed!");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Execute Write failed!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
                 reliable_write = false;
                 length_offset = 0;
@@ -874,6 +893,9 @@ public class GattClient {
             Log.i(TAG, "Refresh Services");
             if(!(mgattClient.mBluetoothGatt.refresh())) {
                 Log.e(TAG, "Refresh services failed");
+                PrintStr.setLength(0);
+                PrintStr.append("Refresh services failed!");
+                SocketServer.sendSocketData(PrintStr.toString());
             } else {
                 Message msg;
                 msg = mGattClientHandler.obtainMessage(MSG_REFRESH_SERV_DONE, null);
@@ -897,10 +919,16 @@ public class GattClient {
                 Log.d(TAG, "Service is found");
                 if (!mCharUUID.contains(UUID.fromString(RdWrClass.Char_uuid))) {
                     Log.e(TAG, "Characteristic not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
             } else {
                 Log.e(TAG, "Service is not found");
+                PrintStr.setLength(0);
+                PrintStr.append("Service not found!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
             mService = mgattClient.mBluetoothGatt.getService(UUID.fromString(
@@ -914,6 +942,9 @@ public class GattClient {
                 status = mgattClient.mBluetoothGatt.readCharacteristic(mCharacteristic);
                 if(status != true)
                     Log.e(TAG, "Read Char failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Read Char failed!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
 
@@ -927,6 +958,10 @@ public class GattClient {
                                 BluetoothGattCharacteristic.WRITE_TYPE_SIGNED)) {
                         Log.e(TAG, "Write failed: Length cannot be more than" +
                                 "ATT_MTU-15 for signed write");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Write failed: Length cannot be more than" +
+                                "ATT_MTU-15 for write!");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         return;
                     }
                     else if ((RdWrClass.Value.length() >= (mtu_size - 3)) &&
@@ -934,6 +969,10 @@ public class GattClient {
                                     BluetoothGattCharacteristic.WRITE_TYPE_SIGNED)) {
                         Log.e(TAG, "Write failed: Length cannot be more than" +
                                 "ATT_MTU-3 for write");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Write failed: Length cannot be more than" +
+                                "ATT_MTU-3 for write!");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         return;
                     }
                 } else {
@@ -942,6 +981,10 @@ public class GattClient {
                     if(RdWrClass.Value.length() >= (mtu_size - 3)) {
                         Log.e(TAG, "Write failed: Length cannot be more than" +
                                 "ATT_MTU-3 for write");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Write failed: Length cannot be more than" +
+                                "ATT_MTU-3 for write!");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         return;
                     }
                 }
@@ -963,6 +1006,9 @@ public class GattClient {
                 }
             } else {
                 Log.e(TAG, "invalid operation");
+                PrintStr.setLength(0);
+                PrintStr.append("Invalid Operation!");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
@@ -977,6 +1023,9 @@ public class GattClient {
             if(mServiceUUID.contains(UUID.fromString(RdWrClass.Srvc_uuid))) {
                 if (!mCharUUID.contains(UUID.fromString(RdWrClass.Char_uuid))) {
                     Log.e(TAG, "Characteristic not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
                 mService = mgattClient.mBluetoothGatt.getService(UUID.fromString(
@@ -987,10 +1036,16 @@ public class GattClient {
                                           CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR);
                 if (mDescriptor == null) {
                     Log.e(TAG, "Descriptor not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
              } else {
                 Log.e(TAG, "Service is not found");
+                PrintStr.setLength(0);
+                PrintStr.append("Service not found!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
 
@@ -1009,6 +1064,9 @@ public class GattClient {
            if(mServiceUUID.contains(UUID.fromString(RdWrClass.Srvc_uuid)))  {
                 if (!mCharUUID.contains(UUID.fromString(RdWrClass.Char_uuid))) {
                     Log.e(TAG, "Characteristic not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
                 mService = mgattClient.mBluetoothGatt.getService(UUID.fromString(
@@ -1019,10 +1077,16 @@ public class GattClient {
                                           CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR);
                 if (mDescriptor == null) {
                     Log.e(TAG, "Descriptor not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append(" Descriptor not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
             } else {
                 Log.e(TAG, "Service is not found");
+                PrintStr.setLength(0);
+                PrintStr.append("Service not found!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
             mgattClient.mBluetoothGatt.setCharacteristicNotification(mCharacteristic, false);
@@ -1040,10 +1104,16 @@ public class GattClient {
                 Log.d(TAG, "mService is not null");
                 if (!mCharUUID.contains(UUID.fromString(RdWrReliableClass.Char_uuid))) {
                     Log.e(TAG, "Characteristic not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
             } else {
                 Log.e(TAG, "Service is not found");
+                PrintStr.setLength(0);
+                PrintStr.append("Service not found!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
 
@@ -1056,6 +1126,9 @@ public class GattClient {
                 Log.i(TAG, "beginReliableWrite successful!");
             } else {
                 Log.e(TAG, "beginReliableWrite failed");
+                PrintStr.setLength(0);
+                PrintStr.append("ReliableWrite failed!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 return;
             }
 
@@ -1093,13 +1166,22 @@ public class GattClient {
            if(mServiceUUID.contains(UUID.fromString(RdWrClass.Srvc_uuid)))  {
                 if (!mCharUUID.contains(UUID.fromString(RdWrClass.Char_uuid))) {
                     Log.e(TAG, "Characteristic not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Characteristic not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
                if (!mDescUUID.contains(UUID.fromString(RdWrClass.Desc_uuid))) {
                     Log.e(TAG, "Descriptor not found");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Descriptor not found!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
             } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Service not found!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 Log.e(TAG, "Service is not found");
                 return;
             }
@@ -1113,8 +1195,13 @@ public class GattClient {
 
             if(RdWrClass.operation == GATT_READ) {
                 status = mgattClient.mBluetoothGatt.readDescriptor(mDescriptor);
-                if(status != true)
+                if(status != true) {
                     Log.e(TAG, "Read Desc failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Read Desc failed!");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+
                 return;
             }
 
@@ -1123,6 +1210,9 @@ public class GattClient {
                 mgattClient.mBluetoothGatt.writeDescriptor(mDescriptor);
             } else {
                 Log.e(TAG, "invalid operation");
+                PrintStr.setLength(0);
+                PrintStr.append("Invalid Operation!");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
     }
