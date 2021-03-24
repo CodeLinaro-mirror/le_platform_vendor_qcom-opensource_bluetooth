@@ -297,6 +297,7 @@ public class SocketServer {
                     sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10;Permissions:0x01;Value:0x12)\n");
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       ClearServices\n");
+                    sendStr.append("                       GetServices\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -698,17 +699,22 @@ public class SocketServer {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if(tmp.length == 1) {
-                         if (tmp[0].equals("Back")) {
+                        if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = MAIN_MENU;
-                         } else if(tmp[0].equals("ClearServices")) {
+                        } else if(tmp[0].equals("ClearServices")) {
                              processOutputState = NONE;
                              msg = MainActivity.msghandler.obtainMessage(
                                         MainActivity.MSG_GS_START_BLE_CLEAR_SERVICES, null);
                              MainActivity.msghandler.sendMessage(msg);
-                         } else {
-                             processOutputState = INVALID_INPUT;
-                         }
+                        } else if(tmp[0].equals("GetServices")) {
+                             processOutputState = NONE;
+                             msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_GET_SERVICES, null);
+                             MainActivity.msghandler.sendMessage(msg);
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                       }
                     } else {
                      processOutputState = INVALID_INPUT;
                     }
