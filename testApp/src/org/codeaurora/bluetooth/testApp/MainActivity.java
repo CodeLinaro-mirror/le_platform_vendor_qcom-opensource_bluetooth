@@ -187,6 +187,7 @@ public class MainActivity extends Activity {
     public static final int MSG_GS_START_BLE_CLEAR_SERVICES = 55;
     public static final int MSG_GS_START_BLE_CONNECT = 56;
     public static final int MSG_GS_START_BLE_PHY_UPDATE = 57;
+    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = 58;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -698,6 +699,11 @@ public class MainActivity extends Activity {
                 case MSG_GS_START_BLE_READ_PHY:
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                               mgattserver.MSG_START_BLE_READ_PHY, null);
+                     mgattserver.mGattServerHandler.sendMessage(msg);
+                     break;
+                case MSG_GS_START_GET_CONNECTED_DEVICES:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                             mgattserver.MSG_START_GET_CONNECTED_DEVICES, null);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 default:
