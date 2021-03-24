@@ -97,16 +97,22 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 
 public class GattServer{
+    /* Variable to update phy */
+    public static int txPhyReq;
+    public static int rxPhyReq;
     public GattServerMessageHandler mGattServerHandler = null;
     public BleGattServer mgattServer;
     public HashMap<String,BluetoothGattService> Service_List;
     private BluetoothManager mManager;
+    private BluetoothDevice mdevice;
     private Context mcontext;
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
     public static final int MSG_ADD_SERVICE_DONE = 1;
     public static final int MSG_START_BLE_REMOVE_SERVICE = 2;
     public static final int MSG_START_BLE_CLEAR_SERVICES = 3;
     public static final int  MSG_START_BLE_GET_SERVICES = 4;
+    public static final int MSG_START_BLE_PHY_UPDATE = 5;
+    public static final int MSG_PHY_UPDATE_DONE = 6;
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
@@ -158,6 +164,34 @@ public class GattServer{
                      SocketServer.sendSocketData(PrintStr.toString());
                  }
              }
+
+             @Override
+             public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
+                   mdevice = device;
+                   Log.d(TAG, "onConnectionStateChange() got connection event");
+             }
+
+             @Override
+             public void onPhyUpdate(BluetoothDevice device, int txPhy, int rxPhy, int status) {
+                if ((status == GATT_SUCCESS)) {
+                    Log.i(TAG, "on Phy updated:"
+                         + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
+                    if(txPhyReq == txPhy || rxPhyReq == rxPhy) {
+                        PhyUpdate tmp_phy = new PhyUpdate();
+                        tmp_phy.txPhy = txPhy;
+                        tmp_phy.rxPhy = rxPhy;
+                        msg = mGattServerHandler.obtainMessage(
+                                         MSG_PHY_UPDATE_DONE, tmp_phy);
+                        mGattServerHandler.sendMessage(msg);
+                        txPhyReq = rxPhyReq = 0;
+                    }
+                } else {
+                    Log.i(TAG, "phy update failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Phy Update failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+             }
         };
 
         public void startServer(){
@@ -165,15 +199,12 @@ public class GattServer{
         mBluetoothGattserver= mManager.openGattServer(mcontext,
                                       mGattServerCallbacks,BluetoothDevice.TRANSPORT_LE);
         }
-
     }
 
     public class GattServerMessageHandler extends Handler {
         Context mMsgContext;
         private static final String TAG = "GattServerMessageHandler";
-
         int operation_request;
-
         public GattServerMessageHandler(Context contxt, Looper looper) {
             super(looper);
             mMsgContext = contxt;
@@ -208,11 +239,24 @@ public class GattServer{
                 case MSG_START_BLE_GET_SERVICES:
                     processGattGetServiceReq();
                     break;
+                case MSG_START_BLE_PHY_UPDATE:
+                    PhyUpdate phyUpdate = (PhyUpdate) msg.obj;
+                    processPhyUpdateReq(phyUpdate);
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
                     PrintStr.append("service added with UUID :");
                     PrintStr.append(interal);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_PHY_UPDATE_DONE:
+                    PrintStr.setLength(0);
+                    phyUpdate = (PhyUpdate) msg.obj;
+                    PrintStr.append("Phy Update done, Tx Phy :");
+                    PrintStr.append(phyUpdate.txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(phyUpdate.rxPhy);
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
             }
@@ -276,10 +320,19 @@ public class GattServer{
                                           Service_List.get(srvc_uuid.toUpperCase()));
             Service_List.remove(srvc_uuid.toUpperCase());
             Log.d(TAG, "Service Removed");
-         } else {
-           Log.d(TAG, "Service Not Found");
+           } else {
+            Log.d(TAG, "Service Not Found");
+           }
          }
-       }
+
+        private void processPhyUpdateReq(PhyUpdate phyUpdate) {
+
+            txPhyReq = phyUpdate.txPhy;
+            rxPhyReq = phyUpdate.rxPhy;
+            Log.i(TAG, "Phy Update");
+            mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,phyUpdate.txPhy,
+                                        phyUpdate.rxPhy, phyUpdate.phyOpt);
+        }
 
         private void processGattClearServiceReq() {
 
