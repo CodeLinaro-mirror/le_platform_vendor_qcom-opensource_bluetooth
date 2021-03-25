@@ -111,6 +111,7 @@ public class GattClient {
     public static int rxPhyReq;
 
     public static BluetoothAdapter bleAdapter;
+    public Looper glooper;
 
     public BleGattClient mgattClient;
     private Context mcontext;
@@ -191,9 +192,9 @@ public class GattClient {
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattClientHandler");
         thread.start();
-        Looper looper = thread.getLooper();
+        glooper = thread.getLooper();
 
-        mGattClientHandler = new GattClientMessageHandler(mcontext, looper);
+        mGattClientHandler = new GattClientMessageHandler(mcontext, glooper);
 
         mServices = new ArrayList<BluetoothGattService>();
         mCharacteristics = new ArrayList<BluetoothGattCharacteristic>();
@@ -202,6 +203,17 @@ public class GattClient {
         mServiceUUID = new ArrayList<UUID>();
         mCharUUID = new ArrayList<UUID>();
         mDescUUID = new ArrayList<UUID>();
+    }
+
+    public void cleanup() {
+        Log.i(TAG, "cleanup");
+        /* disconnect the link */
+        if(mConnectionStatus == BLE_STATE_CONNECTED) {
+            Log.e(TAG, "in cleanup disconnect");
+            mGattClientHandler.processDisconnectReq();
+        }
+        /* stop the looper */
+        glooper.quitSafely();
     }
 
     /* function to print the message on display */
