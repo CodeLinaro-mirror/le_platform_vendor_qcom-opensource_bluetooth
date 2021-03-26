@@ -318,8 +318,6 @@ public class SocketServer {
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
                 Utils.appControlStateMachine.sendMessage(message);
-                mainMenuState = CONNECT_INIT;
-                processOutputState = CONNECT_INIT;
             } else {
                 processOutputState = INVALID_INPUT;
             }
@@ -355,6 +353,8 @@ public class SocketServer {
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
+                }else{
+                    processOutputState = INVALID_INPUT;
                 }
             }else if (tmp.length == 1) {
                 if (tmp[0].equals("Back")) {
@@ -371,6 +371,8 @@ public class SocketServer {
                 }else {
                     processOutputState = INVALID_INPUT;
                 }
+            }else {
+                processOutputState = INVALID_INPUT;
             }
             break;
 
