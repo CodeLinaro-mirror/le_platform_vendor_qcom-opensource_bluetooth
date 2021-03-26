@@ -15,7 +15,6 @@ android_app {
     },
     static_libs: [
         "androidx.legacy_legacy-support-v13",
-        "androidx.appcompat_appcompat",
     ],
     platform_apis: true,
 }
