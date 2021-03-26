@@ -265,6 +265,9 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
+                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
+                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                SocketServer.updateSocketClient();
                 break;
             }
             return retvalue;
@@ -304,6 +307,7 @@ public class AppControlStateMachine extends StateMachine {
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                mAppControlService.closeConnection();
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;
@@ -342,6 +346,7 @@ public class AppControlStateMachine extends StateMachine {
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                mAppControlService.closeConnection();
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;

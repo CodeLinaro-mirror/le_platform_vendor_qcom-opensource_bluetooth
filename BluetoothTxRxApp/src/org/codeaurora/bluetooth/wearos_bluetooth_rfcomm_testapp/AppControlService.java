@@ -167,10 +167,19 @@ public class AppControlService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                Log.d(TAG, "Socket Disconnected");
-                SocketServer
-                .sendSocketData("Connection to Remote Device is Terminated");
-                SocketServer.updateSocketClient();
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if(Utils.bdAddressFromConfig != null && device != null){
+                    Log.d(TAG,"Disconnected Device :: "+device.getAddress());
+                    Log.d(TAG,"RFCOMM Test App Connected Device :: "+Utils.bdAddressFromConfig);
+                    if(Utils.bdAddressFromConfig.equalsIgnoreCase(device.getAddress())){
+                        Log.d(TAG, "Socket Disconnected");
+                        SocketServer
+                        .sendSocketData("Connection to Remote Device " +device.getAddress()+" is Terminated");
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                        Utils.appControlStateMachine.sendMessage(message);
+                    }
+                }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 SocketServer.sendSocketData("Discovery Started");
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED
