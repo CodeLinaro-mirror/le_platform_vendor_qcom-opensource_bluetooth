@@ -119,7 +119,7 @@ typedef void (*register_client_callback)(int status, int client_if,
                 bt_uuid_t *app_uuid);
 
 /** Callback for scan results */
-typedef void (*scan_result_callback)(bt_bdaddr_t* bda, int rssi, uint8_t* adv_data);
+typedef void (*scan_result_callback)(bt_bdaddr_t* bda, int rssi, uint8_t* adv_data, uint16_t adv_data_len);
 
 /** GATT open callback invoked in response to open */
 typedef void (*connect_callback)(int conn_id, int status, int client_if, bt_bdaddr_t* bda);
