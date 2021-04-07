@@ -432,7 +432,8 @@ public class AppControlService extends Service {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
                         mAppControlStateMachine.sendMessage(message);
-                        break;
+                        totalBytes = 0;
+                        //break;
                     }
 
                     if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
