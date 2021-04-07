@@ -371,7 +371,7 @@ public class ThroughputStateMachine {
         };
 
         public void connect(BluetoothDevice device){
-            if(MainActivity.bleAdapter!=null) {
+            if(BleAppService.bleAdapter!=null) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
                 mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
@@ -384,7 +384,7 @@ public class ThroughputStateMachine {
                 if(!mDevice.createBond(TRANSPORT_LE)) {
                     Log.i(TAG, "couldn't start pairing");
                 }
-                MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_THROUGHPUT_SM;
+                BleAppService.pairing_called = BleAppService.PAIRING_REQ_FROM_THROUGHPUT_SM;
             }
             else {
                 Log.i(TAG, "Already Paired!");
@@ -400,7 +400,7 @@ public class ThroughputStateMachine {
                 PrintStr.setLength(0);
                 PrintStr.append("Device unpaired");
                 SocketServer.sendSocketData(PrintStr.toString());
-                MainActivity.pairing_called = 0;
+                BleAppService.pairing_called = 0;
             }
         }
 
@@ -472,7 +472,7 @@ public class ThroughputStateMachine {
         private TestAppThroughputStateMachine(Context context) {
             super("TestAppThroughputStateMachine");
             mContext = context;
-            MainActivity.stateMachinestarted = true;
+            BleAppService.stateMachinestarted = true;
 
             mTAIdle = new TAIdle();
             mTAConnectPending = new TAConnectPending();
@@ -496,7 +496,7 @@ public class ThroughputStateMachine {
         public void doQuit() {
             Log.i("TestAppThroughputStateMachine", "Quit");
             synchronized (TestAppThroughputStateMachine.this) {
-                MainActivity.stateMachinestarted = false;
+                BleAppService.stateMachinestarted = false;
                 quitNow();
             }
         }
@@ -526,12 +526,12 @@ public class ThroughputStateMachine {
                         break;
                     case MSG_TA_SM_CONNECT:
                         Scan scn = (Scan)message.obj;
-                        if(MainActivity.mScannerService.mScanstatus) {
+                        if(BleAppService.mScannerService.mScanstatus) {
                             PrintStr.setLength(0);
                             PrintStr.append("Connect failed, there is an ongoing scan");
                             SocketServer.sendSocketData(PrintStr.toString());
                         }else {
-                            MainActivity.mScannerService.set_scan_parameters(scn);
+                            BleAppService.mScannerService.set_scan_parameters(scn);
                             PrintStr.setLength(0);
                             PrintStr.append("Scanning Started!");
                             SocketServer.sendSocketData(PrintStr.toString());
@@ -549,8 +549,8 @@ public class ThroughputStateMachine {
 
             private void processSMDevFoundEvent(BluetoothDevice device) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
-                if(MainActivity.mScannerService.mScanstatus) {
-                    MainActivity.mScannerService.stopScan();
+                if(BleAppService.mScannerService.mScanstatus) {
+                    BleAppService.mScannerService.stopScan();
                 }
                 mBleConnect.connect(device);
                 transitionTo(mTAConnectPending);
@@ -607,7 +607,7 @@ public class ThroughputStateMachine {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                if(MainActivity.isActivityRunning == false){
+                if(BleAppService.isServiceRunning == false) {
                     transitionTo(mTADisconnect);
                 }
             }

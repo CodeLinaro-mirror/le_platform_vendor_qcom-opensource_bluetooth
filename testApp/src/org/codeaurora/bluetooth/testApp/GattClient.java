@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
@@ -533,7 +538,7 @@ public class GattClient {
         };
 
         public void connect(BluetoothDevice device){
-            if((MainActivity.bleAdapter!=null) && (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
+            if((BleAppService.bleAdapter!=null) && (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
                 mConnectionStatus = BLE_STATE_CONNECTING;
@@ -550,7 +555,7 @@ public class GattClient {
                     PrintStr.append("Pairing failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
-                MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_GATT_CLIENT;
+                BleAppService.pairing_called = BleAppService.PAIRING_REQ_FROM_GATT_CLIENT;
             }
         }
 
@@ -567,7 +572,7 @@ public class GattClient {
                     PrintStr.append("Unpairing failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
-            MainActivity.pairing_called = 0;
+            BleAppService.pairing_called = 0;
             }
         }
 
@@ -607,7 +612,7 @@ public class GattClient {
                 case MSG_START_BLE_CONNECT:
                     /* start scan with filters and initiate conn with the result */
                     Scan scn = (Scan) msg.obj;
-                    if(MainActivity.mScannerService.mScanstatus) {
+                    if(BleAppService.mScannerService.mScanstatus) {
                         PrintStr.setLength(0);
                         PrintStr.append("Connect failed, there is an ongoing scan");
                         SocketServer.sendSocketData(PrintStr.toString());
@@ -781,8 +786,8 @@ public class GattClient {
         }
 
         private void processCheckAndStartBleScan(Scan scn) {
-            Log.i(TAG, "scanflag set,service bound: " + MainActivity.boundS);
-            MainActivity.mScannerService.set_scan_parameters(scn);
+            Log.i(TAG, "scanflag set,service bound: " + BleAppService.boundS);
+            BleAppService.mScannerService.set_scan_parameters(scn);
 
             PrintStr.setLength(0);
             PrintStr.append("Scanning Started!");
@@ -791,9 +796,9 @@ public class GattClient {
 
         private void processCancelConnect() {
             Log.i(TAG, "processCancelConnect mConnectionStatus: " + mConnectionStatus
-                    + " mScanStatus: "+ MainActivity.mScannerService.mScanstatus);
-            if(MainActivity.mScannerService.mScanstatus) {
-                MainActivity.mScannerService.stopScan();
+                    + " mScanStatus: "+ BleAppService.mScannerService.mScanstatus);
+            if(BleAppService.mScannerService.mScanstatus) {
+                BleAppService.mScannerService.stopScan();
                 PrintStr.setLength(0);
                 PrintStr.append("Scan Stopped!");
                 SocketServer.sendSocketData(PrintStr.toString());
@@ -808,8 +813,8 @@ public class GattClient {
 
         private void processScanDevFound(BluetoothDevice device) {
             Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
-            if(MainActivity.mScannerService.mScanstatus) {
-                MainActivity.mScannerService.stopScan();
+            if(BleAppService.mScannerService.mScanstatus) {
+                BleAppService.mScannerService.stopScan();
             }
             mgattClient.connect(device);
         }
