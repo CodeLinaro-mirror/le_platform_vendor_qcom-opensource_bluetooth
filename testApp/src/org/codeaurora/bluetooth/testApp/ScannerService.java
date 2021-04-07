@@ -84,7 +84,7 @@ public class ScannerService extends Service {
     private List<BluetoothDevice> mDeviceList;
     public List<ScanResult> mScanResult;
     private List<Integer> mRssiList;
-    private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
+    private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
     private BluetoothLeScanner mBleScanner;
 
 
@@ -222,7 +222,7 @@ public class ScannerService extends Service {
             mScanResult.add(r);
 
             StringBuilder PrintStr = new StringBuilder();
-            if(MainActivity.scan_called == MainActivity.SCAN_CALLED_FROM_MAIN_ACTIVITY){
+            if(BleAppService.scan_called == BleAppService.SCAN_CALLED_FROM_MAIN_ACTIVITY){
                 /* Display scannner queue */
                 PrintStr.setLength(0);
                 PrintStr.append("==================================================\n");
@@ -259,9 +259,9 @@ public class ScannerService extends Service {
                 SocketServer.sendSocketData(PrintStr.toString());
             }
 
-            Message msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
-            MainActivity.msghandler.sendMessage(msg);
+            Message msg = BleAppService.msghandler.obtainMessage(
+                      BleAppService.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
+            BleAppService.msghandler.sendMessage(msg);
         }
 
         @Override
@@ -321,9 +321,9 @@ public class ScannerService extends Service {
                         PrintStr.append(scanRes.getTimestampNanos());
                         SocketServer.sendSocketData(PrintStr.toString());
                     }
-                    Message msg = MainActivity.msghandler.obtainMessage(
-                          MainActivity.MSG_MA_SCAN_DEV_FOUND, results.get(0).getDevice());
-                    MainActivity.msghandler.sendMessage(msg);
+                    Message msg = BleAppService.msghandler.obtainMessage(
+                          BleAppService.MSG_MA_SCAN_DEV_FOUND, results.get(0).getDevice());
+                    BleAppService.msghandler.sendMessage(msg);
                 }
             }
         }

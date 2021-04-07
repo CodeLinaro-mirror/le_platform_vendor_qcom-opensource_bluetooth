@@ -51,6 +51,10 @@
         android:label="@string/app_name" >
   
         <service
+            android:name=".BleAppService"
+            android:enabled="true"
+            android:exported="false"></service>
+        <service
             android:name=".AdvertiserService"
             android:enabled="true"
             android:exported="false"></service>

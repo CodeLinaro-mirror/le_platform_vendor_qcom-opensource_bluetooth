@@ -369,17 +369,17 @@ public class SocketServer {
                             Adv advParam = parse.AdvParse(tmp[1]);
                             if (advParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_MA_START_BLE_ADV, advParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_START_BLE_ADV, advParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if (tmp[0].equals("AdvStop")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_STOP_BLE_ADV,
+                            msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_MA_STOP_BLE_ADV,
                                     Integer.parseInt(tmp[1]));
-                            MainActivity.msghandler.sendMessage(msg);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
@@ -402,9 +402,9 @@ public class SocketServer {
                             Scan scanParam = parse.ScanParse(tmp[1]);
                             if (scanParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_START_BLE_SCAN,
+                                msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_MA_START_BLE_SCAN,
                                         scanParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -414,8 +414,8 @@ public class SocketServer {
                     } else if (tmp.length == 1) {
                         if (tmp[0].equals("ScanStop")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_STOP_BLE_SCAN, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_MA_STOP_BLE_SCAN, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = MAIN_MENU;
@@ -434,9 +434,9 @@ public class SocketServer {
                             Scan scanParam = parse.ScanParse(tmp[1]);
                             if (scanParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_SM_START_BLE_CONNECT,
+                                msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_SM_START_BLE_CONNECT,
                                         scanParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -444,9 +444,9 @@ public class SocketServer {
                             ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
                             if (connUpdateParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_SM_START_BLE_CONN_UPDATE, connUpdateParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_CONN_UPDATE, connUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -454,9 +454,9 @@ public class SocketServer {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_SM_START_BLE_PHY_UPDATE, phyUpdateParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_PHY_UPDATE, phyUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -464,9 +464,9 @@ public class SocketServer {
                             DataTx dataTxParam = parse.DataTxParse(tmp[1]);
                             if (dataTxParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_SM_START_BLE_DATA_TX_TEST, dataTxParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_DATA_TX_TEST, dataTxParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -474,9 +474,9 @@ public class SocketServer {
                             DataRx dataRxParam = parse.DataRxParse(tmp[1]);
                             if (dataRxParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_SM_START_BLE_DATA_RX_TEST, dataRxParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_DATA_RX_TEST, dataRxParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -484,9 +484,9 @@ public class SocketServer {
                             LatencyTest latencyTestParam = parse.LatencyTestParse(tmp[1]);
                             if (latencyTestParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_SM_START_BLE_LATENCY_TEST, latencyTestParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_LATENCY_TEST, latencyTestParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -496,24 +496,24 @@ public class SocketServer {
                     } else if (tmp.length == 1) {
                         if (tmp[0].equals("ReadPhy")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_SM_START_BLE_READ_PHY, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_START_BLE_READ_PHY, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Pair")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_SM_START_BLE_PAIR, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_START_BLE_PAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("UnPair")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_SM_START_BLE_UNPAIR, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_START_BLE_UNPAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Disconnect")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_SM_START_BLE_GATT_DISC, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_START_BLE_GATT_DISC, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = MAIN_MENU;
@@ -532,9 +532,9 @@ public class SocketServer {
                             Scan scanParam = parse.ScanParse(tmp[1]);
                             if (scanParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                       MainActivity.MSG_GC_START_BLE_CONNECT, scanParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                       BleAppService.MSG_GC_START_BLE_CONNECT, scanParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -542,9 +542,9 @@ public class SocketServer {
                             ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
                             if (connUpdateParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -552,26 +552,26 @@ public class SocketServer {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_START_BLE_PHY_UPDATE, phyUpdateParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_PHY_UPDATE, phyUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if (tmp[0].equals("ConfigureMTU")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE,
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE,
                                     Integer.parseInt(tmp[1]));
-                            MainActivity.msghandler.sendMessage(msg);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("RW_Char")) {
                             ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
                             if (readWriteCharOpParam != null) {
                                 Log.i(TAG, "RW_Char SrvUUID: " +readWriteCharOpParam.Srvc_uuid + " Value: " +readWriteCharOpParam.Value);
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_START_BLE_GATT_WRITE_READ_CHAR, readWriteCharOpParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_GATT_WRITE_READ_CHAR, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -580,9 +580,9 @@ public class SocketServer {
                             if (readWriteDescOpParam != null) {
                                 Log.i(TAG, "RW_Desc SrvUUID: " +readWriteDescOpParam.Srvc_uuid + " Value: " +readWriteDescOpParam.Value);
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_START_BLE_GATT_WRITE_READ_DESC, readWriteDescOpParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_GATT_WRITE_READ_DESC, readWriteDescOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -590,9 +590,9 @@ public class SocketServer {
                             ReadWriteOp regNotifParam = parse.ReadWriteOpParse(tmp[1]);
                             if (regNotifParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS, regNotifParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS, regNotifParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -600,9 +600,9 @@ public class SocketServer {
                             ReadWriteOp deregNotifParam = parse.ReadWriteOpParse(tmp[1]);
                             if (deregNotifParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS, deregNotifParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS, deregNotifParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -611,9 +611,9 @@ public class SocketServer {
                             if (reliableWriteParam != null) {
                                 Log.i(TAG, "ReliableWrite SrvUUID: " +reliableWriteParam.Srvc_uuid + " Value: " +reliableWriteParam.Value);
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GC_START_BLE_GATT_RELIABLE_WRITE, reliableWriteParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_GATT_RELIABLE_WRITE, reliableWriteParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
@@ -623,44 +623,44 @@ public class SocketServer {
                     } else if (tmp.length == 1) {
                         if (tmp[0].equals("ReadPhy")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_READ_PHY, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_READ_PHY, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Pair")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_PAIR, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_PAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("UnPair")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_UNPAIR, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_UNPAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("DiscoverServices")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_DISCOVER, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_DISCOVER, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("RefreshServices")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_REFRESH_SERVICES, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_REFRESH_SERVICES, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("AbortReliableWrite")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("CancelConnect")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_CANCEL_CONNECT, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_CANCEL_CONNECT, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Disconnect")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_DISC, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_DISC, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = MAIN_MENU;
@@ -678,25 +678,25 @@ public class SocketServer {
                             AddServices AddServiceParam = parse.AddServicesParse(tmp[1]);
                             if ( AddServiceParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GS_START_BLE_ADD_SERVICE,AddServiceParam);
-                                MainActivity.msghandler.sendMessage(msg);
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_ADD_SERVICE,AddServiceParam);
+                                BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if(tmp[0].equals("RemoveService")) {
                             String [] tmp2 = tmp[1].split(":");
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
                               processOutputState = NONE;
-                              msg = MainActivity.msghandler.obtainMessage(
-                                     MainActivity.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
-                              MainActivity.msghandler.sendMessage(msg);
+                              msg = BleAppService.msghandler.obtainMessage(
+                                     BleAppService.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
+                              BleAppService.msghandler.sendMessage(msg);
                             } else {
                               processOutputState = INVALID_INPUT;
                             }
@@ -709,24 +709,24 @@ public class SocketServer {
                             processOutputState = MAIN_MENU;
                         } else if(tmp[0].equals("ClearServices")) {
                              processOutputState = NONE;
-                             msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GS_START_BLE_CLEAR_SERVICES, null);
-                             MainActivity.msghandler.sendMessage(msg);
+                             msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_CLEAR_SERVICES, null);
+                             BleAppService.msghandler.sendMessage(msg);
                         } else if(tmp[0].equals("GetServices")) {
                              processOutputState = NONE;
-                             msg = MainActivity.msghandler.obtainMessage(
-                                        MainActivity.MSG_GS_START_BLE_GET_SERVICES, null);
-                             MainActivity.msghandler.sendMessage(msg);
+                             msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_GET_SERVICES, null);
+                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("ReadPhy")) {
                              processOutputState = NONE;
-                             msg = MainActivity.msghandler.obtainMessage(
-                                     MainActivity.MSG_GS_START_BLE_READ_PHY, null);
-                             MainActivity.msghandler.sendMessage(msg);
+                             msg = BleAppService.msghandler.obtainMessage(
+                                     BleAppService.MSG_GS_START_BLE_READ_PHY, null);
+                             BleAppService.msghandler.sendMessage(msg);
                         } else if(tmp[0].equals("GetConnectedDevices")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(
-                                     MainActivity.MSG_GS_START_GET_CONNECTED_DEVICES, null);
-                            MainActivity.msghandler.sendMessage(msg);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                     BleAppService.MSG_GS_START_GET_CONNECTED_DEVICES, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
