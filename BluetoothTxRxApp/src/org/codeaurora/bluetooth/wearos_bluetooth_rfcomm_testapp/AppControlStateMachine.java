@@ -184,6 +184,7 @@ public class AppControlStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
+            mAppControlService.startRxOperation();
             transitionTo(mReadyState);
             Log.d(TAG, "Going to Ready state");
             SocketServer.sendSocketData("Device is Connected.");
@@ -259,7 +260,7 @@ public class AppControlStateMachine extends StateMachine {
                 transitionTo(mDataRxState);
                 Log.d(TAG, "Going to DataRx state");
                 SocketServer.sendSocketData("Rx Operation Started");
-                mAppControlService.startRxOperation();
+                //mAppControlService.startRxOperation();
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
