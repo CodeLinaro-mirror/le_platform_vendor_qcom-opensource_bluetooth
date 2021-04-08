@@ -124,7 +124,10 @@ public class GattServer{
 
     public static int LOG_LEVEL = 3;
     public static final int GATT_SERVER = 8;
+    public static final int BLE_STATE_CONNECTED = 10;
+    public static final int BLE_STATE_DISCONNECTED = 11;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
+    private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
 
@@ -177,8 +180,16 @@ public class GattServer{
 
              @Override
              public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
-                   mdevice = device;
-                   Log.d(TAG, "onConnectionStateChange() got connection event");
+                 mdevice = device;
+                 Log.d(TAG, "onConnectionStateChange() got connection event");
+                 if(mConnectionStatus == BLE_STATE_DISCONNECTED) {
+                    mGattServerHandler.processConnectReq();
+                    mConnectionStatus = BLE_STATE_CONNECTED;
+                 }
+                 else {
+                    mConnectionStatus = BLE_STATE_DISCONNECTED;
+                 }
+
              }
 
              @Override
@@ -275,7 +286,7 @@ public class GattServer{
                     processReadPhyReq();
                     break;
                 case MSG_START_GET_CONNECTED_DEVICES:
-                    getconnecteddevices();
+                    processGetConnectedDevices();
                     break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
@@ -403,7 +414,7 @@ public class GattServer{
             mgattServer.mBluetoothGattserver.readPhy(mdevice);
         }
 
-        private void getconnecteddevices() {
+        private void processGetConnectedDevices() {
              connectedDevices=mManager.getConnectedDevices(GATT_SERVER);
              PrintStr.setLength(0);
              PrintStr.append("Connected Device:");
@@ -414,6 +425,11 @@ public class GattServer{
              }
              SocketServer.sendSocketData(PrintStr.toString());
         }
+
+        private void processConnectReq() {
+            mgattServer.mBluetoothGattserver.connect(mdevice,false);
+        }
+
 
     }
 }
