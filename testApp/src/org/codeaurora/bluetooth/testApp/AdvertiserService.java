@@ -136,6 +136,12 @@ public class AdvertiserService extends Service {
                     "Deleting the adv instance");
             advertisements.remove(adv_id);
             Log.d(TAG,"Total adv instances after deleting: " + advertisements.size());
+            StringBuilder PrintStr = new StringBuilder();
+
+            PrintStr.setLength(0);
+            PrintStr.append("Advertising Stopped on adv_id: ");
+            PrintStr.append(adv_id);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
     }
 }
