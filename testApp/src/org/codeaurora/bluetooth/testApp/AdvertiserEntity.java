@@ -57,7 +57,7 @@ public class AdvertiserEntity {
     private String invalidParam = "XX";
 
     private byte[] manuData;
-    private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
+    private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
 
     Adv adv_info;
 
@@ -90,9 +90,9 @@ public class AdvertiserEntity {
             
             if (status == ADVERTISE_SUCCESS){
                 adv_status = ADV_STARTED;
-                msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
-                MainActivity.msghandler.sendMessage(msg);
+                msg = BleAppService.msghandler.obtainMessage(
+                      BleAppService.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+                BleAppService.msghandler.sendMessage(msg);
             } else {
                 StringBuilder PrintStr = new StringBuilder();
 
@@ -108,9 +108,9 @@ public class AdvertiserEntity {
             //super.onAdvertisingSetStopped(advertisingSet);
             Log.d(TAG,"onAdvertisingSetStopped");
             adv_status = ADV_STOPPED;
-            msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
-            MainActivity.msghandler.sendMessage(msg);
+            msg = BleAppService.msghandler.obtainMessage(
+                      BleAppService.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
+            BleAppService.msghandler.sendMessage(msg);
         }
 
         @Override
@@ -165,9 +165,9 @@ public class AdvertiserEntity {
             Log.d(TAG, "Advertisemnt sent");
             adv_status = ADV_STARTED;
             Message msg;
-            msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
-            MainActivity.msghandler.sendMessage(msg);
+            msg = BleAppService.msghandler.obtainMessage(
+                      BleAppService.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+            BleAppService.msghandler.sendMessage(msg);
             super.onStartSuccess(settingsInEffect);
         }
 
