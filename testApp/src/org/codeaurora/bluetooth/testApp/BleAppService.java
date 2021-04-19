@@ -182,16 +182,16 @@ public class BleAppService extends Service {
     public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_DISC;
 
     /* GATT Server Actions */
-
-    public static final int MSG_GS_START_BLE_ADD_SERVICE = 50;
-    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = 51;
-    public static final int MSG_GS_START_BLE_SET_PHY = 52;
-    public static final int MSG_GS_START_BLE_READ_PHY = 53;
-    public static final int MSG_GS_START_BLE_GET_SERVICES = 54;
-    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = 55;
-    public static final int MSG_GS_START_BLE_CONNECT = 56;
-    public static final int MSG_GS_START_BLE_PHY_UPDATE = 57;
-    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = 58;
+    public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
+    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = MSG_SM_MAX_ACTION_VALUE + 2;
+    public static final int MSG_GS_START_BLE_SET_PHY = MSG_SM_MAX_ACTION_VALUE + 3;
+    public static final int MSG_GS_START_BLE_READ_PHY = MSG_SM_MAX_ACTION_VALUE + 4;
+    public static final int MSG_GS_START_BLE_GET_SERVICES = MSG_SM_MAX_ACTION_VALUE + 5;
+    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = MSG_SM_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GS_START_BLE_CONNECT = MSG_SM_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = MSG_SM_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_GET_CONNECTED_DEVICES;
 
     @Override
     public void onCreate() {
