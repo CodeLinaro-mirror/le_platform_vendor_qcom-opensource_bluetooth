@@ -137,7 +137,8 @@ public class GattClient {
     public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 15;
     public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 16;
     public static final int MSG_START_CANCEL_CONNECT = 17;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_CANCEL_CONNECT;
+    public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 18;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_BLE_GATT_REQ_CONN_PRIORITY;
 
     public static final int MSG_REM_DEV_FAILED_TO_CONNECT = MSG_GC_ACTION_MAX_VALUE + 1;
     public static final int MSG_REFRESH_SERV_DONE = MSG_GC_ACTION_MAX_VALUE + 2;
@@ -634,6 +635,10 @@ public class GattClient {
                     int Mtu_Size = (int) msg.obj;
                     processConfigureMtuReq(Mtu_Size);
                     break;
+                case MSG_BLE_GATT_REQ_CONN_PRIORITY:
+                    int conn_priority = (int) msg.obj;
+                    processConnPriorityReq(conn_priority);
+                    break;
                 case MSG_START_BLE_PAIR_DEV:
                     processStartPair();
                     break;
@@ -887,6 +892,11 @@ public class GattClient {
         private void processConfigureMtuReq(int Mtu_Size) {
             Log.i(TAG, "Configure mtu");
             mgattClient.mBluetoothGatt.requestMtu(Mtu_Size);
+        }
+
+        private void processConnPriorityReq(int conn_pri) {
+            Log.i(TAG, "Request connection priority");
+            mgattClient.mBluetoothGatt.requestConnectionPriority(conn_pri);
         }
 
         private void processRefreshServices() {
