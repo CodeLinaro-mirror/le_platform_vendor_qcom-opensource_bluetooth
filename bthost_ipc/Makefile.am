@@ -15,7 +15,7 @@ AM_CPPFLAGS= \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/utils/include \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
         -I$(bdroid_C_INCLUDES)
-if !RB5_AUDIO_HAL
+if !NEW_AUDIO_HAL
 AM_CPPFLAGS += \
         -I${WORKSPACE}/frameworks/system/media/audio/include \
         -I${WORKSPACE}/frameworks/include \
