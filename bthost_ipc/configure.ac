@@ -32,7 +32,7 @@ AC_ARG_ENABLE(target,
 )
 
 # Use new audio hal for qrb5165
-AM_CONDITIONAL([RB5_AUDIO_HAL], [test "x$TARGET" = "xqrb5165"])
+AM_CONDITIONAL([NEW_AUDIO_HAL], [test "x$TARGET" = "xqrb5165" -o "x$TARGET" = "xqrbx210-rbx"])
 
 AC_HEADER_STDBOOL
 AC_C_INLINE
