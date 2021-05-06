@@ -138,7 +138,8 @@ public class GattClient {
     public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 16;
     public static final int MSG_START_CANCEL_CONNECT = 17;
     public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 18;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_BLE_GATT_REQ_CONN_PRIORITY;
+    public static final int MSG_START_BLE_CONNECT_TO_BDADDR = 19;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_CONNECT_TO_BDADDR;
 
     public static final int MSG_REM_DEV_FAILED_TO_CONNECT = MSG_GC_ACTION_MAX_VALUE + 1;
     public static final int MSG_REFRESH_SERV_DONE = MSG_GC_ACTION_MAX_VALUE + 2;
@@ -616,6 +617,10 @@ public class GattClient {
                         processCheckAndStartBleScan(scn);
                     }
                     break;
+              case MSG_START_BLE_CONNECT_TO_BDADDR:
+                    String bdAddr = (String) msg.obj;
+                    processConnectToBdaddr(bdAddr);
+                    break;
                 case MSG_START_CANCEL_CONNECT:
                     processCancelConnect();
                     break;
@@ -792,6 +797,14 @@ public class GattClient {
             PrintStr.setLength(0);
             PrintStr.append("Scanning Started!");
             SocketServer.sendSocketData(PrintStr.toString());
+        }
+
+        private void processConnectToBdaddr(String bdAddr) {
+            if(BleAppService.bleAdapter != null) {
+                Log.i(TAG, "Connect to Address: " + bdAddr);
+                BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(bdAddr);
+                mgattClient.connect(remoteDevice);
+            }
         }
 
         private void processCancelConnect() {
