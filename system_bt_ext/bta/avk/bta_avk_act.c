@@ -581,6 +581,9 @@ void bta_avk_rc_opened(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 
 	APPL_TRACE_DEBUG("%s ========================!~", __func__);
 
+       if (p_data == NULL)
+               return;
+
     /* find the SCB & stop the timer */
     for(i=0; i<BTA_AVK_NUM_STRS; i++)
     {
