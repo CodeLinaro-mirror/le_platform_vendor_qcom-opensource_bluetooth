@@ -703,6 +703,9 @@ void bta_avk_rc_br_opened (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RC_BROWSE_OPEN br_open;
 
+    if (p_data == NULL)
+      return;
+
     br_open.rc_handle = p_data->rc_conn_chg.handle;
     bta_avk_cb.rcb[br_open.rc_handle].status |= BTA_AVK_RC_CONN_BR_MASK;
     APPL_TRACE_DEBUG("bta_avk_rc_br_opened ");
@@ -744,6 +747,10 @@ BOOLEAN browsing_dev_blacklisted_for_sniff (BD_ADDR addr)
 void bta_avk_rc_remote_cmd(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RCB    *p_rcb;
+
+    if (p_data == NULL)
+      return;
+
     if (p_cb->features & BTA_AVK_FEAT_RCCT)
     {
         if(p_data->hdr.layer_specific < BTA_AVK_NUM_RCB)
@@ -770,6 +777,10 @@ void bta_avk_rc_remote_cmd(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 void bta_avk_rc_vendor_cmd(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RCB    *p_rcb;
+
+    if (p_data == NULL)
+      return;
+
     if ( (p_cb->features & (BTA_AVK_FEAT_RCCT | BTA_AVK_FEAT_VENDOR)) ==
          (BTA_AVK_FEAT_RCCT | BTA_AVK_FEAT_VENDOR))
     {
@@ -793,6 +804,10 @@ void bta_avk_rc_vendor_cmd(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 void bta_avk_rc_vendor_rsp(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RCB    *p_rcb;
+
+    if (p_data == NULL)
+      return;
+
     if ( (p_cb->features & (BTA_AVK_FEAT_RCTG | BTA_AVK_FEAT_VENDOR)) ==
          (BTA_AVK_FEAT_RCTG | BTA_AVK_FEAT_VENDOR))
     {
@@ -817,6 +832,9 @@ void bta_avk_rc_meta_rsp(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RCB *p_rcb;
     BOOLEAN         do_free = TRUE;
+
+    if (p_data == NULL)
+      return;
 
     if ((p_cb->features & BTA_AVK_FEAT_METADATA) && (p_data->hdr.layer_specific < BTA_AVK_NUM_RCB))
     {
@@ -1291,9 +1309,13 @@ void bta_avk_rc_msg(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 *******************************************************************************/
 void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
-    UINT16 handle = p_data->hdr.layer_specific;
+    UINT16 handle;
     tBTA_AVK_SCB  *p_scb;
     tBTA_AVK_RCB *p_rcb;
+
+    if (p_data == NULL)
+      return;
+    handle = p_data->hdr.layer_specific;
 
     if(handle < BTA_AVK_NUM_RCB)
     {
@@ -1322,6 +1344,9 @@ void bta_avk_rc_close (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 void bta_avk_rc_br_close(tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     tBTA_AVK_RC_BROWSE_CLOSE br_close;
+
+    if (p_data == NULL)
+      return;
 
     br_close.rc_handle = p_data->rc_conn_chg.handle;
     bta_avk_cb.rcb[br_close.rc_handle].status &= ~BTA_AVK_RC_CONN_BR_MASK;
@@ -2383,6 +2408,9 @@ void bta_avk_rc_closed(tBTA_AVK_DATA *p_data)
     BOOLEAN conn = FALSE;
     tBTA_AVK_LCB *p_lcb;
 
+    if (p_msg == NULL)
+      return;
+
     rc_close.rc_handle = BTA_AVK_RC_HANDLE_NONE;
     p_scb = NULL;
     APPL_TRACE_DEBUG("bta_avk_rc_closed rc_handle:%d", p_msg->handle);
@@ -2556,6 +2584,9 @@ void bta_avk_dereg_comp(tBTA_AVK_DATA *p_data)
     tBTA_UTL_COD    cod;
     UINT8   mask;
     BT_HDR  *p_buf;
+
+    if (p_data == NULL)
+      return;
 
     /* find the stream control block */
     p_scb = bta_avk_hndl_to_scb(p_data->hdr.layer_specific);
