@@ -372,18 +372,14 @@ public class InputParse {
                  if (tmp2[0].equals("ServiceUuid")) {
                       AddServicesParam.lserviceUUID = UUID.fromString(tmp2[1]);
                  } else if (tmp2[0].equals("CharUuid")) {
-                      String tmp3[] = tmp2[1].split(" ");
-                      for (int index=0; index<tmp3.length; index++){
-                        AddServicesParam.lcharUUIDs=new ArrayList<>();
-                        AddServicesParam.lcharUUIDs.add(UUID.fromString(tmp3[index]));
-                      }
+                      AddServicesParam.lcharUUID = UUID.fromString(tmp2[1]);
                  } else if (tmp2[0].equals("Properties")) {
-                      String tmp3[] = tmp2[1].split(" ");
+                      String tmp3[] = tmp2[1].split(",");
                       List<String> list = Arrays.asList(tmp3);
                       AddServicesParam.lProps = list.stream().map(Integer::decode)
                             .collect(Collectors.toList());
                  } else if (tmp2[0].equals("Permissions")) {
-                      String tmp3[] = tmp2[1].split(" ");
+                      String tmp3[] = tmp2[1].split(",");
                       List<String> list = Arrays.asList(tmp3);
                       AddServicesParam.lPerms = list.stream().map(Integer::decode)
                             .collect(Collectors.toList());
