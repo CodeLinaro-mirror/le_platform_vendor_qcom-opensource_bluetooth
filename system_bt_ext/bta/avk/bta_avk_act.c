@@ -868,7 +868,8 @@ void bta_avk_rc_free_rsp (tBTA_AVK_CB *p_cb, tBTA_AVK_DATA *p_data)
 {
     UNUSED(p_cb);
 
-    osi_free (p_data->api_meta_rsp.p_pkt);
+    if (p_data)
+      osi_free (p_data->api_meta_rsp.p_pkt);
 }
 
 /*******************************************************************************
