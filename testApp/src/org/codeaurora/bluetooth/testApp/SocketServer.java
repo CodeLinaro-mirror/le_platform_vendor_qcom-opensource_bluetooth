@@ -544,7 +544,8 @@ public class SocketServer {
                             if (BleAppService.bleAdapter.checkBluetoothAddress(tmp[1].toUpperCase())) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_GC_START_BLE_CONNECT_TO_BDADDR, tmp[1]);
+                                        BleAppService.MSG_GC_START_BLE_CONNECT_TO_BDADDR,
+                                        tmp[1].toUpperCase());
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
