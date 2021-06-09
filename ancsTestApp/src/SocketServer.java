@@ -208,6 +208,7 @@ public class SocketServer {
                 case MAIN_MENU:
                     sendStr.append("\n******************** Bt Test App ********************\n");
                     sendStr.append("                     AdvStart\n");
+                    sendStr.append("                     AdvStop\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -244,6 +245,11 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = AncsService.mStateMachine.obtainMessage(
                                     AncsService.NCStateMachine.MSG_NC_SM_START_ADV, null);
+                            AncsService.mStateMachine.sendMessage(msg);
+                        } else if (tmp[0].equals("AdvStop")) {
+                            processOutputState = NONE;
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                    AncsService.NCStateMachine.MSG_NC_SM_STOP_ADV, null);
                             AncsService.mStateMachine.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
