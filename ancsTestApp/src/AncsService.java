@@ -165,6 +165,7 @@ public class AncsService extends Service {
         BluetoothAdapter bluetoothAdapter = MainActivity.mBluetoothManager.getAdapter();
         Log.i(TAG, "OnDestroy");
         if (bluetoothAdapter.isEnabled()) {
+            stopServer();
             stopAdvertising();
         }
         /* Stopping notification consumer state machine */
@@ -221,6 +222,27 @@ public class AncsService extends Service {
         mBluetoothLeAdvertiser.stopAdvertising(mAdvertiseCallback);
     }
 
+    /**
+     * Initialize the GATT server instance with the services/characteristics
+     * from the Time Profile.
+     */
+    private void startServer() {
+        mBluetoothGattServer = MainActivity.mBluetoothManager.openGattServer(this,
+                                          mGattServerCallback);
+        if (mBluetoothGattServer == null) {
+            Log.w(TAG, "Unable to create GATT server");
+        }
+    }
+
+    /**
+     * Shut down the GATT server.
+     */
+    private void stopServer() {
+        if (mBluetoothGattServer == null) return;
+
+        mBluetoothGattServer.close();
+    }
+
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
@@ -239,9 +261,46 @@ public class AncsService extends Service {
         }
     };
 
+    /**
+     * Callback to handle incoming requests to the GATT server.
+     */
+    private BluetoothGattServerCallback mGattServerCallback = new BluetoothGattServerCallback() {
+
+        @Override
+        public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
+            Log.i(TAG, "mGattServerCallback onConnectionStateChange device :" + device +
+                    " status :" + status + " newState :" + newState);
+
+            if (device == null || (status != BluetoothGatt.GATT_SUCCESS)) {
+                Log.e(TAG, "mGattServerCallback onConnectionStateChange:Unexpected error! mstate: "
+                        + newState);
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT);
+                return;
+            }
+
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.i(TAG, "mGattServerCallback onConnectionStateChange:CONNECTED "
+                        + " remoteDevice: " + device.getAddress());
+                mDevice = device;
+                printStr.setLength(0);
+                printStr.append("Connected to ");
+                printStr.append(device.getName());
+                SocketServer.sendSocketData(printStr.toString());
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_GATT_SERVER_CONNECTED);
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(TAG, "mGattServerCallback onConnectionStateChange:DISCONNECTED "
+                        + " remoteDevice: " + device.getAddress());
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_GATT_SERVER_DISCONNECTED);
+            }
+        }
+    };
+
     public class NCStateMachine extends StateMachine {
         public static final int MSG_NC_SM_START_ADV = 1;
         public static final int MSG_NC_SM_STOP_ADV = 2;
+        public static final int MSG_NC_SM_GATT_SERVER_CONNECTED = 3;
+        public static final int MSG_NC_SM_GATT_SERVER_DISCONNECTED = 4;
+        public static final int MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT = 5;
         private NCIdle mNCIdle;
         private NCPending mNCPending;
         private NCPaired mNCPaired;
@@ -303,18 +362,43 @@ public class AncsService extends Service {
                 switch (message.what) {
                     case MSG_NC_SM_START_ADV:
                         startAdvertising();
+                        startServer();
                         Log.i(TAG, "wakelock acquired");
                         break;
                     case MSG_NC_SM_STOP_ADV:
+                        stopServer();
                         stopAdvertising();
                         printStr.setLength(0);
                         printStr.append("Advertising stopped!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        break;
+                    case MSG_NC_SM_GATT_SERVER_CONNECTED:
+                        stopAdvertising();
+                        connectGatt();
+                        transitionTo(mNCPending);
+                        break;
+                    case MSG_NC_SM_GATT_SERVER_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        break;
+                    case MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT:
+                        printStr.setLength(0);
+                        printStr.append("Connect failed!");
                         SocketServer.sendSocketData(printStr.toString());
                         break;
                     default:
                         return NOT_HANDLED;
                 }
                 return retValue;
+            }
+
+            public void connectGatt() {
+                if (bleAdapter != null) {
+                    Log.i(TAG, "Gatt Connect");
+                    mBluetoothGatt = mDevice.connectGatt(mAppContext, false, mGattCallbacks,
+                                                       BluetoothDevice.TRANSPORT_LE);
+                }
             }
         }
 
@@ -335,6 +419,14 @@ public class AncsService extends Service {
             public boolean processMessage(Message message) {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_NC_SM_GATT_SERVER_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
+                }
                 return retValue;
             }
         }
