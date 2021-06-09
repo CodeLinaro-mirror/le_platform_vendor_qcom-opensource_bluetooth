@@ -207,6 +207,7 @@ public class SocketServer {
             switch (processOutputState) {
                 case MAIN_MENU:
                     sendStr.append("\n******************** Bt Test App ********************\n");
+                    sendStr.append("                     AdvStart\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -239,6 +240,11 @@ public class SocketServer {
                             closeReceived = true;
                             mainMenuState = MAIN_MENU;
                             processOutputState = SOC_CLOSE_ACK;
+                        } else if (tmp[0].equals("AdvStart")) {
+                            processOutputState = NONE;
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                    AncsService.NCStateMachine.MSG_NC_SM_START_ADV, null);
+                            AncsService.mStateMachine.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
