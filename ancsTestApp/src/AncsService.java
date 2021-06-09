@@ -68,6 +68,10 @@ import android.app.Service;
 import android.app.IntentService;
 import android.app.PendingIntent;
 
+import com.android.internal.util.IState;
+import com.android.internal.util.State;
+import com.android.internal.util.StateMachine;
+
 import java.util.Arrays;
 
 public class AncsService extends Service {
@@ -83,6 +87,8 @@ public class AncsService extends Service {
 
     public static final int TRANSPORT_LE = 2;
 
+    public static NCStateMachine mStateMachine;
+    public static boolean stateMachineStarted = false;
     private static boolean mReceiverRegistered = false;
     public StringBuilder printStr = new StringBuilder();
 
@@ -148,6 +154,7 @@ public class AncsService extends Service {
         super.onStartCommand(intent, flags, startId);
         Log.d(TAG, "Service onStartCommand");
 
+        startNCStateMachine();
         return Service.START_STICKY;
     }
 
@@ -157,10 +164,224 @@ public class AncsService extends Service {
 
         BluetoothAdapter bluetoothAdapter = MainActivity.mBluetoothManager.getAdapter();
         Log.i(TAG, "OnDestroy");
+
+        /* Stopping notification consumer state machine */
+        if (mStateMachine != null) {
+            mStateMachine.doQuit();
+        }
+    }
+
+    /* function to start notification consumer state machine */
+    private void startNCStateMachine() {
+        if (stateMachineStarted == false) {
+            mStateMachine = new NCStateMachine(mAppContext);
+            Log.i(TAG, "start_nc_state_machine");
+            mStateMachine.start();
+            stateMachineStarted = true;
+        }
     }
 
     /* function to print the message on display */
     private void showMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+    }
+
+    public class NCStateMachine extends StateMachine {
+        private NCIdle mNCIdle;
+        private NCPending mNCPending;
+        private NCPaired mNCPaired;
+        private NCNotificationReceived mNCNotificationReceived;
+        private NCControlPoint mNCControlPoint;
+        private NCDisconnect mNCDisconnect;
+        private NCOffloaded mNCOffloaded;
+
+        StringBuilder printStr = new StringBuilder();
+
+        private NCStateMachine(Context context) {
+            super("NCStateMachine");
+
+            mNCIdle = new NCIdle();
+            mNCPending = new NCPending();
+            mNCPaired = new NCPaired();
+            mNCNotificationReceived = new NCNotificationReceived();
+            mNCControlPoint = new NCControlPoint();
+            mNCDisconnect = new NCDisconnect();
+            mNCOffloaded = new NCOffloaded();
+
+            addState(mNCIdle);
+            addState(mNCPending);
+            addState(mNCPaired);
+            addState(mNCNotificationReceived);
+            addState(mNCControlPoint);
+            addState(mNCDisconnect);
+            addState(mNCOffloaded);
+
+            setInitialState(mNCIdle);
+        }
+
+        public void doQuit() {
+            Log.i(TAG, "doQuit");
+            synchronized (NCStateMachine.this) {
+                stateMachineStarted = false;
+                quitNow();
+            }
+        }
+
+        private class NCIdle extends State {
+            private static final String TAG = "NCIdle";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter" + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit" + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
+
+        private class NCPending extends State {
+            private static final String TAG = "NCPending";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
+
+        private class NCPaired extends State {
+            private static final String TAG = "NCPaired";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
+
+        private class NCNotificationReceived extends State {
+            private static final String TAG = "NCNotificationReceived";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
+
+        private class NCControlPoint extends State {
+            private static final String TAG = "NCControlPoint";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
+
+        private class NCOffloaded extends State {
+            private static final String TAG = "NCOffloaded";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                switch (message.what) {
+
+                }
+                return retValue;
+            }
+        }
+
+        private class NCDisconnect extends State {
+            private static final String TAG = "NCDisconnect";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+
+                return retValue;
+            }
+        }
     }
 }
