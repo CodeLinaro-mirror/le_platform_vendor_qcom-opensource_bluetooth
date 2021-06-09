@@ -30,6 +30,7 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class PhyUpdate {
+    public String remoteAddress = null;
     public int txPhy;
     public int rxPhy;
     public int phyOpt;
