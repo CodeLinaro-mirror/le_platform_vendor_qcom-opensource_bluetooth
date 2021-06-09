@@ -46,6 +46,7 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
@@ -63,10 +64,14 @@ public class MainActivity extends Activity {
     public static BluetoothManager mBluetoothManager;
 
     private Context mAppContext;
+    public static WakeLock wl;
+    public static boolean wl_acquired=false;
+
     public static SocketServer socServer;
 
     /* Location permissions */
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
+    public static AncsService ancsService = null;
     public static boolean isBound = false;
 
     @Override
@@ -77,6 +82,8 @@ public class MainActivity extends Activity {
         mAppContext = getApplicationContext();
 
         if (savedInstanceState != null) {
+            // Restore value of members from saved state
+            wl_acquired = savedInstanceState.getBoolean("wl_acquired");
             Log.d(TAG, "on create savedInstance not null");
         } else {
             mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -85,6 +92,10 @@ public class MainActivity extends Activity {
                 return;
             }
 
+            PowerManager pm = (PowerManager)mAppContext.getSystemService(
+                                              Context.POWER_SERVICE);
+            wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WakeLock");
+
             /* Request for location access */
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
@@ -92,12 +103,20 @@ public class MainActivity extends Activity {
             }
 
             socServer = SocketServer.getInstance();
+
+            Intent intent = new Intent(this, AncsService.class);
+            //bindService(intent, appServiceConnection, BIND_AUTO_CREATE);
+            this.startService(intent);
         }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         Log.d(TAG, "onSaveInstanceState");
+        if(wl_acquired) {
+            savedInstanceState.putBoolean("wl_acquired", true);
+            Log.d(TAG, "onSaveInstanceState:wl acquired -true");
+        }
         super.onSaveInstanceState(savedInstanceState);
     }
 
@@ -105,6 +124,7 @@ public class MainActivity extends Activity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         Log.d(TAG, "onRestoreInstanceState called");
+        wl_acquired = savedInstanceState.getBoolean("wl_acquired");
     }
 
     @Override
@@ -138,7 +158,39 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
+        if(!wl_acquired) {
+            Log.i(TAG, "onDestroy - wakelock acquired");
+            if (isBound) {
+                //unbindService(appServiceConnection);
+                isBound = false;
+            }
+            /*stop service */
+            Intent intent = new Intent(this, AncsService.class);
+            this.stopService(intent);
+        }
     }
+
+    /* Ancs service */
+    private ServiceConnection appServiceConnection = new ServiceConnection() {
+        public void onServiceConnected(ComponentName className, IBinder service) {
+            // This is called when the connection with the service has been
+            // established, giving us the object we can use to
+            // interact with the service.  We are communicating with the
+            // service using a Messenger, so here we get a client-side
+            // representation of that from the raw IBinder object.
+            AncsService.MyBinder binderT=(AncsService.MyBinder) service;
+            ancsService = binderT.getService();
+            isBound = true;
+        }
+
+        public void onServiceDisconnected(ComponentName className) {
+            // This is called when the connection with the service has been
+            // unexpectedly disconnected -- that is, its process crashed.
+            ancsService = null;
+            isBound = false;
+        }
+    };
+
 
     /* function to print the message on display */
     private void showMessage(String msg) {
