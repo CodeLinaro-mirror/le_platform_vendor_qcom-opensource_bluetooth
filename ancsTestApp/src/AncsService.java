@@ -187,6 +187,7 @@ public class AncsService extends Service {
     private void showMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
+
     /*
      * Begin advertising over Bluetooth that this device is connectable
      * and supports the Current Time Service.
@@ -211,6 +212,15 @@ public class AncsService extends Service {
                 .startAdvertising(settings, data, mAdvertiseCallback);
     }
 
+    /**
+     * Stop Bluetooth advertisements.
+     */
+    private void stopAdvertising() {
+        if (mBluetoothLeAdvertiser == null) return;
+
+        mBluetoothLeAdvertiser.stopAdvertising(mAdvertiseCallback);
+    }
+
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
@@ -231,6 +241,7 @@ public class AncsService extends Service {
 
     public class NCStateMachine extends StateMachine {
         public static final int MSG_NC_SM_START_ADV = 1;
+        public static final int MSG_NC_SM_STOP_ADV = 2;
         private NCIdle mNCIdle;
         private NCPending mNCPending;
         private NCPaired mNCPaired;
@@ -293,6 +304,12 @@ public class AncsService extends Service {
                     case MSG_NC_SM_START_ADV:
                         startAdvertising();
                         Log.i(TAG, "wakelock acquired");
+                        break;
+                    case MSG_NC_SM_STOP_ADV:
+                        stopAdvertising();
+                        printStr.setLength(0);
+                        printStr.append("Advertising stopped!");
+                        SocketServer.sendSocketData(printStr.toString());
                         break;
                     default:
                         return NOT_HANDLED;
