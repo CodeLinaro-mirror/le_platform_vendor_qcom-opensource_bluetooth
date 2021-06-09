@@ -164,7 +164,9 @@ public class AncsService extends Service {
 
         BluetoothAdapter bluetoothAdapter = MainActivity.mBluetoothManager.getAdapter();
         Log.i(TAG, "OnDestroy");
-
+        if (bluetoothAdapter.isEnabled()) {
+            stopAdvertising();
+        }
         /* Stopping notification consumer state machine */
         if (mStateMachine != null) {
             mStateMachine.doQuit();
@@ -185,8 +187,50 @@ public class AncsService extends Service {
     private void showMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
+    /*
+     * Begin advertising over Bluetooth that this device is connectable
+     * and supports the Current Time Service.
+     */
+    private void startAdvertising() {
+        mBluetoothLeAdvertiser = bleAdapter.getBluetoothLeAdvertiser();
+        if (mBluetoothLeAdvertiser == null) {
+            Log.w(TAG, "Failed to create advertiser");
+            return;
+        }
+
+        AdvertiseSettings settings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
+                .setConnectable(true)
+                .setTimeout(0)
+                .build();
+        AdvertiseData data = new AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .build();
+
+        mBluetoothLeAdvertiser
+                .startAdvertising(settings, data, mAdvertiseCallback);
+    }
+
+    private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
+        @Override
+        public void onStartSuccess(AdvertiseSettings settingsInEffect) {
+            Log.i(TAG, "LE Advertise Started.");
+            printStr.setLength(0);
+            printStr.append("Advertising started!");
+            SocketServer.sendSocketData(printStr.toString());
+        }
+
+        @Override
+        public void onStartFailure(int errorCode) {
+            Log.w(TAG, "LE Advertise Failed: " + errorCode);
+            printStr.setLength(0);
+            printStr.append("Advertising failed!");
+            SocketServer.sendSocketData(printStr.toString());
+        }
+    };
 
     public class NCStateMachine extends StateMachine {
+        public static final int MSG_NC_SM_START_ADV = 1;
         private NCIdle mNCIdle;
         private NCPending mNCPending;
         private NCPaired mNCPaired;
@@ -245,6 +289,14 @@ public class AncsService extends Service {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
 
+                switch (message.what) {
+                    case MSG_NC_SM_START_ADV:
+                        startAdvertising();
+                        Log.i(TAG, "wakelock acquired");
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
                 return retValue;
             }
         }
@@ -266,7 +318,6 @@ public class AncsService extends Service {
             public boolean processMessage(Message message) {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
-
                 return retValue;
             }
         }
@@ -288,7 +339,6 @@ public class AncsService extends Service {
             public boolean processMessage(Message message) {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
-
                 return retValue;
             }
         }
