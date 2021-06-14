@@ -209,6 +209,10 @@ public class SocketServer {
                     sendStr.append("\n******************** Bt Test App ********************\n");
                     sendStr.append("                     AdvStart\n");
                     sendStr.append("                     AdvStop\n");
+                    sendStr.append("                     GetNotificationAttr      \
+                                (Ex: GetNotificationAttr NotificationUID AppIdentifier;Title:10; \
+                                Subtitle:20;Message:30;MessageSize;Date;PositiveActionLabel; \
+                                NegativeActionLabel)\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -254,12 +258,104 @@ public class SocketServer {
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
+                    } else if (tmp.length == 3) {
+                        if (tmp[0].equals("GetNotificationAttr")) {
+                            AncsParse.NotificationAttr notificationAttr =
+                                            new AncsParse.NotificationAttr();
+                            notificationAttr.NotificationUID =
+                                            intToByteArray(Integer.parseInt(tmp[1]));
+                            notificationAttr.NotificationAttributes =
+                                            notificationAttrParse(tmp[2]);
+                            if(notificationAttr.NotificationAttributes != null) {
+                                msg = AncsService.mStateMachine.obtainMessage(
+                                            AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ATTR,
+                                            notificationAttr);
+                                AncsService.mStateMachine.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
                     break;
             }
         }
+    }
+
+    public byte[] notificationAttrParse (String input){
+        Log.i(TAG, "notificationAttrParse()");
+
+        ByteArrayOutputStream commandAttr = new ByteArrayOutputStream(1024);
+
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("Title")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDTitle);
+                    int len = Integer.parseInt(tmp2[1]);
+                    commandAttr.write((byte) (len & 0xFF));
+                    commandAttr.write((byte) ((len >> 8) & 0xFF));
+                } else if (tmp2[0].equals("Subtitle")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDSubtitle);
+                    int len = Integer.parseInt(tmp2[1]);
+                    commandAttr.write((byte) (len & 0xFF));
+                    commandAttr.write((byte) ((len >> 8) & 0xFF));
+                } else if (tmp2[0].equals("Message")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDMessage);
+                    int len = Integer.parseInt(tmp2[1]);
+                    commandAttr.write((byte) (len & 0xFF));
+                    commandAttr.write((byte) ((len >> 8) & 0xFF));
+                } else {
+                    break;
+                }
+            } else if (tmp2.length == 1) {
+                if (tmp2[0].equals("AppIdentifier")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDAppIdentifier);
+                } else if (tmp2[0].equals("MessageSize")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDMessageSize);
+                } else if (tmp2[0].equals("Date")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDDate);
+                } else if (tmp2[0].equals("PositiveActionLabel")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDPositiveActionLabel);
+                } else if (tmp2[0].equals("NegativeActionLabel")) {
+                    commandAttr.write(AncsParse.NotificationAttributeIDNegativeActionLabel);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return commandAttr.toByteArray();
+        }else{
+            return null;
+        }
+    }
+
+    public static byte[] intToByteArray(int a)
+    {
+        byte[] byteArr = new byte[4];
+        byteArr[0] = (byte) (a & 0xFF);
+        byteArr[1] = (byte) ((a >> 8) & 0xFF);
+        byteArr[2] = (byte) ((a >> 16) & 0xFF);
+        byteArr[3] = (byte) ((a >> 24) & 0xFF);
+        return byteArr;
+    }
+
+    public static int byteArrayToInt(byte[] b)
+    {
+        return ((b[3] & 0xFF) << 24) |
+                ((b[2] & 0xFF) << 16) |
+                ((b[1] & 0xFF) << 8) |
+                ((b[0] & 0xFF) << 0);
     }
 
     public static void sendSocketData(String data) {

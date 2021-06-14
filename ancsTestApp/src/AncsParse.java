@@ -77,6 +77,22 @@ public class AncsParse {
     public static final byte CategoryIDLocation = 10;
     public static final byte CategoryIDEntertainment = 11;
 
+    // CommandID values
+    public static final byte CommandIDGetNotificationAttributes = 0;
+
+    // NotificationAttributeID values
+    public static final byte NotificationAttributeIDAppIdentifier = 0;
+    // (Needs to be followed by a 2-bytes max length parameter)
+    public static final byte NotificationAttributeIDTitle = 1;
+    // (Needs to be followed by a 2-bytes max length parameter)
+    public static final byte NotificationAttributeIDSubtitle = 2;
+    // (Needs to be followed by a 2-bytes max length parameter)
+    public static final byte NotificationAttributeIDMessage = 3;
+    public static final byte NotificationAttributeIDMessageSize = 4;
+    public static final byte NotificationAttributeIDDate = 5;
+    public static final byte NotificationAttributeIDPositiveActionLabel = 6;
+    public static final byte NotificationAttributeIDNegativeActionLabel = 7;
+
     // Error Codes
     /* The commandID was not recognized by the NP. */
     public static final byte UnknownCommand = (byte) 0xA0;
@@ -109,6 +125,11 @@ public class AncsParse {
         }
     }
 
+    public static class NotificationAttr {
+        byte[] NotificationUID = new byte[4];
+        byte[] NotificationAttributes;
+    }
+
     public static void processNotificationSource(byte[] value) {
         if (NOTIFICATION_SOURCE_LENGTH == value.length) {
             NotificationSource notification = new NotificationSource(value);
@@ -137,6 +158,45 @@ public class AncsParse {
 
     public static void processDataSource(byte[] value) {
         Log.i(TAG, "processDataSource");
+        StringBuilder printStr = new StringBuilder();
+        int i = 0, size = 0;
+
+        printStr.setLength(0);
+        printStr.append('\n');
+        if (value.length > 0) {
+            if (value[0] == CommandIDGetNotificationAttributes) {
+                printStr.append("NotificationAttr");
+                printStr.append("\nuid : ");
+                printStr.append(SocketServer.byteArrayToInt(Arrays.copyOfRange(value, 1, 5)));
+                i = 5;
+                for (; i < value.length; ) {
+                    printStr.append("\n");
+                    printStr.append(getNotificationAttrString(value[i]));
+                    printStr.append(" : ");
+                    size = (value[i + 2] << 8) | value[i + 1];
+                    i += 3;
+                    if (size > 0) {
+                        printStr.append(new String(Arrays.copyOfRange(value, i, i + size)));
+                        i = i + size;
+                    }
+                }
+                printStr.append('\n');
+            } else if (value[0] == UnknownCommand) {
+                printStr.append("Unknown command\n");
+            } else if (value[0] == InvalidCommand) {
+                printStr.append("Invalid command\n");
+            } else if (value[0] == InvalidParameter) {
+                printStr.append("Invalid parameter\n");
+            } else if (value[0] == ActionFailed) {
+                printStr.append("Action failed\n");
+            } else {
+                printStr.append("processDataSource Error\n");
+                Log.e(TAG, "processDataSource unknown commandID");
+            }
+            SocketServer.sendSocketData(printStr.toString());
+        } else {
+            Log.e(TAG, "processDataSource invalid length");
+        }
     }
 
     public static int searchNotificationSource(NotificationSource notification) {
@@ -149,6 +209,18 @@ public class AncsParse {
             }
         }
         return index;
+    }
+
+    public static byte[] getNotificationAttributes(NotificationAttr attr) {
+        ByteArrayOutputStream command = new ByteArrayOutputStream(1024);
+        command.write(CommandIDGetNotificationAttributes); // CommandID
+        try {
+            command.write(attr.NotificationUID); // NotificationUID
+            command.write(attr.NotificationAttributes);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return command.toByteArray();
     }
 
     public static void printNotificationSource() {
@@ -216,5 +288,45 @@ public class AncsParse {
                 break;
         }
         return categoryIdString;
+    }
+
+    public static String getNotificationAttrString (byte notificationAttr) {
+        String notificationAttrString = null;
+
+        switch (notificationAttr) {
+            case NotificationAttributeIDAppIdentifier:
+                notificationAttrString = "AppID";
+                break;
+
+            case NotificationAttributeIDTitle:
+                notificationAttrString = "Title";
+                break;
+
+            case NotificationAttributeIDSubtitle:
+                notificationAttrString ="SubTitle";
+                break;
+
+            case NotificationAttributeIDMessage:
+                notificationAttrString ="Message";
+                break;
+
+            case NotificationAttributeIDMessageSize:
+                notificationAttrString ="MessageSize";
+                break;
+
+            case NotificationAttributeIDDate:
+                notificationAttrString ="Date";
+                break;
+
+            case NotificationAttributeIDPositiveActionLabel:
+                notificationAttrString ="PositiveActionLabel";
+                break;
+
+            case NotificationAttributeIDNegativeActionLabel:
+                notificationAttrString ="NegativeActionLabel";
+                break;
+        }
+
+        return notificationAttrString;
     }
 }
