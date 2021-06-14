@@ -472,6 +472,7 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_NOTIFICATION_RECEIVED = 14;
         public static final int MSG_NC_SM_NOTIFICATION_ATTR = 15;
         public static final int MSG_NC_SM_APP_ATTR = 16;
+        public static final int MSG_NC_SM_NOTIFICATION_ACTION = 17;
         public static final int MSG_NC_SM_WRITE_RSP_RECEIVED = 20;
 
         private NCIdle mNCIdle;
@@ -744,6 +745,12 @@ public class AncsService extends Service {
                         Log.i(TAG, "MSG_NC_SM_APP_ATTR: 1");
                         writeToControlPointChar(appAttrCmd);
                         Log.i(TAG, "MSG_NC_SM_APP_ATTR: 2");
+                        transitionTo(mNCControlPoint);
+                        break;
+                    case MSG_NC_SM_NOTIFICATION_ACTION:
+                        byte[] actionCmd = AncsParse.performNotificationAction(
+                                (AncsParse.NotificationAction) message.obj);
+                        writeToControlPointChar(actionCmd);
                         transitionTo(mNCControlPoint);
                         break;
                     default:
