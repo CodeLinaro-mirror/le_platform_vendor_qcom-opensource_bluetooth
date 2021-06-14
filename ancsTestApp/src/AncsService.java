@@ -410,6 +410,7 @@ public class AncsService extends Service {
                                           int status) {
             if ((status == BluetoothGatt.GATT_SUCCESS)) {
                 Log.i(TAG, "onCharacteristicWrite: " + status);
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_WRITE_RSP_RECEIVED);
             } else {
                 Log.i(TAG, "write characteristic failed");
             }
@@ -469,6 +470,8 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 12;
         public static final int MSG_NC_SM_ANCS_SERVICE_NOT_FOUND = 13;
         public static final int MSG_NC_SM_NOTIFICATION_RECEIVED = 14;
+        public static final int MSG_NC_SM_NOTIFICATION_ATTR = 15;
+        public static final int MSG_NC_SM_WRITE_RSP_RECEIVED = 20;
 
         private NCIdle mNCIdle;
         private NCPending mNCPending;
@@ -729,10 +732,24 @@ public class AncsService extends Service {
                     case MSG_NC_SM_NOTIFICATION_RECEIVED:
                         // Do Nothing
                         break;
+                    case MSG_NC_SM_NOTIFICATION_ATTR:
+                        byte[] notificationAttrCmd = AncsParse.getNotificationAttributes(
+                                (AncsParse.NotificationAttr) message.obj);
+                        writeToControlPointChar(notificationAttrCmd);
+                        transitionTo(mNCControlPoint);
+                        break;
                     default:
                         return NOT_HANDLED;
                 }
                 return retValue;
+            }
+
+            public void writeToControlPointChar(byte[] value) {
+                controlPointChar.setWriteType(
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                controlPointChar.setValue(value);
+                Log.i(TAG, "value written to CP: " +Arrays.toString(value));
+                mBluetoothGatt.writeCharacteristic(controlPointChar);
             }
         }
 
@@ -742,6 +759,8 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                MainActivity.wl.acquire();
+                Log.i(TAG, "wakelock acquired");
             }
 
             @Override
@@ -754,6 +773,24 @@ public class AncsService extends Service {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
 
+                switch (message.what) {
+                    case MSG_NC_SM_WRITE_RSP_RECEIVED:
+                        if (MainActivity.wl != null) {
+                            Log.i(TAG, "Releasing wakelock");
+                            try {
+                                MainActivity.wl.release();
+                                MainActivity.wl_acquired = false;
+                            } catch (Throwable th) {
+                                // ignoring this exception, probably wakeLock was already released
+                            }
+                        } else {
+                            // should never happen during normal workflow
+                            Log.e(TAG, "Wakelock reference is null");
+                        }
+                        Log.i(TAG, "wakelock released");
+                        transitionTo(mNCNotificationReceived);
+                        break;
+                }
                 return retValue;
             }
         }
