@@ -215,6 +215,8 @@ public class SocketServer {
                                 NegativeActionLabel)\n");
                     sendStr.append("                     GetAppAttr               \
                                 (Ex: GetAppAttr com.vendor.app)\n");
+                    sendStr.append("                     DoNotificationAction     \
+                                (Ex: DoNotificationAction NotificationUID Positive)\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -284,7 +286,17 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                        } else {
+                        } else if (tmp[0].equals("DoNotificationAction")) {
+                                AncsParse.NotificationAction notificationAction =
+                                            new AncsParse.NotificationAction();
+                                notificationAction.NotificationUID =
+                                              intToByteArray(Integer.parseInt(tmp[1]));
+                                notificationAction.NotificationAction = tmp[2];
+                                msg = AncsService.mStateMachine.obtainMessage(
+                                        AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ACTION,
+                                        notificationAction);
+                                AncsService.mStateMachine.sendMessage(msg);
+                         }  else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else {

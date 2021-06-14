@@ -80,6 +80,7 @@ public class AncsParse {
     // CommandID values
     public static final byte CommandIDGetNotificationAttributes = 0;
     public static final byte CommandIDGetAppAttributes = 1;
+    public static final byte CommandIDPerformNotificationAction = 2;
 
     // NotificationAttributeID values
     public static final byte NotificationAttributeIDAppIdentifier = 0;
@@ -96,6 +97,10 @@ public class AncsParse {
 
     // AppAttributeID values
     public static final byte AppAttributeIDDisplayName = 0;
+
+    // ActionID values
+    public static final byte ActionIDPositive = 0;
+    public static final byte ActionIDNegative = 1;
 
     // Error Codes
     /* The commandID was not recognized by the NP. */
@@ -132,6 +137,11 @@ public class AncsParse {
     public static class NotificationAttr {
         byte[] NotificationUID = new byte[4];
         byte[] NotificationAttributes;
+    }
+
+    public static class NotificationAction {
+        byte[] NotificationUID = new byte[4];
+        String NotificationAction;
     }
 
     public static void processNotificationSource(byte[] value) {
@@ -255,6 +265,22 @@ public class AncsParse {
             e.printStackTrace();
         }
         command.write(AppAttributeIDDisplayName); // Attribute
+        return command.toByteArray();
+    }
+
+    public static byte[] performNotificationAction(NotificationAction action) {
+        ByteArrayOutputStream command = new ByteArrayOutputStream(1024);
+        command.write(CommandIDPerformNotificationAction); // CommandID
+        try {
+            command.write(action.NotificationUID); // NotificationUID
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (action.NotificationAction.equals("Positive")) {
+            command.write(ActionIDPositive); // Action
+        } else {
+            command.write(ActionIDNegative); // Action
+        }
         return command.toByteArray();
     }
 
