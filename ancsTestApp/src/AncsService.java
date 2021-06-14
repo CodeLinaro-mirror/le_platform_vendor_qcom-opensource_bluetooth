@@ -353,6 +353,7 @@ public class AncsService extends Service {
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.i(TAG, "mGattCallbacks onConnectionStateChange:DISCONNECTED "
                         + " remoteDevice: " + gatt.getDevice().getAddress());
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_GATT_DISCONNECTED);
             }
         }
 
@@ -465,6 +466,7 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT = 5;
         public static final int MSG_NC_SM_REM_DEV_PAIRED = 6;
         public static final int MSG_NC_SM_FAILED_TO_PAIR = 7;
+        public static final int MSG_NC_SM_GATT_DISCONNECTED = 9;
         public static final int MSG_NC_SM_GATT_FAILED_TO_CONNECT = 10;
         public static final int MSG_NC_SM_ANCS_SERVICE_FOUND = 11;
         public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 12;
@@ -473,6 +475,7 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_NOTIFICATION_ATTR = 15;
         public static final int MSG_NC_SM_APP_ATTR = 16;
         public static final int MSG_NC_SM_NOTIFICATION_ACTION = 17;
+        public static final int MSG_NC_SM_DISCONNECT = 19;
         public static final int MSG_NC_SM_WRITE_RSP_RECEIVED = 20;
 
         private NCIdle mNCIdle;
@@ -648,6 +651,12 @@ public class AncsService extends Service {
                         Log.i(TAG, "wakelock released");
                         transitionTo(mNCIdle);
                         break;
+                    case MSG_NC_SM_GATT_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
                     case MSG_NC_SM_GATT_FAILED_TO_CONNECT:
                         printStr.setLength(0);
                         printStr.append("Connect failed!");
@@ -698,12 +707,21 @@ public class AncsService extends Service {
                 boolean retValue = HANDLED;
 
                 switch (message.what) {
+                    case MSG_NC_SM_GATT_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
                     case MSG_NC_SM_NOTIFICATION_RECEIVED:
                         if(dataSourceChar != null) {
                             setCharacteristicNotification(dataSourceChar, true);
                             Log.d(TAG, "dataSourceChar registered");
                         }
                         transitionTo(mNCNotificationReceived);
+                        break;
+                    case MSG_NC_SM_DISCONNECT:
+                        transitionTo(mNCDisconnect);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -731,6 +749,12 @@ public class AncsService extends Service {
                 boolean retValue = HANDLED;
 
                 switch (message.what) {
+                    case MSG_NC_SM_GATT_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
                     case MSG_NC_SM_NOTIFICATION_RECEIVED:
                         // Do Nothing
                         break;
@@ -752,6 +776,9 @@ public class AncsService extends Service {
                                 (AncsParse.NotificationAction) message.obj);
                         writeToControlPointChar(actionCmd);
                         transitionTo(mNCControlPoint);
+                        break;
+                    case MSG_NC_SM_DISCONNECT:
+                        transitionTo(mNCDisconnect);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -841,6 +868,12 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                // Disable Notifications
+                setCharacteristicNotification(notificationSourceChar, false);
+                Log.d(TAG, "notificationSourceChar deregistered");
+                setCharacteristicNotification(dataSourceChar, false);
+                Log.d(TAG, "dataSourceChar deregistered");
+                mBluetoothGatt.disconnect();
             }
 
             @Override
@@ -853,6 +886,14 @@ public class AncsService extends Service {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
 
+                switch (message.what) {
+                    case MSG_NC_SM_GATT_DISCONNECTED:
+                        printStr.setLength(0);
+                        printStr.append("Disconnected!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
+                }
                 return retValue;
             }
         }
