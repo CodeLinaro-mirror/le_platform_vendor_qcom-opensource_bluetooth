@@ -393,6 +393,15 @@ public class AncsService extends Service {
                                             BluetoothGattCharacteristic characteristic) {
             byte[] value = characteristic.getValue();
             Log.d(TAG, "onCharacteristicChanged Data: " + Arrays.toString(value));
+
+            if (characteristic == notificationSourceChar) {
+                AncsParse.processNotificationSource(value);
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_NOTIFICATION_RECEIVED);
+            } else if (characteristic == dataSourceChar) {
+                AncsParse.processDataSource(value);
+            } else {
+                Log.d(TAG, "onCharacteristicChanged unknown notification");
+            }
         }
 
         @Override
@@ -459,6 +468,7 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_ANCS_SERVICE_FOUND = 11;
         public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 12;
         public static final int MSG_NC_SM_ANCS_SERVICE_NOT_FOUND = 13;
+        public static final int MSG_NC_SM_NOTIFICATION_RECEIVED = 14;
 
         private NCIdle mNCIdle;
         private NCPending mNCPending;
@@ -681,6 +691,18 @@ public class AncsService extends Service {
             public boolean processMessage(Message message) {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
+
+                switch (message.what) {
+                    case MSG_NC_SM_NOTIFICATION_RECEIVED:
+                        if(dataSourceChar != null) {
+                            setCharacteristicNotification(dataSourceChar, true);
+                            Log.d(TAG, "dataSourceChar registered");
+                        }
+                        transitionTo(mNCNotificationReceived);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
                 return retValue;
             }
         }
@@ -703,6 +725,13 @@ public class AncsService extends Service {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
 
+                switch (message.what) {
+                    case MSG_NC_SM_NOTIFICATION_RECEIVED:
+                        // Do Nothing
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
                 return retValue;
             }
         }
