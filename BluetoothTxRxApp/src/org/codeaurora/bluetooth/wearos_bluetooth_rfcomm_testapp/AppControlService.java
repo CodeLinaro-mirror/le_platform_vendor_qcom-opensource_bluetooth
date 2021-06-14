@@ -195,6 +195,7 @@ public class AppControlService extends Service {
     private void startStateMachine() {
         mAppControlStateMachine = new AppControlStateMachine(
                 AppControlService.this);
+        Log.d(TAG,"Starting App State Machine");
         mAppControlStateMachine.start();
         Utils.appControlStateMachine = mAppControlStateMachine;
     }

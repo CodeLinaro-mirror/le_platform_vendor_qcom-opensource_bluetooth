@@ -127,6 +127,7 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
+                Log.d(TAG, "Going to GAP Test Cases state");
                 break;
             }
             return retvalue;
@@ -266,6 +267,7 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;
                 SocketServer.updateSocketClient();
@@ -310,6 +312,7 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;
                 SocketServer.updateSocketClient();
@@ -339,16 +342,19 @@ public class AppControlStateMachine extends StateMachine {
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_END_DATA_RX:
                 transitionTo(mReadyState);
+            Log.d(TAG, "Going to Ready state");
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DATA_RX_FAILED:
                 transitionTo(mReadyState);
+                Log.d(TAG, "Going to Ready state");
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;
                 SocketServer.updateSocketClient();
@@ -426,6 +432,7 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_END_GAP_TEST_CASES:
                 transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
