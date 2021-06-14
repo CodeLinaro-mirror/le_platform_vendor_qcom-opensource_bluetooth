@@ -79,6 +79,7 @@ public class AncsParse {
 
     // CommandID values
     public static final byte CommandIDGetNotificationAttributes = 0;
+    public static final byte CommandIDGetAppAttributes = 1;
 
     // NotificationAttributeID values
     public static final byte NotificationAttributeIDAppIdentifier = 0;
@@ -92,6 +93,9 @@ public class AncsParse {
     public static final byte NotificationAttributeIDDate = 5;
     public static final byte NotificationAttributeIDPositiveActionLabel = 6;
     public static final byte NotificationAttributeIDNegativeActionLabel = 7;
+
+    // AppAttributeID values
+    public static final byte AppAttributeIDDisplayName = 0;
 
     // Error Codes
     /* The commandID was not recognized by the NP. */
@@ -181,6 +185,25 @@ public class AncsParse {
                     }
                 }
                 printStr.append('\n');
+            } else if (value[0] == CommandIDGetAppAttributes) {
+                printStr.append("AppAttr\t");
+                for (i = 1; i < value.length; i++) {
+                    if (value[i] == '\0') {
+                        printStr.append(new String(Arrays.copyOfRange(value, 1, i)));
+                        printStr.append("\t");
+                        i++;
+                        if (value[i] == AppAttributeIDDisplayName) {
+                            size = (value[i + 2] << 8) | value[i + 1];
+                            i += 3;
+                            if (size > 0) {
+                                printStr.append(new String(Arrays.copyOfRange(
+                                                                value, i, i + size)));
+                            }
+                        }
+                        break;
+                    }
+                }
+                printStr.append('\n');
             } else if (value[0] == UnknownCommand) {
                 printStr.append("Unknown command\n");
             } else if (value[0] == InvalidCommand) {
@@ -220,6 +243,18 @@ public class AncsParse {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return command.toByteArray();
+    }
+
+    public static byte[] getAppAttributes(String appID) {
+        ByteArrayOutputStream command = new ByteArrayOutputStream(1024);
+        command.write(CommandIDGetAppAttributes); // CommandID
+        try {
+            command.write(appID.getBytes()); // App ID
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        command.write(AppAttributeIDDisplayName); // Attribute
         return command.toByteArray();
     }
 

@@ -213,6 +213,8 @@ public class SocketServer {
                                 (Ex: GetNotificationAttr NotificationUID AppIdentifier;Title:10; \
                                 Subtitle:20;Message:30;MessageSize;Date;PositiveActionLabel; \
                                 NegativeActionLabel)\n");
+                    sendStr.append("                     GetAppAttr               \
+                                (Ex: GetAppAttr com.vendor.app)\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -254,6 +256,14 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = AncsService.mStateMachine.obtainMessage(
                                     AncsService.NCStateMachine.MSG_NC_SM_STOP_ADV, null);
+                            AncsService.mStateMachine.sendMessage(msg);
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+                    } else if (tmp.length == 2) {
+                        if (tmp[0].equals("GetAppAttr")) {
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                   AncsService.NCStateMachine.MSG_NC_SM_APP_ATTR, (tmp[1] + '\0'));
                             AncsService.mStateMachine.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
