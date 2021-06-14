@@ -217,6 +217,7 @@ public class SocketServer {
                                 (Ex: GetAppAttr com.vendor.app)\n");
                     sendStr.append("                     DoNotificationAction     \
                                 (Ex: DoNotificationAction NotificationUID Positive)\n");
+                    sendStr.append("                     UnregNotifications\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -258,6 +259,11 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = AncsService.mStateMachine.obtainMessage(
                                     AncsService.NCStateMachine.MSG_NC_SM_STOP_ADV, null);
+                            AncsService.mStateMachine.sendMessage(msg);
+                        } else if (tmp[0].equals("UnregNotifications")) {
+                            processOutputState = NONE;
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                    AncsService.NCStateMachine.MSG_NC_SM_DISCONNECT, null);
                             AncsService.mStateMachine.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
