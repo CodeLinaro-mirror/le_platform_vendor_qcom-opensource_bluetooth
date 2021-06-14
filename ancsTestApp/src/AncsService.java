@@ -92,6 +92,10 @@ public class AncsService extends Service {
     private static boolean mReceiverRegistered = false;
     public StringBuilder printStr = new StringBuilder();
 
+    private static BluetoothGattCharacteristic notificationSourceChar;
+    private static BluetoothGattCharacteristic controlPointChar;
+    private static BluetoothGattCharacteristic dataSourceChar;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -153,6 +157,11 @@ public class AncsService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
         Log.d(TAG, "Service onStartCommand");
+        IntentFilter Pairingfilter = new IntentFilter();
+        Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        Pairingfilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        registerReceiver(mPairingReceiver, Pairingfilter);
+        mReceiverRegistered = true;
 
         startNCStateMachine();
         return Service.START_STICKY;
@@ -171,6 +180,16 @@ public class AncsService extends Service {
         /* Stopping notification consumer state machine */
         if (mStateMachine != null) {
             mStateMachine.doQuit();
+        }
+
+        /* Unregistering Paring Receiver */
+        try {
+            if (mReceiverRegistered) {
+                unregisterReceiver(mPairingReceiver);
+                mReceiverRegistered = false;
+            }
+        } catch (Exception E) {
+            Log.d(TAG, "not able to unregister");
         }
     }
 
@@ -243,6 +262,21 @@ public class AncsService extends Service {
         mBluetoothGattServer.close();
     }
 
+     /**
+     * Start LE Pairing
+     */
+    private void startPairing(){
+            if(mDevice.getBondState() != BluetoothDevice.BOND_BONDED){
+                Log.i(TAG, "Pairing!");
+                if(!mDevice.createBond(TRANSPORT_LE)) {
+                    Log.i(TAG, "couldn't start pairing");
+                    printStr.setLength(0);
+                    printStr.append("Pairing failed!");
+                    SocketServer.sendSocketData(printStr.toString());
+                }
+            }
+        }
+
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
@@ -295,12 +329,137 @@ public class AncsService extends Service {
         }
     };
 
+    private final BluetoothGattCallback mGattCallbacks = new BluetoothGattCallback() {
+
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            Log.i(TAG, "mGattCallbacks onConnectionStateChange device :" + gatt.getDevice() +
+                    " status :" + status + " newState :" + newState);
+
+            if (gatt.getDevice() == null || (status != BluetoothGatt.GATT_SUCCESS) &&
+                    (mStateMachine.getCurrentState() == mStateMachine.mNCPending)) {
+                Log.e(TAG, "mGattCallbacks onConnectionStateChange:Unexpected error! mstate: " +
+                                                                             newState);
+                mStateMachine.sendMessage(
+                        NCStateMachine.MSG_NC_SM_GATT_FAILED_TO_CONNECT);
+                return;
+            }
+
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.i(TAG, "mGattCallbacks onConnectionStateChange:CONNECTED "
+                        + " remoteDevice: " + gatt.getDevice().getAddress());
+                Log.d(TAG, "starting discover services");
+                gatt.discoverServices();
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.i(TAG, "mGattCallbacks onConnectionStateChange:DISCONNECTED "
+                        + " remoteDevice: " + gatt.getDevice().getAddress());
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "onService discovery success");
+
+                BluetoothGattService mService = gatt.getService(AncsParse.ANCS_SERVICE_UUID);
+                if (mService != null) {
+                    notificationSourceChar = mService.getCharacteristic(
+                                                   AncsParse.ANCS_NOTIFICATION_SOURCE_UUID);
+                    controlPointChar = mService.getCharacteristic(
+                                                   AncsParse.ANCS_CONTROL_POINT_UUID);
+                    dataSourceChar = mService.getCharacteristic(AncsParse.ANCS_DATA_SOURCE_UUID);
+
+                    // Enable Notifications
+                    if(notificationSourceChar != null) {
+                        setCharacteristicNotification(notificationSourceChar, true);
+                        Log.d(TAG, "notificationSourceChar registered");
+                    }
+
+                    Log.d(TAG, "ANCS service found");
+                    mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_SERVICE_FOUND);
+                } else {
+                    Log.d(TAG, "ANCS service not found");
+                    mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_SERVICE_NOT_FOUND);
+                }
+
+            } else {
+                Log.d(TAG, "onServicesDiscovered failed: " + status);
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_FAILED_SERVICE_DISCOVERY);
+            }
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt,
+                                            BluetoothGattCharacteristic characteristic) {
+            byte[] value = characteristic.getValue();
+            Log.d(TAG, "onCharacteristicChanged Data: " + Arrays.toString(value));
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt,
+                                          BluetoothGattCharacteristic characteristic,
+                                          int status) {
+            if ((status == BluetoothGatt.GATT_SUCCESS)) {
+                Log.i(TAG, "onCharacteristicWrite: " + status);
+            } else {
+                Log.i(TAG, "write characteristic failed");
+            }
+        }
+    };
+
+    public void setCharacteristicNotification(BluetoothGattCharacteristic characteristic,
+                                                       boolean enable) {
+        mBluetoothGatt.setCharacteristicNotification(characteristic, enable);
+        BluetoothGattDescriptor descriptor = characteristic.getDescriptor(
+                                                       AncsParse.CONFIG_DESCRIPTOR_UUID);
+        if (descriptor != null) {
+            if (enable) {
+                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            } else {
+                descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+            }
+            mBluetoothGatt.writeDescriptor(descriptor);
+        } else {
+            Log.e(TAG, "Descriptor not found");
+        }
+    }
+
+    private final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
+                int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
+                        BluetoothDevice.ERROR);
+                if (bondState == BluetoothDevice.BOND_BONDED) {
+                    mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_REM_DEV_PAIRED);
+                }
+            } else if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        mDevice.setPairingConfirmation(true);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error occurs when trying to auto pair");
+                    e.printStackTrace();
+                }
+            }
+        }
+    };
+
     public class NCStateMachine extends StateMachine {
         public static final int MSG_NC_SM_START_ADV = 1;
         public static final int MSG_NC_SM_STOP_ADV = 2;
         public static final int MSG_NC_SM_GATT_SERVER_CONNECTED = 3;
         public static final int MSG_NC_SM_GATT_SERVER_DISCONNECTED = 4;
         public static final int MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT = 5;
+        public static final int MSG_NC_SM_REM_DEV_PAIRED = 6;
+        public static final int MSG_NC_SM_FAILED_TO_PAIR = 7;
+        public static final int MSG_NC_SM_GATT_FAILED_TO_CONNECT = 10;
+        public static final int MSG_NC_SM_ANCS_SERVICE_FOUND = 11;
+        public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 12;
+        public static final int MSG_NC_SM_ANCS_SERVICE_NOT_FOUND = 13;
+
         private NCIdle mNCIdle;
         private NCPending mNCPending;
         private NCPaired mNCPaired;
@@ -408,6 +567,17 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
+
+                if (mDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
+                    mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_REM_DEV_PAIRED);
+                } else {
+                    printStr.setLength(0);
+                    printStr.append("Waiting to get paired");
+                    SocketServer.sendSocketData(printStr.toString());
+                    MainActivity.wl.acquire();
+                    /* start pairing */
+                    startPairing();
+                }
             }
 
             @Override
@@ -426,6 +596,69 @@ public class AncsService extends Service {
                         SocketServer.sendSocketData(printStr.toString());
                         transitionTo(mNCIdle);
                         break;
+                    case MSG_NC_SM_REM_DEV_PAIRED:
+                        printStr.setLength(0);
+                        printStr.append("Device paired");
+                        SocketServer.sendSocketData(printStr.toString());
+                        if (MainActivity.wl != null) {
+                            Log.i(TAG, "Releasing wakelock");
+                            try {
+                                MainActivity.wl.release();
+                                MainActivity.wl_acquired = false;
+                            } catch (Throwable th) {
+                                // ignoring this exception, probably wakeLock was already released
+                            }
+                        } else {
+                            // should never happen during normal workflow
+                            Log.e(TAG, "Wakelock reference is null");
+                        }
+                        Log.i(TAG, "wakelock released");
+                        break;
+                    case MSG_NC_SM_FAILED_TO_PAIR:
+                        printStr.setLength(0);
+                        printStr.append("Pairing failed!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        if (MainActivity.wl != null) {
+                            Log.i(TAG, "Releasing wakelock");
+                            try {
+                                MainActivity.wl.release();
+                                MainActivity.wl_acquired = false;
+                            } catch (Throwable th) {
+                                // ignoring this exception, probably wakeLock was already released
+                            }
+                        } else {
+                            // should never happen during normal workflow
+                            Log.e(TAG, "Wakelock reference is null");
+                        }
+                        Log.i(TAG, "wakelock released");
+                        transitionTo(mNCIdle);
+                        break;
+                    case MSG_NC_SM_GATT_FAILED_TO_CONNECT:
+                        printStr.setLength(0);
+                        printStr.append("Connect failed!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
+                    case MSG_NC_SM_ANCS_SERVICE_FOUND:
+                        printStr.setLength(0);
+                        printStr.append("ANCS service found");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCPaired);
+                        break;
+                    case MSG_NC_SM_ANCS_SERVICE_NOT_FOUND:
+                        printStr.setLength(0);
+                        printStr.append("ANCS service not found");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
+                    case MSG_NC_SM_FAILED_SERVICE_DISCOVERY:
+                        printStr.setLength(0);
+                        printStr.append("Service discovery failed!");
+                        SocketServer.sendSocketData(printStr.toString());
+                        transitionTo(mNCIdle);
+                        break;
+                    default:
+                        return NOT_HANDLED;
                 }
                 return retValue;
             }
