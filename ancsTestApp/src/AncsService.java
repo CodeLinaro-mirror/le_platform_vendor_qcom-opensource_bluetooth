@@ -92,9 +92,9 @@ public class AncsService extends Service {
     private static boolean mReceiverRegistered = false;
     public StringBuilder printStr = new StringBuilder();
 
-    private static BluetoothGattCharacteristic notificationSourceChar;
-    private static BluetoothGattCharacteristic controlPointChar;
-    private static BluetoothGattCharacteristic dataSourceChar;
+    private static BluetoothGattCharacteristic notificationSourceChar = null;
+    private static BluetoothGattCharacteristic controlPointChar = null;
+    private static BluetoothGattCharacteristic dataSourceChar = null;
 
     @Override
     public void onCreate() {
@@ -400,6 +400,7 @@ public class AncsService extends Service {
                 mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_NOTIFICATION_RECEIVED);
             } else if (characteristic == dataSourceChar) {
                 AncsParse.processDataSource(value);
+                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_DATA_SOURCE_NOTIFICATION_RECEIVED);
             } else {
                 Log.d(TAG, "onCharacteristicChanged unknown notification");
             }
@@ -411,7 +412,6 @@ public class AncsService extends Service {
                                           int status) {
             if ((status == BluetoothGatt.GATT_SUCCESS)) {
                 Log.i(TAG, "onCharacteristicWrite: " + status);
-                mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_WRITE_RSP_RECEIVED);
             } else {
                 Log.i(TAG, "write characteristic failed");
             }
@@ -459,24 +459,24 @@ public class AncsService extends Service {
     };
 
     public class NCStateMachine extends StateMachine {
-        public static final int MSG_NC_SM_START_ADV = 1;
-        public static final int MSG_NC_SM_STOP_ADV = 2;
-        public static final int MSG_NC_SM_GATT_SERVER_CONNECTED = 3;
-        public static final int MSG_NC_SM_GATT_SERVER_DISCONNECTED = 4;
-        public static final int MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT = 5;
-        public static final int MSG_NC_SM_REM_DEV_PAIRED = 6;
-        public static final int MSG_NC_SM_FAILED_TO_PAIR = 7;
-        public static final int MSG_NC_SM_GATT_DISCONNECTED = 9;
-        public static final int MSG_NC_SM_GATT_FAILED_TO_CONNECT = 10;
-        public static final int MSG_NC_SM_ANCS_SERVICE_FOUND = 11;
-        public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 12;
-        public static final int MSG_NC_SM_ANCS_SERVICE_NOT_FOUND = 13;
-        public static final int MSG_NC_SM_NOTIFICATION_RECEIVED = 14;
-        public static final int MSG_NC_SM_NOTIFICATION_ATTR = 15;
-        public static final int MSG_NC_SM_APP_ATTR = 16;
-        public static final int MSG_NC_SM_NOTIFICATION_ACTION = 17;
-        public static final int MSG_NC_SM_DISCONNECT = 19;
-        public static final int MSG_NC_SM_WRITE_RSP_RECEIVED = 20;
+        public static final int MSG_NC_SM_START_ADV = 0;
+        public static final int MSG_NC_SM_STOP_ADV = 1;
+        public static final int MSG_NC_SM_GATT_SERVER_CONNECTED = 2;
+        public static final int MSG_NC_SM_GATT_SERVER_DISCONNECTED = 3;
+        public static final int MSG_NC_SM_GATT_SERVER_FAILED_TO_CONNECT = 4;
+        public static final int MSG_NC_SM_REM_DEV_PAIRED = 5;
+        public static final int MSG_NC_SM_FAILED_TO_PAIR = 6;
+        public static final int MSG_NC_SM_GATT_DISCONNECTED = 7;
+        public static final int MSG_NC_SM_GATT_FAILED_TO_CONNECT = 8;
+        public static final int MSG_NC_SM_ANCS_SERVICE_FOUND = 9;
+        public static final int MSG_NC_SM_FAILED_SERVICE_DISCOVERY = 10;
+        public static final int MSG_NC_SM_ANCS_SERVICE_NOT_FOUND = 11;
+        public static final int MSG_NC_SM_NOTIFICATION_RECEIVED = 12;
+        public static final int MSG_NC_SM_NOTIFICATION_ATTR = 13;
+        public static final int MSG_NC_SM_APP_ATTR = 14;
+        public static final int MSG_NC_SM_NOTIFICATION_ACTION = 15;
+        public static final int MSG_NC_SM_DATA_SOURCE_NOTIFICATION_RECEIVED = 16;
+        public static final int MSG_NC_SM_DISCONNECT = 17;
 
         private NCIdle mNCIdle;
         private NCPending mNCPending;
@@ -540,7 +540,6 @@ public class AncsService extends Service {
                     case MSG_NC_SM_START_ADV:
                         startAdvertising();
                         startServer();
-                        Log.i(TAG, "wakelock acquired");
                         break;
                     case MSG_NC_SM_STOP_ADV:
                         stopServer();
@@ -592,7 +591,11 @@ public class AncsService extends Service {
                     printStr.setLength(0);
                     printStr.append("Waiting to get paired");
                     SocketServer.sendSocketData(printStr.toString());
-                    MainActivity.wl.acquire();
+                    if ((MainActivity.wl != null) && (!MainActivity.wl_acquired)) {
+                        MainActivity.wl.acquire();
+                        MainActivity.wl_acquired = true;
+                        Log.i(TAG, "wakelock acquired");
+                    }
                     /* start pairing */
                     startPairing();
                 }
@@ -612,17 +615,30 @@ public class AncsService extends Service {
                         printStr.setLength(0);
                         printStr.append("Disconnected!");
                         SocketServer.sendSocketData(printStr.toString());
+                        if ((MainActivity.wl != null) && (MainActivity.wl_acquired)) {
+                            Log.i(TAG, "Releasing wakelock");
+                            try {
+                                MainActivity.wl.release();
+                                MainActivity.wl_acquired = false;
+                                Log.i(TAG, "wakelock released");
+                            } catch (Throwable th) {
+                                // ignoring this exception, probably wakeLock was already released
+                            }
+                        } else {
+                            Log.e(TAG, "Wakelock reference is null");
+                        }
                         transitionTo(mNCIdle);
                         break;
                     case MSG_NC_SM_REM_DEV_PAIRED:
                         printStr.setLength(0);
                         printStr.append("Device paired");
                         SocketServer.sendSocketData(printStr.toString());
-                        if (MainActivity.wl != null) {
+                        if ((MainActivity.wl != null) && (MainActivity.wl_acquired)) {
                             Log.i(TAG, "Releasing wakelock");
                             try {
                                 MainActivity.wl.release();
                                 MainActivity.wl_acquired = false;
+                                Log.i(TAG, "wakelock released");
                             } catch (Throwable th) {
                                 // ignoring this exception, probably wakeLock was already released
                             }
@@ -630,17 +646,18 @@ public class AncsService extends Service {
                             // should never happen during normal workflow
                             Log.e(TAG, "Wakelock reference is null");
                         }
-                        Log.i(TAG, "wakelock released");
                         break;
                     case MSG_NC_SM_FAILED_TO_PAIR:
+                        // Wait for device to be disconnected
                         printStr.setLength(0);
                         printStr.append("Pairing failed!");
                         SocketServer.sendSocketData(printStr.toString());
-                        if (MainActivity.wl != null) {
+                        if ((MainActivity.wl != null) && (MainActivity.wl_acquired)) {
                             Log.i(TAG, "Releasing wakelock");
                             try {
                                 MainActivity.wl.release();
                                 MainActivity.wl_acquired = false;
+                                Log.i(TAG, "wakelock released");
                             } catch (Throwable th) {
                                 // ignoring this exception, probably wakeLock was already released
                             }
@@ -648,10 +665,20 @@ public class AncsService extends Service {
                             // should never happen during normal workflow
                             Log.e(TAG, "Wakelock reference is null");
                         }
-                        Log.i(TAG, "wakelock released");
-                        transitionTo(mNCIdle);
                         break;
                     case MSG_NC_SM_GATT_DISCONNECTED:
+                        if ((MainActivity.wl != null) && (MainActivity.wl_acquired)) {
+                            Log.i(TAG, "Releasing wakelock");
+                            try {
+                                MainActivity.wl.release();
+                                MainActivity.wl_acquired = false;
+                                Log.i(TAG, "wakelock released");
+                            } catch (Throwable th) {
+                                // ignoring this exception, probably wakeLock was already released
+                            }
+                        } else {
+                            Log.e(TAG, "Wakelock reference is null");
+                        }
                         printStr.setLength(0);
                         printStr.append("Disconnected!");
                         SocketServer.sendSocketData(printStr.toString());
@@ -673,13 +700,13 @@ public class AncsService extends Service {
                         printStr.setLength(0);
                         printStr.append("ANCS service not found");
                         SocketServer.sendSocketData(printStr.toString());
-                        transitionTo(mNCIdle);
+                        transitionTo(mNCDisconnect);
                         break;
                     case MSG_NC_SM_FAILED_SERVICE_DISCOVERY:
                         printStr.setLength(0);
                         printStr.append("Service discovery failed!");
                         SocketServer.sendSocketData(printStr.toString());
-                        transitionTo(mNCIdle);
+                        transitionTo(mNCDisconnect);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -801,8 +828,11 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                MainActivity.wl.acquire();
-                Log.i(TAG, "wakelock acquired");
+                if ((MainActivity.wl != null) && (!MainActivity.wl_acquired)) {
+                    MainActivity.wl.acquire();
+                    MainActivity.wl_acquired = true;
+                    Log.i(TAG, "wakelock acquired");
+                }
             }
 
             @Override
@@ -816,12 +846,13 @@ public class AncsService extends Service {
                 boolean retValue = HANDLED;
 
                 switch (message.what) {
-                    case MSG_NC_SM_WRITE_RSP_RECEIVED:
-                        if (MainActivity.wl != null) {
+                    case MSG_NC_SM_DATA_SOURCE_NOTIFICATION_RECEIVED:
+                        if ((MainActivity.wl != null) && (MainActivity.wl_acquired)) {
                             Log.i(TAG, "Releasing wakelock");
                             try {
                                 MainActivity.wl.release();
                                 MainActivity.wl_acquired = false;
+                                Log.i(TAG, "wakelock released");
                             } catch (Throwable th) {
                                 // ignoring this exception, probably wakeLock was already released
                             }
@@ -829,7 +860,6 @@ public class AncsService extends Service {
                             // should never happen during normal workflow
                             Log.e(TAG, "Wakelock reference is null");
                         }
-                        Log.i(TAG, "wakelock released");
                         transitionTo(mNCNotificationReceived);
                         break;
                 }
@@ -869,10 +899,16 @@ public class AncsService extends Service {
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
                 // Disable Notifications
-                setCharacteristicNotification(notificationSourceChar, false);
-                Log.d(TAG, "notificationSourceChar deregistered");
-                setCharacteristicNotification(dataSourceChar, false);
-                Log.d(TAG, "dataSourceChar deregistered");
+                if(notificationSourceChar != null) {
+                    setCharacteristicNotification(notificationSourceChar, false);
+                    Log.d(TAG, "notificationSourceChar deregistered");
+                    notificationSourceChar = null;
+                }
+                if(dataSourceChar != null) {
+                    setCharacteristicNotification(dataSourceChar, false);
+                    Log.d(TAG, "dataSourceChar deregistered");
+                    dataSourceChar = null;
+                }
                 mBluetoothGatt.disconnect();
             }
 
