@@ -209,14 +209,16 @@ public class SocketServer {
                     sendStr.append("\n******************** Bt Test App ********************\n");
                     sendStr.append("                     AdvStart\n");
                     sendStr.append("                     AdvStop\n");
-                    sendStr.append("                     GetNotificationAttr      \
-                                (Ex: GetNotificationAttr NotificationUID AppIdentifier;Title:10; \
-                                Subtitle:20;Message:30;MessageSize;Date;PositiveActionLabel; \
-                                NegativeActionLabel)\n");
-                    sendStr.append("                     GetAppAttr               \
-                                (Ex: GetAppAttr com.vendor.app)\n");
-                    sendStr.append("                     DoNotificationAction     \
-                                (Ex: DoNotificationAction NotificationUID Positive)\n");
+                    sendStr.append("                     GetNotificationAttr   ");
+                    sendStr.append("(Ex: GetNotificationAttr NotificationUID AppIdentifier;\n");
+                    sendStr.append("                                                ");
+                    sendStr.append("Title:10;Subtitle:20;Message:30;MessageSize;Date;\n");
+                    sendStr.append("                                                ");
+                    sendStr.append("PositiveActionLabel;NegativeActionLabel)\n");
+                    sendStr.append("                     GetAppAttr            ");
+                    sendStr.append("(Ex: GetAppAttr com.vendor.app)\n");
+                    sendStr.append("                     DoNotificationAction  ");
+                    sendStr.append("(Ex: DoNotificationAction NotificationUID Positive)\n");
                     sendStr.append("                     UnregNotifications\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
