@@ -585,7 +585,6 @@ public class SocketServer {
                         } else if (tmp[0].equals("RW_Char")) {
                             ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
                             if (readWriteCharOpParam != null) {
-                                Log.i(TAG, "RW_Char SrvUUID: " +readWriteCharOpParam.Srvc_uuid + " Value: " +readWriteCharOpParam.Value);
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_GATT_WRITE_READ_CHAR, readWriteCharOpParam);
@@ -596,7 +595,6 @@ public class SocketServer {
                         } else if (tmp[0].equals("RW_Desc")) {
                             ReadWriteOp readWriteDescOpParam = parse.ReadWriteOpParse(tmp[1]);
                             if (readWriteDescOpParam != null) {
-                                Log.i(TAG, "RW_Desc SrvUUID: " +readWriteDescOpParam.Srvc_uuid + " Value: " +readWriteDescOpParam.Value);
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_GATT_WRITE_READ_DESC, readWriteDescOpParam);
@@ -627,7 +625,6 @@ public class SocketServer {
                         } else if (tmp[0].equals("ReliableWrite")) {
                             ReadWriteOp reliableWriteParam = parse.ReadWriteOpParse(tmp[1]);
                             if (reliableWriteParam != null) {
-                                Log.i(TAG, "ReliableWrite SrvUUID: " +reliableWriteParam.Srvc_uuid + " Value: " +reliableWriteParam.Value);
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_GATT_RELIABLE_WRITE, reliableWriteParam);

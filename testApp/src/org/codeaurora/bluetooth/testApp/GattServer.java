@@ -82,7 +82,6 @@ public class GattServer{
     public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_PHY_READ_DONE;
 
     public static int LOG_LEVEL = 3;
-    public static final int GATT_SERVER = 8;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
@@ -92,7 +91,7 @@ public class GattServer{
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
         mgattServer.startServer();
-        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
+        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(BluetoothProfile.GATT_SERVER);
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -105,11 +104,7 @@ public class GattServer{
     public class BleGattServer {
         private static final String TAG = "BleGattServer";
         private BluetoothGattServer mBluetoothGattserver;
-        private BluetoothGattService mService;
-        private BluetoothGattCharacteristic mCharacteristic;
-        private BluetoothGattCharacteristic mreadChar;
         private Context context;
-        private int mState;
         private int GATT_SUCCESS = 0x00;
         Message msg;
 
@@ -206,7 +201,6 @@ public class GattServer{
     public class GattServerMessageHandler extends Handler {
         Context mMsgContext;
         private static final String TAG = "GattServerMessageHandler";
-        int operation_request;
         public GattServerMessageHandler(Context contxt, Looper looper) {
             super(looper);
             mMsgContext = contxt;
@@ -218,7 +212,6 @@ public class GattServer{
         public void handleMessage(Message msg) {
             if (GattClient.LOG_LEVEL >= 2)
                 Log.d(TAG, "Handler(): msg = " + msg.what);
-            int status;
             AddServices AddServ;
             switch (msg.what) {
                 case MSG_START_BLE_ADD_SERVICE:
