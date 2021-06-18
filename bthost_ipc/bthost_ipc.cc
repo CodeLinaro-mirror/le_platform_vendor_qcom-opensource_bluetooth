@@ -134,6 +134,7 @@ static const char* dump_a2dp_ctrl_event(char event)
         CASE_RETURN_STR(A2DP_CTRL_GET_CODEC_CONFIG)
         CASE_RETURN_STR(A2DP_CTRL_GET_MULTICAST_STATUS)
         CASE_RETURN_STR(A2DP_CTRL_GET_CONNECTION_STATUS)
+        CASE_RETURN_STR(A2DP_CTRL_GET_SINK_LATENCY)
         default:
             return "UNKNOWN MSG ID";
     }
@@ -1239,6 +1240,24 @@ int audio_check_a2dp_ready()
     return 1;
 }
 
+uint16_t audio_get_a2dp_sink_latency()
+{
+    uint16_t sink_latency = 0;
+
+    INFO("%s",__func__);
+    if (a2dp_command(&audio_stream, A2DP_CTRL_GET_SINK_LATENCY) < 0 )
+    {
+        ERROR("%s failed",__func__);
+        return 0;
+    }
+    INFO("%s: fd = %d",__func__, audio_stream.ctrl_fd);
+    if ( a2dp_ctrl_receive(&audio_stream, &sink_latency, sizeof(sink_latency)) < 0)
+        return 0;
+
+    INFO("%s: latency %d",__func__, sink_latency);
+    return sink_latency;
+}
+
 //Entry point for dynamic lib
 EXPORT_SYMBOL bt_host_ipc_interface_t BTHOST_IPC_INTERFACE = {
     sizeof(bt_host_ipc_interface_t),
@@ -1263,5 +1282,6 @@ EXPORT_SYMBOL bt_host_ipc_interface_t BTHOST_IPC_INTERFACE = {
     audio_handoff_triggered,
     clear_a2dpsuspend_flag,
     audio_get_next_codec_config,
-    audio_check_a2dp_ready
+    audio_check_a2dp_ready,
+    audio_get_a2dp_sink_latency,
 };
