@@ -139,6 +139,7 @@ public class GattClient {
     private static int total_length = 0;
     private boolean reliable_write_no_more_data = false;
     private ReadWriteOp RdWrReliableClass;
+    private ReadWriteOp RdWrClass;
     private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
 
     private List<UUID> mServiceUUID;
@@ -209,7 +210,7 @@ public class GattClient {
                       " status :" + status + " newState :" + newState);
                 if (gatt.getDevice() == null || status != GATT_SUCCESS) {
                     if(GattClient.LOG_LEVEL >= 1) {
-                        Log.e(TAG, "onConnectionStateChange:Unexpected error! state: " +  newState);
+                        Log.e(TAG, "onConnectionStateChange:Unexpected error! state: " + newState);
                     }
                     mConnectionStatus = BLE_STATE_DISCONNECTED;
                     /*Send Message to Message Handler */
@@ -335,8 +336,8 @@ public class GattClient {
                                                 BluetoothGattCharacteristic characteristic,
                                                 int status){
                 if ((status == GATT_SUCCESS)) {
-                    String value = new String(characteristic.getValue());
-                    Log.i(TAG, "Characteristic read is "+ value);
+                    /* get value based on format type */
+                    String value = fetchFormatValue(characteristic);
                     msg = mGattClientHandler.obtainMessage(MSG_CHAR_READ_DONE, value);
                     mGattClientHandler.sendMessage(msg);
                 } else {
@@ -367,7 +368,20 @@ public class GattClient {
                                    offset_value = RdWrReliableClass.Value.substring(
                                           length_offset,(length_offset + mtu_size-5));
                                    length_offset +=  (mtu_size - 5);
-                                   characteristic.setValue(offset_value.getBytes());
+                                   /* set value according to format type */
+                                   if(RdWrReliableClass.Format_type == GATT_FORMAT_STRING) {
+                                        characteristic.setValue(new String(offset_value));
+                                   }
+                                   else if(RdWrReliableClass.Format_type == GATT_FORMAT_INT){
+                                        characteristic.setValue(offset_value.getBytes());
+                                   }
+                                   else{
+                                         Log.e(TAG, "invalid format");
+                                         PrintStr.setLength(0);
+                                         PrintStr.append("Invalid format type for Reliable Write");
+                                         SocketServer.sendSocketData(PrintStr.toString());
+
+                                   }
                                    mgattClient.mBluetoothGatt.writeCharacteristic(
                                                 characteristic);
                                 } else if(total_length <= length_offset + mtu_size - 5) {
@@ -376,7 +390,19 @@ public class GattClient {
                                           total_length);
                                     reliable_write_no_more_data = true;
                                     length_offset = total_length - (mtu_size - 5);
-                                    characteristic.setValue(offset_value.getBytes());
+                                    /* set value according to format type */
+                                    if(RdWrReliableClass.Format_type == GATT_FORMAT_STRING) {
+                                        characteristic.setValue(new String(offset_value));
+                                    }
+                                    else if(RdWrReliableClass.Format_type == GATT_FORMAT_INT){
+                                        characteristic.setValue(offset_value.getBytes());
+                                    }
+                                    else{
+                                          Log.e(TAG, "invalid format");
+                                          PrintStr.setLength(0);
+                                          PrintStr.append("Invalid format type for Reliable Write");
+                                          SocketServer.sendSocketData(PrintStr.toString());
+                                    }
                                     mgattClient.mBluetoothGatt.writeCharacteristic(
                                                 characteristic);
                                 }
@@ -536,6 +562,36 @@ public class GattClient {
                 }
             }
         }
+
+        public String fetchFormatValue(BluetoothGattCharacteristic characteristic) {
+            /* String format */
+            if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
+                String value = characteristic.getStringValue(0);
+                Log.i(TAG, "Characteristic value(string) is "+ value);
+                return value;
+            }
+            /* Int format */
+            else if(RdWrClass.Format_type == GATT_FORMAT_INT){
+                byte[] value = characteristic.getValue();
+                StringBuilder result = new StringBuilder();
+                for (byte temp : value) {
+                    result.append(String.format("%d ", temp));
+                }
+                Log.i(TAG, "Characteristic value(int) is "+ result.toString());
+                return (result.toString());
+            }
+            /* Default format - Hex */
+            else{
+                Log.e(TAG, "Default format");
+                byte[] value = characteristic.getValue();
+                StringBuilder result = new StringBuilder();
+                for (byte temp : value) {
+                    result.append(String.format("%02x ", temp));
+                }
+                Log.i(TAG, "Characteristic value(hex) is "+ result.toString());
+                return (result.toString());
+            }
+        }
     }
 
     public class GattClientMessageHandler extends Handler {
@@ -613,7 +669,7 @@ public class GattClient {
                     processDisconnectReq();
                     break;
                 case MSG_START_BLE_GATT_WRITE_READ_CHAR:
-                    ReadWriteOp RdWrClass = (ReadWriteOp) msg.obj;
+                    RdWrClass = (ReadWriteOp) msg.obj;
                     processGattReadWriteCharReq(RdWrClass);
                     break;
                 case MSG_START_BLE_GATT_WRITE_READ_DESC:
@@ -895,7 +951,6 @@ public class GattClient {
                        "char uuid:" + mCharacteristic.getUuid().toString());
 
             if(RdWrClass.operation == GATT_READ) {
-                Log.d(TAG, "Read Char, Srvc uuid" + RdWrClass.Srvc_uuid + "char uuid:" + RdWrClass.Char_uuid);
                 status = mgattClient.mBluetoothGatt.readCharacteristic(mCharacteristic);
                 if(status != true)
                     Log.e(TAG, "Read Char failed");
@@ -959,6 +1014,9 @@ public class GattClient {
                 }
                 else{
                       Log.e(TAG, "invalid format");
+                      PrintStr.setLength(0);
+                      PrintStr.append("Invalid format type for Characteristic Write");
+                      SocketServer.sendSocketData(PrintStr.toString());
                 }
             } else {
                 Log.e(TAG, "invalid operation");
@@ -1096,13 +1154,37 @@ public class GattClient {
                 offset_value = RdWrReliableClass.Value.substring(
                         length_offset, (mtu_size - 5));
                 length_offset +=  (mtu_size - 5);
-                mCharacteristic.setValue(offset_value.getBytes());
+                /* set value according to format type */
+                if(RdWrReliableClass.Format_type == GATT_FORMAT_STRING) {
+                    mCharacteristic.setValue(new String(offset_value));
+                }
+                else if(RdWrReliableClass.Format_type == GATT_FORMAT_INT){
+                    mCharacteristic.setValue(offset_value.getBytes());
+                }
+                else{
+                      Log.e(TAG, "invalid format");
+                      PrintStr.setLength(0);
+                      PrintStr.append("Invalid format type for Reliable Write");
+                      SocketServer.sendSocketData(PrintStr.toString());
+                }
             } else {
                 length_offset = total_length;
                 reliable_write_no_more_data = true;
                 offset_value = String.valueOf(RdWrReliableClass.Value);
                 Log.d(TAG, "leng_offset"+length_offset+"offset_value"+offset_value.toString());
-                mCharacteristic.setValue(offset_value.getBytes());
+                /* set value according to format type */
+                if(RdWrReliableClass.Format_type == GATT_FORMAT_STRING) {
+                    mCharacteristic.setValue(new String(offset_value));
+                }
+                else if(RdWrReliableClass.Format_type == GATT_FORMAT_INT){
+                    mCharacteristic.setValue(offset_value.getBytes());
+                }
+                else{
+                      Log.e(TAG, "invalid format");
+                      PrintStr.setLength(0);
+                      PrintStr.append("Invalid format type for Reliable Write");
+                      SocketServer.sendSocketData(PrintStr.toString());
+                }
             }
             mgattClient.mBluetoothGatt.writeCharacteristic(
                                         mCharacteristic);

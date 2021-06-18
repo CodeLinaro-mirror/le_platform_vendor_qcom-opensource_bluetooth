@@ -58,9 +58,6 @@ import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothProfile;
 
 public class GattServer{
-    /* Variable to update phy */
-    public static int txPhyReq = 1;
-    public static int rxPhyReq = 1;
     public GattServerMessageHandler mGattServerHandler = null;
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
@@ -77,12 +74,9 @@ public class GattServer{
     public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_GET_CONNECTED_DEVICES;
 
     public static final int MSG_ADD_SERVICE_DONE = MSG_GS_ACTION_MAX_VALUE + 1;
-    public static final int MSG_PHY_UPDATE_DONE = MSG_GS_ACTION_MAX_VALUE + 2;
-    public static final int MSG_PHY_READ_DONE = MSG_GS_ACTION_MAX_VALUE + 3;
-    public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_PHY_READ_DONE;
+    public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_ADD_SERVICE_DONE;
 
     public static int LOG_LEVEL = 3;
-    public static final int GATT_SERVER = 8;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
@@ -92,7 +86,8 @@ public class GattServer{
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
         mgattServer.startServer();
-        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
+        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(
+                            BluetoothProfile.GATT_SERVER);
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -105,11 +100,7 @@ public class GattServer{
     public class BleGattServer {
         private static final String TAG = "BleGattServer";
         private BluetoothGattServer mBluetoothGattserver;
-        private BluetoothGattService mService;
-        private BluetoothGattCharacteristic mCharacteristic;
-        private BluetoothGattCharacteristic mreadChar;
         private Context context;
-        private int mState;
         private int GATT_SUCCESS = 0x00;
         Message msg;
 
@@ -162,15 +153,15 @@ public class GattServer{
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
-                    if(txPhyReq == txPhy || rxPhyReq == rxPhy) {
-                        PhyUpdate tmp_phy = new PhyUpdate();
-                        tmp_phy.txPhy = txPhy;
-                        tmp_phy.rxPhy = rxPhy;
-                        msg = mGattServerHandler.obtainMessage(
-                                         MSG_PHY_UPDATE_DONE, tmp_phy);
-                        mGattServerHandler.sendMessage(msg);
-                        txPhyReq = rxPhyReq = 0;
-                    }
+                    /* Print Phy values along with bdAddress*/
+                    PrintStr.setLength(0);
+                    PrintStr.append("Phy Update done, BDAddress:");
+                    PrintStr.append(device.getAddress());
+                    PrintStr.append(" Tx Phy :");
+                    PrintStr.append(txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(rxPhy);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "phy update failed");
                     PrintStr.setLength(0);
@@ -182,12 +173,15 @@ public class GattServer{
             @Override
             public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
                 if(status == GATT_SUCCESS){
-                     Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
-                     PhyUpdate tmp_phy = new PhyUpdate();
-                     tmp_phy.txPhy = txPhy;
-                     tmp_phy.rxPhy = rxPhy;
-                     msg = mGattServerHandler.obtainMessage(MSG_PHY_READ_DONE, tmp_phy);
-                     mGattServerHandler.sendMessage(msg);
+                    Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Phy Read, BDAddress:");
+                    PrintStr.append(device.getAddress());
+                    PrintStr.append(" Tx Phy :");
+                    PrintStr.append(txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(rxPhy);
+                    SocketServer.sendSocketData(PrintStr.toString());
                  } else{
                      Log.i(TAG, "Read Phy failed");
                      PrintStr.setLength(0);
@@ -206,7 +200,6 @@ public class GattServer{
     public class GattServerMessageHandler extends Handler {
         Context mMsgContext;
         private static final String TAG = "GattServerMessageHandler";
-        int operation_request;
         public GattServerMessageHandler(Context contxt, Looper looper) {
             super(looper);
             mMsgContext = contxt;
@@ -218,7 +211,6 @@ public class GattServer{
         public void handleMessage(Message msg) {
             if (GattClient.LOG_LEVEL >= 2)
                 Log.d(TAG, "Handler(): msg = " + msg.what);
-            int status;
             AddServices AddServ;
             switch (msg.what) {
                 case MSG_START_BLE_ADD_SERVICE:
@@ -257,24 +249,6 @@ public class GattServer{
                     String interal = (String) msg.obj;
                     PrintStr.append("service added with UUID :");
                     PrintStr.append(interal);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_PHY_UPDATE_DONE:
-                    PrintStr.setLength(0);
-                    phyUpdate = (PhyUpdate) msg.obj;
-                    PrintStr.append("Phy Update done, Tx Phy :");
-                    PrintStr.append(phyUpdate.txPhy);
-                    PrintStr.append(" Rx Phy :");
-                    PrintStr.append(phyUpdate.rxPhy);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_PHY_READ_DONE:
-                    PrintStr.setLength(0);
-                    phyUpdate = (PhyUpdate) msg.obj;
-                    PrintStr.append("Current Phy: Tx Phy :");
-                    PrintStr.append(phyUpdate.txPhy);
-                    PrintStr.append(" Rx Phy :");
-                    PrintStr.append(phyUpdate.rxPhy);
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
             }
@@ -344,8 +318,6 @@ public class GattServer{
 
         private void processPhyUpdateReq(PhyUpdate phyUpdate) {
             Log.i(TAG, "Phy Update");
-            txPhyReq = phyUpdate.txPhy;
-            rxPhyReq = phyUpdate.rxPhy;
             String bdAddr = phyUpdate.remoteAddress.toUpperCase();
             if (BleAppService.bleAdapter.checkBluetoothAddress(bdAddr)) {
                 BluetoothDevice mdevice = getRemoteDevice(bdAddr);
