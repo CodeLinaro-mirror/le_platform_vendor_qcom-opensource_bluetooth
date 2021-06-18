@@ -294,6 +294,7 @@ public class SocketServer {
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
+                    sendStr.append("                       Pair                         (Ex: Pair 11:22:33:44:55:66)\n");
                     sendStr.append("                       GetConnectedDevices\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
@@ -730,7 +731,18 @@ public class SocketServer {
                             } else {
                               processOutputState = INVALID_INPUT;
                             }
-                        } else {
+                        } else if (tmp[0].equals("Pair")) {
+                            if (BleAppService.bleAdapter.
+                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_PAIR,
+                                        tmp[1].toUpperCase());
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        }  else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if(tmp.length == 1) {
