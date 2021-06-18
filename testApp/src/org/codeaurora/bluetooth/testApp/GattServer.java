@@ -65,7 +65,6 @@ public class GattServer{
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
-    private BluetoothDevice mdevice = null;
     private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
@@ -84,10 +83,7 @@ public class GattServer{
 
     public static int LOG_LEVEL = 3;
     public static final int GATT_SERVER = 8;
-    public static final int BLE_STATE_CONNECTED = 10;
-    public static final int BLE_STATE_DISCONNECTED = 11;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
-    private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
 
@@ -96,6 +92,7 @@ public class GattServer{
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
         mgattServer.startServer();
+        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -140,22 +137,21 @@ public class GattServer{
 
              @Override
              public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
-                 mdevice = device;
                  Log.d(TAG, "onConnectionStateChange() got connection event");
                  if(newState == BluetoothProfile.STATE_CONNECTED &&
-                                                    mConnectionStatus == BLE_STATE_DISCONNECTED ) {
-                    mGattServerHandler.processConnectReq();
+                                                   !connectedDevices.contains(device)  ) {
+                    mGattServerHandler.processConnectReq(device);
                     PrintStr.setLength(0);
                     PrintStr.append("Device Connected : ");
                     PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
-                    mConnectionStatus = BLE_STATE_CONNECTED;
+                    connectedDevices.add(device);
                } else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                     PrintStr.setLength(0);
                     PrintStr.append("Device Disonnected : ");
-                    PrintStr.append(mdevice.getAddress());
+                    PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
-                    mConnectionStatus = BLE_STATE_DISCONNECTED;
+                    connectedDevices.remove(device);
                }
 
              }
@@ -250,7 +246,8 @@ public class GattServer{
                     processPhyUpdateReq(phyUpdate);
                     break;
                 case MSG_START_BLE_READ_PHY:
-                    processReadPhyReq();
+                    String mdeviceAddr = (String) msg.obj;
+                    processReadPhyReq(mdeviceAddr);
                     break;
                 case MSG_START_GET_CONNECTED_DEVICES:
                     processGetConnectedDevices();
@@ -283,7 +280,7 @@ public class GattServer{
             }
         }
 
-        private BluetoothGattService createService(UUID srvcUUID, List<UUID> charuuids,
+        private BluetoothGattService createService(UUID srvcUUID, UUID charuuid,
                                  List<Integer> props, List<Integer>perms, byte[] value){
 
             if(LOG_LEVEL >=2)
@@ -300,23 +297,22 @@ public class GattServer{
                 perm_ored = perm_ored | x;
             }
             BluetoothGattCharacteristic charAdd;
-            for(UUID Char_uuid: charuuids){
 
-                charAdd = new BluetoothGattCharacteristic(Char_uuid, prop_ored, perm_ored);
-                if(value != null)
-                    charAdd.setValue(value);
+            charAdd = new BluetoothGattCharacteristic(charuuid, prop_ored, perm_ored);
+            if(value != null)
+                charAdd.setValue(value);
 
-                if((prop_ored & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0){
-                    BluetoothGattDescriptor desc =  new BluetoothGattDescriptor
-                            (UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG),
-                                    perm_ored);
+            if((prop_ored & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0){
+                BluetoothGattDescriptor desc =  new BluetoothGattDescriptor
+                        (UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG),
+                                perm_ored);
 
-                    desc.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-                    charAdd.addDescriptor(desc);
-                }
-
-                srvc.addCharacteristic(charAdd);
+                desc.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+                charAdd.addDescriptor(desc);
             }
+
+            srvc.addCharacteristic(charAdd);
+
             if(srvc != null){
                 return srvc;
             }
@@ -326,7 +322,7 @@ public class GattServer{
         private void processGattAddServiceReq(AddServices AddServ) {
 
             BluetoothGattService lService = createService(AddServ.lserviceUUID,
-                              AddServ.lcharUUIDs, AddServ.lProps,AddServ.lPerms, AddServ.lvalue);
+                              AddServ.lcharUUID, AddServ.lProps,AddServ.lPerms, AddServ.lvalue);
             if(lService != null) {
             Log.d(TAG, AddServ.lserviceUUID.toString());
             Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
@@ -347,12 +343,29 @@ public class GattServer{
          }
 
         private void processPhyUpdateReq(PhyUpdate phyUpdate) {
-
+            Log.i(TAG, "Phy Update");
             txPhyReq = phyUpdate.txPhy;
             rxPhyReq = phyUpdate.rxPhy;
-            Log.i(TAG, "Phy Update");
-            mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,phyUpdate.txPhy,
-                                        phyUpdate.rxPhy, phyUpdate.phyOpt);
+            String bdAddr = phyUpdate.remoteAddress.toUpperCase();
+            if (BleAppService.bleAdapter.checkBluetoothAddress(bdAddr)) {
+                BluetoothDevice mdevice = getRemoteDevice(bdAddr);
+                if (mdevice != null) {
+                    mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,
+                          phyUpdate.txPhy, phyUpdate.rxPhy, phyUpdate.phyOpt);
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device not in connected list");
+                    PrintStr.append(bdAddr);
+                    PrintStr.append("  ");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Improper Device Address for set phy:");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         }
 
         private void processGattClearServiceReq() {
@@ -360,8 +373,6 @@ public class GattServer{
             mgattServer.mBluetoothGattserver.clearServices();
             Service_List.clear();
         }
-
-
 
         private void processGattGetServiceReq() {
             Log.d(TAG, "Listing all the services");
@@ -376,13 +387,21 @@ public class GattServer{
             SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processReadPhyReq() {
+        private void processReadPhyReq(String bdAddr) {
             Log.i(TAG, "Read Phy");
-            mgattServer.mBluetoothGattserver.readPhy(mdevice);
+            BluetoothDevice mdevice = getRemoteDevice(bdAddr);
+            if (mdevice != null) {
+                mgattServer.mBluetoothGattserver.readPhy(mdevice);
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Device not in connected list");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         }
 
         private void processGetConnectedDevices() {
-             connectedDevices=MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
              PrintStr.setLength(0);
              PrintStr.append("Connected Device:");
              for (int i = 0; i < connectedDevices.size(); i++)  {
@@ -393,10 +412,22 @@ public class GattServer{
              SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processConnectReq() {
+        private void processConnectReq(BluetoothDevice mdevice) {
             mgattServer.mBluetoothGattserver.connect(mdevice,false);
         }
 
-
+        private BluetoothDevice getRemoteDevice(String address) {
+            BluetoothDevice mdevice = null;
+            Log.i(TAG,"address: " + address);
+            for (int i = 0; i < connectedDevices.size(); i++)  {
+                 Log.i(TAG,connectedDevices.get(i).getAddress());
+                 if (connectedDevices.get(i).getAddress().equals(address)) {
+                     Log.i(TAG, "Found match");
+                     mdevice = connectedDevices.get(i);
+                     break;
+                 }
+            }
+            return mdevice;
+        }
     }
 }

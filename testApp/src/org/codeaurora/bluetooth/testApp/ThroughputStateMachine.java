@@ -349,7 +349,6 @@ public class ThroughputStateMachine {
                 if(!mDevice.createBond(TRANSPORT_LE)) {
                     Log.i(TAG, "couldn't start pairing");
                 }
-                BleAppService.pairing_called = BleAppService.PAIRING_REQ_FROM_THROUGHPUT_SM;
             }
             else {
                 Log.i(TAG, "Already Paired!");
@@ -365,7 +364,6 @@ public class ThroughputStateMachine {
                 PrintStr.setLength(0);
                 PrintStr.append("Device unpaired");
                 SocketServer.sendSocketData(PrintStr.toString());
-                BleAppService.pairing_called = 0;
             }
         }
 
@@ -412,15 +410,14 @@ public class ThroughputStateMachine {
         public static final int MSG_TA_SM_PHY_UPDATED = 11;
         public static final int MSG_TA_SM_PHY_READ_DONE = 12;
         public static final int MSG_TA_SM_MTU_EXCHANGE_DONE = 13;
-        public static final int MSG_TA_SM_REM_DEV_PAIRED = 14;
-        public static final int MSG_TA_SM_CONN_UPDATE = 15;
-        public static final int MSG_TA_SM_UNPAIR_DEV = 16;
-        public static final int MSG_TA_SM_PHY_UPDATE = 17;
-        public static final int MSG_TA_SM_READ_PHY = 18;
-        public static final int MSG_TA_SM_DATA_TX_TEST = 19;
-        public static final int MSG_TA_SM_DATA_RX_TEST = 20;
-        public static final int MSG_TA_SM_LATENCY_TEST = 21;
-        public static final int MSG_TA_SM_PAIR_DEV = 22;
+        public static final int MSG_TA_SM_CONN_UPDATE = 14;
+        public static final int MSG_TA_SM_UNPAIR_DEV = 15;
+        public static final int MSG_TA_SM_PHY_UPDATE = 16;
+        public static final int MSG_TA_SM_READ_PHY = 17;
+        public static final int MSG_TA_SM_DATA_TX_TEST = 18;
+        public static final int MSG_TA_SM_DATA_RX_TEST = 19;
+        public static final int MSG_TA_SM_LATENCY_TEST = 20;
+        public static final int MSG_TA_SM_PAIR_DEV = 21;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
@@ -634,11 +631,6 @@ public class ThroughputStateMachine {
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"Disconnectflag");
                         transitionTo(mTADisconnect);
-                        break;
-                    case MSG_TA_SM_REM_DEV_PAIRED:
-                        PrintStr.setLength(0);
-                        PrintStr.append("Remote device paired");
-                        SocketServer.sendSocketData(PrintStr.toString());
                         break;
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
