@@ -49,6 +49,7 @@ UINT8 bta_avk_mp3_cfg_matches_cap(UINT8 *p_cfg, tA2D_MP3_CIE *p_cap)
     UINT8           status = 0;
     tA2D_MP3_CIE    cfg_cie;
 
+    memset(&cfg_cie, 0x00, sizeof(cfg_cie));
     /* parse configuration */
     if ((status = A2D_ParsMp3Info(&cfg_cie, p_cfg, TRUE)) != 0)
     {
@@ -107,6 +108,7 @@ UINT8 bta_avk_mp3_cfg_in_cap(UINT8 *p_cfg, tA2D_MP3_CIE *p_cap)
     UINT8           status = 0;
     tA2D_MP3_CIE    cfg_cie;
 
+    memset(&cfg_cie, 0x00, sizeof(cfg_cie));
     /* parse configuration */
     if ((status = A2D_ParsMp3Info(&cfg_cie, p_cfg, FALSE)) != 0)
     {
