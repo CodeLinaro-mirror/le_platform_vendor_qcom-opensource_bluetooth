@@ -150,7 +150,8 @@ public class BleAppService extends Service {
     public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
     public static final int MSG_GS_START_GET_CONNECTED_DEVICES = MSG_SM_MAX_ACTION_VALUE + 9;
     public static final int MSG_GS_START_BLE_PAIR = MSG_SM_MAX_ACTION_VALUE + 10;
-    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_PAIR;
+    public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_DISCONNECT;
 
     @Override
     public void onCreate() {
@@ -699,6 +700,12 @@ public class BleAppService extends Service {
                     bdAddr = (String) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                             mgattserver.MSG_START_BLE_PAIR, bdAddr);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_DISCONNECT:
+                    bdAddr = (String) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_DISCONNECT, bdAddr);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 default:
