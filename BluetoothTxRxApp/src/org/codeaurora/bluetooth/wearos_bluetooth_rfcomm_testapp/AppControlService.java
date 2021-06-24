@@ -44,6 +44,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -70,6 +71,7 @@ public class AppControlService extends Service {
     ConfigFileParser parser;
     AppControlStateMachine mAppControlStateMachine;
     private ConnectThread connectThread;
+    private ReadyToAcceptThread readyToAcceptThread;
 
     public AppControlService() {
         super();
@@ -219,7 +221,12 @@ public class AppControlService extends Service {
 
     public void closeConnection(){
         Log.d(TAG,"closeConnection");
-        connectThread.cancel();
+        if(connectThread != null){
+            connectThread.cancel();
+        }
+        if(readyToAcceptThread != null){
+            readyToAcceptThread.cancel();
+        }
     }
 
     private class ConnectThread extends Thread {
@@ -276,6 +283,7 @@ public class AppControlService extends Service {
                 Log.d(TAG, "Socket Connected");
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                message.obj = mmSocket.getRemoteDevice();
                 mAppControlStateMachine.sendMessage(message);
 
             } catch (IOException connectException) {
@@ -685,4 +693,75 @@ public class AppControlService extends Service {
         bluetoothAdapter.startDiscovery();
     }
 
+    public void startReadyToAcceptConnection() {
+        Log.d(TAG, "startReadyToAcceptConnect");
+        readyToAcceptThread = new ReadyToAcceptThread();
+        readyToAcceptThread.start();
+    }
+
+    private class ReadyToAcceptThread extends Thread {
+        private final BluetoothServerSocket mmServerSocket;
+
+        public ReadyToAcceptThread() {
+            BluetoothServerSocket tmp = null;
+
+            try {
+                Log.d(TAG,
+                        "ReadyToAcceptThread: Setting up BluetoothServerSocket for listening to connection requests from client");
+                tmp = bluetoothAdapter
+                        .listenUsingInsecureRfcommWithServiceRecord(
+                                "RFCOMM Test App",
+                                Utils.UUIDConstants.INCOMING_CONNECTION_UUID);
+            } catch (IOException e) {
+                Log.e(TAG,
+                        "ReadyToAcceptThread: Socket's listen() method failed",
+                        e);
+            }
+            mmServerSocket = tmp;
+        }
+
+        public void run() {
+            Log.d(TAG, "AcceptThread Running run()");
+
+            // Keep listening till exception occurs
+            while (true) {
+                try {
+                    Log.d(TAG,
+                            "ReadyToAcceptThread: going to wait till connection is made");
+                    mmSocket = mmServerSocket.accept();
+                    Log.d(TAG,
+                            "ReadyToAcceptThread: Connection was made, BluetoothSocket returned");
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                        message.obj = mmSocket.getRemoteDevice();
+                        mAppControlStateMachine.sendMessage(message);
+                        break;
+                } catch (IOException e) {
+                    Log.e(TAG,
+                            "ReadyToAcceptThread: Socket's accept() method failed",
+                            e);
+                    break;
+                }
+            }
+        }
+
+        public void cancel() {
+            try {
+                mmServerSocket.close();
+                if(mmSocket != null){
+                    if(mmSocket.getInputStream() != null){
+                        mmSocket.getInputStream().close();
+                    }
+                    if(mmSocket.getOutputStream() != null){
+                        mmSocket.getOutputStream().close();
+                    }
+                    mmSocket.close();
+                }
+            } catch (IOException e) {
+                Log.e(TAG,
+                        "ReadyToAcceptThread: Could not close the connect socket",
+                        e);
+            }
+        }
+    }
 }

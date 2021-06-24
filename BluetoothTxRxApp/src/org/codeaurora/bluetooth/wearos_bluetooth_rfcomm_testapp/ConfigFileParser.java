@@ -167,4 +167,18 @@ public class ConfigFileParser {
        return scanMode;
    }
 
+    public IncomingConnection incomingConnectionParse(String input) {
+        IncomingConnection incomingConnection = new IncomingConnection();
+        String tmp[] = input.split(":", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("uuid")) {
+                incomingConnection.uuid = tmp[1];
+            } else {
+                incomingConnection = null;
+            }
+        } else {
+            incomingConnection = null;
+        }
+        return incomingConnection;
+    }
 }

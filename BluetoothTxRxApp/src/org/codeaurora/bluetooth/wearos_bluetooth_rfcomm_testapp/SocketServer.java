@@ -32,6 +32,7 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.Semaphore;
 
 import android.net.LocalServerSocket;
@@ -220,6 +221,7 @@ public class SocketServer {
         case CONNECT_INIT:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa-bbbbbb-cccc\n");
             sendStr.append("                     GAP\n");
             sendStr.append("                     Close\n");
             sendStr.append("**************************************************************\n");
@@ -289,7 +291,21 @@ public class SocketServer {
                             processOutputState = INVALID_INPUT;
                             mainMenuState = CONNECT_INIT;
                         }
+                    }else if (tmp[0].equals("Incoming_Connection")) {
+                    IncomingConnection incomingConnection = parser
+                            .incomingConnectionParse(tmp[1]);
+                    if (incomingConnection != null) {
+                        processOutputState = NONE;
+                        Utils.UUIDConstants.INCOMING_CONNECTION_UUID = UUID
+                                .fromString(incomingConnection.uuid);
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION;
+                        Utils.appControlStateMachine.sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = CONNECT_INIT;
                     }
+				}
                 }else if (inputString.equals("Close")) {
                     closeReceived = true;
                     mainMenuState = CONNECT_INIT;

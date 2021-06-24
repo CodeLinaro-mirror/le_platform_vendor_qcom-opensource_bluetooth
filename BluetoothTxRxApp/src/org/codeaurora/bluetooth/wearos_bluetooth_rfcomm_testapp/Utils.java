@@ -90,12 +90,14 @@ public class Utils {
         static final int STATE_GAP_TEST_CASE_START_DISCOVERY = 21;
         static final int STATE_GAP_TEST_CASE_END_DISCOVERY = 22;
         static final int STATE_END_GAP_TEST_CASES = 23;
+        static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
 
     }
 
     public static class UUIDConstants {
         static final UUID APP_UUID = UUID
                 .fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
+        static UUID INCOMING_CONNECTION_UUID = null;
     }
 
 }

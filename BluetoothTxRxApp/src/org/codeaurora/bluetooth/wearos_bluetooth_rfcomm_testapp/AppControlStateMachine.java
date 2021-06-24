@@ -29,6 +29,8 @@
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
+import org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp.Utils.UUIDConstants;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Message;
@@ -45,6 +47,7 @@ public class AppControlStateMachine extends StateMachine {
     // Declaring Service Object
 
     AppControlService mAppControlService;
+    BluetoothDevice mConnectedDevice;
 
     // Declaring the States
     private InitState mInitState;
@@ -55,6 +58,7 @@ public class AppControlStateMachine extends StateMachine {
     private DataRxState mDataRxState;
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
+    private ReadyToAcceptConnection mReadyToAcceptConnection;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -70,6 +74,7 @@ public class AppControlStateMachine extends StateMachine {
         mDataRxState = new DataRxState();
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
+        mReadyToAcceptConnection = new ReadyToAcceptConnection();
 
         // Adding States
         addState(mInitState);
@@ -80,6 +85,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDataRxState);
         addState(mDisconnectedState);
         addState(mGapTestState);
+        addState(mReadyToAcceptConnection);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -125,6 +131,11 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to Ready to Connect state");
                 break;
 
+            case Utils.StateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION:
+                transitionTo(mReadyToAcceptConnection);
+                Log.d(TAG, "Going to Ready to Accept Connect state");
+                break;
+
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
                 break;
@@ -157,6 +168,7 @@ public class AppControlStateMachine extends StateMachine {
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_CONNECTED:
                 transitionTo(mConnectedState);
+                mConnectedDevice = (BluetoothDevice) message.obj;
                 Log.d(TAG, "Going to Connected state");
                 break;
 
@@ -187,7 +199,29 @@ public class AppControlStateMachine extends StateMachine {
             mAppControlService.startRxOperation();
             transitionTo(mReadyState);
             Log.d(TAG, "Going to Ready state");
-            SocketServer.sendSocketData("Device is Connected.");
+            if (UUIDConstants.INCOMING_CONNECTION_UUID != null) {
+                if (mConnectedDevice != null) {
+                    if (!mConnectedDevice.getName().isEmpty()) {
+                        SocketServer.sendSocketData("Device "
+                                + mConnectedDevice.getName()
+                                + " is Connected with UUID :: "
+                                + Utils.UUIDConstants.INCOMING_CONNECTION_UUID);
+                    } else {
+                        SocketServer.sendSocketData("Device "
+                                + mConnectedDevice.getAddress()
+                                + " is Connected with UUID :: "
+                                + Utils.UUIDConstants.INCOMING_CONNECTION_UUID);
+                    }
+                } else {
+                    SocketServer.sendSocketData("Device is Connected");
+                }
+                Utils.UUIDConstants.INCOMING_CONNECTION_UUID = null;
+            } else {
+                SocketServer.sendSocketData("Device "
+                        + mConnectedDevice.getName()
+                        + " is Connected with UUID :: "
+                        + Utils.UUIDConstants.APP_UUID);
+            }
             SocketServer.mainMenuState = SocketServer.MAIN_MENU;
             SocketServer.processOutputState = SocketServer.MAIN_MENU;
         }
@@ -433,6 +467,54 @@ public class AppControlStateMachine extends StateMachine {
 
             }
 
+            return retvalue;
+        }
+    }
+
+    private class ReadyToAcceptConnection extends State {
+        private static final String TAG = "BluetoothTxRxApp ReadyToAcceptConnection State";
+
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+            if (mAppControlService != null) {
+                mAppControlService.startReadyToAcceptConnection();
+            }
+            SocketServer
+            .sendSocketData("Accepting Incoming Connection with UUID :: "
+                    + Utils.UUIDConstants.INCOMING_CONNECTION_UUID
+                    .toString());
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+            case Utils.StateMachineMessageConstants.STATE_CONNECTED:
+                transitionTo(mConnectedState);
+                mConnectedDevice = (BluetoothDevice) message.obj;
+                Log.d(TAG, "Going to Connected state");
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED:
+                transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
+                SocketServer
+                .sendSocketData("Connection Failed...Please Restart Phone App");
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                transitionTo(mInitState);
+                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
+                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                SocketServer.updateSocketClient();
+                break;
+            }
             return retvalue;
         }
     }
