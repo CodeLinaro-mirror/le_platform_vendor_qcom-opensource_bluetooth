@@ -67,16 +67,20 @@ public class SocketServer {
 
     communicationHandler commHandler;
 
-    static final int CONNECT_INIT = 0;
+    static final int INIT_MENU = 0;
     static final int MAIN_MENU = 1;
-    static final int THROUGHPUT_MENU = 3;
-    static final int INVALID_INPUT = 6;
-    static final int SOC_CLOSE_ACK = 7;
-    static final int NONE = 8;
+    static final int THROUGHPUT_TESTING_MENU = 2;
+    static final int OFFLOAD_TESTING_MENU = 3;
+    static final int THROUGHPUT_MENU = 4;
+    static final int NOT_RCV = 5;
+    static final int CTL_PT = 6;
+    static final int INVALID_INPUT = 7;
+    static final int SOC_CLOSE_ACK = 8;
+    static final int NONE = 9;
     static final int CONNECTION_TEST_MENU = 999;
 
-    static int mainMenuState = CONNECT_INIT;
-    static int processOutputState = CONNECT_INIT;
+    static int mainMenuState = INIT_MENU;
+    static int processOutputState = INIT_MENU;
 
     ConfigFileParser parser;
 
@@ -155,8 +159,8 @@ public class SocketServer {
             Log.d(TAG, "communicationHandler run()");
 
             // Display main menu and start receiving socket data
-            mainMenuState = CONNECT_INIT;
-            processOutputState = CONNECT_INIT;
+            mainMenuState = INIT_MENU;
+            processOutputState = INIT_MENU;
             sendSocketData(processOutput());
 
             while (true) {
@@ -218,12 +222,28 @@ public class SocketServer {
         StringBuilder sendStr = new StringBuilder();
         Log.d(TAG, "processOutputState is ::" + processOutputState);
         switch (processOutputState) {
-        case CONNECT_INIT:
+        case INIT_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
-            sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa-bbbbbb-cccc\n");
+            sendStr.append("                     Throughput_Testing\n");
+            sendStr.append("                     Offload_Testing\n");
             sendStr.append("                     GAP\n");
             sendStr.append("                     Close\n");
+            sendStr.append("**************************************************************\n");
+            break;
+
+        case THROUGHPUT_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa:bbbbbb:cccc\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+            break;
+
+        case OFFLOAD_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            // sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa:bbbbbb:cccc\n");
+            sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
 
@@ -262,6 +282,13 @@ public class SocketServer {
             sendStr.append("A_Close");
             break;
 
+        case NOT_RCV:
+            sendStr.append("Notification Receive State");
+            break;
+        case CTL_PT:
+            sendStr.append("Control Point State");
+            break;
+
         default:
             sendStr.append("\nError\n");
             break;
@@ -275,23 +302,62 @@ public class SocketServer {
         Log.d(TAG, "mainMenuState is ::" + mainMenuState);
         switch (mainMenuState) {
 
-        case CONNECT_INIT:
+        case INIT_MENU:
             try {
-                tmp = inputString.split(" ", 2);
-                if (tmp.length == 2) {
-                    if (tmp[0].equals("Connect")) {
-                        Connect connectParam = parser.connectParse(tmp[1]);
-                        if (connectParam != null) {
-                            Utils.bdAddressFromConfig = connectParam.BDaddress;
-                            processOutputState = NONE;
-                            Message message = Message.obtain();
-                            message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_CONNECT;
-                            Utils.appControlStateMachine.sendMessage(message);
-                        } else {
-                            processOutputState = INVALID_INPUT;
-                            mainMenuState = CONNECT_INIT;
-                        }
-                    }else if (tmp[0].equals("Incoming_Connection")) {
+                if (inputString.equals("Throughput_Testing")) {
+                    Log.d(TAG, "Throughput Menu");
+                    mainMenuState = THROUGHPUT_TESTING_MENU;
+                    processOutputState = THROUGHPUT_TESTING_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = true;
+                } else if (inputString.equals("Offload_Testing")) {
+                    Log.d(TAG, "Offload Menu");
+                    mainMenuState = OFFLOAD_TESTING_MENU;
+                    processOutputState = OFFLOAD_TESTING_MENU;
+                    Utils.isOffloadStateMachineUnderProcessing = true;
+                } else if (inputString.equals("Close")) {
+                    closeReceived = true;
+                    mainMenuState = INIT_MENU;
+                    processOutputState = SOC_CLOSE_ACK;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
+                } else if (inputString.equals("GAP")) {
+                    Log.d(TAG, "Gap Menu");
+                    mainMenuState = CONNECTION_TEST_MENU;
+                    processOutputState = CONNECTION_TEST_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
+                } else {
+                    Log.d(TAG, "Invalid");
+                    processOutputState = INVALID_INPUT;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                mainMenuState = INIT_MENU;
+                processOutputState = INVALID_INPUT;
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            }
+
+            break;
+
+        case THROUGHPUT_TESTING_MENU:
+            tmp = inputString.split(" ", 2);
+            if (tmp.length == 2) {
+                if (tmp[0].equals("Connect")) {
+                    Connect connectParam = parser.connectParse(tmp[1]);
+                    if (connectParam != null) {
+                        Utils.bdAddressFromConfig = connectParam.BDaddress;
+                        processOutputState = NONE;
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_CONNECT;
+                        Utils.appControlStateMachine.sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = INIT_MENU;
+                    }
+                } else if (tmp[0].equals("Incoming_Connection")) {
                     IncomingConnection incomingConnection = parser
                             .incomingConnectionParse(tmp[1]);
                     if (incomingConnection != null) {
@@ -303,27 +369,59 @@ public class SocketServer {
                         Utils.appControlStateMachine.sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;
-                        mainMenuState = CONNECT_INIT;
+                        mainMenuState = INIT_MENU;
                     }
-				}
-                }else if (inputString.equals("Close")) {
-                    closeReceived = true;
-                    mainMenuState = CONNECT_INIT;
-                    processOutputState = SOC_CLOSE_ACK;
-                } else if(inputString.equals("GAP")){
-                    Log.d(TAG,"Gap Menu");
-                    mainMenuState = CONNECTION_TEST_MENU;
-                    processOutputState = CONNECTION_TEST_MENU;
-                }else {
-                    Log.d(TAG,"Invalid");
-                    processOutputState = INVALID_INPUT;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-                mainMenuState = CONNECT_INIT;
+            } else if (inputString.equals("Back")) {
+                mainMenuState = INIT_MENU;
+                processOutputState = INIT_MENU;
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            } else {
                 processOutputState = INVALID_INPUT;
             }
+            break;
 
+        case OFFLOAD_TESTING_MENU:
+            tmp = inputString.split(" ", 2);
+            if (tmp.length == 2) {
+                if (tmp[0].equals("Connect")) {
+                    Connect connectParam = parser.connectParse(tmp[1]);
+                    if (connectParam != null) {
+                        Utils.bdAddressFromConfig = connectParam.BDaddress;
+                        processOutputState = NONE;
+                        Message message = Message.obtain();
+                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_CONNECT;
+                        Utils.notificationOffloadStateMachine
+                        .sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = INIT_MENU;
+                    }
+                } else if (tmp[0].equals("Incoming_Connection")) {
+                    IncomingConnection incomingConnection = parser
+                            .incomingConnectionParse(tmp[1]);
+                    if (incomingConnection != null) {
+                        processOutputState = NONE;
+                        Utils.UUIDConstants.INCOMING_CONNECTION_UUID = UUID
+                                .fromString(incomingConnection.uuid);
+                        Message message = Message.obtain();
+                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION;
+                        Utils.notificationOffloadStateMachine
+                        .sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = INIT_MENU;
+                    }
+                }
+            } else if (inputString.equals("Back")) {
+                mainMenuState = INIT_MENU;
+                processOutputState = INIT_MENU;
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            } else {
+                processOutputState = INVALID_INPUT;
+            }
             break;
 
         case MAIN_MENU:
@@ -334,6 +432,33 @@ public class SocketServer {
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
                 Utils.appControlStateMachine.sendMessage(message);
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            } else {
+                processOutputState = INVALID_INPUT;
+            }
+            break;
+
+        case CTL_PT:
+            tmp = inputString.split(" ", 2);
+            Log.d(TAG, "Inside ctl pt");
+            if (tmp.length == 2) {
+
+                if (tmp[0].equals("getInfo")) {
+                    Log.d(TAG, "Inside ctl pt got info");
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.obj = inputString;
+                    message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE;
+                    Utils.notificationOffloadStateMachine.sendMessage(message);
+                } else if (tmp[0].equals("action")) {
+                    Log.d(TAG, "Inside ctl pt action");
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.obj = inputString;
+                    message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE;
+                    Utils.notificationOffloadStateMachine.sendMessage(message);
+                }
             } else {
                 processOutputState = INVALID_INPUT;
             }
@@ -347,7 +472,8 @@ public class SocketServer {
             tmp = inputString.split(" ", 2);
             if (tmp.length == 2) {
                 if (tmp[0].equalsIgnoreCase("OFF_ON")) {
-                    ConnectionTest connectionTestParam = parser.connectionTestParse(tmp[1]);
+                    ConnectionTest connectionTestParam = parser
+                            .connectionTestParse(tmp[1]);
                     if (connectionTestParam != null) {
                         processOutputState = NONE;
                         Message message = Message.obtain();
@@ -357,11 +483,11 @@ public class SocketServer {
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
-                }else if(tmp[0].equalsIgnoreCase("Set_Scan")){
+                } else if (tmp[0].equalsIgnoreCase("Set_Scan")) {
                     SetScanMode scanTestParam = parser.setScanModeParse(tmp[1]);
                     if (scanTestParam != null) {
                         processOutputState = NONE;
-                        Log.d(TAG,"Set Scan Mode :: "+scanTestParam.scanMode);
+                        Log.d(TAG, "Set Scan Mode :: " + scanTestParam.scanMode);
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_SCAN_MODE;
                         message.obj = scanTestParam;
@@ -369,25 +495,27 @@ public class SocketServer {
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
-                }else{
+                } else {
                     processOutputState = INVALID_INPUT;
                 }
-            }else if (tmp.length == 1) {
+            } else if (tmp.length == 1) {
                 if (tmp[0].equals("Back")) {
-                    mainMenuState = CONNECT_INIT;
-                    processOutputState = CONNECT_INIT;
+                    mainMenuState = INIT_MENU;
+                    processOutputState = INIT_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
                     gapTestMessage = Message.obtain();
                     gapTestMessage.what = Utils.StateMachineMessageConstants.STATE_END_GAP_TEST_CASES;
                     Utils.appControlStateMachine.sendMessage(gapTestMessage);
-                }else if(tmp[0].equals("Discovery")){
+                } else if (tmp[0].equals("Discovery")) {
                     processOutputState = NONE;
                     Message message = Message.obtain();
                     message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_START_DISCOVERY;
                     Utils.appControlStateMachine.sendMessage(message);
-                }else {
+                } else {
                     processOutputState = INVALID_INPUT;
                 }
-            }else {
+            } else {
                 processOutputState = INVALID_INPUT;
             }
             break;
@@ -500,7 +628,7 @@ public class SocketServer {
         sendSocketData(INSTANCE.processOutput());
     }
 
-    public static void cleanUp(){
+    public static void cleanUp() {
         sendSocketData("Application is Closed... Please restart");
         if (INSTANCE.client != null) {
             try {

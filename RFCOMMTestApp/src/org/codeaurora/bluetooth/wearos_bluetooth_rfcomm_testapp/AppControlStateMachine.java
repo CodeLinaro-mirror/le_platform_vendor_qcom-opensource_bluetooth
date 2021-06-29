@@ -92,7 +92,7 @@ public class AppControlStateMachine extends StateMachine {
         setInitialState(mInitState);
     }// end of constructor
 
-    public void cleanUp(){
+    public void cleanUp() {
         mAppControlService = null;
         quitNow();
         Utils.appControlStateMachine = null;
@@ -181,8 +181,8 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -294,14 +294,15 @@ public class AppControlStateMachine extends StateMachine {
                 transitionTo(mDataRxState);
                 Log.d(TAG, "Going to DataRx state");
                 SocketServer.sendSocketData("Rx Operation Started");
-                //mAppControlService.startRxOperation();
+                // mAppControlService.startRxOperation();
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -344,8 +345,9 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -373,6 +375,7 @@ public class AppControlStateMachine extends StateMachine {
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_END_DATA_RX:
                 transitionTo(mReadyState);
+                Log.d(TAG, "Going to Ready state");
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
 
@@ -383,8 +386,9 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -418,7 +422,8 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class GapTestState extends State {
-        private static final String TAG="BluetoothTxRxApp GapTestState State";
+        private static final String TAG = "BluetoothTxRxApp GapTestState State";
+
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
@@ -431,11 +436,10 @@ public class AppControlStateMachine extends StateMachine {
 
         @Override
         public boolean processMessage(Message message) {
-            boolean retvalue=HANDLED;
-            switch(message.what)
-            {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON:
-                ConnectionTest offOn = (ConnectionTest)message.obj;
+                ConnectionTest offOn = (ConnectionTest) message.obj;
                 mAppControlService.startOnOffTestCase(offOn.count);
                 break;
 
@@ -510,8 +514,8 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }

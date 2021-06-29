@@ -37,6 +37,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.Set;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.concurrent.Semaphore;
+import java.util.LinkedList;
 
 import android.Manifest;
 import android.app.IntentService;
@@ -70,8 +74,27 @@ public class AppControlService extends Service {
     private Context mContext;
     ConfigFileParser parser;
     AppControlStateMachine mAppControlStateMachine;
+    NotificationOffloadStateMachine mNotificationOffloadStateMachine;
     private ConnectThread connectThread;
     private ReadyToAcceptThread readyToAcceptThread;
+
+    private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
+
+    public static class NotificationPacketInd {
+        byte NotificationID;
+        byte NotificationStatus;
+        byte action = 0x00;
+        byte getAttID;
+        byte[] NotificationHandle = new byte[2];
+        Semaphore sem = new Semaphore(0);
+        Semaphore getInfoSem = new Semaphore(0);
+
+        public NotificationPacketInd(byte[] value) {
+            NotificationID = value[5];
+            NotificationStatus = value[6];
+            NotificationHandle = Arrays.copyOfRange(value, 3, 5);
+        }
+    }
 
     public AppControlService() {
         super();
@@ -86,14 +109,15 @@ public class AppControlService extends Service {
         Intent notificationIntent = new Intent(this, AppControlActivity.class);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                        notificationIntent, 0);
+                notificationIntent, 0);
 
         Notification notification = new NotificationCompat.Builder(this)
-                        .setContentTitle("RFCOMM Test App")
-                        .setContentText("Running...!!!")
-                        .setContentIntent(pendingIntent).build();
+        .setContentTitle("RFCOMM Test App")
+        .setContentText("Running...!!!")
+        .setContentIntent(pendingIntent).build();
 
         startForeground(1337, notification);
+        parser = new ConfigFileParser();
         if (!initAdapter()) {
             Log.d(TAG, "Unexpected error: Turning off BT");
         } else {
@@ -112,11 +136,11 @@ public class AppControlService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.d(TAG,"onDestroy");
+        Log.d(TAG, "onDestroy");
         super.onDestroy();
         mContext = null;
         unregisterReceiver(eventReceiver);
-        if(mAppControlStateMachine != null){
+        if (mAppControlStateMachine != null) {
             mAppControlStateMachine.cleanUp();
         }
         SocketServer.cleanUp();
@@ -169,17 +193,32 @@ public class AppControlService extends Service {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if(Utils.bdAddressFromConfig != null && device != null){
-                    Log.d(TAG,"Disconnected Device :: "+device.getAddress());
-                    Log.d(TAG,"RFCOMM Test App Connected Device :: "+Utils.bdAddressFromConfig);
-                    if(Utils.bdAddressFromConfig.equalsIgnoreCase(device.getAddress())){
+                BluetoothDevice device = intent
+                        .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if (Utils.bdAddressFromConfig != null && device != null) {
+                    Log.d(TAG, "Disconnected Device :: " + device.getAddress());
+                    Log.d(TAG, "RFCOMM Test App Connected Device :: "
+                            + Utils.bdAddressFromConfig);
+                    if (Utils.bdAddressFromConfig.equalsIgnoreCase(device
+                            .getAddress())) {
                         Log.d(TAG, "Socket Disconnected");
                         SocketServer
-                        .sendSocketData("Connection to Remote Device " +device.getAddress()+" is Terminated");
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
-                        Utils.appControlStateMachine.sendMessage(message);
+                        .sendSocketData("Connection to Remote Device "
+                                + device.getAddress()
+                                + " is Terminated");
+                        Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
+                        Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                        if (Utils.isThroughputStateMachineUnderProcessing == true) {
+                            Message message = Message.obtain();
+                            message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                            Utils.appControlStateMachine.sendMessage(message);
+                        }
+                        if (Utils.isOffloadStateMachineUnderProcessing == true) {
+                            Message message = Message.obtain();
+                            message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED;
+                            Utils.notificationOffloadStateMachine
+                            .sendMessage(message);
+                        }
                     }
                 }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
@@ -197,8 +236,15 @@ public class AppControlService extends Service {
     private void startStateMachine() {
         mAppControlStateMachine = new AppControlStateMachine(
                 AppControlService.this);
+        Log.d(TAG, "Starting App State Machine");
         mAppControlStateMachine.start();
         Utils.appControlStateMachine = mAppControlStateMachine;
+
+        mNotificationOffloadStateMachine = new NotificationOffloadStateMachine(
+                AppControlService.this);
+        Log.d(TAG, "Starting Notification Offload State Machine");
+        mNotificationOffloadStateMachine.start();
+        Utils.notificationOffloadStateMachine = mNotificationOffloadStateMachine;
     }
 
     protected void initializeTestSetup() {
@@ -219,12 +265,12 @@ public class AppControlService extends Service {
         connectThread.start();
     }
 
-    public void closeConnection(){
-        Log.d(TAG,"closeConnection");
-        if(connectThread != null){
+    public void closeConnection() {
+        Log.d(TAG, "closeConnection");
+        if (connectThread != null) {
             connectThread.cancel();
         }
-        if(readyToAcceptThread != null){
+        if (readyToAcceptThread != null) {
             readyToAcceptThread.cancel();
         }
     }
@@ -281,19 +327,39 @@ public class AppControlService extends Service {
                     return;
                 }
                 Log.d(TAG, "Socket Connected");
-                Message message = Message.obtain();
-                message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
-                message.obj = mmSocket.getRemoteDevice();
-                mAppControlStateMachine.sendMessage(message);
+                Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
+                Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                if (Utils.isThroughputStateMachineUnderProcessing == true) {
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                    message.obj = mmSocket.getRemoteDevice();
+                    mAppControlStateMachine.sendMessage(message);
+                }
+
+                if (Utils.isOffloadStateMachineUnderProcessing == true) {
+                    Message message = Message.obtain();
+                    message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTED;
+                    message.obj = mmSocket.getRemoteDevice();
+                    mNotificationOffloadStateMachine.sendMessage(message);
+                }
 
             } catch (IOException connectException) {
                 Log.e(TAG, "Unable to connect; close the socket and return",
                         connectException);
                 try {
                     mmSocket.close();
-                    Message message = Message.obtain();
-                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
-                    mAppControlStateMachine.sendMessage(message);
+                    Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
+                    Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                    if (Utils.isThroughputStateMachineUnderProcessing == true) {
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                        mAppControlStateMachine.sendMessage(message);
+                    }
+                    if (Utils.isOffloadStateMachineUnderProcessing == true) {
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                        mNotificationOffloadStateMachine.sendMessage(message);
+                    }
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket",
                             closeException);
@@ -304,11 +370,11 @@ public class AppControlService extends Service {
 
         public void cancel() {
             try {
-                if(mmSocket != null){
-                    if(mmSocket.getInputStream() != null){
+                if (mmSocket != null) {
+                    if (mmSocket.getInputStream() != null) {
                         mmSocket.getInputStream().close();
                     }
-                    if(mmSocket.getOutputStream() != null){
+                    if (mmSocket.getOutputStream() != null) {
                         mmSocket.getOutputStream().close();
                     }
                     mmSocket.close();
@@ -441,7 +507,7 @@ public class AppControlService extends Service {
                         message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
                         mAppControlStateMachine.sendMessage(message);
                         totalBytes = 0;
-                        //break;
+                        // break;
                     }
 
                     if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
@@ -731,11 +797,23 @@ public class AppControlService extends Service {
                     mmSocket = mmServerSocket.accept();
                     Log.d(TAG,
                             "ReadyToAcceptThread: Connection was made, BluetoothSocket returned");
+                    Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
+                    Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                    if (Utils.isThroughputStateMachineUnderProcessing == true) {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
                         message.obj = mmSocket.getRemoteDevice();
                         mAppControlStateMachine.sendMessage(message);
-                        break;
+                    }
+
+                    if (Utils.isOffloadStateMachineUnderProcessing) {
+                        Message message = Message.obtain();
+                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTED;
+                        message.obj = mmSocket.getRemoteDevice();
+                        mNotificationOffloadStateMachine.sendMessage(message);
+                    }
+
+                    break;
                 } catch (IOException e) {
                     Log.e(TAG,
                             "ReadyToAcceptThread: Socket's accept() method failed",
@@ -758,10 +836,234 @@ public class AppControlService extends Service {
                     mmSocket.close();
                 }
             } catch (IOException e) {
-                Log.e(TAG,
-                        "ReadyToAcceptThread: Could not close the connect socket",
-                        e);
+                Log.e(TAG,"ReadyToAcceptThread: Could not close the connect socket",e);
             }
+
         }
     }
+
+    public void startNotRcvOperation() {
+        Thread notRcvOperation = new Thread(notRcvOperationRunnable);
+        notRcvOperation.start();
+    }
+
+    Runnable notRcvOperationRunnable = new Runnable() {
+        public void run() {
+            InputStream inputStream = null;
+            byte[] mBuffer = new byte[1024];
+            int numBytes; // bytes returned from read()
+            int packet_code;
+            try {
+                inputStream = mmSocket.getInputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+
+            while (true) {
+                try {
+                    numBytes = inputStream.read(mBuffer);
+                    if (numBytes > 0) {
+                        Log.d(TAG, "Bytes received " + numBytes);
+                        packet_code = mBuffer[2] & 0xFF;
+                        if (packet_code == 0xE1) {
+                            Log.d(TAG, "New Notification received");
+                            notificationReceived(mBuffer);
+                        } else if (packet_code == 0xE3) {
+                            Log.d(TAG, "Response received");
+                            notificationInfoRespoceReceived(mBuffer);
+                        } else {
+                            Log.e(TAG, "Invalid packet code");
+                        }
+                    } else {
+                        Log.e(TAG, "Error occurred. Read returned 0 bytes");
+                    }
+                } catch (IOException e) {
+                    Log.d(TAG, "Input stream was disconnected", e);
+                    break;
+                }
+            }
+        }
+    };
+
+    public void startNotCTLPTOperation() {
+        Thread prNotRunnable = new Thread(processNotificationRunnable);
+        prNotRunnable.start();
+    }
+
+    Runnable processNotificationRunnable = new Runnable() {
+        public void run() {
+            while (NotificationPacketList.size() > 0) {
+                processNotification(NotificationPacketList.getFirst());
+            }
+            Message message = Message.obtain();
+            message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
+            mNotificationOffloadStateMachine.sendMessage(message);
+        }
+    };
+
+    private void processNotification(NotificationPacketInd obj) {
+        StringBuilder sendStr = new StringBuilder();
+        OutputStream outputStream = null;
+        ByteBuffer wrapped = ByteBuffer.wrap(obj.NotificationHandle);
+        byte action = 0;
+        byte getInfoId = 0;
+        short num = wrapped.getShort();
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        Log.d(TAG, "Notification received with notification handle " + num);
+        sendStr.append("\n*********Received notification with below details*********** \n\n");
+        switch (obj.NotificationID) {
+        case 0x01:
+            sendStr.append("Notification ID     : 0x01[Incoming call]\n");
+            break;
+        case 0x02:
+            sendStr.append("Notification ID     : 0x02[Missed call]\n");
+            break;
+        case 0x03:
+            sendStr.append("Notification ID     : 0x03[Email]\n");
+            break;
+        default:
+            Log.e(TAG, "Invalid notification id\t");
+            break;
+        }
+        switch (obj.NotificationStatus) {
+        case 0x01:
+            sendStr.append("Notification Status : 0x01[Notification added]\n");
+            break;
+        case 0x02:
+            sendStr.append("Notification Status : 0x02[Notification cleared]\n");
+            break;
+        case 0x03:
+            sendStr.append("Notification Status : 0x03[Notification modified]\n");
+            break;
+        default:
+            Log.e(TAG, "Invalid Notification Status\n");
+            break;
+        }
+        while (true) {
+            sendStr.append("\n*********Please select getInfo to get more info about Notification and Do select the action to be performed***********");
+            sendStr.append("\nGet Info                [exp: getInfo 1]\n");
+            sendStr.append("Do Action               [exp: action 1]\n");
+            if (obj.NotificationID == 0x01 || obj.NotificationID == 0x02) {
+                sendStr.append("getInfo Values = 1[Caller Phone Number]  2[Caller Name]\n");
+            } else {
+                sendStr.append("getInfo Values = 3[Sender email address] 4[Email Subject] 5[Email Body]\n");
+            }
+            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("\n**************************************************************\n");
+            SocketServer.sendSocketData(sendStr.toString());
+            sendStr.delete(0, sendStr.length());
+            try {
+                obj.sem.acquire();
+            } catch (Exception e) {
+                Log.e(TAG, "There is an exception when acquiring semaphore");
+                e.printStackTrace();
+            }
+            if (obj.action > 0x00) {
+                switch (obj.action) {
+                case 0x01:
+                    Log.d(TAG, "Action Dismiss Notification");
+                    action = 0x01;
+                    break;
+                case 0x02:
+                    Log.d(TAG, "Action Attend Notification");
+                    action = 0x02;
+                    break;
+                case 0x03:
+                    Log.d(TAG, "Action Ignore Notification");
+                    action = 0x03;
+                    break;
+                default:
+                    Log.d(TAG, "Invalid Action");
+                    break;
+                }
+                try {
+                    outputStream.write(parser
+                            .getActionPacket(action, getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                break;
+            } else {
+                switch (obj.getAttID) {
+                case 0x01:
+                    Log.d(TAG, "Get Caller Phone Number");
+                    getInfoId = 0x01;
+                    break;
+                case 0x02:
+                    Log.d(TAG, "Get Caller Name");
+                    getInfoId = 0x02;
+                    break;
+                case 0x03:
+                    Log.d(TAG, "Get Sender's email address");
+                    getInfoId = 0x03;
+                    break;
+                case 0x04:
+                    Log.d(TAG, "Get Email Subject");
+                    getInfoId = 0x04;
+                    break;
+                case 0x05:
+                    Log.d(TAG, "Get Email Body Snippet");
+                    getInfoId = 0x05;
+                    break;
+                default:
+                    Log.e(TAG, "Invalid get Attribute ID");
+                    break;
+                }
+                try {
+                    outputStream.write(parser.getReadInfoPacket(getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                try {
+                    Log.d(TAG, "Before aquiring info lock");
+                    obj.getInfoSem.acquire();
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
+                Log.d(TAG, "after aquiring info lock");
+            }
+        }
+        NotificationPacketList.remove();
+    }
+
+    public void notificationReceived(byte[] bytes) {
+        NotificationPacketInd notification = new NotificationPacketInd(bytes);
+        NotificationPacketList.add(notification);
+        Message message = Message.obtain();
+        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
+        mNotificationOffloadStateMachine.sendMessage(message);
+    }
+
+    public void notificationInfoRespoceReceived(byte[] bytes) {
+        Log.d(TAG, "Received notification info respose");
+        SocketServer.sendSocketData((parser.notificationInfoParse(bytes))
+                .toString());
+        NotificationPacketList.getFirst().getInfoSem.release();
+    }
+
+    public void responseFromCLI(String responce) {
+        String[] tmpStr;
+        Log.d(TAG, "responceFromCLI");
+        tmpStr = responce.split(" ", 2);
+        if (tmpStr[0].equals("getInfo")) {
+            Log.d(TAG, "responceFromCLI getInfo");
+            try {
+                NotificationPacketList.getFirst().getAttID = Byte
+                        .valueOf(tmpStr[1]);
+            } catch (Exception e) {
+                //
+            }
+            NotificationPacketList.getFirst().sem.release();
+        } else if (tmpStr[0].equals("action")) {
+            Log.d(TAG, "responceFromCLI action");
+            NotificationPacketList.getFirst().action = Byte.valueOf(tmpStr[1]);
+            NotificationPacketList.getFirst().sem.release();
+        }
+    }
+
 }
