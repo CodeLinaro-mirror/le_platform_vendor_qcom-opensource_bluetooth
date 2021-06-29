@@ -35,7 +35,10 @@ public class Utils {
 
     public static String bdAddressFromConfig = null;
     public static AppControlStateMachine appControlStateMachine = null;
+    public static NotificationOffloadStateMachine notificationOffloadStateMachine = null;
     public static SocketServer socServer = SocketServer.getInstance();
+    public static boolean isThroughputStateMachineUnderProcessing = false;
+    public static boolean isOffloadStateMachineUnderProcessing = false;
 
     public static class AppControlConstants {
 
@@ -92,6 +95,19 @@ public class Utils {
         static final int STATE_END_GAP_TEST_CASES = 23;
         static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
 
+    }
+
+    public static class NotificationOffloadStateMachineMessageConstants {
+        static final int STATE_DISCONNECTED = 0;
+        static final int STATE_READY_TO_CONNECT = 1;
+        static final int STATE_READY_TO_ACCEPT_CONNECTION = 2;
+        static final int STATE_CONNECTED = 3;
+        static final int STATE_CONNECTION_FAILED = 4;
+        static final int STATE_NOTIFICATION_RECEIVE = 5;
+        static final int STATE_NOTIFICATION_RECEIVED = 6;
+        static final int STATE_CONTROL_POINT = 7;
+        static final int STATE_INFO_RESPONSE = 8;
+        static final int STATE_NOT_PROCESS_END = 9;
     }
 
     public static class UUIDConstants {

@@ -42,6 +42,8 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
@@ -55,16 +57,46 @@ public class AppControlActivity extends Activity {
 
     AppControlService appControlService;
     boolean isBound = false;
+    public static WakeLock mWakeLock;
+    public static boolean mWakeLock_acquired = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate");
+        if (savedInstanceState != null) {
+            // Restore value of members from saved state
+            mWakeLock_acquired = savedInstanceState
+                    .getBoolean("mWakeLock_acquired");
+        } else {
+            PowerManager pm = (PowerManager) getApplicationContext()
+                    .getSystemService(Context.POWER_SERVICE);
+            mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
+                    "WakeLock");
+        }
         setContentView(R.layout.activity_main);
         socServer = SocketServer.getInstance();
         Intent intent = new Intent(this, AppControlService.class);
-        //bindService(intent, appControlServiceConnection, BIND_AUTO_CREATE);
+        // bindService(intent, appControlServiceConnection, BIND_AUTO_CREATE);
         this.startService(intent);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle savedInstanceState) {
+        Log.d(TAG, "onSaveInstanceState");
+        if (mWakeLock_acquired) {
+            savedInstanceState.putBoolean("mWakeLock_acquired", true);
+            Log.d(TAG, "onSaveInstanceState:mWakeLock_acquired -true");
+        }
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        Log.d(TAG, "onRestoreInstanceState called");
+        mWakeLock_acquired = savedInstanceState
+                .getBoolean("mWakeLock_acquired");
     }
 
     @Override
@@ -81,7 +113,7 @@ public class AppControlActivity extends Activity {
     }
 
     @Override
-    protected void onNewIntent (Intent intent){
+    protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         Log.d(TAG, "onNewIntent");
     }
@@ -103,7 +135,7 @@ public class AppControlActivity extends Activity {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
         if (isBound) {
-            //unbindService(appControlServiceConnection);
+            // unbindService(appControlServiceConnection);
             isBound = false;
         }
         Intent intent = new Intent(this, AppControlService.class);
@@ -111,7 +143,7 @@ public class AppControlActivity extends Activity {
     }
 
     @Override
-    public void onBackPressed(){
+    public void onBackPressed() {
         moveTaskToBack(true);
     }
 
