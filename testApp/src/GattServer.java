@@ -197,6 +197,29 @@ public class GattServer{
                 mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
                                                                  0, characteristic.getValue());
             }
+
+            @Override
+            public void onCharacteristicWriteRequest(BluetoothDevice device, int requestId,
+                         BluetoothGattCharacteristic characteristic, boolean preparedWrite,
+                         boolean responseNeeded, int offset, byte[] value) {
+                Log.d(TAG, "onCharacteristicWriteRequest from device " + device.getName());
+                characteristic.setValue(value);
+                if (responseNeeded) {
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                 GATT_SUCCESS, 0, value);
+                }
+                if ((characteristic.getProperties() &
+                                            BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+                    for (BluetoothDevice devs: connectedDevices)
+                        mgattServer.mBluetoothGattserver.notifyCharacteristicChanged(
+                                          devs, characteristic, false);
+                } else if ((characteristic.getProperties() &
+                                           BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0) {
+                    for (BluetoothDevice devs: connectedDevices)
+                        mgattServer.mBluetoothGattserver.notifyCharacteristicChanged(
+                                          devs, characteristic, true);
+                }
+            }
         };
 
         public void startServer() {
