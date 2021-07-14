@@ -56,6 +56,10 @@ public class NotificationOffloadStateMachine extends StateMachine {
     private NotificationReceiveState mNotRcvState;
     private DisconnectedState mDisconnectedState;
     private ControlPointState mControlPointState;
+    private Offloaded mOffloaded;
+
+    public static final int MSG_NC_SM_OFFLOADED = 21;
+    public static final int MSG_NC_SM_ACTIVE = 22;
 
     public NotificationOffloadStateMachine(AppControlService service) {
         super("NotificationOffloadStateMachine");
@@ -70,6 +74,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
         mDisconnectedState = new DisconnectedState();
         mNotRcvState = new NotificationReceiveState();
         mControlPointState = new ControlPointState();
+        mOffloaded = new Offloaded();
 
         // Adding States
         addState(mInitState);
@@ -79,6 +84,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
         addState(mDisconnectedState);
         addState(mNotRcvState);
         addState(mControlPointState);
+        addState(mOffloaded);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -127,6 +133,10 @@ public class NotificationOffloadStateMachine extends StateMachine {
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION:
                 transitionTo(mReadyToAcceptConnection);
                 Log.d(TAG, "Going to Ready to Accept Connect state");
+                break;
+            case MSG_NC_SM_OFFLOADED:
+                Log.d(TAG, "Going to Offloaded state");
+                transitionTo(mOffloaded);
                 break;
             }
             return retvalue;
@@ -350,6 +360,43 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 break;
             }
             return retvalue;
+        }
+    }
+
+    private class Offloaded extends State {
+        private static final String TAG = "Offloaded";
+
+        @Override
+        public void enter() {
+           Log.i(TAG, "Enter: " + getCurrentMessage().what);
+           SocketServer.sendSocketData("Offloaded State");
+           //byte[] blob = AppContextProto.getAppContextProtoBuffer();
+           //if(blob.length > 0) {
+           //    processSetAppContext(blob);
+           //}
+           //inform OffloadableAppAdapter
+        }
+
+        @Override
+        public void exit() {
+             Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            Log.i(TAG, "processMessage: " + message.what);
+            boolean retValue = HANDLED;
+
+            switch (message.what) {
+                case MSG_NC_SM_ACTIVE:
+                    SocketServer.sendSocketData("Transitioned to active");
+                    //we need to make a note of what the previous state was
+                    // and transition to that state
+                    //transitionTo(ncPreviousState);
+                    break;
+
+            }
+            return retValue;
         }
     }
 
