@@ -212,6 +212,7 @@ public class SocketServer {
                     sendStr.append("                     HoldWakeLock\n");
                     sendStr.append("                     ReleaseWakeLock\n");
                     sendStr.append("                     GattServer\n");
+                    sendStr.append("                     GetConnectedDevices\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -295,7 +296,6 @@ public class SocketServer {
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
                     sendStr.append("                       Pair                         (Ex: Pair 11:22:33:44:55:66)\n");
-                    sendStr.append("                       GetConnectedDevices\n");
                     sendStr.append("                       Disconnect                   (Ex: Disconnect 11:22:33:44:55:66)\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
@@ -356,6 +356,12 @@ public class SocketServer {
                     } else if (inputString.equals("GattServer")) {
                         mainMenuState = GATT_SERVER_MENU;
                         processOutputState = GATT_SERVER_MENU;
+                    } else if (inputString.equals("GetConnectedDevices")) {
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = NONE;
+                        msg = BleAppService.msghandler.obtainMessage(
+                                     BleAppService.MSG_MA_GET_CONNECTED_DEVICES, null);
+                        BleAppService.msghandler.sendMessage(msg);
                     } else if (inputString.equals("Close")) {
                         closeReceived = true;
                         mainMenuState = MAIN_MENU;
@@ -771,11 +777,6 @@ public class SocketServer {
                              msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GS_START_BLE_GET_SERVICES, null);
                              BleAppService.msghandler.sendMessage(msg);
-                        } else if(tmp[0].equals("GetConnectedDevices")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                     BleAppService.MSG_GS_START_GET_CONNECTED_DEVICES, null);
-                            BleAppService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
