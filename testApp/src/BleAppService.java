@@ -272,16 +272,23 @@ public class BleAppService extends Service {
                         BluetoothDevice bluetoothDevice = intent.getParcelableExtra(
                                                               BluetoothDevice.EXTRA_DEVICE);
 
-                        for (index = 0; index < mgattserver.connectedDevices.size(); index++) {
-                            if (mgattserver.connectedDevices.get(index).getAddress().equals(
+                        /**
+                         * Handle incoming pairing from connected devices only.
+                         * getConnectedDevices() will get connected devices from
+                         * both client and server
+                         */
+                        List<BluetoothDevice> connectedDevices = MainActivity.mBluetoothManager
+                                .getConnectedDevices(BluetoothProfile.GATT);
+
+                        for (index = 0; index < connectedDevices.size(); index++) {
+                            if (connectedDevices.get(index).getAddress().equals(
                                     bluetoothDevice.getAddress())) {
                                 break;
                             }
                         }
 
-                        /* Handle incoming pairing from devices in connectedDevices list only */
-                        if ((mgattserver.connectedDevices.size() > 0)
-                                && (index == mgattserver.connectedDevices.size())) {
+                        if ((connectedDevices.size() > 0)
+                                && (index == connectedDevices.size())) {
                             Log.i(TAG, "Pairing device not found " + bluetoothDevice.getAddress());
                             return;
                         }
