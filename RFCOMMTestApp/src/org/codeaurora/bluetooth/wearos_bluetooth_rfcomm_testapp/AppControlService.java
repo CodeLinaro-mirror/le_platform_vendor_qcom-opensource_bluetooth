@@ -38,6 +38,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.Set;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.LinkedList;
@@ -58,6 +59,7 @@ import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.util.Log;
 import android.widget.Toast;
@@ -77,6 +79,11 @@ public class AppControlService extends Service {
     NotificationOffloadStateMachine mNotificationOffloadStateMachine;
     private ConnectThread connectThread;
     private ReadyToAcceptThread readyToAcceptThread;
+    private Semaphore getSdpSearchSem = new Semaphore(0);
+    public AcceptThread mAcceptThread = null;
+    public ServerConnectedThread mServerConnectedThread = null;
+    private static final String name = "BluetoothRFCommNotApp";
+    private static boolean sdpRecordFound = false;
 
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
@@ -185,7 +192,17 @@ public class AppControlService extends Service {
         intentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        intentFilter.addAction(BluetoothDevice.ACTION_SDP_RECORD);
         mContext.registerReceiver(eventReceiver, intentFilter);
+    }
+
+    public void initServerSocket () {
+        Log.d(TAG, "initServerSocket: enter()");
+        if (mAcceptThread == null) {
+            Log.d(TAG, "Creating Server Accept thread");
+            mAcceptThread = new AcceptThread();
+            mAcceptThread.start();
+        }
     }
 
     private BroadcastReceiver eventReceiver = new BroadcastReceiver() {
@@ -229,9 +246,152 @@ public class AppControlService extends Service {
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_END_DISCOVERY;
                 mAppControlStateMachine.sendMessage(message);
+            } else if (BluetoothDevice.ACTION_SDP_RECORD.equals(action)) {
+                Log.d(TAG, "Received ACTION_SDP_RECORD intent with status "+intent.getParcelableExtra(BluetoothDevice.EXTRA_SDP_SEARCH_STATUS)+
+                        " for uuid " +intent.getParcelableExtra(BluetoothDevice.EXTRA_UUID)+ " Extra sdp record "+ intent.getParcelableExtra(BluetoothDevice.EXTRA_SDP_RECORD));
+                if (intent.getParcelableExtra(BluetoothDevice.EXTRA_SDP_RECORD) == null) {
+                    Log.e(TAG, "SDP Record not found for UUID "+intent.getParcelableExtra(BluetoothDevice.EXTRA_UUID));
+                } else {
+                    Log.d(TAG, "SDP Record found for UUID "+intent.getParcelableExtra(BluetoothDevice.EXTRA_UUID));
+                    sdpRecordFound = true;
+                }
+                getSdpSearchSem.release();
             }
         }
     };
+
+    private void manageServerSocket(BluetoothSocket socket) {
+        Log.d(TAG, "manageMyConnectedSocket()");
+        mServerConnectedThread = new ServerConnectedThread(socket);
+        mServerConnectedThread.start();
+    }
+
+    private class ServerConnectedThread extends Thread {
+        private final BluetoothSocket mSocket;
+        private final OutputStream mOutputStream;
+        private final InputStream mInputStream;
+
+        public ServerConnectedThread(BluetoothSocket socket) {
+            mSocket = socket;
+            OutputStream tmpOut = null;
+            InputStream tmpIn = null;
+            try {
+                tmpOut = mSocket.getOutputStream();
+                tmpIn = mSocket.getInputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "ServerConnectedThread: Socket'getOutputStream/InputStream method failed", e);
+            }
+            mInputStream = tmpIn;
+            mOutputStream = tmpOut;
+        }
+
+        public void run() {
+            Log.d(TAG, "ServerConnectedThread Running run()");
+            byte[] buffer = new byte[1024]; //buffer to store the stream
+            int bytes;
+
+            while (true) {
+                try {
+                    bytes = mInputStream.read(buffer);
+                    String incomingMsg = new String(buffer, 0, bytes);
+                    Log.d(TAG, "Received data in Server socket "+ incomingMsg);
+                } catch (IOException e) {
+                    Log.e(TAG, "ServerConnectedThread: could not read the incoming message" + e.getMessage());
+                    break;
+                }
+            }
+        }
+
+        /* API for main application to write messages */
+        public void write(byte[] data) {
+            String text = new String(data, Charset.defaultCharset());
+            Log.d(TAG, "ServerConnectedThread: data to be written: " + text);
+            try {
+                mOutputStream.write(data);
+            } catch (IOException e) {
+                Log.e(TAG, "ServerConnectedThread: could not write to the OutputStream" + e.getMessage());
+            }
+        }
+
+        public void cancel() {
+            try {
+                mSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "ServerConnectedThread: Could not close the connect socket", e);
+            }
+        }
+
+        public void disconnect() {
+            Log.d(TAG, "disconnect()");
+            if(mSocket != null) {
+                try {
+                    InputStream I=mSocket.getInputStream();
+                    OutputStream O=mSocket.getOutputStream();
+                    if(I!=null)
+                        I.close();
+                    if(O!=null)
+                        O.close();
+                    mSocket.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "ServerConnectedThread: Could not close the input and output streams");
+                }
+            }
+        }
+    }
+
+    /*Thread to Create a Server RFCOMM channel and listen for accept*/
+    private class AcceptThread extends Thread {
+        private final BluetoothServerSocket mmServerSocket;
+
+        public AcceptThread() {
+            BluetoothServerSocket tmp = null;
+
+            try {
+                Log.d(TAG, "AcceptThread: Setting up BluetoothServerSocket for listening to connection requests from client");
+                tmp = bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord(name, Utils.UUIDConstants.APP_SERVER_UUID);
+            } catch (IOException e) {
+                SocketServer.sendSocketData("Error while creating Server Socket");
+                Log.e(TAG, "AcceptThread: Socket's listen() method failed", e);
+            }
+            mmServerSocket = tmp;
+        }
+
+        public void run() {
+            Log.d(TAG, "AcceptThread Running run()");
+            BluetoothSocket socket = null;
+
+            //Keep listening till exception occurs
+            while (true) {
+                try {
+                    socket = mmServerSocket.accept();
+                    Log.d(TAG, "AcceptThread: Connection was made, BluetoothSocket returned");
+                } catch (IOException e) {
+                    SocketServer.sendSocketData("Error while accepting a Server Socket");
+                    Log.e(TAG, "AcceptThread: Socket's accept() method failed", e);
+                    break;
+                }
+
+                if (socket != null) {
+                    manageServerSocket(socket);
+                    try {
+                        mmServerSocket.close();
+                        break;
+                    } catch (IOException e) {
+                        Log.e(TAG, "AcceptThread: Socket's close() method failed", e);
+                        break;
+                    }
+                }
+            }
+        }
+
+        public void cancel() {
+            try {
+                mmServerSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "AcceptThread: Could not close the connect socket", e);
+            }
+        }
+    }
 
     private void startStateMachine() {
         mAppControlStateMachine = new AppControlStateMachine(
@@ -253,7 +413,7 @@ public class AppControlService extends Service {
                     .getRemoteDevice(Utils.bdAddressFromConfig.toUpperCase());
         } else {
             SocketServer
-            .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
+                .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
             return;
         }
         startConnectionProcess();
@@ -273,6 +433,14 @@ public class AppControlService extends Service {
         if (readyToAcceptThread != null) {
             readyToAcceptThread.cancel();
         }
+        if (mServerConnectedThread != null) {
+            mServerConnectedThread.cancel();
+            mServerConnectedThread = null;
+        }
+        if (mAcceptThread != null) {
+            mAcceptThread.cancel();
+            mAcceptThread = null;
+        }
     }
 
     private class ConnectThread extends Thread {
@@ -291,18 +459,28 @@ public class AppControlService extends Service {
             }
 
             try {
-                Log.d(TAG,
-                        "Creating a BluetoothSocket to create a connection to a remote device");
-                tmp = device
-                        .createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.APP_UUID);
+                Log.d(TAG, "Creating a BluetoothSocket to create a connection to a remote device");
+                device.sdpSearch(ParcelUuid.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66"));
+                getSdpSearchSem.acquire();
+                if (sdpRecordFound) {
+                    SocketServer.sendSocketData("SDP Record found and Creating RFComm Socket");
+                    tmp = device.createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.APP_UUID);
+                    sdpRecordFound = false;
+                } else {
+                    SocketServer.sendSocketData("SDP Record not found for this UUID on Remote Device");
+                    Log.e(TAG, "SDP Record not found for this UUID");
+                }
+                getSdpSearchSem.release();
             } catch (IOException e) {
+                Log.e(TAG, "Socket's create() method failed", e);
+            } catch (Exception e) {
                 Log.e(TAG, "Socket's create() method failed", e);
             }
 
             if (tmp == null) {
                 Log.d(TAG, "Socket is null");
                 SocketServer
-                .sendSocketData("Communication Socket is not created... Please close and restart the Process");
+                    .sendSocketData("Communication Socket is not created... Please close and restart the Process");
                 return;
             } else {
                 Log.d(TAG, "Socket is not null");
@@ -357,7 +535,7 @@ public class AppControlService extends Service {
                     }
                     if (Utils.isOffloadStateMachineUnderProcessing == true) {
                         Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTION_FAILED;
                         mNotificationOffloadStateMachine.sendMessage(message);
                     }
                 } catch (IOException closeException) {
@@ -539,7 +717,6 @@ public class AppControlService extends Service {
                     break;
                 }
             }
-
         }
     };
 
@@ -1034,6 +1211,9 @@ public class AppControlService extends Service {
     public void notificationReceived(byte[] bytes) {
         NotificationPacketInd notification = new NotificationPacketInd(bytes);
         NotificationPacketList.add(notification);
+        if (mServerConnectedThread != null) {
+            mServerConnectedThread.write("Notification delivered".getBytes());
+        }
         Message message = Message.obtain();
         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
         mNotificationOffloadStateMachine.sendMessage(message);
