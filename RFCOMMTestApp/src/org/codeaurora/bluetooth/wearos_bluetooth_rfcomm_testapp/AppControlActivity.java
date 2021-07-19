@@ -54,6 +54,7 @@ public class AppControlActivity extends Activity {
     private static final String TAG = "BluetoothTxRxApp AppControlActivity";
 
     private static SocketServer socServer;
+    private static Context mContext;
 
     AppControlService appControlService;
     boolean isBound = false;
@@ -74,6 +75,7 @@ public class AppControlActivity extends Activity {
             mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                     "WakeLock");
         }
+        mContext = getApplicationContext();
         setContentView(R.layout.activity_main);
         socServer = SocketServer.getInstance();
         Intent intent = new Intent(this, AppControlService.class);

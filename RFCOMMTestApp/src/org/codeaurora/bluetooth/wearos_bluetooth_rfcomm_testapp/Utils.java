@@ -113,6 +113,8 @@ public class Utils {
     public static class UUIDConstants {
         static final UUID APP_UUID = UUID
                 .fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
+        static final UUID APP_SERVER_UUID = UUID
+            .fromString("8ce255c0-200a-11e0-ac64-0800200c9a77");
         static UUID INCOMING_CONNECTION_UUID = null;
     }
 

@@ -60,6 +60,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
 
     public static final int MSG_NC_SM_OFFLOADED = 21;
     public static final int MSG_NC_SM_ACTIVE = 22;
+    private static final String name = "BluetoothRFCommNotApp";
 
     public NotificationOffloadStateMachine(AppControlService service) {
         super("NotificationOffloadStateMachine");
@@ -244,6 +245,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public void enter() {
             Log.d(TAG, "enter()");
             mAppControlService.startNotRcvOperation();
+            mAppControlService.initServerSocket();
             transitionTo(mNotRcvState);
             Log.d(TAG, "Going to Notification Receive state");
             SocketServer.sendSocketData("Device is Connected.");
@@ -315,7 +317,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public void enter() {
             Log.d(TAG, "enter()");
             Log.d(TAG, "Going to ControlPoint state");
-            AppControlActivity.mWakeLock.acquire();
+            if (AppControlActivity.mWakeLock != null) {
+                AppControlActivity.mWakeLock.acquire();
+            }
             mAppControlService.startNotCTLPTOperation();
             SocketServer.sendSocketData("ControlPoint State Started");
         }
