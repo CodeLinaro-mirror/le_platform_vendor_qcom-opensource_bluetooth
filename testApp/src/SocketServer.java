@@ -214,6 +214,7 @@ public class SocketServer {
                     sendStr.append("                     GattServer\n");
                     sendStr.append("                     GetConnectedDevices\n");
                     sendStr.append("                     Pair   (Ex: Pair 11:22:33:44:55:66)\n");
+                    sendStr.append("                     GetBondedDevices\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -362,6 +363,12 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                          BleAppService.MSG_MA_GET_CONNECTED_DEVICES, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (inputString.equals("GetBondedDevices")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                         BleAppService.MSG_MA_GET_PAIRED_DEVICES, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (inputString.equals("Close")) {
                             closeReceived = true;
