@@ -90,15 +90,14 @@ public class GattClient {
     public static final int MSG_START_BLE_GATT_WRITE_READ_DESC = 7;
     public static final int MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE = 8;
     public static final int MSG_START_BLE_GATT_REFRESH_SERVICES = 9;
-    public static final int MSG_START_BLE_UNPAIR_DEV = 10;
-    public static final int MSG_START_BLE_GATT_DISCONNECT = 11;
-    public static final int MSG_REGISTER_BLE_GATT_NOTIFICATIONS = 12;
-    public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 13;
-    public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 14;
-    public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 15;
-    public static final int MSG_START_CANCEL_CONNECT = 16;
-    public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 17;
-    public static final int MSG_START_BLE_CONNECT_TO_BDADDR = 18;
+    public static final int MSG_START_BLE_GATT_DISCONNECT = 10;
+    public static final int MSG_REGISTER_BLE_GATT_NOTIFICATIONS = 11;
+    public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 12;
+    public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 13;
+    public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 14;
+    public static final int MSG_START_CANCEL_CONNECT = 15;
+    public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 16;
+    public static final int MSG_START_BLE_CONNECT_TO_BDADDR = 17;
     public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_CONNECT_TO_BDADDR;
 
     private static final int GATT_WRITE = 1;
@@ -531,18 +530,6 @@ public class GattClient {
             mgattClient.mBluetoothGatt.disconnect();
         }
 
-        public void unpair(){
-            if(mDevice.getBondState() == BluetoothDevice.BOND_BONDED){
-                Log.i(TAG, "Unpairing!");
-                if(!mDevice.removeBond()) {
-                    Log.i(TAG, "couldn't start unpairing");
-                    PrintStr.setLength(0);
-                    PrintStr.append("Unpairing failed!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-            }
-        }
-
         public String fetchFormatValue(BluetoothGattCharacteristic characteristic) {
             /* String format */
             if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
@@ -629,10 +616,7 @@ public class GattClient {
                     int conn_priority = (int) msg.obj;
                     processConnPriorityReq(conn_priority);
                     break;
-                case MSG_START_BLE_UNPAIR_DEV:
-                    processStartUnpair();
-                    break;
-                case MSG_START_BLE_READ_PHY:
+               case MSG_START_BLE_READ_PHY:
                     processReadPhyReq();
                     break;
                 case MSG_START_BLE_GATT_DISC:
@@ -740,14 +724,6 @@ public class GattClient {
         private void processReadPhyReq(){
             Log.i(TAG, "Read Phy");
             mgattClient.mBluetoothGatt.readPhy();
-        }
-
-        private void processStartUnpair(){
-            Log.i(TAG, "Starting Unpair");
-            mgattClient.unpair();
-            PrintStr.setLength(0);
-            PrintStr.append("Device unpaired");
-            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         private void processDisconnectReq() {
