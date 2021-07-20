@@ -105,7 +105,8 @@ public class BleAppService extends Service {
     public static final int MSG_MA_ADV_STARTED = 5;
     public static final int MSG_MA_ADV_STOPPED = 6;
     public static final int MSG_MA_GET_CONNECTED_DEVICES = 7;
-    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_GET_CONNECTED_DEVICES;
+    public static final int MSG_MA_START_BLE_PAIR = 8;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_START_BLE_PAIR;
 
     /* Gatt Client Actions */
     public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
@@ -113,20 +114,19 @@ public class BleAppService extends Service {
     public static final int MSG_GC_START_BLE_PHY_UPDATE = MSG_MA_MAX_ACTION_VALUE + 3;
     public static final int MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE = MSG_MA_MAX_ACTION_VALUE + 4;
     public static final int MSG_GC_START_BLE_READ_PHY = MSG_MA_MAX_ACTION_VALUE + 5;
-    public static final int MSG_GC_START_BLE_PAIR = MSG_MA_MAX_ACTION_VALUE + 6;
-    public static final int MSG_GC_START_BLE_UNPAIR = MSG_MA_MAX_ACTION_VALUE + 7;
-    public static final int MSG_GC_START_BLE_GATT_DISCOVER = MSG_MA_MAX_ACTION_VALUE + 8;
-    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = MSG_MA_MAX_ACTION_VALUE + 9;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = MSG_MA_MAX_ACTION_VALUE + 10;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = MSG_MA_MAX_ACTION_VALUE + 11;
-    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 12;
-    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 13;
-    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 14;
-    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 15;
-    public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 16;
-    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 17;
-    public static final int MSG_GC_BLE_GATT_REQ_CONN_PRIORITY = MSG_MA_MAX_ACTION_VALUE + 18;
-    public static final int MSG_GC_START_BLE_CONNECT_TO_BDADDR = MSG_MA_MAX_ACTION_VALUE + 19;
+    public static final int MSG_GC_START_BLE_UNPAIR = MSG_MA_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GC_START_BLE_GATT_DISCOVER = MSG_MA_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = MSG_MA_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = MSG_MA_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = MSG_MA_MAX_ACTION_VALUE + 10;
+    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 12;
+    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 13;
+    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 14;
+    public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 15;
+    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 16;
+    public static final int MSG_GC_BLE_GATT_REQ_CONN_PRIORITY = MSG_MA_MAX_ACTION_VALUE + 17;
+    public static final int MSG_GC_START_BLE_CONNECT_TO_BDADDR = MSG_MA_MAX_ACTION_VALUE + 18;
     public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_CONNECT_TO_BDADDR;
 
     /* State Machine Actions */
@@ -151,8 +151,7 @@ public class BleAppService extends Service {
     public static final int MSG_GS_START_BLE_CLEAR_SERVICES = MSG_SM_MAX_ACTION_VALUE + 6;
     public static final int MSG_GS_START_BLE_CONNECT = MSG_SM_MAX_ACTION_VALUE + 7;
     public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
-    public static final int MSG_GS_START_BLE_PAIR = MSG_SM_MAX_ACTION_VALUE + 9;
-    public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 10;
+    public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 9;
     public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_DISCONNECT;
 
     @Override
@@ -457,6 +456,7 @@ public class BleAppService extends Service {
             AddServices AddServ;
             PhyUpdate phyUpdateObj;
             ConnUpdate ConnUpdateObj;
+            String bdAddr;
 
             switch (message.what) {
                 case MSG_MA_START_BLE_ADV:
@@ -505,6 +505,10 @@ public class BleAppService extends Service {
                 case MSG_MA_GET_CONNECTED_DEVICES:
                     processGetConnectedDevices();
                     break;
+                case MSG_MA_START_BLE_PAIR:
+                    bdAddr = (String) message.obj;
+                    processPairRequest(bdAddr);
+                    break;
                 case MSG_GC_START_BLE_CONNECT:
                     scnObj = (Scan) message.obj;
                     scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
@@ -513,7 +517,7 @@ public class BleAppService extends Service {
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_CONNECT_TO_BDADDR:
-                    String bdAddr = (String) message.obj;
+                    bdAddr = (String) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                               mgattclient.MSG_START_BLE_CONNECT_TO_BDADDR, bdAddr);
                     mgattclient.mGattClientHandler.sendMessage(msg);
@@ -550,11 +554,6 @@ public class BleAppService extends Service {
                 case MSG_GC_START_BLE_READ_PHY:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                               mgattclient.MSG_START_BLE_READ_PHY, null);
-                    mgattclient.mGattClientHandler.sendMessage(msg);
-                    break;
-                case MSG_GC_START_BLE_PAIR:
-                    msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_PAIR_DEV, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_UNPAIR:
@@ -701,12 +700,6 @@ public class BleAppService extends Service {
                     bdAddr = (String) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                               mgattserver.MSG_START_BLE_READ_PHY, bdAddr);
-                     mgattserver.mGattServerHandler.sendMessage(msg);
-                     break;
-                case MSG_GS_START_BLE_PAIR:
-                    bdAddr = (String) message.obj;
-                    msg = mgattserver.mGattServerHandler.obtainMessage(
-                            mgattserver.MSG_START_BLE_PAIR, bdAddr);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 case MSG_GS_START_BLE_DISCONNECT:
@@ -752,6 +745,48 @@ public class BleAppService extends Service {
                  PrintStr.append("No Connected Device");
              }
              SocketServer.sendSocketData(PrintStr.toString());
+        }
+
+        private void processPairRequest(String bdAddr) {
+            BluetoothDevice mdevice = getDevice(bdAddr);
+            if (mdevice != null) {
+                if(mdevice.getBondState() != BluetoothDevice.BOND_BONDED) {
+                    Log.i(TAG, "Pairing! " + bdAddr);
+                    if(!mdevice.createBond(BluetoothDevice.TRANSPORT_LE)) {
+                        Log.i(TAG, "Couldn't start pairing");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Pairing failed!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    }
+                } else {
+                    Log.i(TAG, "Device already bonded");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device already bonded!");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Device not in connected list");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+        }
+
+        private BluetoothDevice getDevice(String address) {
+            BluetoothDevice mdevice = null;
+            Log.i(TAG,"address: " + address);
+            List<BluetoothDevice> remoteDevices =
+                            MainActivity.mBluetoothManager.getConnectedDevices(
+                            BluetoothProfile.GATT_SERVER);
+            for (int i = 0; i < remoteDevices.size(); i++)  {
+                 if (remoteDevices.get(i).getAddress().equals(address)) {
+                     Log.i(TAG, "Found match");
+                     mdevice = remoteDevices.get(i);
+                     break;
+                 }
+            }
+            return mdevice;
         }
     }
 }
