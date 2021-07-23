@@ -477,9 +477,6 @@ public class BleAppService extends Service {
                     scnObj = (Scan)message.obj;
                     scan_called = SCAN_CALLED_FROM_MAIN_ACTIVITY;
                     mScannerService.set_scan_parameters(scnObj);
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scanning started!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
                     break;
                 case MSG_MA_STOP_BLE_ADV:
                     int advId = (int)message.obj;
@@ -489,9 +486,6 @@ public class BleAppService extends Service {
                     scan_called = 0;
                     Log.d(TAG, "scan stop(main activity)");
                     mScannerService.stopScan();
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scanning stopped!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
                     break;
                 case MSG_MA_SCAN_DEV_FOUND:
                     Log.d(TAG, "scan dev found(main activity)");

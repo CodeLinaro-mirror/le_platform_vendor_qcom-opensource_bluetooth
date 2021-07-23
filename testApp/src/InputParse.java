@@ -145,6 +145,8 @@ public class InputParse {
                     scanParam.MatchMode = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("ReportDelay")) {
                     scanParam.ReportDelay = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("ScanPhy")) {
+                    scanParam.ScanPhy = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("Legacy")) {
                     scanParam.legacy = Boolean.parseBoolean(tmp2[1]);
                 } else {

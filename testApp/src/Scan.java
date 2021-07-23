@@ -46,5 +46,6 @@ public class Scan {
     int NumOfAdvMatches = 3;
     int MatchMode = 1;
     int ReportDelay = 0;
+    int ScanPhy = 255;
     boolean legacy = true;
 }
