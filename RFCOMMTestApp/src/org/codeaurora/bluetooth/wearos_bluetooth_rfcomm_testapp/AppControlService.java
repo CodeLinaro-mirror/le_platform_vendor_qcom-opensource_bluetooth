@@ -250,7 +250,7 @@ public class AppControlService extends Service {
     protected void initializeTestSetup() {
         if (Utils.bdAddressFromConfig != null) {
             btDeviceToPair = bluetoothAdapter
-                    .getRemoteDevice(Utils.bdAddressFromConfig);
+                    .getRemoteDevice(Utils.bdAddressFromConfig.toUpperCase());
         } else {
             SocketServer
             .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
