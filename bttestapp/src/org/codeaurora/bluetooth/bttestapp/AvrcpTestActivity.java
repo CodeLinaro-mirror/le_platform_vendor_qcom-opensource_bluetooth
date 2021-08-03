@@ -54,7 +54,8 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.media.session.PlaybackState;
 import android.media.browse.MediaBrowser;
-import android.media.browse.MediaBrowser.MediaItem;
+import android.support.v4.media.MediaBrowserCompat.MediaItem;
+import android.support.v4.media.MediaDescriptionCompat;
 import android.media.MediaDescription;
 import android.media.MediaMetadata;
 import android.media.AudioFormat;
@@ -83,9 +84,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
 
-import android.media.browse.MediaBrowser;
-import android.media.browse.MediaBrowser.MediaItem;
-import android.media.MediaDescription;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
 import android.media.session.MediaSession.QueueItem;
@@ -1441,7 +1439,7 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             if (val != null) {
                 for (int index = 0; index < val.size(); index++) {
                     MediaItem item = val.get(index);
-                    MediaDescription md = item.getDescription();
+                    MediaDescriptionCompat md = item.getDescription();
                     if (folder.equals(md.getTitle().toString())) {
                         mediaId = item.getMediaId();
                         found = true;
