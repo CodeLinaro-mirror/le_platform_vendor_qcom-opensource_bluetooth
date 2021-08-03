@@ -57,9 +57,7 @@ import android.util.Log;
 
 import org.codeaurora.bluetooth.bttestapp.R;
 
-import android.media.browse.MediaBrowser;
-import android.media.browse.MediaBrowser.MediaItem;
-import android.media.MediaDescription;
+import android.support.v4.media.MediaBrowserCompat.MediaItem;
 import android.media.session.MediaController;
 import android.media.session.MediaController.TransportControls;
 import android.media.session.MediaSession;
