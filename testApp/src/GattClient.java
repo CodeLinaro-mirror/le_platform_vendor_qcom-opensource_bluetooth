@@ -436,11 +436,15 @@ public class GattClient {
             public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
                                 int status) {
                 if ((status == GATT_SUCCESS)) {
-                    String value = new String(descriptor.getValue());
-                    Log.i(TAG, "onDescriptorRead: " + value);
+                    byte[] value = descriptor.getValue();
+                    StringBuilder result = new StringBuilder();
+                    for (byte temp : value) {
+                        result.append(String.format("%02x ", temp));
+                    }
+                    Log.i(TAG, "Descriptor value(hex) is "+ result.toString());
                     PrintStr.setLength(0);
-                    PrintStr.append("Descriptor Value is :");
-                    PrintStr.append(value);
+                    PrintStr.append("Descriptor Value Read is :");
+                    PrintStr.append(result.toString());
                     SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "read descriptor failed");
@@ -456,10 +460,15 @@ public class GattClient {
                                             BluetoothGattDescriptor desc, int status) {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "onDescriptorWrite: " + status);
-                    String value = new String(desc.getValue());
+                    byte[] value = desc.getValue();
+                    StringBuilder result = new StringBuilder();
+                    for (byte temp : value) {
+                        result.append(String.format("%02x ", temp));
+                    }
+                    Log.i(TAG, "Descriptor value(hex) is "+ result.toString());
                     PrintStr.setLength(0);
                     PrintStr.append("Descriptor Value Written to ");
-                    PrintStr.append(value);
+                    PrintStr.append(result.toString());
                     SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "write descriptor failed");
