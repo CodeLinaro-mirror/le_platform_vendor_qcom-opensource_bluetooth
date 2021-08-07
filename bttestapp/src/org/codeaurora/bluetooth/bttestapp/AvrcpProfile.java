@@ -420,6 +420,9 @@ public class AvrcpProfile {
     public static final String EXTRA_NUM_OF_ITEMS =
         "android.bluetooth.avrcp-controller.profile.extra.NUM_OF_ITEMS";
 
+    // Keys for packaging extra data with MediaItems
+    public static final String AVRCP_ITEM_KEY_UID = "avrcp-item-key-uid";
+
     // Result code
     public static final int RESULT_SUCCESS = 0;
     public static final int RESULT_ERROR = 1;
@@ -791,12 +794,12 @@ public class AvrcpProfile {
         return parentId.startsWith(SEARCH_PREFIX);
     }
 
-    public static int getPlayerId(String mediaId) {
+    public static int getPlayerId(MediaItem item) {
         int playerId = INVALID_PLAYER_ID;
-        Logger.d(TAG, "getPlayerId mediaId=" + mediaId);
-        if (mediaId != null) {
-            String playerIdStr = mediaId.substring(PLAYER_PREFIX.length());
-            playerId = Integer.parseInt(playerIdStr);
+
+        Bundle extras = item.getDescription().getExtras();
+        if (extras != null) {
+            playerId = (int) extras.getLong(AVRCP_ITEM_KEY_UID);
         }
         return playerId;
     }
