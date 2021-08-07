@@ -1782,9 +1782,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
             showTestResult("Can't find player, position " + position + " exceed max size");
             return;
         }
-
+        int id = AvrcpProfile.getPlayerId(item);
         String mediaId = item.getMediaId();
-        int id = AvrcpProfile.getPlayerId(mediaId);
 
         if (id != AvrcpProfile.INVALID_PLAYER_ID) {
             setAddressedPlayer(id, mediaId);
