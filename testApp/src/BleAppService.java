@@ -109,7 +109,8 @@ public class BleAppService extends Service {
     public static final int MSG_MA_START_BLE_PAIR = 8;
     public static final int MSG_MA_GET_PAIRED_DEVICES = 9;
     public static final int MSG_MA_START_BLE_UNPAIR = 10;
-    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_START_BLE_UNPAIR;
+    public static final int MSG_MA_START_BLE_DISCONNECT = 11;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_START_BLE_DISCONNECT;
 
     /* Gatt Client Actions */
     public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
@@ -522,6 +523,10 @@ public class BleAppService extends Service {
                     bdAddr = (String) message.obj;
                     processUnPairRequest(bdAddr);
                     break;
+                case MSG_MA_START_BLE_DISCONNECT:
+                    bdAddr = (String) message.obj;
+                    processDisconnectRequest(bdAddr);
+                    break;
                 case MSG_GC_START_BLE_CONNECT:
                     scnObj = (Scan) message.obj;
                     scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
@@ -827,7 +832,7 @@ public class BleAppService extends Service {
              SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processUnPairRequest(String bdAddr){
+        private void processUnPairRequest(String bdAddr) {
             boolean device_found = false;
             Set<BluetoothDevice> pairedDevices =
                             bleAdapter.getBondedDevices();
@@ -849,6 +854,34 @@ public class BleAppService extends Service {
             if (!device_found) {
                 PrintStr.setLength(0);
                 PrintStr.append("Device not found in bonded list");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+        }
+
+
+        private void processDisconnectRequest(String bdAddr){
+            BluetoothDevice mdevice = getDevice(bdAddr);
+            if (mdevice != null) {
+                if (mgattclient.mDevice.getAddress().equals(bdAddr)) {
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                }
+                if (mgattserver.connectedDevices.contains(mdevice)) {
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                                mgattserver.MSG_START_BLE_DISCONNECT, bdAddr);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                }
+                if (throughputSMClass.mDevice.getAddress().equals(bdAddr)) {
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                        throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                }
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Device not in connected list");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
                 SocketServer.sendSocketData(PrintStr.toString());
             }
         }
