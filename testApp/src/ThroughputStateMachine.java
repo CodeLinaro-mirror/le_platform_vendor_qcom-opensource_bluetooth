@@ -418,6 +418,7 @@ public class ThroughputStateMachine {
         public static final int MSG_TA_SM_DATA_RX_TEST = 19;
         public static final int MSG_TA_SM_LATENCY_TEST = 20;
         public static final int MSG_TA_SM_PAIR_DEV = 21;
+        public static final int MSG_TA_SM_CONNECT_TO_BDADDR = 22;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
@@ -497,6 +498,10 @@ public class ThroughputStateMachine {
                             BleAppService.mScannerService.set_scan_parameters(scn);
                         }
                         break;
+                    case MSG_TA_SM_CONNECT_TO_BDADDR:
+                        String bdAddr = (String) message.obj;
+                        processConnectToBdaddr(bdAddr);
+                        break;
                     case MSG_TA_SM_DEV_FOUND:
                         BluetoothDevice device = (BluetoothDevice) message.obj;
                         processSMDevFoundEvent(device);
@@ -505,6 +510,16 @@ public class ThroughputStateMachine {
                         return NOT_HANDLED;
                 }
                 return retValue;
+            }
+
+            private void processConnectToBdaddr(String bdAddr) {
+                if(BleAppService.bleAdapter != null) {
+                    Log.i(TAG, "Connect to Address: " + bdAddr);
+                    BluetoothDevice remoteDevice =
+                            BleAppService.bleAdapter.getRemoteDevice(bdAddr);
+                    mBleConnect.connect(remoteDevice);
+                    transitionTo(mTAConnectPending);
+                }
             }
 
             private void processSMDevFoundEvent(BluetoothDevice device) {
