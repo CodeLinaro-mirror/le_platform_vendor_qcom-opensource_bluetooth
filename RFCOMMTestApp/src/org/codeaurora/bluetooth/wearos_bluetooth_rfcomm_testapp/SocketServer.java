@@ -242,7 +242,8 @@ public class SocketServer {
         case OFFLOAD_TESTING_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
-            // sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa:bbbbbb:cccc\n");
+            sendStr.append("                     Register_OffloadService\n");
+            sendStr.append("                     DeRegister_OffloadService\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -414,6 +415,12 @@ public class SocketServer {
                         mainMenuState = INIT_MENU;
                     }
                 }
+            } else if (inputString.equals("Register_OffloadService")) {
+                mainMenuState = OFFLOAD_TESTING_MENU;
+                processOutputState = OFFLOAD_TESTING_MENU;
+            } else if (inputString.equals("DeRegister_OffloadService")) {
+                mainMenuState = OFFLOAD_TESTING_MENU;
+                processOutputState = OFFLOAD_TESTING_MENU;
             } else if (inputString.equals("Back")) {
                 mainMenuState = INIT_MENU;
                 processOutputState = INIT_MENU;

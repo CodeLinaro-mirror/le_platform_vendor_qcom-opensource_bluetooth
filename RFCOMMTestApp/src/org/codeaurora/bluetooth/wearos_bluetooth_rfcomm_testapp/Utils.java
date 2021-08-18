@@ -110,6 +110,14 @@ public class Utils {
         static final int STATE_NOT_PROCESS_END = 9;
     }
 
+    /* Offload Service Actions */
+    public static final int MSG_AS_REGISTER_OFFLODABLE_ADAPTER = 0;
+    public static final int MSG_AS_DREGISTER_OFFLODABLE_ADAPTER = 1;
+
+    //Offload states
+    public static final int MSG_NC_SM_OFFLOADED = 21;
+    public static final int MSG_NC_SM_ACTIVE = 22;
+
     public static class UUIDConstants {
         static final UUID APP_UUID = UUID
                 .fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");

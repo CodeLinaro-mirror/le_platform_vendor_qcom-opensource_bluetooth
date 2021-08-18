@@ -57,9 +57,8 @@ public class NotificationOffloadStateMachine extends StateMachine {
     private DisconnectedState mDisconnectedState;
     private ControlPointState mControlPointState;
     private Offloaded mOffloaded;
+    public static IState ncPreviousState;
 
-    public static final int MSG_NC_SM_OFFLOADED = 21;
-    public static final int MSG_NC_SM_ACTIVE = 22;
     private static final String name = "BluetoothRFCommNotApp";
 
     public NotificationOffloadStateMachine(AppControlService service) {
@@ -135,7 +134,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 transitionTo(mReadyToAcceptConnection);
                 Log.d(TAG, "Going to Ready to Accept Connect state");
                 break;
-            case MSG_NC_SM_OFFLOADED:
+            case Utils.MSG_NC_SM_OFFLOADED:
                 Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
                 break;
@@ -185,6 +184,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
+            case Utils.MSG_NC_SM_OFFLOADED:
+                transitionTo(mOffloaded);
+                break;
             }
             return retvalue;
         }
@@ -233,6 +235,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
+            case Utils.MSG_NC_SM_OFFLOADED:
+                transitionTo(mOffloaded);
+                break;
             }
             return retvalue;
         }
@@ -269,6 +274,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
+            case Utils.MSG_NC_SM_OFFLOADED:
+                transitionTo(mOffloaded);
+                break;
             }
             return retvalue;
         }
@@ -304,6 +312,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
+                break;
+            case Utils.MSG_NC_SM_OFFLOADED:
+                transitionTo(mOffloaded);
                 break;
             }
             return retvalue;
@@ -379,6 +390,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
            //    processSetAppContext(blob);
            //}
            //inform OffloadableAppAdapter
+		   mAppControlService.mofflodableappadapter.enableOffloadDone(mAppControlService.BT_OK);
         }
 
         @Override
@@ -392,13 +404,12 @@ public class NotificationOffloadStateMachine extends StateMachine {
             boolean retValue = HANDLED;
 
             switch (message.what) {
-                case MSG_NC_SM_ACTIVE:
+                case Utils.MSG_NC_SM_ACTIVE:
                     SocketServer.sendSocketData("Transitioned to active");
                     //we need to make a note of what the previous state was
                     // and transition to that state
-                    //transitionTo(ncPreviousState);
+                    transitionTo(ncPreviousState);
                     break;
-
             }
             return retValue;
         }
