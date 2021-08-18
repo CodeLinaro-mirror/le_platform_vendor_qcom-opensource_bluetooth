@@ -31,7 +31,7 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
 import static android.widget.Toast.makeText;
 
-import com.qualcomm.bluetooth_offload.client.*;
+//import com.qualcomm.bluetooth_offload.client.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -93,7 +93,7 @@ public class AppControlService extends Service {
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
-    public OffloadableAppAdapter mOfflodableAppAdapter;
+    //public OffloadableAppAdapter mOfflodableAppAdapter;
 
     //offload callback status values
     public static final int BT_FAIL = 0;
@@ -1295,6 +1295,7 @@ public class AppControlService extends Service {
         }
     }
 
+/*
     private final OffloadableAppCallback mofflodableappcallback = new OffloadableAppCallback(){
         @Override
         public void notifyStartDone(int status) {
@@ -1328,7 +1329,7 @@ public class AppControlService extends Service {
         @Override
         public int notifyOffloadDisable(ArrayList<Byte> blob) {
             Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
-            mOfflodableAppAdapter.disableOffloadDone(BT_OK);
+            //mOfflodableAppAdapter.disableOffloadDone(BT_OK);
             Message message = Message.obtain();
             message.what = Utils.MSG_NC_SM_ACTIVE;
             mNotificationOffloadStateMachine.sendMessage(message);
@@ -1340,17 +1341,18 @@ public class AppControlService extends Service {
             Log.i(TAG, "notifyAsyncErr status: " + status);
         }
     };
+*/
 
     private void processRegisterOfflodableAdapter() {
         Log.d(TAG, "processGRegisterOfflodableAdapter()");
-        mOfflodableAppAdapter = new OffloadableAppAdapter(mContext, mofflodableappcallback);
-        mOfflodableAppAdapter.start();
+        //mOfflodableAppAdapter = new OffloadableAppAdapter(mContext, mofflodableappcallback);
+        //mOfflodableAppAdapter.start();
         SocketServer.sendSocketData("OffloadableApp Registered");
     }
 
     private void processDRegisterOfflodableAdapter() {
         Log.d(TAG, "processDRegisterOfflodableAdapter()");
-        mOfflodableAppAdapter.stop();
+        //mOfflodableAppAdapter.stop();
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
 
