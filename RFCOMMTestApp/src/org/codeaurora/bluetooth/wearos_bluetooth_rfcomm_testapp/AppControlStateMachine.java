@@ -42,7 +42,7 @@ import com.android.internal.util.StateMachine;
 import com.android.internal.util.State;
 
 public class AppControlStateMachine extends StateMachine {
-    private static final String TAG = "BluetoothTxRxApp AppControlStateMachine";
+    private static final String TAG = "RFCOMMTestApp AppControlStateMachine";
 
     // Declaring Service Object
 
@@ -99,7 +99,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class InitState extends State {
-        private static final String TAG = "BluetoothTxRxApp Init State";
+        private static final String TAG = "RFCOMMTestApp Init State";
 
         @Override
         public void enter() {
@@ -145,7 +145,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ReadyToConnect extends State {
-        private static final String TAG = "BluetoothTxRxApp ReadyToConnect State";
+        private static final String TAG = "RFCOMMTestApp ReadyToConnect State";
 
         @Override
         public void enter() {
@@ -191,7 +191,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ConnectedState extends State {
-        private static final String TAG = "BluetoothTxRxApp Connected State";
+        private static final String TAG = "RFCOMMTestApp Connected State";
 
         @Override
         public void enter() {
@@ -243,7 +243,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ReadyState extends State {
-        private static final String TAG = "BluetoothTxRxApp ReadyState State";
+        private static final String TAG = "RFCOMMTestApp ReadyState State";
 
         @Override
         public void enter() {
@@ -311,7 +311,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DataTxState extends State {
-        private static final String TAG = "BluetoothTxRxApp DataTx State";
+        private static final String TAG = "RFCOMMTestApp DataTx State";
 
         @Override
         public void enter() {
@@ -356,7 +356,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DataRxState extends State {
-        private static final String TAG = "BluetoothTxRxApp DataRx State";
+        private static final String TAG = "RFCOMMTestApp DataRx State";
 
         @Override
         public void enter() {
@@ -397,7 +397,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DisconnectedState extends State {
-        private static final String TAG = "BluetoothTxRxApp Disconnected State";
+        private static final String TAG = "RFCOMMTestApp Disconnected State";
 
         @Override
         public void enter() {
@@ -422,7 +422,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class GapTestState extends State {
-        private static final String TAG = "BluetoothTxRxApp GapTestState State";
+        private static final String TAG = "RFCOMMTestApp GapTestState State";
 
         @Override
         public void enter() {
@@ -476,7 +476,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ReadyToAcceptConnection extends State {
-        private static final String TAG = "BluetoothTxRxApp ReadyToAcceptConnection State";
+        private static final String TAG = "RFCOMMTestApp ReadyToAcceptConnection State";
 
         @Override
         public void enter() {

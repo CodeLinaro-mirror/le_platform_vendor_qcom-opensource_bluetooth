@@ -75,7 +75,7 @@ import android.app.Notification;
 
 
 public class AppControlService extends Service {
-    private static final String TAG = "BluetoothTxRxApp Service";
+    private static final String TAG = "RFCOMMTestApp Service";
     private static BluetoothAdapter bluetoothAdapter = BluetoothAdapter
             .getDefaultAdapter();
     BluetoothDevice btDeviceToPair = null;

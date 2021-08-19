@@ -51,7 +51,7 @@ import android.widget.Toast;
 
 public class AppControlActivity extends Activity {
 
-    private static final String TAG = "BluetoothTxRxApp AppControlActivity";
+    private static final String TAG = "RFCOMMTestApp AppControlActivity";
 
     private static SocketServer socServer;
     private static Context mContext;

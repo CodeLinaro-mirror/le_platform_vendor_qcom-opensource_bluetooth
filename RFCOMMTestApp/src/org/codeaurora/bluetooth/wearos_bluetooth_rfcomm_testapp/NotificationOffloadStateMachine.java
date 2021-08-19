@@ -179,12 +179,14 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 break;
 
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                Log.d(TAG, "Going to Disconnected state");
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             case Utils.MSG_NC_SM_OFFLOADED:
+                Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
                 break;
             }
@@ -230,12 +232,14 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 break;
 
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                Log.d(TAG, "Going to Disconnected/Init state");
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             case Utils.MSG_NC_SM_OFFLOADED:
+                Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
                 break;
             }
@@ -268,6 +272,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
             boolean retvalue = HANDLED;
             switch (message.what) {
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                Log.d(TAG, "Going to Disconnected/Init state");
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
@@ -275,6 +280,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.updateSocketClient();
                 break;
             case Utils.MSG_NC_SM_OFFLOADED:
+                Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
                 break;
             }
@@ -307,6 +313,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 Log.d(TAG, "Going to ControlPoint state");
                 break;
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                Log.d(TAG, "Going to Disconnected/Init state");
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
@@ -314,6 +321,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 SocketServer.updateSocketClient();
                 break;
             case Utils.MSG_NC_SM_OFFLOADED:
+                Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
                 break;
             }
@@ -385,12 +393,13 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public void enter() {
            Log.i(TAG, "Enter: " + getCurrentMessage().what);
            SocketServer.sendSocketData("Offloaded State");
+           Log.i(TAG, "Reading context from protobuf");
            //byte[] blob = AppContextProto.getAppContextProtoBuffer();
            //if(blob.length > 0) {
            //    processSetAppContext(blob);
            //}
            //inform OffloadableAppAdapter
-		   //mAppControlService.mOfflodableAppAdapter.enableOffloadDone(mAppControlService.BT_OK);
+           //mAppControlService.mOfflodableAppAdapter.enableOffloadDone(mAppControlService.BT_OK);
         }
 
         @Override

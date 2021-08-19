@@ -37,7 +37,7 @@ import java.io.InputStreamReader;
 import android.util.Log;
 
 public class ConfigFileParser {
-    private static final String TAG = "BluetoothTxRxApp ConfigFileParser";
+    private static final String TAG = "RFCOMMTestApp ConfigFileParser";
 
     ConfigFileParser() {
 
