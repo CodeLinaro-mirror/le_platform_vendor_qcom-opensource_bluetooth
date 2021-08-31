@@ -188,28 +188,28 @@ public class ConfigFileParser {
         byte att_id = bytes[5];
         int att_length = 0xff & bytes[6];
         att_value = new String(bytes, 7, att_length);
-        notString.append("\n*********Received***********\n");
         switch (att_id) {
         case 0x01:
-            notString.append("\nCaller Number : ");
+            notString.append("Caller Number : ");
             break;
         case 0x02:
-            notString.append("\nCaller Name : ");
+            notString.append("Caller Name : ");
             break;
         case 0x03:
-            notString.append("\nEmail Address : ");
+            notString.append("Email Address : ");
             break;
         case 0x04:
-            notString.append("\nEmail Subject\n");
+            notString.append("Email Subject :");
             break;
         case 0x05:
-            notString.append("\nEmail Body\n");
+            notString.append("Email Body\n");
             break;
         default:
             Log.e(TAG, "Invalid get Attribute ID");
             break;
         }
         notString.append(att_value);
+        notString.append("\n");
         return notString;
     }
 
