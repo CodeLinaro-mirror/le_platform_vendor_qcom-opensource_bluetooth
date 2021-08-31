@@ -44,6 +44,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.LinkedList;
 
 import android.Manifest;
@@ -1092,6 +1093,11 @@ public class AppControlService extends Service {
         public void run() {
             while (NotificationPacketList.size() > 0) {
                 processNotification(NotificationPacketList.getFirst());
+                try {
+                    Thread.sleep(200);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error occurred when creating output stream", e);
+                }
             }
             Message message = Message.obtain();
             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
@@ -1141,89 +1147,179 @@ public class AppControlService extends Service {
             Log.e(TAG, "Invalid Notification Status\n");
             break;
         }
-        while (true) {
-            sendStr.append("\n*********Please select getInfo to get more info about Notification and Do select the action to be performed***********");
-            sendStr.append("\nGet Info                [exp: getInfo 1]\n");
-            sendStr.append("Do Action               [exp: action 1]\n");
-            if (obj.NotificationID == 0x01 || obj.NotificationID == 0x02) {
-                sendStr.append("getInfo Values = 1[Caller Phone Number]  2[Caller Name]\n");
-            } else {
-                sendStr.append("getInfo Values = 3[Sender email address] 4[Email Subject] 5[Email Body]\n");
+        if (obj.NotificationID == 0x01) {
+            while (true) {
+                sendStr.append("\n*********Please select getInfo to get more info about Notification and Do select the action to be performed***********");
+                sendStr.append("\nGet Info                [exp: getInfo 1]\n");
+                sendStr.append("Do Action               [exp: action 1]\n");
+                if (obj.NotificationID == 0x01 || obj.NotificationID == 0x02) {
+                    sendStr.append("getInfo Values = 1[Caller Phone Number]  2[Caller Name]\n");
+                } else {
+                    sendStr.append("getInfo Values = 3[Sender email address] 4[Email Subject] 5[Email Body]\n");
+                }
+                sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+                sendStr.append("\n**************************************************************\n");
+                SocketServer.sendSocketData(sendStr.toString());
+                sendStr.delete(0, sendStr.length());
+                try {
+                    obj.sem.acquire();
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
+                if (obj.action > 0x00) {
+                    switch (obj.action) {
+                        case 0x01:
+                            Log.d(TAG, "Action Dismiss Notification");
+                            action = 0x01;
+                            break;
+                        case 0x02:
+                            Log.d(TAG, "Action Attend Notification");
+                            action = 0x02;
+                            break;
+                        case 0x03:
+                            Log.d(TAG, "Action Ignore Notification");
+                            action = 0x03;
+                            break;
+                        default:
+                            Log.d(TAG, "Invalid Action");
+                            break;
+                    }
+                    try {
+                        outputStream.write(parser.getActionPacket(action, getInfoId));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
+                    }
+                    break;
+                } else {
+                    switch (obj.getAttID) {
+                        case 0x01:
+                            Log.d(TAG, "Get Caller Phone Number");
+                            getInfoId = 0x01;
+                            break;
+                        case 0x02:
+                            Log.d(TAG, "Get Caller Name");
+                            getInfoId = 0x02;
+                            break;
+                        case 0x03:
+                            Log.d(TAG, "Get Sender's email address");
+                            getInfoId = 0x03;
+                            break;
+                        case 0x04:
+                            Log.d(TAG, "Get Email Subject");
+                            getInfoId = 0x04;
+                            break;
+                        case 0x05:
+                            Log.d(TAG, "Get Email Body Snippet");
+                            getInfoId = 0x05;
+                            break;
+                        default:
+                            Log.e(TAG, "Invalid get Attribute ID");
+                            break;
+                    }
+                    try {
+                        outputStream.write(parser.getReadInfoPacket(getInfoId));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
+                    }
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
+                    }
+                }
             }
-            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+        } else {
             sendStr.append("\n**************************************************************\n");
             SocketServer.sendSocketData(sendStr.toString());
-            sendStr.delete(0, sendStr.length());
-            try {
-                obj.sem.acquire();
-            } catch (Exception e) {
-                Log.e(TAG, "There is an exception when acquiring semaphore");
-                e.printStackTrace();
-            }
-            if (obj.action > 0x00) {
-                switch (obj.action) {
-                case 0x01:
-                    Log.d(TAG, "Action Dismiss Notification");
-                    action = 0x01;
-                    break;
-                case 0x02:
-                    Log.d(TAG, "Action Attend Notification");
-                    action = 0x02;
-                    break;
-                case 0x03:
-                    Log.d(TAG, "Action Ignore Notification");
-                    action = 0x03;
-                    break;
-                default:
-                    Log.d(TAG, "Invalid Action");
-                    break;
-                }
+            if (obj.NotificationID == 0x02) {
                 try {
-                    outputStream.write(parser
-                            .getActionPacket(action, getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                break;
-            } else {
-                switch (obj.getAttID) {
-                case 0x01:
-                    Log.d(TAG, "Get Caller Phone Number");
-                    getInfoId = 0x01;
-                    break;
-                case 0x02:
                     Log.d(TAG, "Get Caller Name");
                     getInfoId = 0x02;
-                    break;
-                case 0x03:
-                    Log.d(TAG, "Get Sender's email address");
-                    getInfoId = 0x03;
-                    break;
-                case 0x04:
-                    Log.d(TAG, "Get Email Subject");
-                    getInfoId = 0x04;
-                    break;
-                case 0x05:
-                    Log.d(TAG, "Get Email Body Snippet");
-                    getInfoId = 0x05;
-                    break;
-                default:
-                    Log.e(TAG, "Invalid get Attribute ID");
-                    break;
-                }
-                try {
                     outputStream.write(parser.getReadInfoPacket(getInfoId));
                 } catch (IOException e) {
                     Log.e(TAG, "Error occurred when sending data", e);
                 }
                 try {
-                    Log.d(TAG, "Before aquiring info lock");
-                    obj.getInfoSem.acquire();
+                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                    } else {
+                        Log.e(TAG, "Error while getting response for readInfo[CallerName]");
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "There is an exception when acquiring semaphore");
                     e.printStackTrace();
                 }
-                Log.d(TAG, "after aquiring info lock");
+                try {
+                    Log.d(TAG, "Get Caller Phone Number");
+                    getInfoId = 0x01;
+                    outputStream.write(parser.getReadInfoPacket(getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                try {
+                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                    } else {
+                        Log.e(TAG, "Error while getting response for readInfo[Caller Number]");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    Log.d(TAG, "Get Sender's email address");
+                    getInfoId = 0x03;
+                    outputStream.write(parser.getReadInfoPacket(getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                try {
+                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                    } else {
+                        Log.e(TAG, "Error while getting response for readInfo[EmailAddress]");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
+                try {
+                    Log.d(TAG, "Get Email Subject");
+                    getInfoId = 0x04;
+                    outputStream.write(parser.getReadInfoPacket(getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                try {
+                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                    } else {
+                        Log.e(TAG, "Error while getting response for readInfo[Email Subject]");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
+                try {
+                    Log.d(TAG, "Get Email Body Snippet");
+                    getInfoId = 0x05;
+                    outputStream.write(parser.getReadInfoPacket(getInfoId));
+                } catch (IOException e) {
+                    Log.e(TAG, "Error occurred when sending data", e);
+                }
+                try {
+                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                    } else {
+                        Log.e(TAG, "Error while getting response for readInfo[Email body]");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "There is an exception when acquiring semaphore");
+                    e.printStackTrace();
+                }
             }
         }
         NotificationPacketList.remove();
