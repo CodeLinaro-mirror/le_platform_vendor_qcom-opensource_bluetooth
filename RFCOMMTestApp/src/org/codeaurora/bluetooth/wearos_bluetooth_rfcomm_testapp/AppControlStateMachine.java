@@ -29,6 +29,8 @@
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
+import org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp.Utils.UUIDConstants;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Message;
@@ -40,11 +42,12 @@ import com.android.internal.util.StateMachine;
 import com.android.internal.util.State;
 
 public class AppControlStateMachine extends StateMachine {
-    private static final String TAG = "BluetoothTxRxApp AppControlStateMachine";
+    private static final String TAG = "RFCOMMTestApp AppControlStateMachine";
 
     // Declaring Service Object
 
     AppControlService mAppControlService;
+    BluetoothDevice mConnectedDevice;
 
     // Declaring the States
     private InitState mInitState;
@@ -55,6 +58,7 @@ public class AppControlStateMachine extends StateMachine {
     private DataRxState mDataRxState;
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
+    private ReadyToAcceptConnection mReadyToAcceptConnection;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -70,6 +74,7 @@ public class AppControlStateMachine extends StateMachine {
         mDataRxState = new DataRxState();
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
+        mReadyToAcceptConnection = new ReadyToAcceptConnection();
 
         // Adding States
         addState(mInitState);
@@ -80,20 +85,21 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDataRxState);
         addState(mDisconnectedState);
         addState(mGapTestState);
+        addState(mReadyToAcceptConnection);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
         setInitialState(mInitState);
     }// end of constructor
 
-    public void cleanUp(){
+    public void cleanUp() {
         mAppControlService = null;
         quitNow();
         Utils.appControlStateMachine = null;
     }
 
     private class InitState extends State {
-        private static final String TAG = "BluetoothTxRxApp Init State";
+        private static final String TAG = "RFCOMMTestApp Init State";
 
         @Override
         public void enter() {
@@ -125,6 +131,11 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to Ready to Connect state");
                 break;
 
+            case Utils.StateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION:
+                transitionTo(mReadyToAcceptConnection);
+                Log.d(TAG, "Going to Ready to Accept Connect state");
+                break;
+
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
                 break;
@@ -134,7 +145,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ReadyToConnect extends State {
-        private static final String TAG = "BluetoothTxRxApp ReadyToConnect State";
+        private static final String TAG = "RFCOMMTestApp ReadyToConnect State";
 
         @Override
         public void enter() {
@@ -157,6 +168,7 @@ public class AppControlStateMachine extends StateMachine {
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_CONNECTED:
                 transitionTo(mConnectedState);
+                mConnectedDevice = (BluetoothDevice) message.obj;
                 Log.d(TAG, "Going to Connected state");
                 break;
 
@@ -169,8 +181,8 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -179,7 +191,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ConnectedState extends State {
-        private static final String TAG = "BluetoothTxRxApp Connected State";
+        private static final String TAG = "RFCOMMTestApp Connected State";
 
         @Override
         public void enter() {
@@ -187,7 +199,29 @@ public class AppControlStateMachine extends StateMachine {
             mAppControlService.startRxOperation();
             transitionTo(mReadyState);
             Log.d(TAG, "Going to Ready state");
-            SocketServer.sendSocketData("Device is Connected.");
+            if (UUIDConstants.INCOMING_CONNECTION_UUID != null) {
+                if (mConnectedDevice != null) {
+                    if (!mConnectedDevice.getName().isEmpty()) {
+                        SocketServer.sendSocketData("Device "
+                                + mConnectedDevice.getName()
+                                + " is Connected with UUID :: "
+                                + Utils.UUIDConstants.INCOMING_CONNECTION_UUID);
+                    } else {
+                        SocketServer.sendSocketData("Device "
+                                + mConnectedDevice.getAddress()
+                                + " is Connected with UUID :: "
+                                + Utils.UUIDConstants.INCOMING_CONNECTION_UUID);
+                    }
+                } else {
+                    SocketServer.sendSocketData("Device is Connected");
+                }
+                Utils.UUIDConstants.INCOMING_CONNECTION_UUID = null;
+            } else {
+                SocketServer.sendSocketData("Device "
+                        + mConnectedDevice.getName()
+                        + " is Connected with UUID :: "
+                        + Utils.UUIDConstants.APP_UUID);
+            }
             SocketServer.mainMenuState = SocketServer.MAIN_MENU;
             SocketServer.processOutputState = SocketServer.MAIN_MENU;
         }
@@ -209,7 +243,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class ReadyState extends State {
-        private static final String TAG = "BluetoothTxRxApp ReadyState State";
+        private static final String TAG = "RFCOMMTestApp ReadyState State";
 
         @Override
         public void enter() {
@@ -260,14 +294,15 @@ public class AppControlStateMachine extends StateMachine {
                 transitionTo(mDataRxState);
                 Log.d(TAG, "Going to DataRx state");
                 SocketServer.sendSocketData("Rx Operation Started");
-                //mAppControlService.startRxOperation();
+                // mAppControlService.startRxOperation();
                 break;
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -276,7 +311,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DataTxState extends State {
-        private static final String TAG = "BluetoothTxRxApp DataTx State";
+        private static final String TAG = "RFCOMMTestApp DataTx State";
 
         @Override
         public void enter() {
@@ -310,8 +345,9 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -320,7 +356,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DataRxState extends State {
-        private static final String TAG = "BluetoothTxRxApp DataRx State";
+        private static final String TAG = "RFCOMMTestApp DataRx State";
 
         @Override
         public void enter() {
@@ -339,6 +375,7 @@ public class AppControlStateMachine extends StateMachine {
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_END_DATA_RX:
                 transitionTo(mReadyState);
+                Log.d(TAG, "Going to Ready state");
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
                 break;
 
@@ -349,8 +386,9 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 mAppControlService.closeConnection();
                 transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
-                SocketServer.processOutputState = SocketServer.CONNECT_INIT;
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
                 break;
             }
@@ -359,7 +397,7 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class DisconnectedState extends State {
-        private static final String TAG = "BluetoothTxRxApp Disconnected State";
+        private static final String TAG = "RFCOMMTestApp Disconnected State";
 
         @Override
         public void enter() {
@@ -384,7 +422,8 @@ public class AppControlStateMachine extends StateMachine {
     }
 
     private class GapTestState extends State {
-        private static final String TAG="BluetoothTxRxApp GapTestState State";
+        private static final String TAG = "RFCOMMTestApp GapTestState State";
+
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
@@ -397,11 +436,10 @@ public class AppControlStateMachine extends StateMachine {
 
         @Override
         public boolean processMessage(Message message) {
-            boolean retvalue=HANDLED;
-            switch(message.what)
-            {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON:
-                ConnectionTest offOn = (ConnectionTest)message.obj;
+                ConnectionTest offOn = (ConnectionTest) message.obj;
                 mAppControlService.startOnOffTestCase(offOn.count);
                 break;
 
@@ -433,6 +471,54 @@ public class AppControlStateMachine extends StateMachine {
 
             }
 
+            return retvalue;
+        }
+    }
+
+    private class ReadyToAcceptConnection extends State {
+        private static final String TAG = "RFCOMMTestApp ReadyToAcceptConnection State";
+
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+            if (mAppControlService != null) {
+                mAppControlService.startReadyToAcceptConnection();
+            }
+            SocketServer
+            .sendSocketData("Accepting Incoming Connection with UUID :: "
+                    + Utils.UUIDConstants.INCOMING_CONNECTION_UUID
+                    .toString());
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+            case Utils.StateMachineMessageConstants.STATE_CONNECTED:
+                transitionTo(mConnectedState);
+                mConnectedDevice = (BluetoothDevice) message.obj;
+                Log.d(TAG, "Going to Connected state");
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED:
+                transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
+                SocketServer
+                .sendSocketData("Connection Failed...Please Restart Phone App");
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                transitionTo(mInitState);
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
+                SocketServer.updateSocketClient();
+                break;
+            }
             return retvalue;
         }
     }

@@ -66,7 +66,7 @@ public class ThroughputStateMachine {
     public BleConnectionClass mBleConnect = null;
     private Context mcontext = null;
     public static TestAppThroughputStateMachine mStateMachine;
-    private BluetoothDevice mDevice = null;
+    public BluetoothDevice mDevice = null;
 
     /* Mutex required for writing characteristics and descriptors */
     private final Object write_mutex = new Object();
@@ -343,6 +343,10 @@ public class ThroughputStateMachine {
             }
         }
 
+        public void disconnect() {
+            mBleConnect.mBluetoothGatt.disconnect();
+        }
+
         public void pair(){
             if(mDevice.getBondState() != BluetoothDevice.BOND_BONDED){
                 Log.i(TAG, "Pairing!");
@@ -418,6 +422,8 @@ public class ThroughputStateMachine {
         public static final int MSG_TA_SM_DATA_RX_TEST = 19;
         public static final int MSG_TA_SM_LATENCY_TEST = 20;
         public static final int MSG_TA_SM_PAIR_DEV = 21;
+        public static final int MSG_TA_SM_CONNECT_TO_BDADDR = 22;
+        public static final int MSG_TA_SM_CANCEL_CONNECT = 23;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
@@ -493,11 +499,17 @@ public class ThroughputStateMachine {
                             PrintStr.append("Connect failed, there is an ongoing scan");
                             SocketServer.sendSocketData(PrintStr.toString());
                         }else {
+                            Log.i(TAG, "starting scanning");
                             BleAppService.mScannerService.set_scan_parameters(scn);
-                            PrintStr.setLength(0);
-                            PrintStr.append("Scanning Started!");
-                            SocketServer.sendSocketData(PrintStr.toString());
                         }
+                        break;
+                    case MSG_TA_SM_CONNECT_TO_BDADDR:
+                        String bdAddr = (String) message.obj;
+                        processConnectToBdaddr(bdAddr);
+                        break;
+                    case MSG_TA_SM_CANCEL_CONNECT:
+                        processCancelConnect();
+                        transitionTo(mTAIdle);
                         break;
                     case MSG_TA_SM_DEV_FOUND:
                         BluetoothDevice device = (BluetoothDevice) message.obj;
@@ -509,6 +521,16 @@ public class ThroughputStateMachine {
                 return retValue;
             }
 
+            private void processConnectToBdaddr(String bdAddr) {
+                if(BleAppService.bleAdapter != null) {
+                    Log.i(TAG, "Connect to Address: " + bdAddr);
+                    BluetoothDevice remoteDevice =
+                            BleAppService.bleAdapter.getRemoteDevice(bdAddr);
+                    mBleConnect.connect(remoteDevice);
+                    transitionTo(mTAConnectPending);
+                }
+            }
+
             private void processSMDevFoundEvent(BluetoothDevice device) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
                 if(BleAppService.mScannerService.mScanstatus) {
@@ -516,6 +538,20 @@ public class ThroughputStateMachine {
                 }
                 mBleConnect.connect(device);
                 transitionTo(mTAConnectPending);
+            }
+
+            private void processCancelConnect() {
+                if(BleAppService.mScannerService.mScanstatus) {
+                    BleAppService.mScannerService.stopScan();
+                    PrintStr.setLength(0);
+                    PrintStr.append("Scan Stopped for connect");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("No Connection in Pending");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+
             }
         }
 
@@ -541,6 +577,10 @@ public class ThroughputStateMachine {
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
                         break;
+                    case MSG_TA_SM_CANCEL_CONNECT:
+                        processCancelConnect();
+                        transitionTo(mTAIdle);
+                        break;
                     case MSG_TA_SM_REM_DEV_CONNECTED:
                         PrintStr.setLength(0);
                         String name = (String) message.obj;
@@ -560,6 +600,13 @@ public class ThroughputStateMachine {
                         return NOT_HANDLED;
                 }
                 return retValue;
+            }
+
+            private void processCancelConnect() {
+                mBleConnect.disconnect();
+                PrintStr.setLength(0);
+                PrintStr.append("Connection cancelled!");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
@@ -585,6 +632,11 @@ public class ThroughputStateMachine {
 
                 boolean retValue = HANDLED;
                 switch (message.what) {
+                    case MSG_TA_SM_CANCEL_CONNECT:
+                        PrintStr.setLength(0);
+                        PrintStr.append("CancelConnect: Already Connected");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
                     case MSG_TA_SM_CONN_UPDATE:
                         ConnUpdate ConnUpdateObj = (ConnUpdate) message.obj;
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)

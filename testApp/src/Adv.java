@@ -30,7 +30,7 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class Adv {
-	int TxPower = 1;
+    int TxPower = 1;
     boolean Legacy = true;
     boolean Periodic = false;
     int PerAdvInterval = 200;
@@ -42,7 +42,7 @@ public class Adv {
     int SecondaryPhy = 1;
     int MaxAdvEvents = 0;
     int Interval = 160;
-    int TimeOutLegacy = 10000;
+    int TimeOutLegacy;
     int AdvertiseMode = 0;
     String ServiceUuid = null;
     int ManufacturerId = 0;

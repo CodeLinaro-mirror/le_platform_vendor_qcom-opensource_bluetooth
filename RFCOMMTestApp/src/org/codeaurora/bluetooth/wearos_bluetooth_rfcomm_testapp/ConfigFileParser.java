@@ -37,7 +37,7 @@ import java.io.InputStreamReader;
 import android.util.Log;
 
 public class ConfigFileParser {
-    private static final String TAG = "BluetoothTxRxApp ConfigFileParser";
+    private static final String TAG = "RFCOMMTestApp ConfigFileParser";
 
     ConfigFileParser() {
 
@@ -137,34 +137,103 @@ public class ConfigFileParser {
         return cacheable;
     }
 
-    public ConnectionTest connectionTestParse(String input){
+    public ConnectionTest connectionTestParse(String input) {
         ConnectionTest connectionTest = new ConnectionTest();
-        String tmp[] = input.split(":",2);
-        if(tmp.length == 2){
-            if(tmp[0].equals("count")){
+        String tmp[] = input.split(":", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("count")) {
                 connectionTest.count = Integer.parseInt(tmp[1]);
-            }else{
+            } else {
                 connectionTest = null;
             }
-        }else{
+        } else {
             connectionTest = null;
         }
         return connectionTest;
     }
 
-   public SetScanMode setScanModeParse(String input){
-       SetScanMode scanMode = new SetScanMode();
-       String tmp[] = input.split(":",2);
-       if(tmp.length == 2){
-           if(tmp[0].equals("mode")){
-               scanMode.scanMode = Integer.parseInt(tmp[1]);
-           }else{
-               scanMode = null;
-           }
-       }else{
-           scanMode = null;
-       }
-       return scanMode;
-   }
+    public SetScanMode setScanModeParse(String input) {
+        SetScanMode scanMode = new SetScanMode();
+        String tmp[] = input.split(":", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("mode")) {
+                scanMode.scanMode = Integer.parseInt(tmp[1]);
+            } else {
+                scanMode = null;
+            }
+        } else {
+            scanMode = null;
+        }
+        return scanMode;
+    }
+
+    public IncomingConnection incomingConnectionParse(String input) {
+        IncomingConnection incomingConnection = new IncomingConnection();
+        String tmp[] = input.split(":", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("uuid")) {
+                incomingConnection.uuid = tmp[1];
+            } else {
+                incomingConnection = null;
+            }
+        } else {
+            incomingConnection = null;
+        }
+        return incomingConnection;
+    }
+
+    public StringBuilder notificationInfoParse(byte[] bytes) {
+        StringBuilder notString = new StringBuilder();
+        String att_value;
+        byte att_id = bytes[5];
+        int att_length = 0xff & bytes[6];
+        att_value = new String(bytes, 7, att_length);
+        notString.append("\n*********Received***********\n");
+        switch (att_id) {
+        case 0x01:
+            notString.append("\nCaller Number : ");
+            break;
+        case 0x02:
+            notString.append("\nCaller Name : ");
+            break;
+        case 0x03:
+            notString.append("\nEmail Address : ");
+            break;
+        case 0x04:
+            notString.append("\nEmail Subject\n");
+            break;
+        case 0x05:
+            notString.append("\nEmail Body\n");
+            break;
+        default:
+            Log.e(TAG, "Invalid get Attribute ID");
+            break;
+        }
+        notString.append(att_value);
+        return notString;
+    }
+
+    public byte[] getActionPacket(byte action, byte getID) {
+        byte[] actionPacket = new byte[7];
+        actionPacket[0] = 0x00;
+        actionPacket[1] = 0x06; // packet length
+        actionPacket[2] = (byte) 0xE4; // packet code
+        actionPacket[3] = 0x00; //
+        actionPacket[4] = 0x01; // Notification handle
+        actionPacket[5] = getID; // Notification Attribute ID
+        actionPacket[6] = action; // Notification Action ID
+        return actionPacket;
+    }
+
+    public byte[] getReadInfoPacket(byte getID) {
+        byte[] readPacket = new byte[6];
+        readPacket[0] = 0x00;
+        readPacket[1] = 0x06; // packet length
+        readPacket[2] = (byte) 0xE2; // packet code
+        readPacket[3] = 0x00; //
+        readPacket[4] = 0x01; // Notification handle
+        readPacket[5] = getID; // Notification Attribute ID
+        return readPacket;
+    }
 
 }

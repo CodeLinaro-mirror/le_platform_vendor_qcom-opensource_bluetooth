@@ -15,6 +15,7 @@ android_app {
     },
     static_libs: [
         "androidx.legacy_legacy-support-v13",
+        //"bluetooth_offload_java_client",
     ],
     platform_apis: true,
 }
