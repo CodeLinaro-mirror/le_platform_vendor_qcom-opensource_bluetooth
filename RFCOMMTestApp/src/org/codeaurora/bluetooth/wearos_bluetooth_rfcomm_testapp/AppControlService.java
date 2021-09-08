@@ -107,8 +107,14 @@ public class AppControlService extends Service {
         byte NotificationID;
         byte NotificationStatus;
         byte action = 0x00;
+        String cName;
+        String cNum;
+        String eBody;
+        String eAdd;
+        String eSub;
         byte getAttID;
         byte[] NotificationHandle = new byte[2];
+        byte[] requestNotHandle = new byte[2];
         Semaphore sem = new Semaphore(0);
         Semaphore getInfoSem = new Semaphore(0);
 
@@ -116,6 +122,11 @@ public class AppControlService extends Service {
             NotificationID = value[5];
             NotificationStatus = value[6];
             NotificationHandle = Arrays.copyOfRange(value, 3, 5);
+            cName = null;
+            cNum = null;
+            eBody = null;
+            eAdd = null;
+            eSub = null;
         }
     }
 
@@ -1091,10 +1102,13 @@ public class AppControlService extends Service {
 
     Runnable processNotificationRunnable = new Runnable() {
         public void run() {
-            while (NotificationPacketList.size() > 0) {
-                processNotification(NotificationPacketList.getFirst());
+            for (int i =0; i < NotificationPacketList.size(); i++) {
+                processNotification(NotificationPacketList.get(i));
                 try {
-                    Thread.sleep(200);
+                    /*Adding sleep just because RFCOMM has not to merge
+                     * requests. We have to send each request has single packet
+                    */
+                    Thread.sleep(300);
                 } catch (Exception e) {
                     Log.e(TAG, "Error occurred when creating output stream", e);
                 }
@@ -1118,40 +1132,41 @@ public class AppControlService extends Service {
             Log.e(TAG, "Error occurred when creating output stream", e);
         }
         Log.d(TAG, "Notification received with notification handle " + num);
-        sendStr.append("\n*********Received notification with below details*********** \n\n");
+        sendStr.append("\n*********Received notification with below details*********** \n");
+        sendStr.append("Notification Handle "+num+"\n");
         switch (obj.NotificationID) {
-        case 0x01:
-            sendStr.append("Notification ID     : 0x01[Incoming call]\n");
-            break;
-        case 0x02:
-            sendStr.append("Notification ID     : 0x02[Missed call]\n");
-            break;
-        case 0x03:
-            sendStr.append("Notification ID     : 0x03[Email]\n");
-            break;
-        default:
-            Log.e(TAG, "Invalid notification id\t");
-            break;
+            case 0x01:
+                sendStr.append("Notification ID     : 0x01[Incoming call]\n");
+                break;
+            case 0x02:
+                sendStr.append("Notification ID     : 0x02[Missed call]\n");
+                break;
+            case 0x03:
+                sendStr.append("Notification ID     : 0x03[Email]\n");
+                break;
+            default:
+                Log.e(TAG, "Invalid notification id\t");
+                break;
         }
         switch (obj.NotificationStatus) {
-        case 0x01:
-            sendStr.append("Notification Status : 0x01[Notification added]\n");
-            break;
-        case 0x02:
-            sendStr.append("Notification Status : 0x02[Notification cleared]\n");
-            break;
-        case 0x03:
-            sendStr.append("Notification Status : 0x03[Notification modified]\n");
-            break;
-        default:
-            Log.e(TAG, "Invalid Notification Status\n");
-            break;
+            case 0x01:
+                sendStr.append("Notification Status : 0x01[Notification added]\n");
+                break;
+            case 0x02:
+                sendStr.append("Notification Status : 0x02[Notification cleared]\n");
+                break;
+            case 0x03:
+                sendStr.append("Notification Status : 0x03[Notification modified]\n");
+                break;
+            default:
+                Log.e(TAG, "Invalid Notification Status\n");
+                break;
         }
         if (obj.NotificationID == 0x01) {
             while (true) {
                 sendStr.append("\n*********Please select getInfo to get more info about Notification and Do select the action to be performed***********");
-                sendStr.append("\nGet Info                [exp: getInfo 1]\n");
-                sendStr.append("Do Action               [exp: action 1]\n");
+                sendStr.append("\nGet Info getInfo att_id not_handle                   [exp: getInfo 1 1]\n");
+                sendStr.append("Do Action  action action_value not_handle            [exp: action 1 1]\n");
                 if (obj.NotificationID == 0x01 || obj.NotificationID == 0x02) {
                     sendStr.append("getInfo Values = 1[Caller Phone Number]  2[Caller Name]\n");
                 } else {
@@ -1186,13 +1201,17 @@ public class AppControlService extends Service {
                             break;
                     }
                     try {
-                        outputStream.write(parser.getActionPacket(action, getInfoId));
+                        outputStream.write(parser.getActionPacket(action, getInfoId, obj.requestNotHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     } catch (Exception e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
-                    break;
+                    if (obj.action == 0x02) {
+                        Log.d(TAG, "Call Attented");
+                    } else {
+                        break;
+                    }
                 } else {
                     switch (obj.getAttID) {
                         case 0x01:
@@ -1220,11 +1239,12 @@ public class AppControlService extends Service {
                             break;
                     }
                     try {
-                        outputStream.write(parser.getReadInfoPacket(getInfoId));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
                     try {
+                        Log.d(TAG, "Before aquiring info lock");
                         if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
                         } else {
                             Log.e(TAG, "Error while getting response for readInfo");
@@ -1233,96 +1253,119 @@ public class AppControlService extends Service {
                         Log.e(TAG, "There is an exception when acquiring semaphore");
                         e.printStackTrace();
                     }
+                    Log.d(TAG, "after aquiring info lock");
                 }
             }
         } else {
+            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("Do Action  action action_value not_handle            [exp: action 1 1]");
             sendStr.append("\n**************************************************************\n");
             SocketServer.sendSocketData(sendStr.toString());
+            sendStr.delete(0, sendStr.length());
             if (obj.NotificationID == 0x02) {
-                try {
-                    Log.d(TAG, "Get Caller Name");
-                    getInfoId = 0x02;
-                    outputStream.write(parser.getReadInfoPacket(getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                try {
-                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
-                    } else {
-                        Log.e(TAG, "Error while getting response for readInfo[CallerName]");
+                if (obj.cName == null) {
+                    try {
+                        Log.d(TAG, "Get Caller Name");
+                        getInfoId = 0x02;
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "There is an exception when acquiring semaphore");
-                    e.printStackTrace();
-                }
-                try {
-                    Log.d(TAG, "Get Caller Phone Number");
-                    getInfoId = 0x01;
-                    outputStream.write(parser.getReadInfoPacket(getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                try {
-                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
-                    } else {
-                        Log.e(TAG, "Error while getting response for readInfo[Caller Number]");
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo[CallerName]");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "There is an exception when acquiring semaphore");
-                    e.printStackTrace();
+                } else {
+                    sendStr.append(obj.cName);
+                }
+                if (obj.cNum == null) {
+                    try {
+                        Log.d(TAG, "Get Caller Phone Number");
+                        getInfoId = 0x01;
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
+                    }
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo[Caller Number]");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
+                    }
+                } else {
+                    sendStr.append(obj.cNum);
                 }
             } else {
-                try {
-                    Log.d(TAG, "Get Sender's email address");
-                    getInfoId = 0x03;
-                    outputStream.write(parser.getReadInfoPacket(getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                try {
-                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
-                    } else {
-                        Log.e(TAG, "Error while getting response for readInfo[EmailAddress]");
+                if (obj.eAdd == null) {
+                    try {
+                        Log.d(TAG, "Get Sender's email address");
+                        getInfoId = 0x03;
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "There is an exception when acquiring semaphore");
-                    e.printStackTrace();
-                }
-                try {
-                    Log.d(TAG, "Get Email Subject");
-                    getInfoId = 0x04;
-                    outputStream.write(parser.getReadInfoPacket(getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                try {
-                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
-                    } else {
-                        Log.e(TAG, "Error while getting response for readInfo[Email Subject]");
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo[EmailAddress]");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "There is an exception when acquiring semaphore");
-                    e.printStackTrace();
+                } else {
+                    sendStr.append(obj.eAdd);
                 }
-                try {
-                    Log.d(TAG, "Get Email Body Snippet");
-                    getInfoId = 0x05;
-                    outputStream.write(parser.getReadInfoPacket(getInfoId));
-                } catch (IOException e) {
-                    Log.e(TAG, "Error occurred when sending data", e);
-                }
-                try {
-                    if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
-                    } else {
-                        Log.e(TAG, "Error while getting response for readInfo[Email body]");
+                if (obj.eSub == null) {
+                    try {
+                        Log.d(TAG, "Get Email Subject");
+                        getInfoId = 0x04;
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "There is an exception when acquiring semaphore");
-                    e.printStackTrace();
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo[Email Subject]");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
+                    }
+                } else {
+                    sendStr.append(obj.eSub);
+                }
+                if (obj.eBody == null) {
+                    try {
+                        Log.d(TAG, "Get Email Body Snippet");
+                        getInfoId = 0x05;
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                    } catch (IOException e) {
+                        Log.e(TAG, "Error occurred when sending data", e);
+                    }
+                    try {
+                        if (obj.getInfoSem.tryAcquire(2, TimeUnit.SECONDS)) {
+                        } else {
+                            Log.e(TAG, "Error while getting response for readInfo[Email body]");
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "There is an exception when acquiring semaphore");
+                        e.printStackTrace();
+                    }
+                } else {
+                    sendStr.append(obj.eBody);
                 }
             }
         }
-        NotificationPacketList.remove();
     }
 
     public void notificationReceived(byte[] bytes) {
@@ -1338,28 +1381,120 @@ public class AppControlService extends Service {
 
     public void notificationInfoRespoceReceived(byte[] bytes) {
         Log.d(TAG, "Received notification info respose");
-        SocketServer.sendSocketData((parser.notificationInfoParse(bytes))
-                .toString());
-        NotificationPacketList.getFirst().getInfoSem.release();
+        byte attId;
+        NotificationPacketInd notObj = null;
+        StringBuilder notString = new StringBuilder();
+        SocketServer.sendSocketData((parser.notificationInfoParse(bytes)).toString());
+        notString =  parser.notificationInfoParse(bytes);
+        ByteBuffer wrapped = ByteBuffer.wrap(Arrays.copyOfRange(bytes, 3, 5));
+        short notHandle = wrapped.getShort();
+        for (int i = 0; i <  NotificationPacketList.size();i++) {
+            wrapped = ByteBuffer.wrap(NotificationPacketList.get(i).NotificationHandle);
+            short num = wrapped.getShort();
+            if (num == notHandle) {
+                notObj = NotificationPacketList.get(i);
+                break;
+            }
+        }
+        if (notObj != null) {
+            //do nothing we found notification handle
+        } else {
+            Log.e(TAG, "Notification Handle Not found in the list");
+            return;
+        }
+        attId = bytes[5];
+        switch (attId) {
+            case 0x01:
+                Log.d(TAG, "Received and Assigning to Handle "+notObj.NotificationHandle+" Number "+notString.toString());
+                notObj.cNum = notString.toString();
+                break;
+            case 0x02:
+                Log.d(TAG, "Received and Assigning to Handle "+notObj.NotificationHandle+" Name "+notString.toString());
+                notObj.cName = notString.toString();
+                break;
+            case 0x03:
+                Log.d(TAG, "Received and Assigning to Handle "+notObj.NotificationHandle+" Address "+notString.toString());
+                notObj.eAdd = notString.toString();
+                break;
+            case 0x04:
+                Log.d(TAG, "Received and Assigning to Handle "+notObj.NotificationHandle+" Subject "+notString.toString());
+                notObj.eSub = notString.toString();
+                break;
+            case 0x05:
+                Log.d(TAG, "Received and Assigning to Handle "+notObj.NotificationHandle+" Body "+notString.toString());
+                notObj.eBody = notString.toString();
+                break;
+            default:
+                Log.e(TAG, "Invalid get Attribute ID");
+                break;
+        }
+        notObj.getInfoSem.release();
     }
 
     public void responseFromCLI(String responce) {
         String[] tmpStr;
-        Log.d(TAG, "responceFromCLI");
-        tmpStr = responce.split(" ", 2);
-        if (tmpStr[0].equals("getInfo")) {
-            Log.d(TAG, "responceFromCLI getInfo");
-            try {
-                NotificationPacketList.getFirst().getAttID = Byte
-                        .valueOf(tmpStr[1]);
-            } catch (Exception e) {
-                //
+        Log.d(TAG, "responseFromCLI");
+        OutputStream outputStream = null;
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        NotificationPacketInd notObj = null;
+        tmpStr = responce.split(" ", 3);
+        if (tmpStr.length != 3) {
+            Log.e(TAG, "Invalid input");
+            SocketServer.sendSocketData("Invalid Input");
+            return;
+        }
+        short notHandle = Short.valueOf(tmpStr[2]);
+        ByteBuffer dbuf = ByteBuffer.allocate(2);
+        dbuf.putShort(notHandle);
+        byte[] bytes = dbuf.array();
+        for (int i = 0; i <  NotificationPacketList.size();i++) {
+            ByteBuffer wrapped = ByteBuffer.wrap(NotificationPacketList.get(i).NotificationHandle);
+            short num = wrapped.getShort();
+            if (num == notHandle) {
+                notObj = NotificationPacketList.get(i);
+                break;
             }
-            NotificationPacketList.getFirst().sem.release();
-        } else if (tmpStr[0].equals("action")) {
-            Log.d(TAG, "responceFromCLI action");
-            NotificationPacketList.getFirst().action = Byte.valueOf(tmpStr[1]);
-            NotificationPacketList.getFirst().sem.release();
+        }
+        if (notObj != null) {
+            if (tmpStr[0].equals("getInfo")) {
+                Log.d(TAG, "responseFromCLI getInfo");
+                try {
+                    notObj.getAttID = Byte.valueOf(tmpStr[1]);
+                    notObj.requestNotHandle = bytes;
+                    if (notObj.NotificationID == 0x01) {
+                        notObj.sem.release();
+                    } else {
+                        outputStream.write(parser.getReadInfoPacket(notObj.getAttID, bytes));
+                    }
+                } catch (Exception e) {
+                    //
+                }
+            } else if (tmpStr[0].equals("action")) {
+                Log.d(TAG, "responseFromCLI action");
+                try {
+                    notObj.action = Byte.valueOf(tmpStr[1]);
+                    notObj.requestNotHandle = bytes;
+                    if (notObj.NotificationID == 0x01) {
+                        notObj.sem.release();
+                    } else {
+                        outputStream.write(parser.getActionPacket(notObj.action, (byte)0, bytes));
+                    }
+                } catch (Exception e) {
+                    //
+                }
+                if (notObj.action == 0x01|| notObj.action == 0x03) {
+                    NotificationPacketList.remove(notObj);
+                    SocketServer.sendSocketData("Removed Notification from list with handle "+notHandle+"\n");
+                } else {
+                }
+            }
+        } else {
+            Log.e(TAG, "Invalid Notification Handle");
+            SocketServer.sendSocketData("Invalid Notification Handle");
         }
     }
 
@@ -1391,53 +1526,53 @@ public class AppControlService extends Service {
         }
     }
 
-/*
-    private final OffloadableAppCallback mofflodableappcallback = new OffloadableAppCallback(){
-        @Override
-        public void notifyStartDone(int status) {
-            if(status == BT_OK) {
-                Log.d(TAG, "Offload Register Done");
-            } else {
-                Log.d(TAG, "offload Registartion failed Status: " + status);
-            }
-        }
+    /*
+       private final OffloadableAppCallback mofflodableappcallback = new OffloadableAppCallback(){
+       @Override
+       public void notifyStartDone(int status) {
+       if(status == BT_OK) {
+       Log.d(TAG, "Offload Register Done");
+       } else {
+       Log.d(TAG, "offload Registartion failed Status: " + status);
+       }
+       }
 
-        @Override
-        public void notifyStopDone(int status) {
-            if(status == BT_OK) {
-                Log.d(TAG, "Offload Deregister Done");
-            } else {
-                Log.d(TAG, "offload Deregistration failed Status: " + status);
-            }
-        }
+       @Override
+       public void notifyStopDone(int status) {
+       if(status == BT_OK) {
+       Log.d(TAG, "Offload Deregister Done");
+       } else {
+       Log.d(TAG, "offload Deregistration failed Status: " + status);
+       }
+       }
 
-        @Override
-        public int notifyOffloadEnable(int mode) {
-            Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
-            mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
-            Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
-            Message message = Message.obtain();
-            message.what = Utils.MSG_NC_SM_OFFLOADED;
-            mNotificationOffloadStateMachine.sendMessage(message);
-            return 0;
-        }
+       @Override
+       public int notifyOffloadEnable(int mode) {
+       Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
+       mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
+       Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
+       Message message = Message.obtain();
+       message.what = Utils.MSG_NC_SM_OFFLOADED;
+       mNotificationOffloadStateMachine.sendMessage(message);
+       return 0;
+       }
 
-        @Override
-        public int notifyOffloadDisable(ArrayList<Byte> blob) {
-            Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
-            //mOfflodableAppAdapter.disableOffloadDone(BT_OK);
-            Message message = Message.obtain();
-            message.what = Utils.MSG_NC_SM_ACTIVE;
-            mNotificationOffloadStateMachine.sendMessage(message);
-            return 0;
-        }
+       @Override
+       public int notifyOffloadDisable(ArrayList<Byte> blob) {
+       Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
+//mOfflodableAppAdapter.disableOffloadDone(BT_OK);
+Message message = Message.obtain();
+message.what = Utils.MSG_NC_SM_ACTIVE;
+mNotificationOffloadStateMachine.sendMessage(message);
+return 0;
+       }
 
-        @Override
-        public void notifyAsyncErr(int status) {
-            Log.i(TAG, "notifyAsyncErr status: " + status);
-        }
-    };
-*/
+       @Override
+       public void notifyAsyncErr(int status) {
+       Log.i(TAG, "notifyAsyncErr status: " + status);
+       }
+       };
+       */
 
     private void processRegisterOfflodableAdapter() {
         Log.d(TAG, "processGRegisterOfflodableAdapter()");

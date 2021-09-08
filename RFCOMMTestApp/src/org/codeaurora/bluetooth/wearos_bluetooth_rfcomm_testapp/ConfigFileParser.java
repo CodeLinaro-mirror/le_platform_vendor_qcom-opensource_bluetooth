@@ -213,27 +213,26 @@ public class ConfigFileParser {
         return notString;
     }
 
-    public byte[] getActionPacket(byte action, byte getID) {
+    public byte[] getActionPacket(byte action, byte getID, byte[] handle) {
         byte[] actionPacket = new byte[7];
         actionPacket[0] = 0x00;
         actionPacket[1] = 0x06; // packet length
         actionPacket[2] = (byte) 0xE4; // packet code
-        actionPacket[3] = 0x00; //
-        actionPacket[4] = 0x01; // Notification handle
+        actionPacket[3] = handle[0]; //
+        actionPacket[4] = handle[1]; // Notification handle
         actionPacket[5] = getID; // Notification Attribute ID
         actionPacket[6] = action; // Notification Action ID
         return actionPacket;
     }
 
-    public byte[] getReadInfoPacket(byte getID) {
+    public byte[] getReadInfoPacket(byte getID, byte[] handle) {
         byte[] readPacket = new byte[6];
         readPacket[0] = 0x00;
         readPacket[1] = 0x06; // packet length
         readPacket[2] = (byte) 0xE2; // packet code
-        readPacket[3] = 0x00; //
-        readPacket[4] = 0x01; // Notification handle
+        readPacket[3] = handle[0]; //
+        readPacket[4] = handle[1]; // Notification handle
         readPacket[5] = getID; // Notification Attribute ID
         return readPacket;
     }
-
 }
