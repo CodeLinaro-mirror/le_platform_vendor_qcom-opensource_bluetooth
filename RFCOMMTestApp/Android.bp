@@ -1,0 +1,22 @@
+android_app {
+    name: "wearos_bluetooth_rfcomm_testapp",
+    system_ext_specific: true,
+
+    srcs: [
+        "src/**/*.java",
+    ],
+
+    certificate: "platform",
+
+    owner: "qti",
+
+    optimize: {
+        enabled: false,
+    },
+    static_libs: [
+        "androidx.legacy_legacy-support-v13",
+        //"bluetooth_offload_java_client",
+    ],
+    platform_apis: true,
+}
+
