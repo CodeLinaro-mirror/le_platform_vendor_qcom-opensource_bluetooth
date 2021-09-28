@@ -263,10 +263,15 @@ public class MainActivity extends MonkeyActivity {
 
             } else if (action.equals(BluetoothAdapter.ACTION_LOCAL_OOB_DATA)) {
                 OobData oobData = intent.getParcelableExtra(BluetoothAdapter.EXTRA_LOCAL_OOB_DATA);
-                Logger.d(TAG, "localC192 is " + byteArrayToString(oobData.getC192())
-                         + "\nlocalR192 is " + byteArrayToString(oobData.getR192())
-                         + "\nlocalC256 is " + byteArrayToString(oobData.getC256())
-                         + "\nlocalR256 is " + byteArrayToString(oobData.getR256()));
+                int res = intent.getIntExtra(BluetoothAdapter.EXTRA_OOB_RESULT, -1);
+                if (res == 0) {
+                    Logger.d(TAG, "localC192 is " + byteArrayToString(oobData.getC192())
+                             + "\nlocalR192 is " + byteArrayToString(oobData.getR192())
+                             + "\nlocalC256 is " + byteArrayToString(oobData.getC256())
+                             + "\nlocalR256 is " + byteArrayToString(oobData.getR256()));
+                } else {
+                    Logger.e(TAG, "read local oob data fail");
+                }
             }
         }
     };
