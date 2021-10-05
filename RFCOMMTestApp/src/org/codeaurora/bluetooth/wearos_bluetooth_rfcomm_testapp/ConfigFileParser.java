@@ -188,52 +188,51 @@ public class ConfigFileParser {
         byte att_id = bytes[5];
         int att_length = 0xff & bytes[6];
         att_value = new String(bytes, 7, att_length);
-        notString.append("\n*********Received***********\n");
         switch (att_id) {
         case 0x01:
-            notString.append("\nCaller Number : ");
+            notString.append("Caller Number : ");
             break;
         case 0x02:
-            notString.append("\nCaller Name : ");
+            notString.append("Caller Name : ");
             break;
         case 0x03:
-            notString.append("\nEmail Address : ");
+            notString.append("Email Address : ");
             break;
         case 0x04:
-            notString.append("\nEmail Subject\n");
+            notString.append("Email Subject :");
             break;
         case 0x05:
-            notString.append("\nEmail Body\n");
+            notString.append("Email Body\n");
             break;
         default:
             Log.e(TAG, "Invalid get Attribute ID");
             break;
         }
         notString.append(att_value);
+        notString.append("\n");
         return notString;
     }
 
-    public byte[] getActionPacket(byte action, byte getID) {
+    public byte[] getActionPacket(byte action, byte getID, byte[] handle) {
         byte[] actionPacket = new byte[7];
         actionPacket[0] = 0x00;
         actionPacket[1] = 0x06; // packet length
         actionPacket[2] = (byte) 0xE4; // packet code
-        actionPacket[3] = 0x00; //
-        actionPacket[4] = 0x01; // Notification handle
+        actionPacket[3] = handle[0]; //
+        actionPacket[4] = handle[1]; // Notification handle
         actionPacket[5] = getID; // Notification Attribute ID
         actionPacket[6] = action; // Notification Action ID
         return actionPacket;
     }
 
-    public byte[] getReadInfoPacket(byte getID) {
+    public byte[] getReadInfoPacket(byte getID, byte[] handle) {
         byte[] readPacket = new byte[6];
         readPacket[0] = 0x00;
         readPacket[1] = 0x06; // packet length
         readPacket[2] = (byte) 0xE2; // packet code
-        readPacket[3] = 0x00; //
-        readPacket[4] = 0x01; // Notification handle
+        readPacket[3] = handle[0]; //
+        readPacket[4] = handle[1]; // Notification handle
         readPacket[5] = getID; // Notification Attribute ID
         return readPacket;
     }
-
 }
