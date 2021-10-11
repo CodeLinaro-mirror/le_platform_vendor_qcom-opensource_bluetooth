@@ -284,8 +284,11 @@ public class SocketServer {
             break;
 
         case NOT_RCV:
-            sendStr.append("Notification Receive State");
+            sendStr.append("Notification Receive State\n");
+            sendStr.append("Do Action  action action_value not_handle            [exp: action 1 1]\n");
+            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
             break;
+
         case CTL_PT:
             sendStr.append("Control Point State");
             break;
@@ -445,12 +448,28 @@ public class SocketServer {
                 processOutputState = INVALID_INPUT;
             }
             break;
+        case NOT_RCV:
+            tmp = inputString.split(" ", 3);
+            if (tmp[0].equals("action")) {
+                Log.d(TAG, "Inside NOT_RCV action");
+                processOutputState = NONE;
+                Message message_cp = Message.obtain();
+                message_cp.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
+                Utils.notificationOffloadStateMachine.sendMessage(message_cp);
+                Message message_ir = Message.obtain();
+                message_ir.obj = inputString;
+                message_ir.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE;
+                Utils.notificationOffloadStateMachine.sendMessage(message_ir);
+                Message message_cpe = Message.obtain();
+                message_cpe.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
+                Utils.notificationOffloadStateMachine.sendMessage(message_cpe);
+            }
+            break;
 
         case CTL_PT:
-            tmp = inputString.split(" ", 2);
+            tmp = inputString.split(" ", 3);
             Log.d(TAG, "Inside ctl pt");
-            if (tmp.length == 2) {
-
+            if (tmp.length == 3) {
                 if (tmp[0].equals("getInfo")) {
                     Log.d(TAG, "Inside ctl pt got info");
                     processOutputState = NONE;
@@ -594,7 +613,6 @@ public class SocketServer {
             }
             break;
         }
-
     }
 
     public static void sendSocketData(String data) {

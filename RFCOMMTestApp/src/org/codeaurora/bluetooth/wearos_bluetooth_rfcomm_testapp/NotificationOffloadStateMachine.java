@@ -312,10 +312,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
                     SocketServer.processOutputState = SocketServer.CTL_PT;
                     Log.d(TAG, "Going to ControlPoint state");
                     break;
-                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE:
-                    Log.d(TAG, "STATE_INFO_RESPONSE ");
-                    mAppControlService.responseFromCLI((String) message.obj);
-                    break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
                     mAppControlService.closeConnection();
                     transitionTo(mInitState);
@@ -336,12 +332,11 @@ public class NotificationOffloadStateMachine extends StateMachine {
 
         @Override
         public void enter() {
-            Log.d(TAG, "enter()");
             Log.d(TAG, "Going to ControlPoint state");
             if (AppControlActivity.mWakeLock != null) {
+                Log.d(TAG, "Wakelock acquire");
                 AppControlActivity.mWakeLock.acquire();
             }
-            mAppControlService.startNotCTLPTOperation();
             SocketServer.sendSocketData("ControlPoint State Started");
         }
 
@@ -354,35 +349,41 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public boolean processMessage(Message message) {
             boolean retvalue = HANDLED;
             switch (message.what) {
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT:
-                // Ignore
-                break;
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE:
-                Log.d(TAG, "STATE_INFO_RESPONSE ");
-                mAppControlService.responseFromCLI((String) message.obj);
-                break;
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END:
-                if (AppControlActivity.mWakeLock != null) {
-                    Log.i(TAG, "Releasing mWakelock");
-                    try {
-                        AppControlActivity.mWakeLock.release();
-                        AppControlActivity.mWakeLock_acquired = false;
-                    } catch (Throwable th) {
-                        // ignoring this exception, probably wakeLock was
-                        // already released
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT:
+                    // Ignore
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_START:
+                    mAppControlService.startNotCTLPTOperation();
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE:
+                    Log.d(TAG, "STATE_INFO_RESPONSE ");
+                    mAppControlService.responseFromCLI((String) message.obj);
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END:
+                    if (AppControlActivity.mWakeLock != null) {
+                        Log.i(TAG, "Releasing mWakelock");
+                        try {
+                            AppControlActivity.mWakeLock.release();
+                            AppControlActivity.mWakeLock_acquired = false;
+                        } catch (Throwable th) {
+                            // ignoring this exception, probably wakeLock was
+                            // already released
+                        }
+                    } else {
+                        Log.e(TAG, "Wakelock reference is null");
                     }
-                } else {
-                    Log.e(TAG, "Wakelock reference is null");
-                }
-                transitionTo(mNotRcvState);
-                break;
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
-                mAppControlService.closeConnection();
-                transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.INIT_MENU;
-                SocketServer.processOutputState = SocketServer.INIT_MENU;
-                SocketServer.updateSocketClient();
-                break;
+                    transitionTo(mNotRcvState);
+                    SocketServer.mainMenuState = SocketServer.NOT_RCV;
+                    SocketServer.processOutputState = SocketServer.NOT_RCV;
+                    SocketServer.updateSocketClient();
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                    mAppControlService.closeConnection();
+                    transitionTo(mInitState);
+                    SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                    SocketServer.processOutputState = SocketServer.INIT_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
             }
             return retvalue;
         }

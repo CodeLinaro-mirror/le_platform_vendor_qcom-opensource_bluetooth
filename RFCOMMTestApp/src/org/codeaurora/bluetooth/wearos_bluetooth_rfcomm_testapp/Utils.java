@@ -107,7 +107,8 @@ public class Utils {
         static final int STATE_NOTIFICATION_RECEIVED = 6;
         static final int STATE_CONTROL_POINT = 7;
         static final int STATE_INFO_RESPONSE = 8;
-        static final int STATE_NOT_PROCESS_END = 9;
+        static final int STATE_NOT_PROCESS_START = 9;
+        static final int STATE_NOT_PROCESS_END = 10;
     }
 
     /* Offload Service Actions */
