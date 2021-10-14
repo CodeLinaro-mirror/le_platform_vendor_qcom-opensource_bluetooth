@@ -300,22 +300,26 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public boolean processMessage(Message message) {
             boolean retvalue = HANDLED;
             switch (message.what) {
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT:
-                transitionTo(mControlPointState);
-                SocketServer.mainMenuState = SocketServer.CTL_PT;
-                SocketServer.processOutputState = SocketServer.CTL_PT;
-                Log.d(TAG, "Going to ControlPoint state");
-                break;
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
-                mAppControlService.closeConnection();
-                transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.INIT_MENU;
-                SocketServer.processOutputState = SocketServer.INIT_MENU;
-                SocketServer.updateSocketClient();
-                break;
-            case Utils.MSG_NC_SM_OFFLOADED:
-                transitionTo(mOffloaded);
-                break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT:
+                    transitionTo(mControlPointState);
+                    SocketServer.mainMenuState = SocketServer.CTL_PT;
+                    SocketServer.processOutputState = SocketServer.CTL_PT;
+                    Log.d(TAG, "Going to ControlPoint state");
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_INFO_RESPONSE:
+                    Log.d(TAG, "STATE_INFO_RESPONSE ");
+                    mAppControlService.responseFromCLI((String) message.obj);
+                    break;
+                case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                    mAppControlService.closeConnection();
+                    transitionTo(mInitState);
+                    SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                    SocketServer.processOutputState = SocketServer.INIT_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
+                case Utils.MSG_NC_SM_OFFLOADED:
+                    transitionTo(mOffloaded);
+                    break;
             }
             return retvalue;
         }
