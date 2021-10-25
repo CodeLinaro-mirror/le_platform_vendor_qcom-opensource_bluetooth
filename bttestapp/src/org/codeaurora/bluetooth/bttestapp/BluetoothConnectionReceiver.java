@@ -34,13 +34,14 @@ import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.util.Log;
+
+import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
 import java.util.ArrayList;
 
 public class BluetoothConnectionReceiver extends BroadcastReceiver {
 
-    private final static String TAG = "BtTestConnectionReceiver";
+    private final static String TAG = "BluetoothConnectionReceiver";
 
     public static final String ACTION_NEW_BLUETOOTH_DEVICE = "org.codeaurora.bluetooth.action.NEW_BLUETOOTH_DEVICE";
 
@@ -62,13 +63,14 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
         observers.remove(observer);
     }
 
-    private void notifyObserversDeviceChanged(BluetoothDevice device) {
+    public static void notifyObserversDeviceChanged(BluetoothDevice device) {
+        selectedDevice = device;//notifyObserversDeviceChanged is called from MainActivity now.
         for (IBluetoothConnectionObserver observer : observers) {
             observer.onDeviceChanged(device);
         }
     }
 
-    private void notifyObserversDeviceDisconected() {
+    public static void notifyObserversDeviceDisconected() {
         for (IBluetoothConnectionObserver observer : observers) {
             observer.onDeviceDisconected();
         }
@@ -77,7 +79,7 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (ACTION_NEW_BLUETOOTH_DEVICE.equals(intent.getAction())) {
-            Log.v(TAG, "Receive new bluetooth device.");
+            Logger.v(TAG, "Receive new bluetooth device.");
 
             String address = intent.getStringExtra(EXTRA_DEVICE_ADDRESS);
 
@@ -86,18 +88,18 @@ public class BluetoothConnectionReceiver extends BroadcastReceiver {
                 selectedDevice = adapter.getRemoteDevice(address);
                 notifyObserversDeviceChanged(selectedDevice);
             } else {
-                Log.e(TAG, "Received NULL address!");
+                Logger.e(TAG, "Received NULL address!");
             }
         } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(intent.getAction())) {
             BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
 
             if (device.equals(selectedDevice)) {
-                Log.v(TAG, "Received bluetooth disconected.");
+                Logger.v(TAG, "Received bluetooth disconected. " + device);
 
                 notifyObserversDeviceDisconected();
             }
         } else {
-            Log.w(TAG, "Unknown intent received with action: " + intent.getAction());
+            Logger.w(TAG, "Unknown intent received with action: " + intent.getAction());
         }
     }
 }

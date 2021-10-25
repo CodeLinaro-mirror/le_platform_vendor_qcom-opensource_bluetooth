@@ -1,4 +1,5 @@
 cc_library_shared {
+    enabled: false,
     name: "libbt-logClient",
     system_ext_specific: true,
 

@@ -1,9 +1,19 @@
 android_app {
+    enabled: false,
     name: "BTTestApp",
     system_ext_specific: true,
 
     srcs: [
         "src/**/*.java",
+    ],
+
+    exclude_srcs: [
+        "src/org/codeaurora/bluetooth/bttestapp/services/IMapServiceCallback.java",
+    ],
+
+    static_libs: [
+        "com.android.vcard",
+        "androidx.legacy_legacy-support-v4",
     ],
 
     certificate: "platform",
