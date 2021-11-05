@@ -69,6 +69,8 @@ common_CPPFLAGS = $(common_CFLAGS) -DHAS_NO_BDROID_BUILDCFG -fPIC
 library_includedir = $(pkgincludedir)\
 library_include_HEADERS = $(h_sources)
 lib_LTLIBRARIES = libhidlclient.la
+hidlClient_includedir = $(includedir)/
+hidlClient_include_HEADERS = $(srcdir)/inc/hidl_client.h
 libhidlclient_la_CC = @CC@
 libhidlclient_la_SOURCES = $(cpp_sources)
 libhidlclient_la_CPPFLAGS = $(AM_CPPFLAGS) -std=c++11 $(common_CPPFLAGS) -g -O0 -DFTM

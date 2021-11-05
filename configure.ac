@@ -4,7 +4,8 @@ AM_INIT_AUTOMAKE([1.10 no-define foreign])
 AC_CONFIG_SRCDIR([hal/hardware.cc])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile \
-                 hal/Makefile
+                 hal/Makefile \
+                 bluetoothHost.pc
                  ])
 
 AC_PROG_CXX
