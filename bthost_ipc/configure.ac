@@ -10,6 +10,14 @@ AC_PROG_CC
 
 LT_INIT
 
+PKG_CHECK_MODULES([LIBHARDWARE], [hardware])
+AC_SUBST([LIBHARDWARE_CFLAGS])
+AC_SUBST([LIBHARDWARE_LIBS])
+
+PKG_CHECK_MODULES([SYSTEM_BT], [system_bt])
+AC_SUBST([SYSTEM_BT_CFLAGS])
+AC_SUBST([SYSTEM_BT_LIBS])
+
 if (test "x${with_glib}" = "xyes"); then
        PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
                               AC_MSG_ERROR(GThread >= 2.16 is required))
@@ -32,7 +40,7 @@ AC_ARG_ENABLE(target,
 )
 
 # Use new audio hal for qrb5165
-AM_CONDITIONAL([RB5_AUDIO_HAL], [test "x$TARGET" = "xqrb5165"])
+AM_CONDITIONAL([NEW_AUDIO_HAL], [test "x$TARGET" = "xqrb5165" -o "x$TARGET" = "xqrbx210-rbx"])
 
 AC_HEADER_STDBOOL
 AC_C_INLINE
