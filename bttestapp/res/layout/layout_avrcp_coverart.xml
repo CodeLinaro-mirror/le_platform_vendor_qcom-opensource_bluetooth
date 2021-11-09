@@ -41,7 +41,23 @@
         android:baselineAligned="false"
         android:orientation="horizontal"
         android:padding="@dimen/activity_base_margin" >
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="getCoveArtImage"
+            android:text="@string/getCoveArtImage"
+            android:layout_below="@id/linearLayout1"
+            android:layout_alignEnd="@+id/linearLayout1"
+            android:layout_margin="@dimen/activity_base_margin"
+            />
+    </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:padding="@dimen/activity_base_margin" >
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -70,13 +86,14 @@
             <TextView
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:text="@string/encode" />
+                android:text="@string/scheme" />
 
             <Spinner
-                android:id="@+id/id_sp_img_encode"
+                android:id="@+id/id_sp_scheme"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:entries="@array/array_image_encode" />
+                android:entries="@array/array_scheme_type"
+                android:padding="@dimen/activity_base_margin" />
         </LinearLayout>
     </LinearLayout>
 
@@ -85,6 +102,23 @@
         android:layout_height="wrap_content"
         android:baselineAligned="false"
         android:orientation="horizontal" >
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:text="@string/encode" />
+
+            <Spinner
+                android:id="@+id/id_sp_img_encode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:entries="@array/array_image_encode" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="0dp"
@@ -104,6 +138,13 @@
                 android:entries="@array/array_image_width"
                 android:padding="@dimen/activity_base_margin" />
         </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:orientation="horizontal" >
 
         <LinearLayout
             android:layout_width="0dp"
@@ -123,24 +164,25 @@
                 android:entries="@array/array_image_height"
                 android:padding="@dimen/activity_base_margin" />
         </LinearLayout>
-    </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal" >
-
-        <TextView
-            android:layout_width="100dp"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/max_size" />
+            android:layout_weight="1"
+            android:orientation="horizontal" >
 
-        <Spinner
-            android:id="@+id/id_sp_img_maxsize"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:entries="@array/array_image_max_size"
-            android:padding="@dimen/activity_base_margin" />
+            <TextView
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:text="@string/max_size" />
+
+            <Spinner
+                android:id="@+id/id_sp_img_maxsize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:entries="@array/array_image_max_size"
+                android:padding="@dimen/activity_base_margin" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
