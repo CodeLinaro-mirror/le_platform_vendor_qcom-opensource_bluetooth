@@ -77,7 +77,8 @@ public class GattServer{
     public static final int MSG_START_BLE_PHY_UPDATE = 4;
     public static final int MSG_START_BLE_READ_PHY = 5;
     public static final int MSG_START_BLE_DISCONNECT = 6;
-    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DISCONNECT;
+    public static final int MSG_START_BLE_REGISTER = 7;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_REGISTER;
 
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
@@ -88,7 +89,6 @@ public class GattServer{
         this.mcontext = mcontext;
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
-        mgattServer.startServer();
         connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(
                             BluetoothProfile.GATT_SERVER);
         mMap_indicate = new HashMap<>();
@@ -365,11 +365,6 @@ public class GattServer{
                 }
             }
         };
-
-        public void startServer() {
-            mBluetoothGattserver = MainActivity.mBluetoothManager.openGattServer(mcontext,
-                    mGattServerCallbacks, BluetoothDevice.TRANSPORT_LE);
-        }
     }
 
     public class GattServerMessageHandler extends Handler {
@@ -415,6 +410,10 @@ public class GattServer{
                 case MSG_START_BLE_READ_PHY:
                     String mdeviceAddr = (String) msg.obj;
                     processReadPhyReq(mdeviceAddr);
+                    break;
+                case MSG_START_BLE_REGISTER:
+                    startServer();
+                    SocketServer.sendSocketData("Server registered!");
                     break;
                 case MSG_START_BLE_DISCONNECT:
                     String bdAddr = (String) msg.obj;
@@ -569,6 +568,11 @@ public class GattServer{
                     mgattServer.mBluetoothGattserver.cancelConnection(remoteDevice);
                 }
             }
+        }
+
+        public void startServer() {
+            mgattServer.mBluetoothGattserver = MainActivity.mBluetoothManager.openGattServer(mcontext,
+                    mgattServer.mGattServerCallbacks, BluetoothDevice.TRANSPORT_LE);
         }
 
         private BluetoothDevice getRemoteDevice(String address) {
