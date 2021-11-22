@@ -726,7 +726,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         Logger.d(TAG, "onGetMessage " + message);
         mMessagesMap.put(message.getHandle(), message);
         mAdapterMessages.add(message);
-//        updateListEmptyView(false);
+        updateListEmptyView(true);
     }
 
     private void onRemoveMessage(String handle, boolean deleted) {
