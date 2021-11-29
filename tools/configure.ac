@@ -26,17 +26,6 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 PKG_PROG_PKG_CONFIG
 
-# Library configs
-AC_ARG_WITH([common_includes],
-      AC_HELP_STRING([--with-common-includes=@<:@dir@:>@],
-         [Specify the location of the common headers]),
-      [common_incdir=$withval],
-      with_common_includes=no)
-
-if test "x$with_common_includes" != "xno"; then
-   CFLAGS="${CFLAGS} -I${common_incdir}"
-fi
-
 AC_ARG_WITH([hardware_include],
                   AC_HELP_STRING([--with-hardware-include=@<:@dir@:>@],
                                  [Specify the location of the hardware headers]),
