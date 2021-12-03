@@ -1,0 +1,14 @@
+android_app {
+    name: "ancs_ble_testApp",
+
+    srcs: [
+        "src/*.java",
+    ],
+
+    certificate: "platform",
+
+    optimize: {
+        enabled: false,
+    },
+    platform_apis: true,
+ }
