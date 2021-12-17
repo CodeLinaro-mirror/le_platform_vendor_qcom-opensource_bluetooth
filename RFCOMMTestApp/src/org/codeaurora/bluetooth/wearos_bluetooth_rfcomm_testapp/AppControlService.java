@@ -114,7 +114,6 @@ public class AppControlService extends Service {
         String eSub;
         byte getAttID;
         byte[] NotificationHandle = new byte[2];
-        byte[] requestNotHandle = new byte[2];
         Semaphore sem = new Semaphore(0);
         Semaphore getInfoSem = new Semaphore(0);
 
@@ -1201,7 +1200,7 @@ public class AppControlService extends Service {
                             break;
                     }
                     try {
-                        outputStream.write(parser.getActionPacket(action, getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getActionPacket(action, getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     } catch (Exception e) {
@@ -1239,7 +1238,7 @@ public class AppControlService extends Service {
                             break;
                     }
                     try {
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1267,7 +1266,7 @@ public class AppControlService extends Service {
                     try {
                         Log.d(TAG, "Get Caller Name");
                         getInfoId = 0x02;
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1287,7 +1286,7 @@ public class AppControlService extends Service {
                     try {
                         Log.d(TAG, "Get Caller Phone Number");
                         getInfoId = 0x01;
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1308,7 +1307,7 @@ public class AppControlService extends Service {
                     try {
                         Log.d(TAG, "Get Sender's email address");
                         getInfoId = 0x03;
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1328,7 +1327,7 @@ public class AppControlService extends Service {
                     try {
                         Log.d(TAG, "Get Email Subject");
                         getInfoId = 0x04;
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1348,7 +1347,7 @@ public class AppControlService extends Service {
                     try {
                         Log.d(TAG, "Get Email Body Snippet");
                         getInfoId = 0x05;
-                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.requestNotHandle));
+                        outputStream.write(parser.getReadInfoPacket(getInfoId, obj.NotificationHandle));
                     } catch (IOException e) {
                         Log.e(TAG, "Error occurred when sending data", e);
                     }
@@ -1365,18 +1364,23 @@ public class AppControlService extends Service {
                     sendStr.append(obj.eBody);
                 }
             }
+            SocketServer.sendSocketData(sendStr.toString());
+            sendStr.delete(0, sendStr.length());
         }
     }
 
     public void notificationReceived(byte[] bytes) {
+        Message message_cp = Message.obtain();
+        message_cp.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
+        mNotificationOffloadStateMachine.sendMessage(message_cp);
         NotificationPacketInd notification = new NotificationPacketInd(bytes);
         NotificationPacketList.add(notification);
         if (mServerConnectedThread != null) {
             mServerConnectedThread.write("Notification delivered".getBytes());
         }
-        Message message = Message.obtain();
-        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
-        mNotificationOffloadStateMachine.sendMessage(message);
+        Message message_cps = Message.obtain();
+        message_cps.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_START;
+        mNotificationOffloadStateMachine.sendMessage(message_cps);
     }
 
     public void notificationInfoRespoceReceived(byte[] bytes) {
@@ -1464,7 +1468,6 @@ public class AppControlService extends Service {
                 Log.d(TAG, "responseFromCLI getInfo");
                 try {
                     notObj.getAttID = Byte.valueOf(tmpStr[1]);
-                    notObj.requestNotHandle = bytes;
                     if (notObj.NotificationID == 0x01) {
                         notObj.sem.release();
                     } else {
@@ -1477,7 +1480,6 @@ public class AppControlService extends Service {
                 Log.d(TAG, "responseFromCLI action");
                 try {
                     notObj.action = Byte.valueOf(tmpStr[1]);
-                    notObj.requestNotHandle = bytes;
                     if (notObj.NotificationID == 0x01) {
                         notObj.sem.release();
                     } else {
