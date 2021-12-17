@@ -31,6 +31,7 @@ package org.codeaurora.bluetooth.bttestapp;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothAvrcpController;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothProfile.ServiceListener;
 import android.content.BroadcastReceiver;
@@ -64,14 +65,33 @@ public class AvrcpCoverArtActivity extends Activity
     private final String EXTRA_METADATA =
             "android.bluetooth.avrcp-controller.profile.extra.METADATA";
     private ImageView mIvCoverArt, mIvThumbNail;
-    private Spinner mSpImgType, mSpImgEncode, mSpImgWidth, mSpImgSize, mSpImgheight;
+    private Spinner mSpImgType, mSpScheme, mSpImgEncode, mSpImgWidth, mSpImgSize, mSpImgheight;
     private Button mBtnConfig, mBtnConfigBase;
 
     private final BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     BluetoothAvrcpController mAvrcpController;
 
+    // Image Download Schemes for cover art
+    public static final String AVRCP_CONTROLLER_COVER_ART_SCHEME =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_SCHEME";
+    public static final String AVRCP_CONTROLLER_COVER_ART_MIMETYPE =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_MIMETYPE";
+    public static final String AVRCP_CONTROLLER_COVER_ART_IMGTYPE =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_TYPE";
+    public static final String AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_HEIGHT";
+    public static final String AVRCP_CONTROLLER_COVER_ART_IMGWIDTH =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_WIDTH";
+    public static final String AVRCP_CONTROLLER_COVER_ART_IMGMAXSIZE =
+            "persist.bluetooth.avrcpcontroller.BIP_DOWNLOAD_MAXSIZE";
+
+    // Refer to class com.android.bluetooth.avrcpcontroller.BipEncoding
+    // for supported mime types
     private static final String MIMETYPE_DEFAULT = "JPEG";
+    // Image types defined by AVRCP spec are Image, Thumbnail, ThumbnailLinked.
     private static final String IMAGETYPE_DEFAULT = "Image";
+    // Scheme defined by AVRCP spec are thumbnail and native
+    private static final String SCHMEME_DEFAULT = "thumbnail";
     private static final int IMAGE_HEIGHT_DEFAULT = 500;
     private static final int IMAGE_WIDTH_DEFAULT = 500;
     private static final int THUMBNAIL_IMAGE_HEIGHT_DEFAULT = 200;
@@ -125,6 +145,7 @@ public class AvrcpCoverArtActivity extends Activity
         mBtnConfigBase = (Button) findViewById(R.id.id_btn_config_reset);
         mSpImgType = (Spinner) findViewById(R.id.id_sp_img_type);
         mSpImgType.setOnItemSelectedListener(this);
+        mSpScheme = (Spinner) findViewById(R.id.id_sp_scheme);
         mSpImgheight = (Spinner) findViewById(R.id.id_sp_img_height);
         mSpImgEncode = (Spinner) findViewById(R.id.id_sp_img_encode);
         mSpImgWidth = (Spinner) findViewById(R.id.id_sp_img_width);
@@ -178,24 +199,27 @@ public class AvrcpCoverArtActivity extends Activity
     @Override
     public void onClick(View v) {
         if (v == mBtnConfig) {
-            SystemProperties.set("persist.service.bt.avrcpct.imgtype",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGTYPE,
                     getValue(mSpImgType));
-            SystemProperties.set("persist.service.bt.avrcpct.imgencode",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_SCHEME,
+                    getValue(mSpScheme));
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_MIMETYPE,
                     getValue(mSpImgEncode));
-            SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGWIDTH,
                     getValue(mSpImgWidth));
-            SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT,
                     getValue(mSpImgheight));
-            SystemProperties.set("persist.service.bt.avrcpct.imgsize",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGMAXSIZE,
                     getValue(mSpImgSize));
         } else if (v == mBtnConfigBase) {
-            SystemProperties.set("persist.service.bt.avrcpct.imgtype", IMAGETYPE_DEFAULT);
-            SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
-            SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGTYPE, IMAGETYPE_DEFAULT);
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_SCHEME, SCHMEME_DEFAULT);
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_MIMETYPE, MIMETYPE_DEFAULT);
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGWIDTH,
                 IMAGE_WIDTH_DEFAULT + "");
-            SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT,
                 IMAGE_HEIGHT_DEFAULT + "");
-            SystemProperties.set("persist.service.bt.avrcpct.imgsize",
+            SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGMAXSIZE,
                 MAXSIZE_DEFAULT + "");
             setSpinners();
         }
@@ -203,25 +227,41 @@ public class AvrcpCoverArtActivity extends Activity
 
     public void getCoveArtImage(View v) {
         Log.i(TAG, "Start Fetching Album art");
-        String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype",
+        String type = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_IMGTYPE,
             IMAGETYPE_DEFAULT);
-        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+        String scheme = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_SCHEME,
+            SCHMEME_DEFAULT);
+        String mimeType = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_MIMETYPE,
+            MIMETYPE_DEFAULT);
+        int height = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT,
             IMAGE_HEIGHT_DEFAULT);
-        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+        int width = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGWIDTH,
             IMAGE_WIDTH_DEFAULT);
-        int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
+        int maxSize = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGMAXSIZE,
             MAXSIZE_DEFAULT);
-        // mAvrcpController.startFetchingAlbumArt(type, height, width, maxSize);
+
+        //Note, API shall be getActiveDevice when multiple AVRCP connections are enabled
+        BluetoothDevice device = mAvrcpController.getConnectedDevices().get(0);
+        mAvrcpController.startFetchingAlbumArt(device, type, scheme, mimeType, height, width, maxSize);
     }
 
     private void setSpinners() {
-        String type = SystemProperties.get("persist.service.bt.avrcpct.imgtype");
+        String type = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_IMGTYPE);
         if (TextUtils.isEmpty(type) || type.equalsIgnoreCase(IMAGETYPE_DEFAULT)) {
             mSpImgType.setSelection(0);
         } else {
             mSpImgType.setSelection(1);
         }
-        String mime = SystemProperties.get("persist.service.bt.avrcpct.imgencode");
+
+        String scheme = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_SCHEME,
+            SCHMEME_DEFAULT);
+        if (TextUtils.isEmpty(type) || type.equalsIgnoreCase(SCHMEME_DEFAULT)) {
+            mSpScheme.setSelection(0);
+        } else {
+            mSpScheme.setSelection(1);
+        }
+
+        String mime = SystemProperties.get(AVRCP_CONTROLLER_COVER_ART_MIMETYPE);
         if ("PNG".equalsIgnoreCase(mime)){
             mSpImgEncode.setSelection(1);
         } else if ("GIF".equalsIgnoreCase(mime)){
@@ -230,11 +270,11 @@ public class AvrcpCoverArtActivity extends Activity
             mSpImgEncode.setSelection(0);
         }
 
-        int height = SystemProperties.getInt("persist.service.bt.avrcpct.imgheight",
+        int height = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT,
             IMAGE_HEIGHT_DEFAULT);
-        int width = SystemProperties.getInt("persist.service.bt.avrcpct.imgwidth",
+        int width = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGWIDTH,
             IMAGE_WIDTH_DEFAULT);
-        int maxSize = SystemProperties.getInt("persist.service.bt.avrcpct.imgsize",
+        int maxSize = SystemProperties.getInt(AVRCP_CONTROLLER_COVER_ART_IMGMAXSIZE,
             MAXSIZE_DEFAULT);
         Log.i(TAG, " Type :" + type + " Mime :" + mime + " Height:" + height + ": width :"
                 + width + " Max size:" + maxSize);
@@ -260,6 +300,7 @@ public class AvrcpCoverArtActivity extends Activity
     @Override
     public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
         if(mSpImgType.getSelectedItem().toString().equals(IMAGETYPE_DEFAULT)) {
+            mSpScheme.setEnabled(true);
             mSpImgEncode.setEnabled(true);
             mSpImgheight.setEnabled(true);
             mSpImgSize.setEnabled(true);
@@ -268,10 +309,10 @@ public class AvrcpCoverArtActivity extends Activity
         } else {
             Logger.v(TAG," Thumbnail");
             if(mSpImgType.getSelectedItem().toString().equals("ThumbnailImage")) {
-                SystemProperties.set("persist.service.bt.avrcpct.imgencode", MIMETYPE_DEFAULT);
-                SystemProperties.set("persist.service.bt.avrcpct.imgheight",
+                SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_MIMETYPE, MIMETYPE_DEFAULT);
+                SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGHEIGHT,
                     THUMBNAIL_IMAGE_HEIGHT_DEFAULT + "");
-                SystemProperties.set("persist.service.bt.avrcpct.imgwidth",
+                SystemProperties.set(AVRCP_CONTROLLER_COVER_ART_IMGWIDTH,
                     THUMBNAIL_IMAGE_WIDTH_DEFAULT + "");
                 mSpImgEncode.setSelection(getIndex(mSpImgEncode, MIMETYPE_DEFAULT));
                 mSpImgWidth.setSelection(getIndex(mSpImgheight,
@@ -279,6 +320,7 @@ public class AvrcpCoverArtActivity extends Activity
                 mSpImgheight.setSelection(getIndex(mSpImgWidth,
                     THUMBNAIL_IMAGE_WIDTH_DEFAULT + ""));
             }
+            mSpScheme.setEnabled(false);
             mSpImgEncode.setEnabled(false);
             mSpImgheight.setEnabled(false);
             mSpImgSize.setEnabled(false);
