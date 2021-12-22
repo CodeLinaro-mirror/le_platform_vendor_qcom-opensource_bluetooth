@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+/*
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above
+ *    copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials provided
+ *    with the distribution.
+ *  * Neither the name of The Linux Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/id_btn_rewind"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_rewind" />
+        <Button
+            android:id="@+id/id_btn_play_pause"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_play"
+            android:layout_margin="@dimen/activity_vertical_margin" />
+        <Button
+            android:id="@+id/id_btn_stop"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_stop" />
+        <Button
+            android:id="@+id/id_btn_fast_forward"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_fastforward" />
+        <Button
+            android:id="@+id/id_btn_set_shuffle_mode"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_setshufflemode" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/id_btn_volume_down"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_volume_down" />
+        <Button
+            android:id="@+id/id_btn_previous_group"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_previous_group" />
+        <Button
+            android:id="@+id/id_btn_next_group"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_next_group" />
+        <Button
+            android:id="@+id/id_btn_volume_up"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_volume_up" />
+        <Button
+            android:id="@+id/id_btn_set_repeat_mode"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_setrepeatmode" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/id_btn_test_cmd"
+            style="@style/textview_normal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_test" />
+        <Spinner
+            android:id="@+id/id_sp_test_cmd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_test_cmd" />
+        <EditText
+            android:id="@+id/id_test_resp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:paddingLeft="5dp"
+            android:ems="20" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/id_tv_scope"
+            android:text="@string/avrcp_scope"
+            style="@style/textview_normal" />
+        <RadioGroup
+            android:id="@+id/id_rg_scope"
+            style="@style/textview_normal"
+            android:orientation="horizontal"
+            android:gravity="start"
+            android:layout_margin="25dp">
+            <RadioButton
+                android:id="@+id/id_rb_player"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_player" />
+            <RadioButton
+                android:id="@+id/id_rb_vfs"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_vfs" />
+            <RadioButton
+                android:id="@+id/id_rb_search"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_search" />
+            <RadioButton
+                android:id="@+id/id_rb_now_playing"
+                style="@style/textview_normal"
+                android:checked="true"
+                android:text="@string/avrcp_now_playing" />
+        </RadioGroup>
+        <TextView
+            android:id="@+id/id_tv_edit_folder"
+            android:text="@string/avrcp_folder"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_folder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/layout_vertical_margin"
+            android:paddingLeft="5dp"
+            android:ems="20" />
+        <TextView
+            android:id="@+id/id_tv_edit_item_position"
+            android:text="@string/avrcp_item_position"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_item_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/layout_vertical_margin"
+            android:paddingLeft="5dp"
+            android:digits="0123456789"
+            android:ems="20" />
+        <TextView
+            android:id="@+id/id_tv_edit_value"
+            android:text="@string/avrcp_query"
+            style="@style/textview_normal" />
+        <EditText
+            android:id="@+id/id_edit_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_margin="@dimen/layout_vertical_margin"
+            android:paddingLeft="5dp"
+            android:ems="20" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/id_tv_attribute"
+            android:text="@string/avrcp_attribute"
+            style="@style/textview_normal" />
+        <RadioGroup
+            android:id="@+id/id_rg_attribute"
+            style="@style/textview_normal"
+            android:orientation="horizontal"
+            android:gravity="start"
+            android:layout_margin="25dp">
+            <RadioButton
+                android:id="@+id/id_rb_title"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_title" />
+            <RadioButton
+                android:id="@+id/id_rb_cover_art"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_cover_art" />
+            <RadioButton
+                android:id="@+id/id_rb_all"
+                style="@style/textview_normal"
+                android:text="@string/avrcp_all" />
+        </RadioGroup>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/id_btn_get_current_pas"
+        style="@style/textview_normal"
+        android:layout_width="match_parent"
+        android:layout_margin="@dimen/activity_vertical_margin"
+        android:textAllCaps="false"
+        android:text="@string/avrcp_get_current_pas" />
+
+      <TableLayout
+      android:id="@+id/table"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="@dimen/activity_horizontal_margin"
+      android:layout_marginTop="@dimen/activity_vertical_margin"
+      android:stretchColumns="*"
+      android:padding="3dip">
+      <TableRow>
+        <TextView
+            android:id="@+id/id_avrcp_equalizer_title"
+            android:layout_marginTop="@dimen/activity_vertical_margin"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="@string/avrcp_equalizer_title"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin" />
+        <TextView
+            android:id="@+id/id_avrcp_equalizer_value"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="*"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+        <Spinner
+            android:id="@+id/id_sp_equalizer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_equalizer" />
+      </TableRow>
+      <TableRow>
+        <TextView
+            android:id="@+id/id_avrcp_repeat_title"
+            android:layout_marginTop="@dimen/activity_vertical_margin"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="@string/avrcp_repeat_title"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin" />
+        <TextView
+            android:id="@+id/id_avrcp_repeat_value"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="*"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+        <Spinner
+            android:id="@+id/id_sp_repeat"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_repeat" />
+      </TableRow>
+      <TableRow>
+        <TextView
+            android:id="@+id/id_avrcp_shuffle_title"
+            android:layout_marginTop="@dimen/activity_vertical_margin"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="@string/avrcp_shuffle_title"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin" />
+        <TextView
+            android:id="@+id/id_avrcp_shuffle_value"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="*"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+        <Spinner
+            android:id="@+id/id_sp_shuffle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_shuffle" />
+      </TableRow>
+      <TableRow>
+        <TextView
+            android:id="@+id/id_avrcp_scan_title"
+            android:layout_marginTop="@dimen/activity_vertical_margin"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="@string/avrcp_scan_title"
+            android:textAppearance="?android:attr/textAppearanceLarge"
+            android:layout_marginLeft="@dimen/activity_horizontal_margin" />
+        <TextView
+            android:id="@+id/id_avrcp_scan_value"
+            android:layout_width="@dimen/activity_avrcp_textview_width"
+            android:layout_height="wrap_content"
+            android:text="*"
+            android:textAppearance="?android:attr/textAppearanceLarge" />
+        <Spinner
+            android:id="@+id/id_sp_scan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/activity_base_margin"
+            android:entries="@array/array_scan" />
+      </TableRow>
+    </TableLayout>
+</LinearLayout>

@@ -1,0 +1,8 @@
+============================
+Version 1.0
+============================
+Steps:
+1) Open BtProfileTest app
+2) Click Select button select Companion device
+3) Click discover button it will list down all the profiles it supports
+4) Double Click on PBAP or MAP Profile Which one you wanted to test
