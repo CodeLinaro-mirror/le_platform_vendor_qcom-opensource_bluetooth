@@ -209,16 +209,22 @@ public class SocketServer {
                     sendStr.append("\n******************** Bt Test App ********************\n");
                     sendStr.append("                     AdvStart\n");
                     sendStr.append("                     AdvStop\n");
-                    sendStr.append("                     GetNotificationAttr   ");
-                    sendStr.append("(Ex: GetNotificationAttr NotificationUID AppIdentifier;\n");
-                    sendStr.append("                                                ");
-                    sendStr.append("Title:10;Subtitle:20;Message:30;MessageSize;Date;\n");
-                    sendStr.append("                                                ");
-                    sendStr.append("PositiveActionLabel;NegativeActionLabel)\n");
-                    sendStr.append("                     GetAppAttr            ");
-                    sendStr.append("(Ex: GetAppAttr com.vendor.app)\n");
-                    sendStr.append("                     DoNotificationAction  ");
-                    sendStr.append("(Ex: DoNotificationAction NotificationUID Positive)\n");
+                    sendStr.append("                     GetNotificationAttr      (Ex: GetNotificationAttr NotificationUID)\n");
+                    sendStr.append("                     GetAppAttr               (Ex: GetAppAttr com.apple.facetime)\n");
+                    sendStr.append("                     DoNotificationAction     (Ex: DoNotificationAction NotificationUID Positive)\n");
+                    sendStr.append("                     RegOffloadableApp\n");
+                    sendStr.append("                     SetMode (Ex: SetMode 0(tracker), 1(twm) , 2(active))\n");
+                    sendStr.append("                     DeRegOffloadableApp\n");
+                    sendStr.append("                     setSubscribedGattHandles (Ex: setSubscribedGattHandles 1,2,3,4)\n");
+                    sendStr.append("                     SetCategoryAttrs         (Ex: SetCategoryAttrs Category Attributes)\n");
+                    sendStr.append("                                                   SetCategoryAttrs 1 1;3)\n");
+                    sendStr.append("                                                   Category: 0-MissedCall,1-Email,2-Social\n");
+                    sendStr.append("                                                   Attributes: 0-AppIdentifier;1-Title;2-Subtitle;3-Message;4-MessageSize;5-Date;6-PositiveActionLabel;7-NegativeActionLabel,8-Ignore\n");
+                    sendStr.append("                     SetCategoryAction        (Ex: SetCategoryAction Category Action)\n");
+                    sendStr.append("                                                   SetCategoryAction 1 2)\n");
+                    sendStr.append("                                                   Category: 0-MissedCall,1-Email,2-Social\n");
+                    sendStr.append("                                                   Action: 0-WakeUp,1-DisplayDot,2-Buzz,3-DontDisplayDot,4-Ring,5-Ignore\n");
+                    sendStr.append("                     SetAppContext\n");
                     sendStr.append("                     UnregNotifications\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
@@ -248,11 +254,7 @@ public class SocketServer {
                 case MAIN_MENU:
                     tmp = inputString.split(" ");
                     if (tmp.length == 1) {
-                        if (inputString.equals("Close")) {
-                            closeReceived = true;
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = SOC_CLOSE_ACK;
-                        } else if (tmp[0].equals("AdvStart")) {
+                        if (tmp[0].equals("AdvStart")) {
                             processOutputState = NONE;
                             msg = AncsService.mStateMachine.obtainMessage(
                                     AncsService.NCStateMachine.MSG_NC_SM_START_ADV, null);
@@ -267,44 +269,84 @@ public class SocketServer {
                             msg = AncsService.mStateMachine.obtainMessage(
                                     AncsService.NCStateMachine.MSG_NC_SM_DISCONNECT, null);
                             AncsService.mStateMachine.sendMessage(msg);
+                        } else if (tmp[0].equals("RegOffloadableApp")) {
+                            processOutputState = NONE;
+                            msg = AncsService.msghandler.obtainMessage(
+                                    AncsService.MSG_AS_REGISTER_OFFLODABLE_ADAPTER, null);
+                            AncsService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("DeRegOffloadableApp")) {
+                            processOutputState = NONE;
+                            msg = AncsService.msghandler.obtainMessage(
+                                    AncsService.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER, null);
+                            AncsService.msghandler.sendMessage(msg);
+                        } else if (inputString.equals("Close")) {
+                            closeReceived = true;
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = SOC_CLOSE_ACK;
+                        } else if (tmp[0].equals("SetAppContext")) {
+                            msg = AncsService.msghandler.obtainMessage(
+                                    AncsService.MSG_AS_SET_APP_CONTEXT,null);
+                            AncsService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if (tmp.length == 2) {
-                        if (tmp[0].equals("GetAppAttr")) {
+                        if (tmp[0].equals("GetNotificationAttr")) {
+                            byte[] uid = new byte[4];
+                            uid[0] = Byte.parseByte(tmp[1].substring(0, 2));
+                            uid[1] = Byte.parseByte(tmp[1].substring(2, 4));
+                            uid[2] = Byte.parseByte(tmp[1].substring(4, 6));
+                            uid[3] = Byte.parseByte(tmp[1].substring(6, 8));
                             msg = AncsService.mStateMachine.obtainMessage(
-                                   AncsService.NCStateMachine.MSG_NC_SM_APP_ATTR, (tmp[1] + '\0'));
+                                    AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ATTR, uid);
                             AncsService.mStateMachine.sendMessage(msg);
+                        } else if (tmp[0].equals("GetAppAttr")) {
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                    AncsService.NCStateMachine.MSG_NC_SM_APP_ATTR, (tmp[1] + '\0'));
+                            AncsService.mStateMachine.sendMessage(msg);
+                        } else if(tmp[0].equals("setSubscribedGattHandles")) {
+                            processOutputState = NONE;
+                            msg = AncsService.msghandler.obtainMessage(
+                                    AncsService.MSG_AS_SET_SUBSCRIBED_GATTHANDLES,tmp[1]);
+                            AncsService.msghandler.sendMessage(msg);
+                        } else if(tmp[0].equals("SetMode")) {
+                            processOutputState = NONE;
+                            msg = AncsService.msghandler.obtainMessage(
+                                    AncsService.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
+                            AncsService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if (tmp.length == 3) {
-                        if (tmp[0].equals("GetNotificationAttr")) {
-                            AncsParse.NotificationAttr notificationAttr =
-                                            new AncsParse.NotificationAttr();
-                            notificationAttr.NotificationUID =
-                                            intToByteArray(Integer.parseInt(tmp[1]));
-                            notificationAttr.NotificationAttributes =
-                                            notificationAttrParse(tmp[2]);
-                            if(notificationAttr.NotificationAttributes != null) {
-                                msg = AncsService.mStateMachine.obtainMessage(
-                                            AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ATTR,
-                                            notificationAttr);
-                                AncsService.mStateMachine.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
+                        if (tmp[0].equals("DoNotificationAction")) {
+                            AncsParse.NotificationAction notificationAction = new AncsParse.NotificationAction();
+                            notificationAction.NotificationUID[0] = Byte.parseByte(tmp[1].substring(0, 2));
+                            notificationAction.NotificationUID[1] = Byte.parseByte(tmp[1].substring(2, 4));
+                            notificationAction.NotificationUID[2] = Byte.parseByte(tmp[1].substring(4, 6));
+                            notificationAction.NotificationUID[3] = Byte.parseByte(tmp[1].substring(6, 8));
+                            notificationAction.NotificationAction = tmp[2];
+                            msg = AncsService.mStateMachine.obtainMessage(
+                                    AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ACTION, notificationAction);
+                            AncsService.mStateMachine.sendMessage(msg);
+                        } else if (tmp[0].equals("SetCategoryAttrs")) {
+                            String attrString[] = tmp[2].split(";");
+                            ByteArrayOutputStream attrByteStream = new ByteArrayOutputStream(256);
+                            for(int i=0; i<attrString.length; i++) {
+                                attrByteStream.write(Byte.parseByte(attrString[i]));
                             }
-                        } else if (tmp[0].equals("DoNotificationAction")) {
-                                AncsParse.NotificationAction notificationAction =
-                                            new AncsParse.NotificationAction();
-                                notificationAction.NotificationUID =
-                                              intToByteArray(Integer.parseInt(tmp[1]));
-                                notificationAction.NotificationAction = tmp[2];
-                                msg = AncsService.mStateMachine.obtainMessage(
-                                        AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ACTION,
-                                        notificationAction);
-                                AncsService.mStateMachine.sendMessage(msg);
-                         }  else {
+                            // if (AppContextProto.setCategoryAttributes(Byte.parseByte(tmp[1]), attrByteStream.toByteArray())) {
+                                // SocketServer.sendSocketData("SetCategoryAttrs Success");
+                            // } else {
+                                // processOutputState = INVALID_INPUT;
+                            // }
+                        } else if (tmp[0].equals("SetCategoryAction")) {
+                            //if (AppContextProto.setCategoryAction(Byte.parseByte(tmp[1]), Byte.parseByte(tmp[2]))) {
+                             //   SocketServer.sendSocketData("SetCategoryAction Success");
+
+                            //} else {
+                              //  processOutputState = INVALID_INPUT;
+                            //}
+                        } else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else {

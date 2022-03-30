@@ -115,7 +115,7 @@ public class AncsParse {
 
     public static final int NOTIFICATION_SOURCE_LENGTH = 8;
 
-    private static LinkedList<NotificationSource> NotificationSourceList =
+    public static LinkedList<NotificationSource> NotificationSourceList =
                     new LinkedList<NotificationSource>();
 
     public static class NotificationSource {
@@ -152,7 +152,8 @@ public class AncsParse {
                         " EventFlag: " + notification.EventFlag +
                         " CategoryID: " + notification.CategoryID +
                         " CategoryCount: " + notification.CategoryCount +
-                        " NotificationUID: " + Arrays.toString(notification.NotificationUID));
+                        " NotificationUID: " + Arrays.toString(notification.NotificationUID) +
+      " payload: " + Arrays.toString(value));
 
             int index = searchNotificationSource(notification);
             if (0xff != index) {
