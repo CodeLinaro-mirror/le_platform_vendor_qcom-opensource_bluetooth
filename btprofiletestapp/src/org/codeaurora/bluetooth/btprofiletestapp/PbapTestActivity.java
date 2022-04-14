@@ -922,7 +922,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         mEditTextBrowseOffsetValue.setText(String.valueOf(mBrowseValueOffset));
 
         try {
-            setPhoneBookRoot();
+            //setPhoneBookRoot(); Set phonebook will be called explicitly from app, so no need to double set it
 
             boolean started = pullVcardListing(path, order, mBrowseValueSearchAttr,
                 searchValue, mBrowseValueMaxCount, mBrowseValueOffset);
