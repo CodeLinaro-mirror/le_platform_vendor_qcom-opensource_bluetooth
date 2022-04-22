@@ -721,11 +721,7 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
             mBtnRead.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if (msg.isRead()) {
-                        mMap.setMessageStatus(mDevice, msg.getHandle(), BluetoothMapClient.UNREAD);
-                    } else {
-                        mMap.setMessageStatus(mDevice, msg.getHandle(), BluetoothMapClient.READ);
-                    }
+                    mMap.setMessageStatus(mDevice, msg.getHandle(), BluetoothMapClient.READ);
                     mBtnRead.setFocusable(false);
                 }
             });
