@@ -105,7 +105,6 @@ public class AppControlService extends Service {
     public static final int BT_OK = 1;
     public static final int BT_INVALID_STATE = 2;
     public static boolean pmLockStatus = false;
-    public static boolean TWM_MODE = false;
     private static int MAX_RETRY;
     private static boolean offloadstart_processing;
 
@@ -1676,10 +1675,6 @@ public class AppControlService extends Service {
 
     public void processSetMode(int mode) {
         Log.d(TAG, "processSetMode() mode: " + mode);
-        if (TWM_MODE) {
-            Log.i(TAG, "In TWM_MODE, so ignoring onOffloadStart");
-            return;
-        }
 
         String mode_string;
         if (mode == ACTIVE_STATE) {
