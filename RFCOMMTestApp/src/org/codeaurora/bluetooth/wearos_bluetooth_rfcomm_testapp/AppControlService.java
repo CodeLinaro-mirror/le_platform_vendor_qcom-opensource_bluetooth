@@ -101,6 +101,9 @@ public class AppControlService extends Service {
     public static final int BT_OK = 1;
     public static final int BT_INVALID_STATE = 2;
 
+    public static final int ACTIVE_STATE = 0;
+    public static final int TRACKER_STATE = 1;
+
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
     public static class NotificationPacketInd {
@@ -143,7 +146,6 @@ public class AppControlService extends Service {
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
                 notificationIntent, 0);
-
         Notification notification = new NotificationCompat.Builder(this)
         .setContentTitle("RFCOMM Test App")
         .setContentText("Running...!!!")
@@ -183,6 +185,7 @@ public class AppControlService extends Service {
         /* Stop Offload Service msg hdlr looper*/
         mlooper.quitSafely();
         SocketServer.cleanUp();
+        processDRegisterOfflodableAdapter();
     }
 
     private final IBinder localBinder = new MyBinder();
@@ -1533,7 +1536,7 @@ public class AppControlService extends Service {
 
     private final BluetoothOffloadCallback mOffloadcallbacks = new BluetoothOffloadCallback() {
 
-       public void notifyStartDone(int status) {
+       public void onNotifyStartDone(int status) {
            if(status == BT_OK) {
                Log.d(TAG, "Offload Register Done");
            } else {
@@ -1541,7 +1544,7 @@ public class AppControlService extends Service {
            }
        }
 
-       public void notifyStopDone(int status) {
+       public void onNotifyStopDone(int status) {
            if(status == BT_OK) {
                Log.d(TAG, "Offload Deregister Done");
            } else {
@@ -1549,7 +1552,7 @@ public class AppControlService extends Service {
            }
        }
 
-       public int notifyEnableOffload(int mode) {
+       public int onNotifyEnableOffload(int mode) {
            Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
            mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
            Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
@@ -1559,7 +1562,7 @@ public class AppControlService extends Service {
            return 0;
        }
 
-       public int notifyDisableOffload(ArrayList<Byte> blob) {
+       public int onNotifyDisableOffload(ArrayList<Byte> blob) {
             Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
             //mNotificationAdapter.disableOffloadDone(BT_OK);
             Message message = Message.obtain();
@@ -1568,13 +1571,19 @@ public class AppControlService extends Service {
             return 0;
        }
 
-       public void notifyAsyncErr(int status) {
+       public void onNotifyAsyncErr(int status) {
             Log.i(TAG, "notifyAsyncErr status: " + status);
        }
 
-       public void transitionToPwrStateDone(int status) {
+       public void onTransitionToPwrStateDone(int status) {
            Log.d(TAG, "transitionToPwrStateDone status " + status);
-           SocketServer.sendSocketData("transitionToPwrState Done\n");
+           if (status != 0) {
+               SocketServer.sendSocketData("transitionToPwrState failed retry Offload\n");
+               processSetMode(TRACKER_STATE);
+           } else {
+               releasePMLock();
+               SocketServer.sendSocketData("transitionToPwrState Done\n");
+           }
        }
     };
 
@@ -1608,5 +1617,13 @@ public class AppControlService extends Service {
             blobBytes.add(blob[i]);
         }
         //mNotificationAdapter.setAppSpecificContextInfo(blobBytes);
+    }
+
+    public void acquirePMLock() {
+        mNotificationAdapter.acquire_pm_wakelock();
+    }
+
+    public void releasePMLock() {
+        mNotificationAdapter.release_pm_wakelock();
     }
 }
