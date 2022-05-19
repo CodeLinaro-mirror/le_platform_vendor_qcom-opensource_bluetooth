@@ -242,9 +242,6 @@ public class SocketServer {
         case OFFLOAD_TESTING_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
-            sendStr.append("                     Register_OffloadService\n");
-            sendStr.append("                     DeRegister_OffloadService\n");
-            sendStr.append("                     SetMode (Ex: SetMode 0(active), 1 (tracker))\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -285,9 +282,13 @@ public class SocketServer {
             break;
 
         case NOT_RCV:
-            sendStr.append("Notification Receive State\n");
-            sendStr.append("Do Action  action action_value not_handle            [exp: action 1 1]\n");
-            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("\n********** Notification Receive State Started **************\n");
+            sendStr.append("        SetMode (Ex: SetMode 0(active), 1 (tracker))\n");
+            sendStr.append("        Register_OffloadService\n");
+            sendStr.append("        DeRegister_OffloadService\n");
+            sendStr.append("        Do Action  action action_value not_handle            [exp: action 1 1]\n");
+            sendStr.append("        Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("**************************************************************\n");
             break;
 
         case CTL_PT:
@@ -464,6 +465,18 @@ public class SocketServer {
                 processOutputState = NONE;
                 Message message = Message.obtain();
                 message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
+                AppControlService.msghandler.sendMessage(message);
+            } else if (inputString.equals("Register_OffloadService")) {
+                mainMenuState = OFFLOAD_TESTING_MENU;
+                processOutputState = OFFLOAD_TESTING_MENU;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_REGISTER_OFFLODABLE_ADAPTER, null);
+                AppControlService.msghandler.sendMessage(message);
+            } else if (inputString.equals("DeRegister_OffloadService")) {
+                mainMenuState = OFFLOAD_TESTING_MENU;
+                processOutputState = OFFLOAD_TESTING_MENU;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER, null);
                 AppControlService.msghandler.sendMessage(message);
             }
             break;

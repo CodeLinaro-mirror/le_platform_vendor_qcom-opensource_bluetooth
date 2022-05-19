@@ -254,8 +254,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
             transitionTo(mNotRcvState);
             Log.d(TAG, "Going to Notification Receive state");
             SocketServer.sendSocketData("Device is Connected.");
-            SocketServer.mainMenuState = SocketServer.NOT_RCV;
-            SocketServer.processOutputState = SocketServer.NOT_RCV;
         }
 
         @Override
@@ -288,7 +286,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
-            SocketServer.sendSocketData("Notification Receive State Started");
+            SocketServer.mainMenuState = SocketServer.NOT_RCV;
+            SocketServer.processOutputState = SocketServer.NOT_RCV;
+            SocketServer.updateSocketClient();
         }
 
         @Override

@@ -91,6 +91,9 @@ public class AppControlService extends Service {
     public AcceptThread mAcceptThread = null;
     public ServerConnectedThread mServerConnectedThread = null;
     private static final String name = "BluetoothRFCommNotApp";
+    private static String remoteAddr;
+    private static String serviceId;
+    private static String appId;
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
@@ -1591,7 +1594,14 @@ public class AppControlService extends Service {
         mNotificationAdapter = new NotificationOffloadAdapter(mContext);
         if(BT_FAIL == mNotificationAdapter.register(mOffloadcallbacks)) {
             Log.e(TAG, "failed to register notification offload adapter");
+            SocketServer.sendSocketData("failed to register notification offload adapter\n");
             return;
+        }
+        if (Utils.bdAddressFromConfig == null) {
+            SocketServer.sendSocketData("failed to send App Context Info. Remote address is null\n");
+        } else {
+            SocketServer.sendSocketData("Setting App Info with Address: " + Utils.bdAddressFromConfig + " Service UUID: " + Utils.UUIDConstants.APP_UUID.toString() + " App Id: " + mContext.getPackageName() + "\n");
+            mNotificationAdapter.setRfCommAppContextInfo(Utils.bdAddressFromConfig, Utils.UUIDConstants.APP_UUID.toString(), mContext.getPackageName());
         }
         Log.d(TAG, "Registered notification offload adapter");
         SocketServer.sendSocketData("OffloadableApp Registered\n");
