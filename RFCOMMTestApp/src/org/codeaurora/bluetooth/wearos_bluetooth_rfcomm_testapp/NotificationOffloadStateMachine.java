@@ -367,9 +367,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
                         Log.e(TAG, "Wakelock reference is null");
                     }
                     transitionTo(mNotRcvState);
-                    SocketServer.mainMenuState = SocketServer.NOT_RCV;
-                    SocketServer.processOutputState = SocketServer.NOT_RCV;
-                    SocketServer.updateSocketClient();
                     break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
                     mAppControlService.closeConnection();

@@ -1100,6 +1100,7 @@ public class AppControlService extends Service {
     };
 
     public void startNotCTLPTOperation() {
+        Log.d(TAG, "startNotCTLPTOperation");
         Thread prNotRunnable = new Thread(processNotificationRunnable);
         prNotRunnable.start();
     }
@@ -1565,12 +1566,33 @@ public class AppControlService extends Service {
            return 0;
        }
 
-       public int onNotifyDisableOffload(ArrayList<Byte> blob) {
-            Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
-            //mNotificationAdapter.disableOffloadDone(BT_OK);
-            Message message = Message.obtain();
-            message.what = Utils.MSG_NC_SM_ACTIVE;
-            mNotificationOffloadStateMachine.sendMessage(message);
+       public int onNotifyDisableOffload(byte[] blob) {
+           Log.d(TAG, "notifyOffloadDisable");
+           Message message = Message.obtain();
+           message.what = Utils.MSG_NC_SM_ACTIVE;
+           mNotificationOffloadStateMachine.sendMessage(message);
+           int size = (blob.length/8);
+           if (size > 0) {
+               Message message_cp = Message.obtain();
+               message_cp.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
+               mNotificationOffloadStateMachine.sendMessage(message_cp);
+           }
+           int Notification_size = 8;
+           Log.i(TAG," payload: " + Arrays.toString(blob));
+           for (int i = 0; i<size; i++) {
+               byte [] value = new byte[Notification_size];
+               for(int j = 0 ; j<Notification_size ; j++) {
+                   value[j] = blob[(Notification_size*i)+j];
+               }
+               Log.i(TAG," Notification payload: " + Arrays.toString(value));
+               NotificationPacketInd notification = new NotificationPacketInd(value);
+               NotificationPacketList.add(notification);
+           }
+           if (size > 0) {
+               Message message_cps = Message.obtain();
+               message_cps.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_START;
+               mNotificationOffloadStateMachine.sendMessage(message_cps);
+           }
             return 0;
        }
 
