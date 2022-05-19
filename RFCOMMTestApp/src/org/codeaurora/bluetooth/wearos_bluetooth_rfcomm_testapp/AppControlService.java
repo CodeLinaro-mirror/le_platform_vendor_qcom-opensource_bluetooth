@@ -98,8 +98,10 @@ public class AppControlService extends Service {
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
     public NotificationOffloadAdapter   mNotificationAdapter = null;
-    public static final int ACTIVE_STATE = 0;
-    public static final int TRACKER_STATE = 1;
+    public static final int ACTIVE_STATE = 3;
+    public static final int TWM_STATE = 1;
+    public static final int DS_STATE = 2;
+    public static final int TRACKER_STATE = 0;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
@@ -1659,8 +1661,8 @@ public class AppControlService extends Service {
 
        public void onTransitionToPwrStateDone(int status) {
            Log.d(TAG, "transitionToPwrStateDone status " + status);
-           if (status != 0) {
-               if (MAX_RETRY > 0) {
+           if (status == 0) {
+               if (MAX_RETRY > 0 && offloadstart_processing) {
                    SocketServer.sendSocketData("transitionToPwrState failed retry Offload. Retry count "+MAX_RETRY+"\n");
                    processSetMode(TRACKER_STATE);
                    MAX_RETRY = MAX_RETRY - 1;
@@ -1720,10 +1722,16 @@ public class AppControlService extends Service {
             mNotificationAdapter.transitionToPwrState(mode);
             switch(mode) {
                 case 0:
-                    mode_string = "Active mode";
+                    mode_string = "Tracker mode";
                     break;
                 case 1:
-                    mode_string = "Tracker mode";
+                    mode_string = "TWM mode";
+                    break;
+                case 2:
+                    mode_string = "DS mode";
+                    break;
+                case 3:
+                    mode_string = "Active mode";
                     break;
                 default:
                     mode_string = "invalid mode";

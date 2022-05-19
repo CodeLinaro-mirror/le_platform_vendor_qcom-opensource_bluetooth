@@ -56,7 +56,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
     public NotificationReceiveState mNotRcvState;
     private DisconnectedState mDisconnectedState;
     private ControlPointState mControlPointState;
-    private Offloaded mOffloaded;
+    public Offloaded mOffloaded;
     public static IState ncPreviousState;
 
     private static final String name = "BluetoothRFCommNotApp";
