@@ -1140,16 +1140,8 @@ public class AppControlService extends Service {
 
     Runnable processNotificationRunnable = new Runnable() {
         public void run() {
-            for (int i =0; i < NotificationPacketList.size(); i++) {
-                processNotification(NotificationPacketList.get(i));
-                try {
-                    /*Adding sleep just because RFCOMM has not to merge
-                     * requests. We have to send each request has single packet
-                    */
-                    //Thread.sleep(300);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error occurred when creating output stream", e);
-                }
+            while(NotificationPacketList.size() > 0) {
+                processNotification(NotificationPacketList.getFirst());
             }
             Message message = Message.obtain();
             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
@@ -1623,12 +1615,13 @@ public class AppControlService extends Service {
                NotificationPacketInd notification = new NotificationPacketInd(value);
                NotificationPacketList.add(notification);
            }
+           Log.i(TAG," NotificationPacketList size : " + NotificationPacketList.size());
            if (size > 0) {
                Message message_cps = Message.obtain();
                message_cps.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_START;
                mNotificationOffloadStateMachine.sendMessage(message_cps);
            }
-            return 0;
+           return 0;
        }
 
        public void onNotifyAsyncErr(int status) {
