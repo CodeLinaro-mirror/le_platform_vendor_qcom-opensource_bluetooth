@@ -107,6 +107,7 @@ public class AppControlService extends Service {
     public static final int ACTIVE_STATE = 0;
     public static final int TRACKER_STATE = 1;
     public static boolean pmLockStatus = false;
+    public static boolean TWM_MODE = false;
 
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
@@ -1643,6 +1644,10 @@ public class AppControlService extends Service {
 
     private void processSetMode(int mode) {
         Log.d(TAG, "processSetMode() mode: " + mode);
+        if (TWM_MODE) {
+            Log.i(TAG, "In TWM_MODE, so ignoring onOffloadStart");
+            return;
+        }
         if (mode == ACTIVE_STATE) {
             SocketServer.sendSocketData("sent transitionToPwrState\n");
             if (pmLockStatus == true ) {

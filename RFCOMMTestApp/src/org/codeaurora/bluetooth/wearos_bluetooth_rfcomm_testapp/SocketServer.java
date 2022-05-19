@@ -286,6 +286,7 @@ public class SocketServer {
             sendStr.append("        SetMode (Ex: SetMode 0(active), 1 (tracker))\n");
             sendStr.append("        Register_OffloadService\n");
             sendStr.append("        DeRegister_OffloadService\n");
+            sendStr.append("        Enter TWMMODE (TWM_MODE true/false)\n");
             sendStr.append("        Do Action  action action_value not_handle            [exp: action 1 1]\n");
             sendStr.append("        Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
             sendStr.append("**************************************************************\n");
@@ -466,6 +467,15 @@ public class SocketServer {
                 Message message = Message.obtain();
                 message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
                 AppControlService.msghandler.sendMessage(message);
+            } else if (tmp[0].equals("TWM_MODE")) {
+                processOutputState = NONE;
+                if (tmp[1].equals("true")) {
+                    sendSocketData("Entered TWM_MODE\n");
+                    AppControlService.TWM_MODE = true;
+                } else {
+                    sendSocketData("TWM_MODE exited\n");
+                    AppControlService.TWM_MODE = false;
+                }
             } else if (inputString.equals("Register_OffloadService")) {
                 mainMenuState = OFFLOAD_TESTING_MENU;
                 processOutputState = OFFLOAD_TESTING_MENU;
