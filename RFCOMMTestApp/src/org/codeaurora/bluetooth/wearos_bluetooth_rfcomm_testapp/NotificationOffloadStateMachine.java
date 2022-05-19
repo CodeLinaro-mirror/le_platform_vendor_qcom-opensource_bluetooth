@@ -421,6 +421,11 @@ public class NotificationOffloadStateMachine extends StateMachine {
             boolean retvalue = HANDLED;
             switch (message.what) {
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                 mAppControlService.closeConnection();
+                 transitionTo(mInitState);
+                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                 SocketServer.processOutputState = SocketServer.INIT_MENU;
+                 SocketServer.updateSocketClient();
                 break;
             }
             return retvalue;

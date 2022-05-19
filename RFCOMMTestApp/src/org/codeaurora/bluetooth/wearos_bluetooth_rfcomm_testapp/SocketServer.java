@@ -65,6 +65,7 @@ public class SocketServer {
     InputStream input;
     private static OutputStream output;
 
+    connectionHandler cnd;
     communicationHandler commHandler;
 
     static final int INIT_MENU = 0;
@@ -120,36 +121,44 @@ public class SocketServer {
             if (null != server) {
                 try {
                     Log.d(TAG, "localSocketServer begins to accept()");
-                    client = server.accept();
+                    while(true)
+                    {
+                        client = server.accept();
+                        socketOpen = true;
+                        Log.d(TAG, "localSocket accepted");
+                        cnd = new connectionHandler();
+                        cnd.start();
+                    }
                 } catch (IOException e) {
                     Log.e(TAG, "localSocketServer accept() failed !!!");
                     e.printStackTrace();
                 }
 
-                socketOpen = true;
-                Log.d(TAG, "localSocket accepted");
-
-                try {
-                    input = client.getInputStream();
-                    Log.d(TAG, "getInputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getInputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                try {
-                    output = client.getOutputStream();
-                    Log.d(TAG, "getOutputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getOutputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                commHandler = new communicationHandler();
-                commHandler.start();
             } else {
                 Log.d(TAG, "The LocalServerSocket is NULL");
             }
+        }
+    }
+
+    private class connectionHandler extends Thread{
+        public void run(){
+            try {
+                   input = client.getInputStream();
+                   Log.d(TAG, "getInputStream");
+            } catch(IOException e) {
+                   Log.e(TAG, "getInputStream() failed !!!");
+                   e.printStackTrace();
+                }
+
+            try {
+                   output = client.getOutputStream();
+                   Log.d(TAG, "getOutputStream");
+            } catch (IOException e){
+                   Log.e(TAG, "getOutputStream() failed !!!");
+                   e.printStackTrace();
+                }
+            commHandler = new communicationHandler();
+            commHandler.start();
         }
     }
 
@@ -197,16 +206,6 @@ public class SocketServer {
                             Log.i(TAG, "client socket closed");
                         } catch (IOException e) {
                             Log.e(TAG, "client socket close failed");
-                            e.printStackTrace();
-                        }
-                    }
-
-                    if (server != null) {
-                        try {
-                            server.close();
-                            Log.i(TAG, "server closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "server close failed");
                             e.printStackTrace();
                         }
                     }
@@ -326,6 +325,9 @@ public class SocketServer {
                     closeReceived = true;
                     mainMenuState = INIT_MENU;
                     processOutputState = SOC_CLOSE_ACK;
+                    Message message = Message.obtain();
+                    message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED;
+                    Utils.notificationOffloadStateMachine.sendMessage(message);
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
                 } else if (inputString.equals("GAP")) {
