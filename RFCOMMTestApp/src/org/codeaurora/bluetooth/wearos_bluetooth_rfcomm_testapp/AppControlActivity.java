@@ -33,6 +33,7 @@ import static android.widget.Toast.makeText;
 
 import android.Manifest;
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -67,6 +68,8 @@ public class AppControlActivity extends Activity {
         }
         mContext = getApplicationContext();
         setContentView(R.layout.activity_main);
+        IntentFilter filter1 = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(on_offBroadcastReceiver, filter1);
         socServer = SocketServer.getInstance();
         Intent intent = new Intent(this, AppControlService.class);
         this.startService(intent);
@@ -124,6 +127,7 @@ public class AppControlActivity extends Activity {
         }
         Intent intent = new Intent(this, AppControlService.class);
         this.stopService(intent);
+        unregisterReceiver(on_offBroadcastReceiver);
     }
 
     @Override
@@ -147,4 +151,26 @@ public class AppControlActivity extends Activity {
             appControlService = null;
         }
     };
+
+   private final BroadcastReceiver on_offBroadcastReceiver = new BroadcastReceiver() {
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        final String action = intent.getAction();
+
+        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+            final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+            switch(state) {
+                case BluetoothAdapter.STATE_OFF:
+                     socServer.sendSocketData("BT is turned off !!\n");
+                     Log.d("BroadcastActions", "BT is turned off !!");
+                     break;
+                case BluetoothAdapter.STATE_ON:
+                     socServer.sendSocketData("BT is turned on !!\n");
+                     Log.d("BroadcastActions", "BT is turned on !!");
+                     break;
+            }
+        }
+    }
+  };
 }
