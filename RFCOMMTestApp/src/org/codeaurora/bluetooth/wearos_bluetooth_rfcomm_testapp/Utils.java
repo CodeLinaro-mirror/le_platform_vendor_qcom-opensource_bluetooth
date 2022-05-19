@@ -35,6 +35,7 @@ public class Utils {
 
     public static String bdAddressFromConfig = null;
     public static AppControlStateMachine appControlStateMachine = null;
+    public static AppControlService mAppControlService = null;
     public static NotificationOffloadStateMachine notificationOffloadStateMachine = null;
     public static SocketServer socServer = SocketServer.getInstance();
     public static boolean isThroughputStateMachineUnderProcessing = false;
@@ -94,7 +95,6 @@ public class Utils {
         static final int STATE_GAP_TEST_CASE_END_DISCOVERY = 22;
         static final int STATE_END_GAP_TEST_CASES = 23;
         static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
-
     }
 
     public static class NotificationOffloadStateMachineMessageConstants {

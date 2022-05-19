@@ -53,7 +53,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
     private ReadyToConnect mReadyToConnect;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
     private ConnectedState mConnectedState;
-    private NotificationReceiveState mNotRcvState;
+    public NotificationReceiveState mNotRcvState;
     private DisconnectedState mDisconnectedState;
     private ControlPointState mControlPointState;
     private Offloaded mOffloaded;
@@ -327,10 +327,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "Going to ControlPoint state");
-            if (AppControlActivity.mWakeLock != null) {
-                Log.d(TAG, "Wakelock acquire");
-                AppControlActivity.mWakeLock.acquire();
-            }
             SocketServer.sendSocketData("ControlPoint State Started");
         }
 
@@ -354,18 +350,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
                     mAppControlService.responseFromCLI((String) message.obj);
                     break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END:
-                    if (AppControlActivity.mWakeLock != null) {
-                        Log.i(TAG, "Releasing mWakelock");
-                        try {
-                            AppControlActivity.mWakeLock.release();
-                            AppControlActivity.mWakeLock_acquired = false;
-                        } catch (Throwable th) {
-                            // ignoring this exception, probably wakeLock was
-                            // already released
-                        }
-                    } else {
-                        Log.e(TAG, "Wakelock reference is null");
-                    }
                     transitionTo(mNotRcvState);
                     break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:

@@ -98,14 +98,12 @@ public class AppControlService extends Service {
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
     public NotificationOffloadAdapter   mNotificationAdapter = null;
-
+    public static final int ACTIVE_STATE = 0;
+    public static final int TRACKER_STATE = 1;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
     public static final int BT_INVALID_STATE = 2;
-
-    public static final int ACTIVE_STATE = 0;
-    public static final int TRACKER_STATE = 1;
     public static boolean pmLockStatus = false;
     public static boolean TWM_MODE = false;
     private static int MAX_RETRY;
@@ -153,6 +151,7 @@ public class AppControlService extends Service {
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
                 notificationIntent, 0);
+        pmLockStatus = false;
         Notification notification = new NotificationCompat.Builder(this)
         .setContentTitle("RFCOMM Test App")
         .setContentText("Running...!!!")
@@ -166,7 +165,6 @@ public class AppControlService extends Service {
             startStateMachine();
         }
         registerReceiver();
-        pmLockStatus = false;
         MAX_RETRY = 3;
         offloadstart_processing = false;
     }
@@ -180,6 +178,7 @@ public class AppControlService extends Service {
         Thread.start();
         mlooper = Thread.getLooper();
         msghandler = new OffloadServiceMessageHandler(mContext, mlooper);
+        Utils.mAppControlService = AppControlService.this;
         return Service.START_STICKY;
     }
 
@@ -210,7 +209,6 @@ public class AppControlService extends Service {
 
         public AppControlService getService() {
             return AppControlService.this;
-
         }
     }
 
@@ -679,7 +677,20 @@ public class AppControlService extends Service {
     };
 
     public void startRxOperation() {
-
+        OutputStream outputStream = null;
+        Log.d(TAG, "startNotRcvOperation");
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        try {
+            outputStream.write("Device connected and ready to receive notifications".getBytes());
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        }
         Thread rxOperation = new Thread(rxOperationRunnable);
         rxOperation.start();
     }
@@ -1065,6 +1076,20 @@ public class AppControlService extends Service {
     }
 
     public void startNotRcvOperation() {
+        OutputStream outputStream = null;
+        Log.d(TAG, "startNotRcvOperation");
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        try {
+            outputStream.write("Device connected and ready to receive notifications".getBytes());
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        }
         Thread notRcvOperation = new Thread(notRcvOperationRunnable);
         notRcvOperation.start();
     }
@@ -1121,7 +1146,7 @@ public class AppControlService extends Service {
                     /*Adding sleep just because RFCOMM has not to merge
                      * requests. We have to send each request has single packet
                     */
-                    Thread.sleep(300);
+                    //Thread.sleep(300);
                 } catch (Exception e) {
                     Log.e(TAG, "Error occurred when creating output stream", e);
                 }
@@ -1381,6 +1406,7 @@ public class AppControlService extends Service {
             SocketServer.sendSocketData(sendStr.toString());
             sendStr.delete(0, sendStr.length());
         }
+        NotificationPacketList.remove(obj);
     }
 
     public void notificationReceived(byte[] bytes) {
@@ -1536,7 +1562,7 @@ public class AppControlService extends Service {
                     processDRegisterOfflodableAdapter();
                     break;
                 case Utils.MSG_AS_SET_MODE:
-				    MAX_RETRY = 3;
+                    MAX_RETRY = 3;
                     int mode = (int)message.obj;
                     processSetMode(mode);
                     break;
@@ -1613,8 +1639,7 @@ public class AppControlService extends Service {
            Log.d(TAG, "transitionToPwrStateDone status " + status);
            if (status != 0) {
                if (MAX_RETRY > 0) {
-                   SocketServer.sendSocketData("transitionToPwrState failed retry Offload. Retry cou
-                           nt "+MAX_RETRY+"\n");
+                   SocketServer.sendSocketData("transitionToPwrState failed retry Offload. Retry count "+MAX_RETRY+"\n");
                    processSetMode(TRACKER_STATE);
                    MAX_RETRY = MAX_RETRY - 1;
                } else {
@@ -1656,22 +1681,37 @@ public class AppControlService extends Service {
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
 
-    private void processSetMode(int mode) {
+    public void processSetMode(int mode) {
         Log.d(TAG, "processSetMode() mode: " + mode);
         if (TWM_MODE) {
             Log.i(TAG, "In TWM_MODE, so ignoring onOffloadStart");
             return;
         }
+
+        String mode_string;
         if (mode == ACTIVE_STATE) {
-            SocketServer.sendSocketData("sent transitionToPwrState\n");
             if (pmLockStatus == true ) {
                 Log.i(TAG, "PM wakelock acuired but received OffloadStop. releasing wakelock ");
                 releasePMLock();
             }
+        } else {
+            acquirePMLock();
+            offloadstart_processing = true;
         }
         if (mNotificationAdapter != null) {
             mNotificationAdapter.transitionToPwrState(mode);
-            SocketServer.sendSocketData("sent transitionToPwrState\n");
+            switch(mode) {
+                case 0:
+                    mode_string = "Active mode";
+                    break;
+                case 1:
+                    mode_string = "Tracker mode";
+                    break;
+                default:
+                    mode_string = "invalid mode";
+                    break;
+            }
+            SocketServer.sendSocketData("sent transitionToPwrState "+ mode_string +"\n");
         }
     }
 
