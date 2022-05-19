@@ -268,7 +268,7 @@ public class AppControlStateMachine extends StateMachine {
                 SocketServer
                 .sendSocketData("Tx Operation Started with chunkSize :"
                         + txParam.chunkSize);
-                mAppControlService.startTxOperation(txParam.chunkSize);
+                mAppControlService.startTxOperation(txParam.chunkSize, txParam.pattern);
                 break;
             case Utils.StateMachineMessageConstants.STATE_START_DATA_TX_WAKEABLE:
                 transitionTo(mDataTxState);

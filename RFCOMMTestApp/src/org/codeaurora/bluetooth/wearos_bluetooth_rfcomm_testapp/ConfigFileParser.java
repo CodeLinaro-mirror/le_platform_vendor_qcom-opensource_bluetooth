@@ -74,15 +74,21 @@ public class ConfigFileParser {
         return connect;
     }
 
-    public Tx txParse(String input) {
-        Log.d(TAG, "txParse input is ::" + input);
+    public Tx txParse(String input1, String input2) {
+        Log.d(TAG, "txParse input is ::" + input1 + " "+ input2);
         Tx tx = new Tx();
-        String tmp[] = input.split(":", 2);
-        Log.d(TAG, "tmp.length is ::" + tmp.length);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("chunkSize")) {
-                Log.d(TAG, "tmp[1] is ::" + tmp[1]);
-                tx.chunkSize = Integer.parseInt(tmp[1]);
+        String tmp1[] = input1.split(":", 2);
+        Log.d(TAG, "tmp1.length is ::" + tmp1.length);
+
+        String tmp2[] = input2.split(":", 2);
+        Log.d(TAG, "tmp2.length is ::" + tmp2.length);
+
+        if (tmp1.length == 2 && tmp2.length ==2) {
+            if (tmp1[0].equals("chunkSize") && tmp2[0].equals("pattern")) {
+                Log.d(TAG, "tmp1[1] is ::" + tmp1[1]);
+                Log.d(TAG, "tmp2[1] is ::" + tmp2[1]);
+                tx.chunkSize = Integer.parseInt(tmp1[1]);
+                tx.pattern = Integer.parseInt(tmp2[1]);
             } else {
                 tx = null;
             }

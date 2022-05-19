@@ -265,7 +265,7 @@ public class SocketServer {
 
         case THROUGHPUT_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     Tx (Ex: Tx chunkSize:1000)\n");
+            sendStr.append("                     Tx(Select chunkSize and pattern 1(Default) 2(Binary) or 3(PRBS9)) (Ex: Tx chunkSize:1000 pattern:1)\n");
             sendStr.append("                     Rx (Ex: Rx )\n");
             sendStr.append("                     Wakeable (Ex: Wakeable timer:1000)\n");
             sendStr.append("                     Actionable (Ex: Actionable timer:1000)\n");
@@ -580,10 +580,14 @@ public class SocketServer {
             break;
 
         case THROUGHPUT_MENU:
-            tmp = inputString.split(" ", 2);
-            if (tmp.length == 2) {
+            tmp = inputString.split(" ");
+            if (tmp.length == 2 || tmp.length==3) {
                 if (tmp[0].equals("Tx")) {
-                    Tx txParam = parser.txParse(tmp[1]);
+                    Tx txParam = null;
+                    if(tmp.length == 2)
+                         txParam = parser.txParse(tmp[1], "pattern:1");
+                    else if(tmp.length == 3)
+                         txParam = parser.txParse(tmp[1], tmp[2]);
                     if (txParam != null) {
                         processOutputState = NONE;
                         Message message = Message.obtain();

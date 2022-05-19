@@ -31,4 +31,5 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
 public class Tx {
     int chunkSize;
+    int pattern;
 }

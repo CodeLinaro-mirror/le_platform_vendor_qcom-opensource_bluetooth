@@ -104,6 +104,9 @@ public class AppControlService extends Service {
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
     public static final int BT_INVALID_STATE = 2;
+    public static final int DEFAULT_DATA_PATTERN = 1;
+    public static final int BINARY_DATA_PATTERN  = 2;
+    public static final int PRBS9_DATA_PATTERN   = 3;
     public static boolean pmLockStatus = false;
     private static int MAX_RETRY;
     private static boolean offloadstart_processing;
@@ -605,17 +608,19 @@ public class AppControlService extends Service {
         }
     }
 
-    public void startTxOperation(int chunkSize) {
-        Runnable txOperationRunnable = new TxOperationRunnable(chunkSize);
+    public void startTxOperation(int chunkSize, int pattern) {
+        Runnable txOperationRunnable = new TxOperationRunnable(chunkSize, pattern);
         new Thread(txOperationRunnable).start();
     }
 
     private class TxOperationRunnable implements Runnable {
 
         int mChunkSize;
+        int mpattern;
 
-        public TxOperationRunnable(int chunkSize) {
+        public TxOperationRunnable(int chunkSize, int pattern) {
             mChunkSize = chunkSize;
+            mpattern = pattern;
         }
 
         public void run() {
@@ -630,9 +635,34 @@ public class AppControlService extends Service {
             int chunksize = mChunkSize;
             chunksize = chunksize * 1024;
             Log.d(TAG, "chunkSize is :: " + chunksize);
+            Log.d(TAG, "pattern is :: " + mpattern);
             StringBuilder sb = new StringBuilder(chunksize);
-            for (int i = 0; i < chunksize; i++) {
-                sb.append('a');
+
+            if(mpattern == DEFAULT_DATA_PATTERN) {
+               for(int i = 0; i < chunksize; i++) {
+                   sb.append('a');
+              }
+            }
+
+            else if(mpattern == BINARY_DATA_PATTERN) {
+               for(int i = 0; i < chunksize; i++) {
+                   if(i%2 == 0)
+                       sb.append('1');
+                   else
+                       sb.append('0');
+                }
+            }
+            else
+            {
+                int start = 0x02;
+                int a = start;
+                int i;
+                for(i = 1;i<chunksize; i++) {
+                   int newbit = (((a >> 9) ^ (a >> 6)) & 1);
+                   a = ((a << 1) | newbit) & 0x7ff;
+                   int b = a & 1;
+                   sb.append(Integer.toString(b));
+                }
             }
             String senttext = sb.toString();
             String start = "Start";
