@@ -108,6 +108,8 @@ public class AppControlService extends Service {
     public static final int TRACKER_STATE = 1;
     public static boolean pmLockStatus = false;
     public static boolean TWM_MODE = false;
+    private static int MAX_RETRY;
+    private static boolean offloadstart_processing;
 
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
@@ -165,6 +167,8 @@ public class AppControlService extends Service {
         }
         registerReceiver();
         pmLockStatus = false;
+        MAX_RETRY = 3;
+        offloadstart_processing = false;
     }
 
     @Override
@@ -1532,6 +1536,7 @@ public class AppControlService extends Service {
                     processDRegisterOfflodableAdapter();
                     break;
                 case Utils.MSG_AS_SET_MODE:
+				    MAX_RETRY = 3;
                     int mode = (int)message.obj;
                     processSetMode(mode);
                     break;
@@ -1607,10 +1612,19 @@ public class AppControlService extends Service {
        public void onTransitionToPwrStateDone(int status) {
            Log.d(TAG, "transitionToPwrStateDone status " + status);
            if (status != 0) {
-               SocketServer.sendSocketData("transitionToPwrState failed retry Offload\n");
-               processSetMode(TRACKER_STATE);
+               if (MAX_RETRY > 0) {
+                   SocketServer.sendSocketData("transitionToPwrState failed retry Offload. Retry cou
+                           nt "+MAX_RETRY+"\n");
+                   processSetMode(TRACKER_STATE);
+                   MAX_RETRY = MAX_RETRY - 1;
+               } else {
+                   SocketServer.sendSocketData("transitionToPwrState failed. Retry ends\n");
+               }
            } else {
-               releasePMLock();
+               if (offloadstart_processing) {
+                   releasePMLock();
+                   offloadstart_processing = false;
+               }
                SocketServer.sendSocketData("transitionToPwrState Done\n");
            }
        }
