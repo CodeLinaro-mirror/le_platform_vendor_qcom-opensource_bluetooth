@@ -114,6 +114,7 @@ public class Utils {
     /* Offload Service Actions */
     public static final int MSG_AS_REGISTER_OFFLODABLE_ADAPTER = 0;
     public static final int MSG_AS_DREGISTER_OFFLODABLE_ADAPTER = 1;
+    public static final int MSG_AS_SET_MODE = 2;
 
     //Offload states
     public static final int MSG_NC_SM_OFFLOADED = 21;

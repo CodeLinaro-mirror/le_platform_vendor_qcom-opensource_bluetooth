@@ -244,6 +244,7 @@ public class SocketServer {
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
             sendStr.append("                     Register_OffloadService\n");
             sendStr.append("                     DeRegister_OffloadService\n");
+            sendStr.append("                     SetMode (Ex: SetMode 0(active), 1 (tracker))\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -397,33 +398,29 @@ public class SocketServer {
                         Message message = Message.obtain();
                         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_CONNECT;
                         Utils.notificationOffloadStateMachine
-                        .sendMessage(message);
+                            .sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;
                         mainMenuState = INIT_MENU;
                     }
-                } else if (tmp[0].equals("Incoming_Connection")) {
-                    IncomingConnection incomingConnection = parser
-                            .incomingConnectionParse(tmp[1]);
-                    if (incomingConnection != null) {
-                        processOutputState = NONE;
-                        Utils.UUIDConstants.INCOMING_CONNECTION_UUID = UUID
-                                .fromString(incomingConnection.uuid);
-                        Message message = Message.obtain();
-                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION;
-                        Utils.notificationOffloadStateMachine
-                        .sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                        mainMenuState = INIT_MENU;
-                    }
+                } else if(tmp[0].equals("SetMode")) {
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
+                    AppControlService.msghandler.sendMessage(message);
                 }
             } else if (inputString.equals("Register_OffloadService")) {
                 mainMenuState = OFFLOAD_TESTING_MENU;
                 processOutputState = OFFLOAD_TESTING_MENU;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_REGISTER_OFFLODABLE_ADAPTER, null);
+                AppControlService.msghandler.sendMessage(message);
             } else if (inputString.equals("DeRegister_OffloadService")) {
                 mainMenuState = OFFLOAD_TESTING_MENU;
                 processOutputState = OFFLOAD_TESTING_MENU;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER, null);
+                AppControlService.msghandler.sendMessage(message);
             } else if (inputString.equals("Back")) {
                 mainMenuState = INIT_MENU;
                 processOutputState = INIT_MENU;
@@ -463,6 +460,11 @@ public class SocketServer {
                 Message message_cpe = Message.obtain();
                 message_cpe.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
                 Utils.notificationOffloadStateMachine.sendMessage(message_cpe);
+            } else if(tmp[0].equals("SetMode")) {
+                processOutputState = NONE;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
+                AppControlService.msghandler.sendMessage(message);
             }
             break;
 

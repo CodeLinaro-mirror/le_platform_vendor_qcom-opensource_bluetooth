@@ -390,12 +390,13 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public void enter() {
            Log.i(TAG, "Enter: " + getCurrentMessage().what);
            SocketServer.sendSocketData("Offloaded State");
+           Log.d(TAG, "Reading context from protobuf");
            //byte[] blob = AppContextProto.getAppContextProtoBuffer();
            //if(blob.length > 0) {
            //    processSetAppContext(blob);
            //}
            //inform OffloadableAppAdapter
-		   //mAppControlService.mOfflodableAppAdapter.enableOffloadDone(mAppControlService.BT_OK);
+           mAppControlService.mNotificationAdapter.enableOffloadDone(mAppControlService.BT_OK);
         }
 
         @Override

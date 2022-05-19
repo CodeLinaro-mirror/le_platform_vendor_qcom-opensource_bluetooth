@@ -31,8 +31,6 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
 import static android.widget.Toast.makeText;
 
-//import com.qualcomm.bluetooth_offload.client.*;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,8 +51,10 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import vendor.qti.bluetooth_offload.BluetoothOffloadCallback;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
+import vendor.qti.bluetooth_offload.NotificationOffloadAdapter;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -94,7 +94,7 @@ public class AppControlService extends Service {
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
-    //public OffloadableAppAdapter mOfflodableAppAdapter;
+    public NotificationOffloadAdapter   mNotificationAdapter;
 
     //offload callback status values
     public static final int BT_FAIL = 0;
@@ -321,7 +321,6 @@ public class AppControlService extends Service {
             Log.d(TAG, "ServerConnectedThread Running run()");
             byte[] buffer = new byte[1024]; //buffer to store the stream
             int bytes;
-
             while (true) {
                 try {
                     bytes = mInputStream.read(buffer);
@@ -1521,6 +1520,10 @@ public class AppControlService extends Service {
                 case Utils.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER:
                     processDRegisterOfflodableAdapter();
                     break;
+                case Utils.MSG_AS_SET_MODE:
+                    int mode = (int)message.obj;
+                    processSetMode(mode);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
@@ -1528,65 +1531,82 @@ public class AppControlService extends Service {
         }
     }
 
-    /*
-       private final OffloadableAppCallback mofflodableappcallback = new OffloadableAppCallback(){
-       @Override
+    private final BluetoothOffloadCallback mOffloadcallbacks = new BluetoothOffloadCallback() {
+
        public void notifyStartDone(int status) {
-       if(status == BT_OK) {
-       Log.d(TAG, "Offload Register Done");
-       } else {
-       Log.d(TAG, "offload Registartion failed Status: " + status);
-       }
+           if(status == BT_OK) {
+               Log.d(TAG, "Offload Register Done");
+           } else {
+               Log.d(TAG, "offload Registartion failed Status: " + status);
+           }
        }
 
-       @Override
        public void notifyStopDone(int status) {
-       if(status == BT_OK) {
-       Log.d(TAG, "Offload Deregister Done");
-       } else {
-       Log.d(TAG, "offload Deregistration failed Status: " + status);
-       }
-       }
-
-       @Override
-       public int notifyOffloadEnable(int mode) {
-       Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
-       mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
-       Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
-       Message message = Message.obtain();
-       message.what = Utils.MSG_NC_SM_OFFLOADED;
-       mNotificationOffloadStateMachine.sendMessage(message);
-       return 0;
+           if(status == BT_OK) {
+               Log.d(TAG, "Offload Deregister Done");
+           } else {
+               Log.d(TAG, "offload Deregistration failed Status: " + status);
+           }
        }
 
-       @Override
-       public int notifyOffloadDisable(ArrayList<Byte> blob) {
-       Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
-//mOfflodableAppAdapter.disableOffloadDone(BT_OK);
-Message message = Message.obtain();
-message.what = Utils.MSG_NC_SM_ACTIVE;
-mNotificationOffloadStateMachine.sendMessage(message);
-return 0;
+       public int notifyEnableOffload(int mode) {
+           Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
+           mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
+           Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
+           Message message = Message.obtain();
+           message.what = Utils.MSG_NC_SM_OFFLOADED;
+           mNotificationOffloadStateMachine.sendMessage(message);
+           return 0;
        }
 
-       @Override
+       public int notifyDisableOffload(ArrayList<Byte> blob) {
+            Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
+            //mNotificationAdapter.disableOffloadDone(BT_OK);
+            Message message = Message.obtain();
+            message.what = Utils.MSG_NC_SM_ACTIVE;
+            mNotificationOffloadStateMachine.sendMessage(message);
+            return 0;
+       }
+
        public void notifyAsyncErr(int status) {
-       Log.i(TAG, "notifyAsyncErr status: " + status);
+            Log.i(TAG, "notifyAsyncErr status: " + status);
        }
-       };
-       */
+
+       public void transitionToPwrStateDone(int status) {
+           Log.d(TAG, "transitionToPwrStateDone status " + status);
+           SocketServer.sendSocketData("transitionToPwrState Done\n");
+       }
+    };
 
     private void processRegisterOfflodableAdapter() {
-        Log.d(TAG, "processGRegisterOfflodableAdapter()");
-        //mOfflodableAppAdapter = new OffloadableAppAdapter(mContext, mofflodableappcallback);
-        //mOfflodableAppAdapter.start();
-        SocketServer.sendSocketData("OffloadableApp Registered");
+        mNotificationAdapter = new NotificationOffloadAdapter(mContext);
+        if(BT_FAIL == mNotificationAdapter.register(mOffloadcallbacks)) {
+            Log.e(TAG, "failed to register notification offload adapter");
+            return;
+        }
+        Log.d(TAG, "Registered notification offload adapter");
+        SocketServer.sendSocketData("OffloadableApp Registered\n");
     }
 
     private void processDRegisterOfflodableAdapter() {
         Log.d(TAG, "processDRegisterOfflodableAdapter()");
-        //mOfflodableAppAdapter.stop();
+        mNotificationAdapter.unregister();
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
 
+    private void processSetMode(int mode) {
+        Log.d(TAG, "processSetMode() mode: " + mode);
+
+        mNotificationAdapter.transitionToPwrState(mode);
+        SocketServer.sendSocketData("sent transitionToPwrState\n");
+    }
+
+    private void processSetAppContext(byte[] blob) {
+        Log.i(TAG, "processSetAppContext() blob: " + Arrays.toString(blob));
+        ArrayList<Byte> blobBytes = new ArrayList<Byte>();
+        for (int i = 0; i < blob.length; i++) {
+            blobBytes.add(blob[i]);
+        }
+        //mNotificationAdapter.setAppSpecificContextInfo(blobBytes);
+    }
 }
