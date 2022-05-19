@@ -97,7 +97,7 @@ public class AppControlService extends Service {
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
-    public NotificationOffloadAdapter   mNotificationAdapter;
+    public NotificationOffloadAdapter   mNotificationAdapter = null;
 
     //offload callback status values
     public static final int BT_FAIL = 0;
@@ -106,6 +106,7 @@ public class AppControlService extends Service {
 
     public static final int ACTIVE_STATE = 0;
     public static final int TRACKER_STATE = 1;
+    public static boolean pmLockStatus = false;
 
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
@@ -162,6 +163,7 @@ public class AppControlService extends Service {
             startStateMachine();
         }
         registerReceiver();
+        pmLockStatus = false;
     }
 
     @Override
@@ -189,6 +191,7 @@ public class AppControlService extends Service {
         mlooper.quitSafely();
         SocketServer.cleanUp();
         processDRegisterOfflodableAdapter();
+        pmLockStatus = false;
     }
 
     private final IBinder localBinder = new MyBinder();
@@ -1631,15 +1634,26 @@ public class AppControlService extends Service {
 
     private void processDRegisterOfflodableAdapter() {
         Log.d(TAG, "processDRegisterOfflodableAdapter()");
-        mNotificationAdapter.unregister();
+        if (mNotificationAdapter != null) {
+            mNotificationAdapter.unregister();
+            mNotificationAdapter = null;
+        }
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
 
     private void processSetMode(int mode) {
         Log.d(TAG, "processSetMode() mode: " + mode);
-
-        mNotificationAdapter.transitionToPwrState(mode);
-        SocketServer.sendSocketData("sent transitionToPwrState\n");
+        if (mode == ACTIVE_STATE) {
+            SocketServer.sendSocketData("sent transitionToPwrState\n");
+            if (pmLockStatus == true ) {
+                Log.i(TAG, "PM wakelock acuired but received OffloadStop. releasing wakelock ");
+                releasePMLock();
+            }
+        }
+        if (mNotificationAdapter != null) {
+            mNotificationAdapter.transitionToPwrState(mode);
+            SocketServer.sendSocketData("sent transitionToPwrState\n");
+        }
     }
 
     private void processSetAppContext(byte[] blob) {
@@ -1652,10 +1666,16 @@ public class AppControlService extends Service {
     }
 
     public void acquirePMLock() {
-        mNotificationAdapter.acquire_pm_wakelock();
+        pmLockStatus = true;
+        if (mNotificationAdapter != null) {
+            mNotificationAdapter.acquire_pm_wakelock();
+        }
     }
 
     public void releasePMLock() {
-        mNotificationAdapter.release_pm_wakelock();
+        pmLockStatus = false;
+        if (mNotificationAdapter != null) {
+            mNotificationAdapter.release_pm_wakelock();
+        }
     }
 }
