@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -78,6 +112,7 @@ public class SocketServer {
     static final int INVALID_INPUT = 7;
     static final int SOC_CLOSE_ACK = 8;
     static final int NONE = 9;
+    static final int BLUETOOTH_HID_TESTING_MENU = 10;
     static final int CONNECTION_TEST_MENU = 999;
 
     static int mainMenuState = INIT_MENU;
@@ -226,6 +261,7 @@ public class SocketServer {
             sendStr.append("                     Throughput_Testing\n");
             sendStr.append("                     Offload_Testing\n");
             sendStr.append("                     GAP\n");
+            sendStr.append("                     Bluetooth_HID\n");
             sendStr.append("                     Close\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -269,6 +305,13 @@ public class SocketServer {
             sendStr.append("                     Wakeable (Ex: Wakeable timer:1000)\n");
             sendStr.append("                     Actionable (Ex: Actionable timer:1000)\n");
             sendStr.append("                     Cacheable (Ex: Cacheable timer:1000)\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+            break;
+
+        case BLUETOOTH_HID_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     register\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -334,6 +377,12 @@ public class SocketServer {
                     Log.d(TAG, "Gap Menu");
                     mainMenuState = CONNECTION_TEST_MENU;
                     processOutputState = CONNECTION_TEST_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
+                } else if (inputString.equals("Bluetooth_HID")) {
+                    Log.d(TAG, "Bluetooth_HID Menu");
+                    mainMenuState = BLUETOOTH_HID_TESTING_MENU;
+                    processOutputState = BLUETOOTH_HID_TESTING_MENU;
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
                 } else {
@@ -451,6 +500,24 @@ public class SocketServer {
             }
             break;
 
+        case BLUETOOTH_HID_TESTING_MENU:
+            if (inputString.equals("register")) {
+                processOutputState = NONE;
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID;
+                Utils.appControlStateMachine.sendMessage(message);
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            } else if (inputString.equals("Back")) {
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                Utils.appControlStateMachine.sendMessage(message);
+                Utils.isThroughputStateMachineUnderProcessing = false;
+                Utils.isOffloadStateMachineUnderProcessing = false;
+            } else {
+                processOutputState = INVALID_INPUT;
+            }
+            break;
 
         case MAIN_MENU:
             if (inputString.equals("Throughput")) {

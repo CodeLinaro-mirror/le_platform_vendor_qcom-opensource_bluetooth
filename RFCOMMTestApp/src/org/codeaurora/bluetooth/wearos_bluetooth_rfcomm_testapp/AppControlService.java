@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -49,6 +83,8 @@ import android.Manifest;
 import android.app.IntentService;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import vendor.qti.bluetooth_offload.BluetoothOffloadCallback;
@@ -102,6 +138,7 @@ public class AppControlService extends Service {
     public static final int TWM_STATE = 1;
     public static final int DS_STATE = 2;
     public static final int TRACKER_STATE = 0;
+    private BluetoothHidDevice service;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
@@ -1769,4 +1806,84 @@ public class AppControlService extends Service {
             mNotificationMgr.release_pm_wakelock();
         }
     }
+
+    public void registerBluetoothHid() {
+        Log.d(TAG, "registerBluetoothHid");
+        bluetoothAdapter.getProfileProxy(
+              mContext, new ServiceListener(), BluetoothProfile.HID_DEVICE);
+    }
+
+    private final class ServiceListener implements BluetoothProfile.ServiceListener {
+    @Override
+    public void onServiceConnected(int profile, BluetoothProfile proxy) {
+        Log.d(TAG, "onServiceConnected :: profile is :: "+profile+ " proxy is :: "+proxy);
+        service = (BluetoothHidDevice) proxy;
+        service.registerApp(
+                Constants.SDP_RECORD, null, Constants.QOS_OUT, Runnable::run, callback);
+        }
+    @Override
+    public void onServiceDisconnected(int profile) {
+        Log.d(TAG, "onServiceDisconnected :: profile is :: "+profile);
+        service = null;
+    }
+    }
+
+    private final BluetoothHidDevice.Callback callback =
+            new BluetoothHidDevice.Callback() {
+                @Override
+                public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+                    super.onAppStatusChanged(pluggedDevice, registered);
+                    Log.d(TAG, "onAppStatusChanged");
+                }
+
+                @Override
+                public void onConnectionStateChanged(BluetoothDevice device, int state) {
+                    super.onConnectionStateChanged(device, state);
+                    Log.d(TAG, "onConnectionStateChanged");
+                }
+
+                @Override
+                public void onGetReport(BluetoothDevice device, byte type, byte id, int bufferSize) {
+                    super.onGetReport(device, type, id, bufferSize);
+                    if (service != null) {
+                        if (type != BluetoothHidDevice.REPORT_TYPE_INPUT) {
+                            service.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
+                        } else if (!replyReport(device, type, id)) {
+                            service.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
+                        }
+                    }
+                }
+
+                @Override
+                public void onSetReport(BluetoothDevice device, byte type, byte id, byte[] data) {
+                    super.onSetReport(device, type, id, data);
+                    if (service != null) {
+                        service.reportError(device, BluetoothHidDevice.ERROR_RSP_SUCCESS);
+                    }
+                }
+    };
+
+    private boolean replyReport(BluetoothDevice device, byte type, byte id) {
+        byte[] report = getReport(id);
+        if (report == null) {
+            return false;
+        }
+
+        if (service != null) {
+            service.replyReport(device, type, id, report);
+        }
+        return true;
+    }
+
+    private byte[] getReport(byte id) {
+        final byte[] keyboardData = "M0ABCDEF".getBytes();
+        if (id < 0) {
+            Log.d(TAG, "getReport - null");
+            return null;
+        }
+        return keyboardData;
+    }
+
 }

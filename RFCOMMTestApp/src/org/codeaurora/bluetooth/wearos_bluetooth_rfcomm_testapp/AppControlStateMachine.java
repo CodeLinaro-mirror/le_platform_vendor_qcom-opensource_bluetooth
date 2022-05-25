@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -59,6 +93,7 @@ public class AppControlStateMachine extends StateMachine {
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
+    private BluetoothHidState mBluetoothHidState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -75,6 +110,7 @@ public class AppControlStateMachine extends StateMachine {
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
         mReadyToAcceptConnection = new ReadyToAcceptConnection();
+        mBluetoothHidState = new BluetoothHidState();
 
         // Adding States
         addState(mInitState);
@@ -86,6 +122,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDisconnectedState);
         addState(mGapTestState);
         addState(mReadyToAcceptConnection);
+        addState(mBluetoothHidState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -139,6 +176,11 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
                 Log.d(TAG, "Going to GAP Test Cases state");
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID:
+                transitionTo(mBluetoothHidState);
+                Log.d(TAG, "Going to Bluetooth HID state");
                 break;
             }
             return retvalue;
@@ -526,4 +568,29 @@ public class AppControlStateMachine extends StateMachine {
         }
     }
 
+    private class BluetoothHidState extends State {
+    private static final String TAG = "BluetoothTxRxApp BluetoothHidState State";
+
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+            if (mAppControlService != null) {
+                mAppControlService.registerBluetoothHid();
+            }
+            SocketServer
+            .sendSocketData("Registering Bluetooth HID");
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            // To-be Implemented
+            return retvalue;
+        }
+    }
 }
