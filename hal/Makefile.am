@@ -1,6 +1,6 @@
 lib_LTLIBRARIES = libbtvendorhal.la
 libbtvendorhal_la_SOURCES = hardware.cc
-libbtvendorhal_la_CFLAGS = -DLINUX_ENABLED -fpermissive
+libbtvendorhal_la_CFLAGS = -DLINUX_ENABLED -fpermissive @LIBHARDWAREVH_CFLAGS@
 libbtvendorhal_la_CFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/system/bt/include
 libbtvendorhal_la_CFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/bluetooth/hal/include
 libbtvendorhal_la_CPPFLAGS = -DLINUX_ENABLED -fpermissive -D__GLIBC__
