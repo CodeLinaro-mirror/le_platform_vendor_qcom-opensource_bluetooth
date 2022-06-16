@@ -377,7 +377,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
            //    processSetAppContext(blob);
            //}
            //inform OffloadableAppAdapter
-           mAppControlService.mNotificationAdapter.enableOffloadDone(mAppControlService.BT_OK);
+           mAppControlService.mNotificationMgr.enableOffloadDone(mAppControlService.BT_OK);
         }
 
         @Override

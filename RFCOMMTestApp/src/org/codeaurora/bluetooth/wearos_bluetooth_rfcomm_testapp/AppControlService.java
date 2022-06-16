@@ -54,7 +54,7 @@ import android.bluetooth.BluetoothDevice;
 import vendor.qti.bluetooth_offload.BluetoothOffloadCallback;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import vendor.qti.bluetooth_offload.NotificationOffloadAdapter;
+import vendor.qti.bluetooth_offload.NotificationOffloadMgr;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -97,7 +97,7 @@ public class AppControlService extends Service {
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
-    public NotificationOffloadAdapter   mNotificationAdapter = null;
+    public NotificationOffloadMgr   mNotificationMgr = null;
     public static final int ACTIVE_STATE = 3;
     public static final int TWM_STATE = 1;
     public static final int DS_STATE = 2;
@@ -1680,8 +1680,8 @@ public class AppControlService extends Service {
     };
 
     private void processRegisterOfflodableAdapter() {
-        mNotificationAdapter = new NotificationOffloadAdapter(mContext);
-        if(BT_FAIL == mNotificationAdapter.register(mOffloadcallbacks)) {
+        mNotificationMgr = new NotificationOffloadMgr(mContext);
+        if(BT_FAIL == mNotificationMgr.register(mOffloadcallbacks)) {
             Log.e(TAG, "failed to register notification offload adapter");
             SocketServer.sendSocketData("failed to register notification offload adapter\n");
             return;
@@ -1690,7 +1690,7 @@ public class AppControlService extends Service {
             SocketServer.sendSocketData("failed to send App Context Info. Remote address is null\n");
         } else {
             SocketServer.sendSocketData("Setting App Info with Address: " + Utils.bdAddressFromConfig + " Service UUID: " + Utils.UUIDConstants.APP_UUID.toString() + " App Id: " + mContext.getPackageName() + "\n");
-            mNotificationAdapter.setRfCommAppContextInfo(Utils.bdAddressFromConfig, Utils.UUIDConstants.APP_UUID.toString(), mContext.getPackageName());
+            mNotificationMgr.setRfCommAppContextInfo(Utils.bdAddressFromConfig, Utils.UUIDConstants.APP_UUID.toString(), mContext.getPackageName());
         }
         Log.d(TAG, "Registered notification offload adapter");
         SocketServer.sendSocketData("OffloadableApp Registered\n");
@@ -1698,9 +1698,9 @@ public class AppControlService extends Service {
 
     private void processDRegisterOfflodableAdapter() {
         Log.d(TAG, "processDRegisterOfflodableAdapter()");
-        if (mNotificationAdapter != null) {
-            mNotificationAdapter.unregister();
-            mNotificationAdapter = null;
+        if (mNotificationMgr != null) {
+            mNotificationMgr.unregister();
+            mNotificationMgr = null;
         }
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
@@ -1718,8 +1718,8 @@ public class AppControlService extends Service {
             acquirePMLock();
             offloadstart_processing = true;
         }
-        if (mNotificationAdapter != null) {
-            mNotificationAdapter.transitionToPwrState(mode);
+        if (mNotificationMgr != null) {
+            mNotificationMgr.transitionToPwrState(mode);
             switch(mode) {
                 case 0:
                     mode_string = "Tracker mode";
@@ -1747,20 +1747,20 @@ public class AppControlService extends Service {
         for (int i = 0; i < blob.length; i++) {
             blobBytes.add(blob[i]);
         }
-        //mNotificationAdapter.setAppSpecificContextInfo(blobBytes);
+        //mNotificationMgr.setAppSpecificContextInfo(blobBytes);
     }
 
     public void acquirePMLock() {
         pmLockStatus = true;
-        if (mNotificationAdapter != null) {
-            mNotificationAdapter.acquire_pm_wakelock();
+        if (mNotificationMgr != null) {
+            mNotificationMgr.acquire_pm_wakelock();
         }
     }
 
     public void releasePMLock() {
         pmLockStatus = false;
-        if (mNotificationAdapter != null) {
-            mNotificationAdapter.release_pm_wakelock();
+        if (mNotificationMgr != null) {
+            mNotificationMgr.release_pm_wakelock();
         }
     }
 }
