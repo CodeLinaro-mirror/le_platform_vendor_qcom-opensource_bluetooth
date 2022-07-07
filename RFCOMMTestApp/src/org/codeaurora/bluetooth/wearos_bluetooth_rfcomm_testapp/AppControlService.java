@@ -635,19 +635,19 @@ public class AppControlService extends Service {
                 Log.e(TAG, "Error occurred when creating output stream", e);
             }
             int chunksize = mChunkSize;
-            chunksize = chunksize * 1024;
+            //chunksize = chunksize * 1024;
             Log.d(TAG, "chunkSize is :: " + chunksize);
             Log.d(TAG, "pattern is :: " + mpattern);
-            StringBuilder sb = new StringBuilder(chunksize);
+            StringBuilder sb = new StringBuilder(1024);
 
             if(mpattern == DEFAULT_DATA_PATTERN) {
-               for(int i = 0; i < chunksize; i++) {
+               for(int i = 0; i < 1024; i++) {
                    sb.append('a');
               }
             }
 
             else if(mpattern == BINARY_DATA_PATTERN) {
-               for(int i = 0; i < chunksize; i++) {
+               for(int i = 0; i < 1024; i++) {
                    if(i%2 == 0)
                        sb.append('1');
                    else
@@ -659,7 +659,7 @@ public class AppControlService extends Service {
                 int start = 0x02;
                 int a = start;
                 int i;
-                for(i = 1;i<chunksize; i++) {
+                for(i = 0;i<1024; i++) {
                    int newbit = (((a >> 9) ^ (a >> 6)) & 1);
                    a = ((a << 1) | newbit) & 0x7ff;
                    int b = a & 1;
@@ -674,9 +674,15 @@ public class AppControlService extends Service {
             Log.d(TAG, "start time: " + tx_start_time);
             Log.d(TAG, "senttext.length() :: " + senttext.length());
             try {
+                int i =1;
                 outputStream.write(start.getBytes());
-                outputStream.write(senttext.getBytes());
+                while(i <= chunksize)
+                {
+                    outputStream.write(senttext.getBytes());
+                    i++;
+                }
                 outputStream.write(end.getBytes());
+
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when sending data", e);
                 Message message = Message.obtain();
