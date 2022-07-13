@@ -53,10 +53,10 @@ public class NotificationOffloadStateMachine extends StateMachine {
     private ReadyToConnect mReadyToConnect;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
     private ConnectedState mConnectedState;
-    private NotificationReceiveState mNotRcvState;
+    public NotificationReceiveState mNotRcvState;
     private DisconnectedState mDisconnectedState;
     private ControlPointState mControlPointState;
-    private Offloaded mOffloaded;
+    public Offloaded mOffloaded;
     public static IState ncPreviousState;
 
     private static final String name = "BluetoothRFCommNotApp";
@@ -254,8 +254,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
             transitionTo(mNotRcvState);
             Log.d(TAG, "Going to Notification Receive state");
             SocketServer.sendSocketData("Device is Connected.");
-            SocketServer.mainMenuState = SocketServer.NOT_RCV;
-            SocketServer.processOutputState = SocketServer.NOT_RCV;
         }
 
         @Override
@@ -288,7 +286,9 @@ public class NotificationOffloadStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
-            SocketServer.sendSocketData("Notification Receive State Started");
+            SocketServer.mainMenuState = SocketServer.NOT_RCV;
+            SocketServer.processOutputState = SocketServer.NOT_RCV;
+            SocketServer.updateSocketClient();
         }
 
         @Override
@@ -327,10 +327,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "Going to ControlPoint state");
-            if (AppControlActivity.mWakeLock != null) {
-                Log.d(TAG, "Wakelock acquire");
-                AppControlActivity.mWakeLock.acquire();
-            }
             SocketServer.sendSocketData("ControlPoint State Started");
         }
 
@@ -354,22 +350,7 @@ public class NotificationOffloadStateMachine extends StateMachine {
                     mAppControlService.responseFromCLI((String) message.obj);
                     break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END:
-                    if (AppControlActivity.mWakeLock != null) {
-                        Log.i(TAG, "Releasing mWakelock");
-                        try {
-                            AppControlActivity.mWakeLock.release();
-                            AppControlActivity.mWakeLock_acquired = false;
-                        } catch (Throwable th) {
-                            // ignoring this exception, probably wakeLock was
-                            // already released
-                        }
-                    } else {
-                        Log.e(TAG, "Wakelock reference is null");
-                    }
                     transitionTo(mNotRcvState);
-                    SocketServer.mainMenuState = SocketServer.NOT_RCV;
-                    SocketServer.processOutputState = SocketServer.NOT_RCV;
-                    SocketServer.updateSocketClient();
                     break;
                 case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
                     mAppControlService.closeConnection();
@@ -390,12 +371,13 @@ public class NotificationOffloadStateMachine extends StateMachine {
         public void enter() {
            Log.i(TAG, "Enter: " + getCurrentMessage().what);
            SocketServer.sendSocketData("Offloaded State");
+           Log.d(TAG, "Reading context from protobuf");
            //byte[] blob = AppContextProto.getAppContextProtoBuffer();
            //if(blob.length > 0) {
            //    processSetAppContext(blob);
            //}
            //inform OffloadableAppAdapter
-		   //mAppControlService.mOfflodableAppAdapter.enableOffloadDone(mAppControlService.BT_OK);
+           mAppControlService.mNotificationMgr.enableOffloadDone(mAppControlService.BT_OK);
         }
 
         @Override
@@ -439,6 +421,11 @@ public class NotificationOffloadStateMachine extends StateMachine {
             boolean retvalue = HANDLED;
             switch (message.what) {
             case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
+                 mAppControlService.closeConnection();
+                 transitionTo(mInitState);
+                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                 SocketServer.processOutputState = SocketServer.INIT_MENU;
+                 SocketServer.updateSocketClient();
                 break;
             }
             return retvalue;

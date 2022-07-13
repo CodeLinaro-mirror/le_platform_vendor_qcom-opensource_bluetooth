@@ -65,6 +65,7 @@ public class SocketServer {
     InputStream input;
     private static OutputStream output;
 
+    connectionHandler cnd;
     communicationHandler commHandler;
 
     static final int INIT_MENU = 0;
@@ -120,36 +121,44 @@ public class SocketServer {
             if (null != server) {
                 try {
                     Log.d(TAG, "localSocketServer begins to accept()");
-                    client = server.accept();
+                    while(true)
+                    {
+                        client = server.accept();
+                        socketOpen = true;
+                        Log.d(TAG, "localSocket accepted");
+                        cnd = new connectionHandler();
+                        cnd.start();
+                    }
                 } catch (IOException e) {
                     Log.e(TAG, "localSocketServer accept() failed !!!");
                     e.printStackTrace();
                 }
 
-                socketOpen = true;
-                Log.d(TAG, "localSocket accepted");
-
-                try {
-                    input = client.getInputStream();
-                    Log.d(TAG, "getInputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getInputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                try {
-                    output = client.getOutputStream();
-                    Log.d(TAG, "getOutputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getOutputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                commHandler = new communicationHandler();
-                commHandler.start();
             } else {
                 Log.d(TAG, "The LocalServerSocket is NULL");
             }
+        }
+    }
+
+    private class connectionHandler extends Thread{
+        public void run(){
+            try {
+                   input = client.getInputStream();
+                   Log.d(TAG, "getInputStream");
+            } catch(IOException e) {
+                   Log.e(TAG, "getInputStream() failed !!!");
+                   e.printStackTrace();
+                }
+
+            try {
+                   output = client.getOutputStream();
+                   Log.d(TAG, "getOutputStream");
+            } catch (IOException e){
+                   Log.e(TAG, "getOutputStream() failed !!!");
+                   e.printStackTrace();
+                }
+            commHandler = new communicationHandler();
+            commHandler.start();
         }
     }
 
@@ -200,16 +209,6 @@ public class SocketServer {
                             e.printStackTrace();
                         }
                     }
-
-                    if (server != null) {
-                        try {
-                            server.close();
-                            Log.i(TAG, "server closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "server close failed");
-                            e.printStackTrace();
-                        }
-                    }
                     break;
                 }
             }
@@ -242,8 +241,7 @@ public class SocketServer {
         case OFFLOAD_TESTING_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
-            sendStr.append("                     Register_OffloadService\n");
-            sendStr.append("                     DeRegister_OffloadService\n");
+            sendStr.append("                     Notification_Receive_State (If you already connected and went back to Main_Menu)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -266,7 +264,7 @@ public class SocketServer {
 
         case THROUGHPUT_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     Tx (Ex: Tx chunkSize:1000)\n");
+            sendStr.append("                     Tx(Select chunkSize and pattern 1(Default) 2(Binary) or 3(PRBS9)) (Ex: Tx chunkSize:1000 pattern:1)\n");
             sendStr.append("                     Rx (Ex: Rx )\n");
             sendStr.append("                     Wakeable (Ex: Wakeable timer:1000)\n");
             sendStr.append("                     Actionable (Ex: Actionable timer:1000)\n");
@@ -284,9 +282,14 @@ public class SocketServer {
             break;
 
         case NOT_RCV:
-            sendStr.append("Notification Receive State\n");
-            sendStr.append("Do Action  action action_value not_handle            [exp: action 1 1]\n");
-            sendStr.append("Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("\n********** Notification Receive State Started **************\n");
+            sendStr.append("        SetMode (Ex: SetMode 0(offload/tracker), 1(TWM), 2(DS), 3(active))\n");
+            sendStr.append("        Register_OffloadService\n");
+            sendStr.append("        DeRegister_OffloadService\n");
+            sendStr.append("        Do Action  action action_value not_handle            [exp: action 1 1]\n");
+            sendStr.append("        Action values   = 1[Dismiss]               2[Attend]        3[Ignore]\n");
+            sendStr.append("        Main_Menu\n");
+            sendStr.append("**************************************************************\n");
             break;
 
         case CTL_PT:
@@ -322,6 +325,9 @@ public class SocketServer {
                     closeReceived = true;
                     mainMenuState = INIT_MENU;
                     processOutputState = SOC_CLOSE_ACK;
+                    Message message = Message.obtain();
+                    message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED;
+                    Utils.notificationOffloadStateMachine.sendMessage(message);
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
                 } else if (inputString.equals("GAP")) {
@@ -392,47 +398,59 @@ public class SocketServer {
                 if (tmp[0].equals("Connect")) {
                     Connect connectParam = parser.connectParse(tmp[1]);
                     if (connectParam != null) {
-                        Utils.bdAddressFromConfig = connectParam.BDaddress;
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_CONNECT;
-                        Utils.notificationOffloadStateMachine
-                        .sendMessage(message);
+                        if(Utils.notificationOffloadStateMachine.getCurrentState() == Utils.notificationOffloadStateMachine.mNotRcvState)
+                        {
+                            sendSocketData("Device is already connected\n");
+                        }
+                        else if(Utils.notificationOffloadStateMachine.getCurrentState() == Utils.notificationOffloadStateMachine.mOffloaded)
+                        {
+                            sendSocketData("Device is already connected\n");
+                        }
+                        else
+                        {
+                             Utils.bdAddressFromConfig = connectParam.BDaddress;
+                             processOutputState = NONE;
+                             Message message = Message.obtain();
+                             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_CONNECT;
+                             Utils.notificationOffloadStateMachine.sendMessage(message);
+                        }
                     } else {
                         processOutputState = INVALID_INPUT;
-                        mainMenuState = INIT_MENU;
+                        mainMenuState = OFFLOAD_TESTING_MENU;
                     }
-                } else if (tmp[0].equals("Incoming_Connection")) {
-                    IncomingConnection incomingConnection = parser
-                            .incomingConnectionParse(tmp[1]);
-                    if (incomingConnection != null) {
-                        processOutputState = NONE;
-                        Utils.UUIDConstants.INCOMING_CONNECTION_UUID = UUID
-                                .fromString(incomingConnection.uuid);
-                        Message message = Message.obtain();
-                        message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION;
-                        Utils.notificationOffloadStateMachine
-                        .sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                        mainMenuState = INIT_MENU;
-                    }
+                }else
+                {
+                    processOutputState = INVALID_INPUT;
+                    mainMenuState = OFFLOAD_TESTING_MENU;
                 }
-            } else if (inputString.equals("Register_OffloadService")) {
-                mainMenuState = OFFLOAD_TESTING_MENU;
-                processOutputState = OFFLOAD_TESTING_MENU;
-            } else if (inputString.equals("DeRegister_OffloadService")) {
-                mainMenuState = OFFLOAD_TESTING_MENU;
-                processOutputState = OFFLOAD_TESTING_MENU;
             } else if (inputString.equals("Back")) {
                 mainMenuState = INIT_MENU;
                 processOutputState = INIT_MENU;
                 Utils.isThroughputStateMachineUnderProcessing = false;
                 Utils.isOffloadStateMachineUnderProcessing = false;
-            } else {
+            } else if (inputString.equals("Notification_Receive_State")) {
+                if (Utils.notificationOffloadStateMachine.getCurrentState() == Utils.notificationOffloadStateMachine.mNotRcvState) {
+                    Log.d(TAG, "State machine in NOT_RCV state so moving to Notification receive state");
+                    mainMenuState = NOT_RCV;
+                    processOutputState = NOT_RCV;
+                    sendSocketData("Device is in Notification receive state\n");
+                }
+                else if(Utils.notificationOffloadStateMachine.getCurrentState() == Utils.notificationOffloadStateMachine.mOffloaded)
+                {
+                    sendSocketData("Device is in offloaded state\n");
+                    mainMenuState = NOT_RCV;
+                    processOutputState = NOT_RCV;
+                } else {
+                    mainMenuState = OFFLOAD_TESTING_MENU;
+                    processOutputState = NONE;
+                    Log.d(TAG, "State machine not in NOT_RCV state so Ignoring the request");
+                    sendSocketData("Device is not in Notification receive state\n");
+                }
+            }  else {
                 processOutputState = INVALID_INPUT;
             }
             break;
+
 
         case MAIN_MENU:
             if (inputString.equals("Throughput")) {
@@ -463,6 +481,26 @@ public class SocketServer {
                 Message message_cpe = Message.obtain();
                 message_cpe.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
                 Utils.notificationOffloadStateMachine.sendMessage(message_cpe);
+            } else if(tmp[0].equals("SetMode")) {
+                processOutputState = NONE;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_SET_MODE,Integer.parseInt(tmp[1]));
+                AppControlService.msghandler.sendMessage(message);
+            } else if (inputString.equals("Register_OffloadService")) {
+                mainMenuState = NOT_RCV;
+                processOutputState = NONE;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_REGISTER_OFFLODABLE_ADAPTER, null);
+                AppControlService.msghandler.sendMessage(message);
+            } else if (inputString.equals("DeRegister_OffloadService")) {
+                mainMenuState = NOT_RCV;
+                processOutputState = NONE;
+                Message message = Message.obtain();
+                message = AppControlService.msghandler.obtainMessage(Utils.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER, null);
+                AppControlService.msghandler.sendMessage(message);
+            } else if (inputString.equals("Main_Menu")) {
+                mainMenuState = INIT_MENU;
+                processOutputState = INIT_MENU;
             }
             break;
 
@@ -547,10 +585,14 @@ public class SocketServer {
             break;
 
         case THROUGHPUT_MENU:
-            tmp = inputString.split(" ", 2);
-            if (tmp.length == 2) {
+            tmp = inputString.split(" ");
+            if (tmp.length == 2 || tmp.length==3) {
                 if (tmp[0].equals("Tx")) {
-                    Tx txParam = parser.txParse(tmp[1]);
+                    Tx txParam = null;
+                    if(tmp.length == 2)
+                         txParam = parser.txParse(tmp[1], "pattern:1");
+                    else if(tmp.length == 3)
+                         txParam = parser.txParse(tmp[1], tmp[2]);
                     if (txParam != null) {
                         processOutputState = NONE;
                         Message message = Message.obtain();

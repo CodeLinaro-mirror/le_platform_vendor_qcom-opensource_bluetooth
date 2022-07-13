@@ -31,8 +31,6 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
 import static android.widget.Toast.makeText;
 
-//import com.qualcomm.bluetooth_offload.client.*;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,8 +51,10 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import vendor.qti.bluetooth_offload.BluetoothOffloadCallback;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
+import vendor.qti.bluetooth_offload.NotificationOffloadMgr;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -91,15 +91,27 @@ public class AppControlService extends Service {
     public AcceptThread mAcceptThread = null;
     public ServerConnectedThread mServerConnectedThread = null;
     private static final String name = "BluetoothRFCommNotApp";
+    private static String remoteAddr;
+    private static String serviceId;
+    private static String appId;
     private static boolean sdpRecordFound = false;
     private Looper mlooper;
     public static OffloadServiceMessageHandler msghandler = null;
-    //public OffloadableAppAdapter mOfflodableAppAdapter;
-
+    public NotificationOffloadMgr   mNotificationMgr = null;
+    public static final int ACTIVE_STATE = 3;
+    public static final int TWM_STATE = 1;
+    public static final int DS_STATE = 2;
+    public static final int TRACKER_STATE = 0;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
     public static final int BT_INVALID_STATE = 2;
+    public static final int DEFAULT_DATA_PATTERN = 1;
+    public static final int BINARY_DATA_PATTERN  = 2;
+    public static final int PRBS9_DATA_PATTERN   = 3;
+    public static boolean pmLockStatus = false;
+    private static int MAX_RETRY;
+    private static boolean offloadstart_processing;
 
     private static LinkedList<NotificationPacketInd> NotificationPacketList = new LinkedList<NotificationPacketInd>();
 
@@ -143,7 +155,7 @@ public class AppControlService extends Service {
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
                 notificationIntent, 0);
-
+        pmLockStatus = false;
         Notification notification = new NotificationCompat.Builder(this)
         .setContentTitle("RFCOMM Test App")
         .setContentText("Running...!!!")
@@ -157,6 +169,8 @@ public class AppControlService extends Service {
             startStateMachine();
         }
         registerReceiver();
+        MAX_RETRY = 3;
+        offloadstart_processing = false;
     }
 
     @Override
@@ -168,6 +182,7 @@ public class AppControlService extends Service {
         Thread.start();
         mlooper = Thread.getLooper();
         msghandler = new OffloadServiceMessageHandler(mContext, mlooper);
+        Utils.mAppControlService = AppControlService.this;
         return Service.START_STICKY;
     }
 
@@ -183,6 +198,8 @@ public class AppControlService extends Service {
         /* Stop Offload Service msg hdlr looper*/
         mlooper.quitSafely();
         SocketServer.cleanUp();
+        processDRegisterOfflodableAdapter();
+        pmLockStatus = false;
     }
 
     private final IBinder localBinder = new MyBinder();
@@ -196,7 +213,6 @@ public class AppControlService extends Service {
 
         public AppControlService getService() {
             return AppControlService.this;
-
         }
     }
 
@@ -321,7 +337,6 @@ public class AppControlService extends Service {
             Log.d(TAG, "ServerConnectedThread Running run()");
             byte[] buffer = new byte[1024]; //buffer to store the stream
             int bytes;
-
             while (true) {
                 try {
                     bytes = mInputStream.read(buffer);
@@ -595,17 +610,19 @@ public class AppControlService extends Service {
         }
     }
 
-    public void startTxOperation(int chunkSize) {
-        Runnable txOperationRunnable = new TxOperationRunnable(chunkSize);
+    public void startTxOperation(int chunkSize, int pattern) {
+        Runnable txOperationRunnable = new TxOperationRunnable(chunkSize, pattern);
         new Thread(txOperationRunnable).start();
     }
 
     private class TxOperationRunnable implements Runnable {
 
         int mChunkSize;
+        int mpattern;
 
-        public TxOperationRunnable(int chunkSize) {
+        public TxOperationRunnable(int chunkSize, int pattern) {
             mChunkSize = chunkSize;
+            mpattern = pattern;
         }
 
         public void run() {
@@ -620,9 +637,34 @@ public class AppControlService extends Service {
             int chunksize = mChunkSize;
             chunksize = chunksize * 1024;
             Log.d(TAG, "chunkSize is :: " + chunksize);
+            Log.d(TAG, "pattern is :: " + mpattern);
             StringBuilder sb = new StringBuilder(chunksize);
-            for (int i = 0; i < chunksize; i++) {
-                sb.append('a');
+
+            if(mpattern == DEFAULT_DATA_PATTERN) {
+               for(int i = 0; i < chunksize; i++) {
+                   sb.append('a');
+              }
+            }
+
+            else if(mpattern == BINARY_DATA_PATTERN) {
+               for(int i = 0; i < chunksize; i++) {
+                   if(i%2 == 0)
+                       sb.append('1');
+                   else
+                       sb.append('0');
+                }
+            }
+            else
+            {
+                int start = 0x02;
+                int a = start;
+                int i;
+                for(i = 1;i<chunksize; i++) {
+                   int newbit = (((a >> 9) ^ (a >> 6)) & 1);
+                   a = ((a << 1) | newbit) & 0x7ff;
+                   int b = a & 1;
+                   sb.append(Integer.toString(b));
+                }
             }
             String senttext = sb.toString();
             String start = "Start";
@@ -666,7 +708,20 @@ public class AppControlService extends Service {
     };
 
     public void startRxOperation() {
-
+        OutputStream outputStream = null;
+        Log.d(TAG, "startNotRcvOperation");
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        try {
+            outputStream.write("Device connected and ready to receive notifications".getBytes());
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        }
         Thread rxOperation = new Thread(rxOperationRunnable);
         rxOperation.start();
     }
@@ -1052,6 +1107,20 @@ public class AppControlService extends Service {
     }
 
     public void startNotRcvOperation() {
+        OutputStream outputStream = null;
+        Log.d(TAG, "startNotRcvOperation");
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        try {
+            outputStream.write("Device connected and ready to receive notifications".getBytes());
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        }
         Thread notRcvOperation = new Thread(notRcvOperationRunnable);
         notRcvOperation.start();
     }
@@ -1095,22 +1164,15 @@ public class AppControlService extends Service {
     };
 
     public void startNotCTLPTOperation() {
+        Log.d(TAG, "startNotCTLPTOperation");
         Thread prNotRunnable = new Thread(processNotificationRunnable);
         prNotRunnable.start();
     }
 
     Runnable processNotificationRunnable = new Runnable() {
         public void run() {
-            for (int i =0; i < NotificationPacketList.size(); i++) {
-                processNotification(NotificationPacketList.get(i));
-                try {
-                    /*Adding sleep just because RFCOMM has not to merge
-                     * requests. We have to send each request has single packet
-                    */
-                    Thread.sleep(300);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error occurred when creating output stream", e);
-                }
+            while(NotificationPacketList.size() > 0) {
+                processNotification(NotificationPacketList.getFirst());
             }
             Message message = Message.obtain();
             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_END;
@@ -1367,6 +1429,7 @@ public class AppControlService extends Service {
             SocketServer.sendSocketData(sendStr.toString());
             sendStr.delete(0, sendStr.length());
         }
+        NotificationPacketList.remove(obj);
     }
 
     public void notificationReceived(byte[] bytes) {
@@ -1521,6 +1584,11 @@ public class AppControlService extends Service {
                 case Utils.MSG_AS_DREGISTER_OFFLODABLE_ADAPTER:
                     processDRegisterOfflodableAdapter();
                     break;
+                case Utils.MSG_AS_SET_MODE:
+                    MAX_RETRY = 3;
+                    int mode = (int)message.obj;
+                    processSetMode(mode);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
@@ -1528,65 +1596,171 @@ public class AppControlService extends Service {
         }
     }
 
-    /*
-       private final OffloadableAppCallback mofflodableappcallback = new OffloadableAppCallback(){
-       @Override
-       public void notifyStartDone(int status) {
-       if(status == BT_OK) {
-       Log.d(TAG, "Offload Register Done");
-       } else {
-       Log.d(TAG, "offload Registartion failed Status: " + status);
-       }
+    private final BluetoothOffloadCallback mOffloadcallbacks = new BluetoothOffloadCallback() {
+
+       public void onNotifyStartDone(int status) {
+           if(status == BT_OK) {
+               Log.d(TAG, "Offload Register Done");
+           } else {
+               Log.d(TAG, "offload Registartion failed Status: " + status);
+           }
        }
 
-       @Override
-       public void notifyStopDone(int status) {
-       if(status == BT_OK) {
-       Log.d(TAG, "Offload Deregister Done");
-       } else {
-       Log.d(TAG, "offload Deregistration failed Status: " + status);
-       }
-       }
-
-       @Override
-       public int notifyOffloadEnable(int mode) {
-       Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
-       mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
-       Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
-       Message message = Message.obtain();
-       message.what = Utils.MSG_NC_SM_OFFLOADED;
-       mNotificationOffloadStateMachine.sendMessage(message);
-       return 0;
+       public void onNotifyStopDone(int status) {
+           if(status == BT_OK) {
+               Log.d(TAG, "Offload Deregister Done");
+           } else {
+               Log.d(TAG, "offload Deregistration failed Status: " + status);
+           }
        }
 
-       @Override
-       public int notifyOffloadDisable(ArrayList<Byte> blob) {
-       Log.d(TAG, "notifyOffloadDisable blob len: " + blob.size() + " Blob " + blob);
-//mOfflodableAppAdapter.disableOffloadDone(BT_OK);
-Message message = Message.obtain();
-message.what = Utils.MSG_NC_SM_ACTIVE;
-mNotificationOffloadStateMachine.sendMessage(message);
-return 0;
+       public int onNotifyEnableOffload(int mode) {
+           Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
+           mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
+           Log.d(TAG, "CurrentState: " + mNotificationOffloadStateMachine.ncPreviousState.getName());
+           Message message = Message.obtain();
+           message.what = Utils.MSG_NC_SM_OFFLOADED;
+           mNotificationOffloadStateMachine.sendMessage(message);
+           return 0;
        }
 
-       @Override
-       public void notifyAsyncErr(int status) {
-       Log.i(TAG, "notifyAsyncErr status: " + status);
+       public int onNotifyDisableOffload(byte[] blob) {
+           Log.d(TAG, "notifyOffloadDisable");
+           Message message = Message.obtain();
+           message.what = Utils.MSG_NC_SM_ACTIVE;
+           mNotificationOffloadStateMachine.sendMessage(message);
+           int size = (blob.length/8);
+           if (size > 0) {
+               Message message_cp = Message.obtain();
+               message_cp.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONTROL_POINT;
+               mNotificationOffloadStateMachine.sendMessage(message_cp);
+           }
+           int Notification_size = 8;
+           Log.i(TAG," payload: " + Arrays.toString(blob));
+           for (int i = 0; i<size; i++) {
+               byte [] value = new byte[Notification_size];
+               for(int j = 0 ; j<Notification_size ; j++) {
+                   value[j] = blob[(Notification_size*i)+j];
+               }
+               Log.i(TAG," Notification payload: " + Arrays.toString(value));
+               NotificationPacketInd notification = new NotificationPacketInd(value);
+               NotificationPacketList.add(notification);
+           }
+           Log.i(TAG," NotificationPacketList size : " + NotificationPacketList.size());
+           if (size > 0) {
+               Message message_cps = Message.obtain();
+               message_cps.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_NOT_PROCESS_START;
+               mNotificationOffloadStateMachine.sendMessage(message_cps);
+           }
+           return 0;
        }
-       };
-       */
+
+       public void onNotifyAsyncErr(int status) {
+            Log.i(TAG, "notifyAsyncErr status: " + status);
+       }
+
+       public void onTransitionToPwrStateDone(int status) {
+           Log.d(TAG, "transitionToPwrStateDone status " + status);
+           if (status == 0) {
+               if (MAX_RETRY > 0 && offloadstart_processing) {
+                   SocketServer.sendSocketData("transitionToPwrState failed retry Offload. Retry count "+MAX_RETRY+"\n");
+                   processSetMode(TRACKER_STATE);
+                   MAX_RETRY = MAX_RETRY - 1;
+               } else {
+                   SocketServer.sendSocketData("transitionToPwrState failed. Retry ends\n");
+               }
+           } else {
+               if (offloadstart_processing) {
+                   releasePMLock();
+                   offloadstart_processing = false;
+               }
+               SocketServer.sendSocketData("transitionToPwrState Done\n");
+           }
+       }
+    };
 
     private void processRegisterOfflodableAdapter() {
-        Log.d(TAG, "processGRegisterOfflodableAdapter()");
-        //mOfflodableAppAdapter = new OffloadableAppAdapter(mContext, mofflodableappcallback);
-        //mOfflodableAppAdapter.start();
-        SocketServer.sendSocketData("OffloadableApp Registered");
+        mNotificationMgr = new NotificationOffloadMgr(mContext);
+        if(BT_FAIL == mNotificationMgr.register(mOffloadcallbacks)) {
+            Log.e(TAG, "failed to register notification offload adapter");
+            SocketServer.sendSocketData("failed to register notification offload adapter\n");
+            return;
+        }
+        if (Utils.bdAddressFromConfig == null) {
+            SocketServer.sendSocketData("failed to send App Context Info. Remote address is null\n");
+        } else {
+            SocketServer.sendSocketData("Setting App Info with Address: " + Utils.bdAddressFromConfig + " Service UUID: " + Utils.UUIDConstants.APP_UUID.toString() + " App Id: " + mContext.getPackageName() + "\n");
+            mNotificationMgr.setRfCommAppContextInfo(Utils.bdAddressFromConfig, Utils.UUIDConstants.APP_UUID.toString(), mContext.getPackageName());
+        }
+        Log.d(TAG, "Registered notification offload adapter");
+        SocketServer.sendSocketData("OffloadableApp Registered\n");
     }
 
     private void processDRegisterOfflodableAdapter() {
         Log.d(TAG, "processDRegisterOfflodableAdapter()");
-        //mOfflodableAppAdapter.stop();
+        if (mNotificationMgr != null) {
+            mNotificationMgr.unregister();
+            mNotificationMgr = null;
+        }
         SocketServer.sendSocketData("OffloadableService Deregistered");
     }
 
+    public void processSetMode(int mode) {
+        Log.d(TAG, "processSetMode() mode: " + mode);
+
+        String mode_string;
+        if (mode == ACTIVE_STATE) {
+            if (pmLockStatus == true ) {
+                Log.i(TAG, "PM wakelock acuired but received OffloadStop. releasing wakelock ");
+                releasePMLock();
+            }
+        } else {
+            acquirePMLock();
+            offloadstart_processing = true;
+        }
+        if (mNotificationMgr != null) {
+            mNotificationMgr.transitionToPwrState(mode);
+            switch(mode) {
+                case 0:
+                    mode_string = "Tracker mode";
+                    break;
+                case 1:
+                    mode_string = "TWM mode";
+                    break;
+                case 2:
+                    mode_string = "DS mode";
+                    break;
+                case 3:
+                    mode_string = "Active mode";
+                    break;
+                default:
+                    mode_string = "invalid mode";
+                    break;
+            }
+            SocketServer.sendSocketData("sent transitionToPwrState "+ mode_string +"\n");
+        }
+    }
+
+    private void processSetAppContext(byte[] blob) {
+        Log.i(TAG, "processSetAppContext() blob: " + Arrays.toString(blob));
+        ArrayList<Byte> blobBytes = new ArrayList<Byte>();
+        for (int i = 0; i < blob.length; i++) {
+            blobBytes.add(blob[i]);
+        }
+        //mNotificationMgr.setAppSpecificContextInfo(blobBytes);
+    }
+
+    public void acquirePMLock() {
+        pmLockStatus = true;
+        if (mNotificationMgr != null) {
+            mNotificationMgr.acquire_pm_wakelock();
+        }
+    }
+
+    public void releasePMLock() {
+        pmLockStatus = false;
+        if (mNotificationMgr != null) {
+            mNotificationMgr.release_pm_wakelock();
+        }
+    }
 }

@@ -33,6 +33,7 @@ import static android.widget.Toast.makeText;
 
 import android.Manifest;
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -42,8 +43,6 @@ import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
@@ -58,8 +57,6 @@ public class AppControlActivity extends Activity {
 
     AppControlService appControlService;
     boolean isBound = false;
-    public static WakeLock mWakeLock;
-    public static boolean mWakeLock_acquired = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,29 +64,20 @@ public class AppControlActivity extends Activity {
         Log.d(TAG, "onCreate");
         if (savedInstanceState != null) {
             // Restore value of members from saved state
-            mWakeLock_acquired = savedInstanceState
-                    .getBoolean("mWakeLock_acquired");
         } else {
-            PowerManager pm = (PowerManager) getApplicationContext()
-                    .getSystemService(Context.POWER_SERVICE);
-            mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                    "WakeLock");
         }
         mContext = getApplicationContext();
         setContentView(R.layout.activity_main);
+        IntentFilter filter1 = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(on_offBroadcastReceiver, filter1);
         socServer = SocketServer.getInstance();
         Intent intent = new Intent(this, AppControlService.class);
-        // bindService(intent, appControlServiceConnection, BIND_AUTO_CREATE);
         this.startService(intent);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
         Log.d(TAG, "onSaveInstanceState");
-        if (mWakeLock_acquired) {
-            savedInstanceState.putBoolean("mWakeLock_acquired", true);
-            Log.d(TAG, "onSaveInstanceState:mWakeLock_acquired -true");
-        }
         super.onSaveInstanceState(savedInstanceState);
     }
 
@@ -97,15 +85,12 @@ public class AppControlActivity extends Activity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         Log.d(TAG, "onRestoreInstanceState called");
-        mWakeLock_acquired = savedInstanceState
-                .getBoolean("mWakeLock_acquired");
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "onStart");
-
     }
 
     @Override
@@ -142,6 +127,7 @@ public class AppControlActivity extends Activity {
         }
         Intent intent = new Intent(this, AppControlService.class);
         this.stopService(intent);
+        unregisterReceiver(on_offBroadcastReceiver);
     }
 
     @Override
@@ -156,7 +142,6 @@ public class AppControlActivity extends Activity {
             AppControlService.MyBinder binder = (AppControlService.MyBinder) service;
             appControlService = binder.getService();
             isBound = true;
-
         }
 
         @Override
@@ -164,7 +149,28 @@ public class AppControlActivity extends Activity {
             Log.d(TAG, "onServiceDisconnected");
             isBound = false;
             appControlService = null;
-
         }
     };
+
+   private final BroadcastReceiver on_offBroadcastReceiver = new BroadcastReceiver() {
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        final String action = intent.getAction();
+
+        if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+            final int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+            switch(state) {
+                case BluetoothAdapter.STATE_OFF:
+                     socServer.sendSocketData("BT is turned off !!\n");
+                     Log.d("BroadcastActions", "BT is turned off !!");
+                     break;
+                case BluetoothAdapter.STATE_ON:
+                     socServer.sendSocketData("BT is turned on !!\n");
+                     Log.d("BroadcastActions", "BT is turned on !!");
+                     break;
+            }
+        }
+    }
+  };
 }
