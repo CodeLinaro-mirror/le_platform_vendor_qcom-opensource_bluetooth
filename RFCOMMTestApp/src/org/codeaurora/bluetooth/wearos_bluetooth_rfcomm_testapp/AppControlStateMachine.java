@@ -93,7 +93,7 @@ public class AppControlStateMachine extends StateMachine {
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
-    private BluetoothHidState mBluetoothHidState;
+    private HidTestState mHidTestState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -110,7 +110,7 @@ public class AppControlStateMachine extends StateMachine {
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
         mReadyToAcceptConnection = new ReadyToAcceptConnection();
-        mBluetoothHidState = new BluetoothHidState();
+        mHidTestState = new HidTestState();
 
         // Adding States
         addState(mInitState);
@@ -122,7 +122,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDisconnectedState);
         addState(mGapTestState);
         addState(mReadyToAcceptConnection);
-        addState(mBluetoothHidState);
+        addState(mHidTestState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -178,10 +178,9 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to GAP Test Cases state");
                 break;
 
-            case Utils.StateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID:
-                transitionTo(mBluetoothHidState);
-                Log.d(TAG, "Going to Bluetooth HID state");
-                break;
+           case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
+				transitionTo(mHidTestState);
+				break;
             }
             return retvalue;
         }
@@ -593,4 +592,73 @@ public class AppControlStateMachine extends StateMachine {
             return retvalue;
         }
     }
+			private class HidTestState extends State {
+		private static final String TAG = "BluetoothTxRxApp :: AppControlStateMachine :: HidTestState";
+		@Override
+		public void enter() {
+			Log.d(TAG, "enter()");
+		}
+		@Override
+		public void exit() {
+			Log.d(TAG, "exit()");
+		}
+		@Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+			case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
+                SocketServer.sendSocketData("Start Bluetooth HID Test Cases");
+                Log.d(TAG, "Start Bluetooth HID Test Cases");
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+					Log.d(TAG, "Going to registerBluetoothHid");
+                    mAppControlService.registerBluetoothHid();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DE_REGISTER_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+						Log.d(TAG, "Going to de_registerBluetoothHid");
+						mAppControlService.de_registerBluetoothHid();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_CONNECT_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                    mAppControlService.device_connect_HID(mAppControlService.btDeviceToPair);
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_READY_TO_CONNECT:
+                if (mAppControlService != null) {
+                    mAppControlService.initializeTestSetup();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DISCONNECT_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                    mAppControlService.device_disconnect_HID();
+					Log.d(TAG, "Going to device disconnect to HID");
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED:
+				mAppControlService.closeConnection();
+                transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
+                SocketServer.updateSocketClient();
+                break;
+
+            case Utils.HidStateMachineMessageConstants.STATE_RE_REGISTER_BLUETOOTH_HID:
+                    SocketServer.sendSocketData("Already Hid_AppRegistered");
+                    SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    SocketServer.updateSocketClient();
+            break;
+			case Utils.HidStateMachineMessageConstants.STATE_STOP_BLUETOOTH_HID_TEST_CASES:
+					transitionTo(mInitState);
+					Log.d(TAG, "Going to Init state");
+			break;
+            }
+            return retvalue;
+        }
+	}
 }

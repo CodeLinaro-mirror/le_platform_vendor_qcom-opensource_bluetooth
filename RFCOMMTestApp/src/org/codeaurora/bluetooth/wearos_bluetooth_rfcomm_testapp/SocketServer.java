@@ -261,7 +261,7 @@ public class SocketServer {
             sendStr.append("                     Throughput_Testing\n");
             sendStr.append("                     Offload_Testing\n");
             sendStr.append("                     GAP\n");
-            sendStr.append("                     Bluetooth_HID\n");
+            sendStr.append("                     HID_Testing\n");
             sendStr.append("                     Close\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -308,22 +308,26 @@ public class SocketServer {
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
-
         case BLUETOOTH_HID_TESTING_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     register\n");
+            sendStr.append("                     Register_HIDservice\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
-
-        case INVALID_INPUT:
+         case BLUETOOTH_HID_CONNECT:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+			sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+			sendStr.append("                     DeRegister_HIDservice\n");
+			sendStr.append("                     Main_Menu\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+			break;
+		case INVALID_INPUT:
             sendStr.append("\nInvalid Input\n");
             break;
-
         case SOC_CLOSE_ACK:
             sendStr.append("A_Close");
             break;
-
         case NOT_RCV:
             sendStr.append("\n********** Notification Receive State Started **************\n");
             sendStr.append("        SetMode (Ex: SetMode 0(offload/tracker), 1(TWM), 2(DS), 3(active))\n");
@@ -359,11 +363,13 @@ public class SocketServer {
                     mainMenuState = THROUGHPUT_TESTING_MENU;
                     processOutputState = THROUGHPUT_TESTING_MENU;
                     Utils.isThroughputStateMachineUnderProcessing = true;
+					Utils.isHidControlStateMachineUnderProcessing = false;
                 } else if (inputString.equals("Offload_Testing")) {
                     Log.d(TAG, "Offload Menu");
                     mainMenuState = OFFLOAD_TESTING_MENU;
                     processOutputState = OFFLOAD_TESTING_MENU;
                     Utils.isOffloadStateMachineUnderProcessing = true;
+					Utils.isHidControlStateMachineUnderProcessing = false;
                 } else if (inputString.equals("Close")) {
                     closeReceived = true;
                     mainMenuState = INIT_MENU;
@@ -373,16 +379,22 @@ public class SocketServer {
                     Utils.notificationOffloadStateMachine.sendMessage(message);
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
+					Utils.isHidControlStateMachineUnderProcessing = false;
                 } else if (inputString.equals("GAP")) {
                     Log.d(TAG, "Gap Menu");
                     mainMenuState = CONNECTION_TEST_MENU;
                     processOutputState = CONNECTION_TEST_MENU;
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
-                } else if (inputString.equals("Bluetooth_HID")) {
-                    Log.d(TAG, "Bluetooth_HID Menu");
+					Utils.isHidControlStateMachineUnderProcessing = false;
+                } else if (inputString.equals("HID_Testing")) {
+                    Log.d(TAG, "HID Testing Menu");
                     mainMenuState = BLUETOOTH_HID_TESTING_MENU;
                     processOutputState = BLUETOOTH_HID_TESTING_MENU;
+					Message message = Message.obtain();
+					message.what = Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES;
+					Utils.appControlStateMachine.sendMessage(message);
+                    Utils.isHidControlStateMachineUnderProcessing = true;
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
                 } else {
@@ -397,10 +409,9 @@ public class SocketServer {
                 processOutputState = INVALID_INPUT;
                 Utils.isThroughputStateMachineUnderProcessing = false;
                 Utils.isOffloadStateMachineUnderProcessing = false;
+				Utils.isHidControlStateMachineUnderProcessing = false;
             }
-
             break;
-
         case THROUGHPUT_TESTING_MENU:
             tmp = inputString.split(" ", 2);
             if (tmp.length == 2) {
@@ -500,25 +511,91 @@ public class SocketServer {
             }
             break;
 
-        case BLUETOOTH_HID_TESTING_MENU:
-            if (inputString.equals("register")) {
-                processOutputState = NONE;
-                Message message = Message.obtain();
-                message.what = Utils.StateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID;
+        c//HID_testing
+		case BLUETOOTH_HID_TESTING_MENU:
+            if (inputString.equals("Register_HIDservice")) {
+				if(AppControlService.HidAppRegistered == false){
+					processOutputState = NONE;
+					Message message = Message.obtain();
+					message.what = Utils.HidStateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID;
+					Utils.appControlStateMachine.sendMessage(message);
+				}
+				else{
+					processOutputState = NONE;
+					Message message = Message.obtain();
+					message.what = Utils.HidStateMachineMessageConstants.STATE_RE_REGISTER_BLUETOOTH_HID;
+					Utils.appControlStateMachine.sendMessage(message);
+				}
+				mainMenuState = BLUETOOTH_HID_TESTING_MENU;
+			}
+			else if(inputString.equals("Back")) {
+				mainMenuState = INIT_MENU;
+				processOutputState = INIT_MENU;
+				Message message = Message.obtain();
+				message.what = Utils.HidStateMachineMessageConstants.STATE_STOP_BLUETOOTH_HID_TEST_CASES;
+				Utils.appControlStateMachine.sendMessage(message);
+				//updateSocketClient();
+			}
+		break;
+		case BLUETOOTH_HID_CONNECT:
+			if(inputString.equals("DeRegister_HIDservice")){
+				processOutputState = NONE;
+				Message message = Message.obtain();
+				message.what = Utils.HidStateMachineMessageConstants.STATE_DE_REGISTER_BLUETOOTH_HID;
                 Utils.appControlStateMachine.sendMessage(message);
-                Utils.isThroughputStateMachineUnderProcessing = false;
-                Utils.isOffloadStateMachineUnderProcessing = false;
-            } else if (inputString.equals("Back")) {
-                Message message = Message.obtain();
-                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
-                Utils.appControlStateMachine.sendMessage(message);
-                Utils.isThroughputStateMachineUnderProcessing = false;
-                Utils.isOffloadStateMachineUnderProcessing = false;
-            } else {
-                processOutputState = INVALID_INPUT;
+			}
+			else if (inputString.equals("Back")) {
+				mainMenuState = BLUETOOTH_HID_TESTING_MENU;
+				processOutputState = BLUETOOTH_HID_TESTING_MENU;
+				updateSocketClient();
             }
+			else if(inputString.equals("Main_Menu")) {
+				mainMenuState = INIT_MENU;
+				processOutputState = INIT_MENU;
+				Message message = Message.obtain();
+				message.what = Utils.HidStateMachineMessageConstants.STATE_STOP_BLUETOOTH_HID_TEST_CASES;
+				Utils.appControlStateMachine.sendMessage(message);
+			}else {
+				tmp = inputString.split(" ", 2);
+				if (tmp.length == 2) {
+					if (tmp[0].equals("Connect")) {
+						Connect connectParam = parser.connectParse(tmp[1]);
+						if (connectParam != null) {
+							if(AppControlService.btDeviceToPair == null){
+								Utils.bdAddressFromConfig = connectParam.BDaddress.toUpperCase();
+								processOutputState = NONE;
+								Message message = Message.obtain();
+								message.what = Utils.HidStateMachineMessageConstants.STATE_READY_TO_CONNECT;
+								Utils.appControlStateMachine.sendMessage(message);
+							}
+							else if(AppControlService.btDeviceToPair != null )
+							{
+								if((Utils.bdAddressFromConfig.compareTo(connectParam.BDaddress.toUpperCase())) == 0)
+									sendSocketData("Already this device is paired");
+								else if(AppControlService.mbtState == 2){ //mbtState 2 : Connected
+									sendSocketData("already one device is connected to this network");
+									sendSocketData("no other devices are added to this network");
+									updateSocketClient();
+								}
+								else if(AppControlService.mbtState == 1)
+									sendSocketData("Connecting Device...Please wait...!!!");
+								else if(AppControlService.mbtState == 0){
+									Utils.bdAddressFromConfig = connectParam.BDaddress.toUpperCase();
+									processOutputState = NONE;
+									Message message = Message.obtain();
+									message.what = Utils.HidStateMachineMessageConstants.STATE_READY_TO_CONNECT;
+									Utils.appControlStateMachine.sendMessage(message);
+								}
+							}
+						} else {
+							mainMenuState = BLUETOOTH_HID_CONNECT;
+						}
+					}
+				}else {
+                processOutputState = INVALID_INPUT;
+				}
+			}
             break;
-
         case MAIN_MENU:
             if (inputString.equals("Throughput")) {
                 mainMenuState = THROUGHPUT_MENU;

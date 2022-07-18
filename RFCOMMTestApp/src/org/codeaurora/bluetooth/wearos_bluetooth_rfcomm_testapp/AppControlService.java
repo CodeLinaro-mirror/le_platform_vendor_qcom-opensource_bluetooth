@@ -109,6 +109,8 @@ import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.app.Notification;
+import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothProfile;
 
 
 public class AppControlService extends Service {
@@ -139,6 +141,17 @@ public class AppControlService extends Service {
     public static final int DS_STATE = 2;
     public static final int TRACKER_STATE = 0;
     private BluetoothHidDevice service;
+    //HID Service
+    //private HidDeviceService mHIDservice;
+    //HidControlStateMachine mHidControlStateMachine;
+    BluetoothHidDevice mHIDservice;
+    BluetoothDevice remotedevice;
+    public static boolean HidAppRegistered = false;
+    public static int mbtState = 0;
+    public static boolean CUR_STATUS = false;
+    //private final byte[] mouseData = "0100".getBytes();
+    private final byte[] mouseData = "BXYW".getBytes();
+    public static int x=0,y=0,i=0,xrev=0,yrev=0;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
@@ -1813,19 +1826,52 @@ public class AppControlService extends Service {
               mContext, new ServiceListener(), BluetoothProfile.HID_DEVICE);
     }
 
+    public void de_registerBluetoothHid(){
+        SocketServer
+                .sendSocketData("Deregistering Bluetooth HID");
+        if(mHIDservice.unregisterApp()== true ){
+            Log.d(TAG, "de_registerBluetoothHid");
+        }
+    }
+
+    public void device_connect_HID(BluetoothDevice mRemotedevice){
+        if(mRemotedevice != null)
+        {
+            Log.d(TAG, "hid_status_check :: device is :: "+mRemotedevice);
+            if(mHIDservice.connect(mRemotedevice)== true){
+                Log.d(TAG, "Connecting device: "+mRemotedevice);
+            }
+        }
+    }
+
+    public void device_disconnect_HID(){
+        if(btDeviceToPair != null)
+        {
+            if(mHIDservice.disconnect(btDeviceToPair)== true){
+                Log.d(TAG, "Disconnecting Device "+btDeviceToPair);
+            }
+        }
+    }
+
     private final class ServiceListener implements BluetoothProfile.ServiceListener {
     @Override
     public void onServiceConnected(int profile, BluetoothProfile proxy) {
         Log.d(TAG, "onServiceConnected :: profile is :: "+profile+ " proxy is :: "+proxy);
-        service = (BluetoothHidDevice) proxy;
-        service.registerApp(
-                Constants.SDP_RECORD, null, Constants.QOS_OUT, Runnable::run, callback);
+            if(profile == BluetoothProfile.HID_DEVICE){
+                mHIDservice = (BluetoothHidDevice)proxy;
+                if(mHIDservice.registerApp(Constants.SDP_RECORD, null, Constants.QOS_OUT, Runnable::run, callback))
+                {
+                    SocketServer.sendSocketData("Registering Bluetooth HID");
+                    Log.d(TAG, "Registering_HID Services\n");
+                }
+            }
         }
     @Override
     public void onServiceDisconnected(int profile) {
         Log.d(TAG, "onServiceDisconnected :: profile is :: "+profile);
-        service = null;
-    }
+        if(mHIDservice.unregisterApp())
+            Log.d(TAG, "De-registered_HID Services\n");
+        }
     }
 
     private final BluetoothHidDevice.Callback callback =
@@ -1834,23 +1880,57 @@ public class AppControlService extends Service {
                 public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
                     super.onAppStatusChanged(pluggedDevice, registered);
                     Log.d(TAG, "onAppStatusChanged");
+                    Log.d(TAG, "onAppStatusChanged :: pluggedDevice is :: "+pluggedDevice+ " registered :: "+registered);
+                    remotedevice=pluggedDevice;
+                    HidAppRegistered=registered;
+                    if(HidAppRegistered == true){
+                        SocketServer.sendSocketData("Hid_AppRegistered");
+                        SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                        SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    }
+                    else {
+                        SocketServer.sendSocketData("Hid_AppNotRegistered or DeRegistered");
+                        SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_TESTING_MENU;
+                        SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_TESTING_MENU;
+                    }
+                    SocketServer.updateSocketClient();
                 }
 
                 @Override
                 public void onConnectionStateChanged(BluetoothDevice device, int state) {
                     super.onConnectionStateChanged(device, state);
-                    Log.d(TAG, "onConnectionStateChanged");
+                    btDeviceToPair=device;
+                    mbtState=state;
+                    if(state == 1)
+                        SocketServer.sendSocketData("Connecting Device to HID Service");
+                    else {
+                        if(state == 2)
+                        {
+                            SocketServer.sendSocketData("Device Connected to HID Service");
+                        }
+                        else if(state == 0){
+                            SocketServer.sendSocketData("Device Disconnected to HID Service");
+                            btDeviceToPair= null;
+                            CUR_STATUS=false;
+                            SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                            SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                            SocketServer.updateSocketClient();
+                        }
+                        else if(state == 3){
+                            SocketServer.sendSocketData("Disconnecting Device to HID Service");
+                        }
+                    }
                 }
 
                 @Override
                 public void onGetReport(BluetoothDevice device, byte type, byte id, int bufferSize) {
                     super.onGetReport(device, type, id, bufferSize);
-                    if (service != null) {
+                    if (mHIDservice != null) {
                         if (type != BluetoothHidDevice.REPORT_TYPE_INPUT) {
-                            service.reportError(
+                            mHIDservice.reportError(
                                     device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
                         } else if (!replyReport(device, type, id)) {
-                            service.reportError(
+                            mHIDservice.reportError(
                                     device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
                         }
                     }
@@ -1859,8 +1939,8 @@ public class AppControlService extends Service {
                 @Override
                 public void onSetReport(BluetoothDevice device, byte type, byte id, byte[] data) {
                     super.onSetReport(device, type, id, data);
-                    if (service != null) {
-                        service.reportError(device, BluetoothHidDevice.ERROR_RSP_SUCCESS);
+                    if (mHIDservice != null) {
+                        mHIDservice.reportError(device, BluetoothHidDevice.ERROR_RSP_SUCCESS);
                     }
                 }
     };
@@ -1871,8 +1951,8 @@ public class AppControlService extends Service {
             return false;
         }
 
-        if (service != null) {
-            service.replyReport(device, type, id, report);
+        if (mHIDservice != null) {
+            mHIDservice.replyReport(device, type, id, report);
         }
         return true;
     }
@@ -1882,6 +1962,10 @@ public class AppControlService extends Service {
         if (id < 0) {
             Log.d(TAG, "getReport - null");
             return null;
+        }
+        else if(id == Constants.ID_MOUSE)
+        {
+            return mouseData;
         }
         return keyboardData;
     }
