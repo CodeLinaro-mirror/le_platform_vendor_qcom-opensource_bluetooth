@@ -164,21 +164,22 @@ public class Utils {
         static UUID INCOMING_CONNECTION_UUID = null;
     }
 /*HID Service */
-		public static class HidStateMachineMessageConstants {
+        public static class HidStateMachineMessageConstants {
         static final int STATE_DISCONNECTED = 0;
         static final int STATE_READY_TO_CONNECT = 1;
         static final int STATE_CONNECTED = 2;
         static final int STATE_CONNECTION_FAILED = 3;
         static final int STATE_NOT_PROCESS_START = 4;
         static final int STATE_NOT_PROCESS_END = 5;
-		static final int STATE_REGISTER_BLUETOOTH_HID = 6;
-		static final int STATE_DE_REGISTER_BLUETOOTH_HID=7;
-		static final int STATE_DISCONNECT_BLUETOOTH_HID=8;
-		static final int STATE_CONNECT_BLUETOOTH_HID=9;
-
-		static final int STATE_RE_REGISTER_BLUETOOTH_HID=12;
-		static final int STATE_START_BLUETOOTH_HID_TEST_CASES = 13;
-		static final int STATE_STOP_BLUETOOTH_HID_TEST_CASES=14;
+        static final int STATE_REGISTER_BLUETOOTH_HID = 6;
+        static final int STATE_DE_REGISTER_BLUETOOTH_HID=7;
+        static final int STATE_DISCONNECT_BLUETOOTH_HID=8;
+        static final int STATE_CONNECT_BLUETOOTH_HID=9;
+        static final int START_MOUSE_MOVEMENT =10;
+        static final int STOP_MOUSE_MOVEMENT = 11;
+        static final int STATE_RE_REGISTER_BLUETOOTH_HID=12;
+        static final int STATE_START_BLUETOOTH_HID_TEST_CASES = 13;
+        static final int STATE_STOP_BLUETOOTH_HID_TEST_CASES=14;
     }
 
 }

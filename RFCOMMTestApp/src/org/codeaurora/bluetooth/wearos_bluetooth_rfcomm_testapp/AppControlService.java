@@ -111,13 +111,14 @@ import androidx.core.app.NotificationManagerCompat;
 import android.app.Notification;
 import android.bluetooth.BluetoothHidDevice;
 import android.bluetooth.BluetoothProfile;
+import androidx.annotation.WorkerThread;
 
 
 public class AppControlService extends Service {
     private static final String TAG = "BluetoothTxRxApp Service";
     private static BluetoothAdapter bluetoothAdapter = BluetoothAdapter
             .getDefaultAdapter();
-    BluetoothDevice btDeviceToPair = null;
+    static BluetoothDevice btDeviceToPair = null;
     private BluetoothSocket mmSocket;
     private Context mContext;
     ConfigFileParser parser;
@@ -142,8 +143,6 @@ public class AppControlService extends Service {
     public static final int TRACKER_STATE = 0;
     private BluetoothHidDevice service;
     //HID Service
-    //private HidDeviceService mHIDservice;
-    //HidControlStateMachine mHidControlStateMachine;
     BluetoothHidDevice mHIDservice;
     BluetoothDevice remotedevice;
     public static boolean HidAppRegistered = false;
@@ -323,6 +322,7 @@ public class AppControlService extends Service {
                                 + " is Terminated");
                         Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                         Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                        Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                         if (Utils.isThroughputStateMachineUnderProcessing == true) {
                             Message message = Message.obtain();
                             message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
@@ -333,6 +333,12 @@ public class AppControlService extends Service {
                             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED;
                             Utils.notificationOffloadStateMachine
                             .sendMessage(message);
+                        }
+                        if(Utils.isHidControlStateMachineUnderProcessing == true){
+                            CUR_STATUS = false;
+                            Message message = Message.obtain();
+                            message.what = Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED;
+                            Utils.appControlStateMachine.sendMessage(message);
                         }
                     }
                 }
@@ -508,12 +514,20 @@ public class AppControlService extends Service {
         if (Utils.bdAddressFromConfig != null) {
             btDeviceToPair = bluetoothAdapter
                     .getRemoteDevice(Utils.bdAddressFromConfig.toUpperCase());
+             Log.d(TAG, "btDeviceToPair  "+btDeviceToPair);
         } else {
             SocketServer
                 .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
             return;
         }
-        startConnectionProcess();
+        SocketServer
+                .sendSocketData("Connecting Device...Please wait...!!!");
+        if(Utils.isHidControlStateMachineUnderProcessing != true){
+                startConnectionProcess();
+        }
+        else{
+            device_connect_HID(btDeviceToPair);
+        }
     }
 
     public void startConnectionProcess() {
@@ -604,6 +618,7 @@ public class AppControlService extends Service {
                 Log.d(TAG, "Socket Connected");
                 Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                 Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                 if (Utils.isThroughputStateMachineUnderProcessing == true) {
                     Message message = Message.obtain();
                     message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
@@ -617,7 +632,12 @@ public class AppControlService extends Service {
                     message.obj = mmSocket.getRemoteDevice();
                     mNotificationOffloadStateMachine.sendMessage(message);
                 }
-
+                if(Utils.isHidControlStateMachineUnderProcessing == true){
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                    message.obj = mmSocket.getRemoteDevice();
+                    mAppControlStateMachine.sendMessage(message);
+                }
             } catch (IOException connectException) {
                 Log.e(TAG, "Unable to connect; close the socket and return",
                         connectException);
@@ -625,6 +645,7 @@ public class AppControlService extends Service {
                     mmSocket.close();
                     Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                     Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                    Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                     if (Utils.isThroughputStateMachineUnderProcessing == true) {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
@@ -634,6 +655,11 @@ public class AppControlService extends Service {
                         Message message = Message.obtain();
                         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTION_FAILED;
                         mNotificationOffloadStateMachine.sendMessage(message);
+}
+                    if(Utils.isHidControlStateMachineUnderProcessing == true){
+                        Message message = Message.obtain();
+                        message.what = Utils.HidStateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                        mAppControlStateMachine.sendMessage(message);
                     }
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket",
@@ -1844,6 +1870,11 @@ public class AppControlService extends Service {
         }
     }
 
+     public void mouse_ctrl(BluetoothDevice mRemotedevice){
+        if(mRemotedevice != null){
+                mouse_movement();
+        }
+    }
     public void device_disconnect_HID(){
         if(btDeviceToPair != null)
         {
@@ -1852,7 +1883,42 @@ public class AppControlService extends Service {
             }
         }
     }
-
+    @WorkerThread
+    public void mouse_movement(){
+        Arrays.fill(mouseData, (byte) 0);
+        while(CUR_STATUS){
+            mHIDservice.sendReport(btDeviceToPair, Constants.ID_MOUSE, mouseData);
+            try {
+                Thread.sleep(3);
+            } catch (Exception e) {
+                Thread.currentThread().interrupt();
+            }
+            if( x < 255 && x >= 0){
+                mouseData[1] = (byte)x;
+                xrev=x;
+                x += 15;
+            }
+            else if(xrev <= 255 && xrev > 0){
+                    mouseData[1] = (byte)xrev;
+                    xrev -= 15;
+            }
+            else
+            {
+                x=xrev;
+            }
+        }
+    }
+    public static void wait(int ms)
+    {
+        try
+        {
+            Thread.sleep(ms);
+        }
+        catch(InterruptedException ex)
+        {
+            Thread.currentThread().interrupt();
+        }
+    }
     private final class ServiceListener implements BluetoothProfile.ServiceListener {
     @Override
     public void onServiceConnected(int profile, BluetoothProfile proxy) {
@@ -1907,6 +1973,9 @@ public class AppControlService extends Service {
                         if(state == 2)
                         {
                             SocketServer.sendSocketData("Device Connected to HID Service");
+                            SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                            SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                            SocketServer.updateSocketClient();
                         }
                         else if(state == 0){
                             SocketServer.sendSocketData("Device Disconnected to HID Service");
@@ -1926,13 +1995,18 @@ public class AppControlService extends Service {
                 public void onGetReport(BluetoothDevice device, byte type, byte id, int bufferSize) {
                     super.onGetReport(device, type, id, bufferSize);
                     if (mHIDservice != null) {
-                        if (type != BluetoothHidDevice.REPORT_TYPE_INPUT) {
+                      /*  if (type != BluetoothHidDevice.REPORT_TYPE_INPUT) {
                             mHIDservice.reportError(
                                     device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
                         } else if (!replyReport(device, type, id)) {
                             mHIDservice.reportError(
                                     device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
-                        }
+                        }*/
+                        Log.d(TAG, "BluetoothHidDevice.REPORT_TYPE_INPUT "+BluetoothHidDevice.REPORT_TYPE_INPUT+"type "+type);
+                        if (replyReport(device, type, id));
+                        else if(type == 2 )
+                            mHIDservice.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
                     }
                 }
 
