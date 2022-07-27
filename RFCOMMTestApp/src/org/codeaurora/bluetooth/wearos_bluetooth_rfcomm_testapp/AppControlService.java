@@ -771,7 +771,7 @@ public class AppControlService extends Service {
                     + (tx_end_time - tx_start_time));
 
             // throughput calculations
-            float TxTput = ((float) senttext.length() * 8 * 1000)
+            float TxTput = ((float) senttext.length() * 8 * 1000 * chunksize)
                     / (tx_end_time - tx_start_time);
             float TxTputk = TxTput / 1000;
             Log.d(TAG, "write: Through put (send) is (in kbps): " + TxTputk);
