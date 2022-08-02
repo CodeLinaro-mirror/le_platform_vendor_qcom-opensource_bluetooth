@@ -574,32 +574,7 @@ public class AppControlStateMachine extends StateMachine {
         }
     }
 
-    private class BluetoothHidState extends State {
-    private static final String TAG = "BluetoothTxRxApp BluetoothHidState State";
-
-        @Override
-        public void enter() {
-            Log.d(TAG, "enter()");
-            if (mAppControlService != null) {
-                mAppControlService.registerBluetoothHid();
-            }
-            SocketServer
-            .sendSocketData("Registering Bluetooth HID");
-        }
-
-        @Override
-        public void exit() {
-            Log.d(TAG, "exit()");
-        }
-
-        @Override
-        public boolean processMessage(Message message) {
-            boolean retvalue = HANDLED;
-            // To-be Implemented
-            return retvalue;
-        }
-    }
-            private class HidTestState extends State {
+    private class HidTestState extends State {
         private static final String TAG = "BluetoothTxRxApp :: AppControlStateMachine :: HidTestState";
         @Override
         public void enter() {

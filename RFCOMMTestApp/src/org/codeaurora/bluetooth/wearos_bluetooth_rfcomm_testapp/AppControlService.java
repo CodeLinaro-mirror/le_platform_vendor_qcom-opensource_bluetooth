@@ -337,7 +337,10 @@ public class AppControlService extends Service {
                         if(Utils.isHidControlStateMachineUnderProcessing == true){
                             CUR_STATUS = false;
                             Message message = Message.obtain();
-                            message.what = Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED;
+                            if(HidAppRegistered == true)
+                                message.what = Utils.HidStateMachineMessageConstants.STATE_CONNECT_BLUETOOTH_HID;
+                            else
+                                message.what = Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED;
                             Utils.appControlStateMachine.sendMessage(message);
                         }
                     }
