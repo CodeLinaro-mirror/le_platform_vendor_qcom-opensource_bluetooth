@@ -188,7 +188,7 @@ public class AncsParse {
                     printStr.append("\n");
                     printStr.append(getNotificationAttrString(value[i]));
                     printStr.append(" : ");
-                    size = (value[i + 2] << 8) | value[i + 1];
+                    size = (((value[i + 2] & 0xFF) << 8) | (value[i + 1] & 0xFF));
                     i += 3;
                     if (size > 0) {
                         printStr.append(new String(Arrays.copyOfRange(value, i, i + size)));

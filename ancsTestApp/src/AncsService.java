@@ -166,7 +166,6 @@ public class AncsService extends Service {
         super.onCreate();
         Log.d(TAG, "onCreate");
         mAppContext = this;
-        startServer();
         registerReceiver(mReceiver,
                 new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),null,null);
 
@@ -835,7 +834,7 @@ public class AncsService extends Service {
                 switch (message.what) {
                     case MSG_NC_SM_START_ADV:
                         startAdvertising();
-                        //startServer();
+                        startServer();
                         break;
                     case MSG_NC_SM_STOP_ADV:
                         stopServer();
@@ -1098,7 +1097,7 @@ public class AncsService extends Service {
                         transitionTo(mNCIdle);
                         break;
                     case MSG_NC_SM_NOTIFICATION_RECEIVED:
-                        // Do Nothing
+                        AncsParse.printNotificationSource();
                         break;
                     case MSG_NC_SM_NOTIFICATION_ATTR:
                         byte[] notificationAttrCmd = AncsParse.getNotificationAttributes((AncsParse.NotificationAttr) message.obj);
@@ -1107,9 +1106,7 @@ public class AncsService extends Service {
                         break;
                     case MSG_NC_SM_APP_ATTR:
                         byte[] appAttrCmd = AncsParse.getAppAttributes((String) message.obj);
-                        Log.i(TAG, "MSG_NC_SM_APP_ATTR: 1");
                         writeToControlPointChar(appAttrCmd);
-                        Log.i(TAG, "MSG_NC_SM_APP_ATTR: 2");
                         transitionTo(mNCControlPoint);
                         break;
                     case MSG_NC_SM_NOTIFICATION_ACTION:
@@ -1196,9 +1193,9 @@ public class AncsService extends Service {
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
 
-                //printStr.setLength(0);
-                //printStr.append("Offloaded");
-                //SocketServer.sendSocketData(printStr.toString());
+                printStr.setLength(0);
+                printStr.append("Offloaded");
+                SocketServer.sendSocketData(printStr.toString());
                 // byte[] blob = AppContextProto.getAppContextProtoBuffer();
                 // if(blob.length > 0) {
      // Log.i(TAG,"blob length greater");
