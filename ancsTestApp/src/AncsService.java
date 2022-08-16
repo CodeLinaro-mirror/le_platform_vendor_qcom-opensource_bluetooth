@@ -41,6 +41,8 @@ import android.os.IBinder;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.Parcel;
+import android.os.ParcelUuid;
 import android.widget.Toast;
 
 import android.content.Context;
@@ -411,6 +413,31 @@ public class AncsService extends Service {
      */
     private void startAdvertising() {
         mBluetoothLeAdvertiser = bleAdapter.getBluetoothLeAdvertiser();
+        AdvertiseData data = null;
+        ParcelUuid uuid = null;
+
+        try {
+            /* get the persist property */
+            Process proc =
+                Runtime.getRuntime().exec("/system/bin/getprop"+" "
+                +"persist.disable.external.adv");
+            BufferedReader reader =
+                            new BufferedReader(
+                                new InputStreamReader(proc.getInputStream()));
+            String readLine = reader.readLine();
+
+            if(readLine != null) {
+                if(readLine.equals("false")) {
+                    /* if the value is false, add device name instead of uuid */
+                    Log.w(TAG, "power testing property set to false");
+                } else {
+                    uuid = ParcelUuid.fromString(readLine);
+                    Log.w(TAG, "uuid:"+ uuid);
+                }
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Exception handling");
+        }
         if (mBluetoothLeAdvertiser == null) {
             Log.w(TAG, "Failed to create advertiser");
             return;
@@ -422,9 +449,15 @@ public class AncsService extends Service {
                 .setTimeout(0)
                 .build();
 
-        AdvertiseData data = new AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
-                .build();
+        AdvertiseData.Builder ancsData = new AdvertiseData.Builder();
+
+        /* set the uuid read from property */
+        if(uuid != null) {
+            ancsData.addServiceUuid(uuid);
+        } else {
+            ancsData.setIncludeDeviceName(true);
+        }
+        data = ancsData.build();
 
         mBluetoothLeAdvertiser
                 .startAdvertising(settings, data, mAdvertiseCallback);
