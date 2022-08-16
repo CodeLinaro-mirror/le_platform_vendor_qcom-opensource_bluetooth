@@ -702,15 +702,11 @@ public class AncsService extends Service {
                     notificationSourceChar = mService.getCharacteristic(AncsParse.ANCS_NOTIFICATION_SOURCE_UUID);
                     controlPointChar = mService.getCharacteristic(AncsParse.ANCS_CONTROL_POINT_UUID);
                     dataSourceChar = mService.getCharacteristic(AncsParse.ANCS_DATA_SOURCE_UUID);
-
-                    // Enable Notifications
+                    //Enable notifications on notification source
                     if(notificationSourceChar != null) {
                         setCharacteristicNotification(notificationSourceChar, true);
                         Log.d(TAG, "notificationSourceChar registered");
                     }
-
-                    Log.d(TAG, "ANCS service found");
-                    mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_SERVICE_FOUND);
                     printStr.setLength(0);
                     List<BluetoothGattService> mServices = gatt.getServices();
                     List<BluetoothGattCharacteristic> mCharacteristics;
@@ -736,7 +732,6 @@ public class AncsService extends Service {
                     Log.d(TAG, "ANCS service not found");
                     mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_SERVICE_NOT_FOUND);
                 }
-
             } else {
                 Log.d(TAG, "onServicesDiscovered failed: " + status);
                 mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_FAILED_SERVICE_DISCOVERY);
@@ -767,8 +762,49 @@ public class AncsService extends Service {
             if ((status == BluetoothGatt.GATT_SUCCESS)) {
                 Log.i(TAG, "onCharacteristicWrite: " + status);
                 mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_WRITE_RSP_RECEIVED);
+            }
+        }
+
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
+            int status) {
+            if ((status == BluetoothGatt.GATT_SUCCESS)) {
+                Log.i(TAG, "onDescriptorWrite: " + status);
+                if( true == Arrays.equals(descriptor.getValue(),
+                            BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)) {
+                    /* If the callback is for enabling notifications on notification source,
+                     enable notifications on data source */
+                    if(descriptor.getCharacteristic() == notificationSourceChar) {
+                        if(dataSourceChar != null) {
+                            setCharacteristicNotification(dataSourceChar, true);
+                            Log.d(TAG, "dataSourceChar registered");
+                        }
+                    } else if(descriptor.getCharacteristic() == dataSourceChar) {
+                        /* If the callback is for enabling notifications on data source,
+                        send message to ANCS SM */
+                        mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_SERVICE_FOUND);
+                    }
+                } else if(true == Arrays.equals(descriptor.getValue(),
+                            BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)) {
+                    if(descriptor.getCharacteristic() == notificationSourceChar) {
+                        /* If the callback is for disabling notifications on notification source,
+                        disable notifications on data source */
+                        if(dataSourceChar != null) {
+                            setCharacteristicNotification(dataSourceChar, false);
+                            Log.d(TAG, "dataSourceChar registered");
+                        }
+                    } else if(descriptor.getCharacteristic() == dataSourceChar) {
+                        /* If the callback is for disabling notifications on data source,
+                        send message to ANCS SM */
+                        mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_ANCS_WRITE_DESC_CB);
+                    }
+                }
             } else {
-                Log.i(TAG, "write characteristic failed");
+                Log.i(TAG, "write descriptor failed"  + status);
+                printStr.setLength(0);
+                printStr.append("Writing to CP failed with error:");
+                printStr.append(status);
+                SocketServer.sendSocketData(printStr.toString());
             }
         }
     };
@@ -836,6 +872,7 @@ public class AncsService extends Service {
         public static final int MSG_NC_SM_WRITE_RSP_RECEIVED = 20;
         public static final int MSG_NC_SM_OFFLOADED = 21;
         public static final int MSG_NC_SM_ACTIVE = 22;
+        public static final int MSG_NC_SM_ANCS_WRITE_DESC_CB = 23;
 
         private NCIdle mNCIdle;
         private NCPending mNCPending;
@@ -1059,6 +1096,7 @@ public class AncsService extends Service {
                         transitionTo(mNCIdle);
                         break;
                     case MSG_NC_SM_ANCS_SERVICE_FOUND:
+                       Log.d(TAG, "ANCS service found");
                         printStr.setLength(0);
                         printStr.append("ANCS service found");
                         SocketServer.sendSocketData(printStr.toString());
@@ -1115,10 +1153,6 @@ public class AncsService extends Service {
                         transitionTo(mNCIdle);
                         break;
                     case MSG_NC_SM_NOTIFICATION_RECEIVED:
-                        if(dataSourceChar != null) {
-                            setCharacteristicNotification(dataSourceChar, true);
-                            Log.d(TAG, "dataSourceChar registered");
-                        }
                         transitionTo(mNCNotificationReceived);
                         break;
                     case MSG_NC_SM_DISCONNECT:
@@ -1324,18 +1358,11 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                // Disable Notifications
+                // Disable Notifications on Notification source
                 if(notificationSourceChar != null) {
                     setCharacteristicNotification(notificationSourceChar, false);
                     Log.d(TAG, "notificationSourceChar deregistered");
-                    notificationSourceChar = null;
                 }
-                if(dataSourceChar != null) {
-                    setCharacteristicNotification(dataSourceChar, false);
-                    Log.d(TAG, "dataSourceChar deregistered");
-                    dataSourceChar = null;
-                }
-                mBluetoothGatt.disconnect();
             }
 
             @Override
@@ -1349,6 +1376,9 @@ public class AncsService extends Service {
                 boolean retValue = HANDLED;
 
                 switch (message.what) {
+                    case MSG_NC_SM_ANCS_WRITE_DESC_CB:
+                        mBluetoothGatt.disconnect();
+                        break;
                     case MSG_NC_SM_GATT_DISCONNECTED:
                         printStr.setLength(0);
                         printStr.append("Disconnected!");
