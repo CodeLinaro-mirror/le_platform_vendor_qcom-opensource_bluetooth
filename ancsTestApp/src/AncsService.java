@@ -67,13 +67,13 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import vendor.qti.bluetooth_offload.SubscribedGattHandles;
 
-
-
+import java.io.*;
 import libcore.io.IoUtils;
 import android.app.Service;
 import android.app.IntentService;
 import android.app.PendingIntent;
 
+import java.util.*;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -781,6 +781,8 @@ public class AncsService extends Service {
         private NCDisconnect mNCDisconnect;
         private NCOffloaded mNCOffloaded;
 
+        private Message messageQueued;
+
         StringBuilder printStr = new StringBuilder();
 
         private NCStateMachine(Context context) {
@@ -1077,6 +1079,12 @@ public class AncsService extends Service {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
+
+                /*dequeue and process */
+                dequeueMessage();
+                if(AncsParse.NotificationSourceList.size() > 0) {
+                    AncsParse.printNotificationSource();
+                }
             }
 
             @Override
@@ -1129,6 +1137,16 @@ public class AncsService extends Service {
                 return retValue;
             }
 
+            public void dequeueMessage() {
+                Message sendMsg;
+                if(messageQueued != null) {
+                    Log.i(TAG, "queued Msg: " + messageQueued.what);
+                    sendMsg = AncsService.mStateMachine.obtainMessage(messageQueued.what, messageQueued.obj);
+                    mStateMachine.sendMessage(sendMsg);
+                    messageQueued = null;
+                }
+            }
+
             public void writeToControlPointChar(byte[] value) {
                 controlPointChar.setWriteType(
                         BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
@@ -1177,10 +1195,16 @@ public class AncsService extends Service {
                             Log.e(TAG, "Wakelock reference is null");
                         }
                         transitionTo(mNCNotificationReceived);
-                       break;
+                        break;
                     case MSG_NC_SM_BT_ADAPTER_OFF:
-                       transitionTo(mNCIdle);
-                       break;
+                        transitionTo(mNCIdle);
+                        break;
+                    default:
+                        /* store the message to be processed later */
+                        messageQueued = new Message();
+                        messageQueued.copyFrom(getCurrentMessage());
+                        Log.e(TAG, "default case, adding "+ messageQueued.what);
+                        break;
                 }
                 return retValue;
             }

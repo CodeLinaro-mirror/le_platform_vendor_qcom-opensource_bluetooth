@@ -30,9 +30,11 @@
 package vendor.qti.ancs_ble_testapp;
 
 import android.util.Log;
+import android.os.Message;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.*;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.UUID;
@@ -114,6 +116,9 @@ public class AncsParse {
     public static final byte ActionFailed = (byte) 0xA3;
 
     public static final int NOTIFICATION_SOURCE_LENGTH = 8;
+    public static boolean PowerTesting = false;
+    public static boolean SubtitleFound = false;
+    public static int NumofNotifications = 0;
 
     public static LinkedList<NotificationSource> NotificationSourceList =
                     new LinkedList<NotificationSource>();
@@ -171,32 +176,89 @@ public class AncsParse {
         }
     }
 
+    private static void frameNotificationAttrCmd(byte[] uid) {
+        Log.i(TAG, "frameNotificationAttrCmd, numNotifications"+NumofNotifications);
+        ByteArrayOutputStream commandAttr = new ByteArrayOutputStream(1024);
+
+        if(NumofNotifications != 0){
+            /* frame the cmd */
+            NotificationAttr notificationAttr =
+                            new NotificationAttr();
+            notificationAttr.NotificationUID = Arrays.copyOfRange(uid, 0, 3);
+            commandAttr.write(AncsParse.NotificationAttributeIDAppIdentifier);
+            commandAttr.write(AncsParse.NotificationAttributeIDMessage);
+
+            /* max payload length without fragmentation*/
+            int len = 236;
+            commandAttr.write((byte) (len & 0xFF));
+            commandAttr.write((byte) ((len >> 8) & 0xFF));
+
+            notificationAttr.NotificationAttributes = commandAttr.toByteArray();
+
+            /* write to CP */
+            if(notificationAttr.NotificationAttributes != null) {
+                Message msg;
+                msg = AncsService.mStateMachine.obtainMessage(
+                   AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ATTR,
+                   notificationAttr);
+               AncsService.mStateMachine.sendMessage(msg);
+            }
+            NumofNotifications--;
+        } else {
+            PowerTesting = false;
+            Log.d(TAG, "frameNotificationAttrCmd, pwr test false");
+        }
+    }
+
     public static void processDataSource(byte[] value) {
         Log.i(TAG, "processDataSource");
         StringBuilder printStr = new StringBuilder();
         int i = 0, size = 0;
+        byte[] uid = new byte[4];
 
-        printStr.setLength(0);
-        printStr.append('\n');
         if (value.length > 0) {
             if (value[0] == CommandIDGetNotificationAttributes) {
-                printStr.append("NotificationAttr");
+                printStr.setLength(0);
+                printStr.append('\n');
+                printStr.append("NotificationAttr:");
+                printStr.append(NumofNotifications);
                 printStr.append("\nuid : ");
+                uid = Arrays.copyOfRange(value, 1, 5);
                 printStr.append(SocketServer.byteArrayToInt(Arrays.copyOfRange(value, 1, 5)));
                 i = 5;
                 for (; i < value.length; ) {
                     printStr.append("\n");
                     printStr.append(getNotificationAttrString(value[i]));
+                    if(Objects.equals("SubTitle",getNotificationAttrString(value[i]))) {
+                        SubtitleFound = true;
+                    }
                     printStr.append(" : ");
                     size = (((value[i + 2] & 0xFF) << 8) | (value[i + 1] & 0xFF));
                     i += 3;
                     if (size > 0) {
-                        printStr.append(new String(Arrays.copyOfRange(value, i, i + size)));
+                        String attr = new String(Arrays.copyOfRange(value, i, i + size));
+                        printStr.append(attr);
+                        Log.i(TAG, "attr: " + attr.getBytes().length + "size:" + size);
+                        if(SubtitleFound) {
+                            String[] tmp;
+                            tmp = attr.split(":");
+                            if(tmp[0].equals("PowerTesting")) {
+                                NumofNotifications = Integer.parseInt(tmp[1]);
+                                PowerTesting = true;
+                            }
+                            SubtitleFound = false;
+                        }
                         i = i + size;
                     }
                 }
+                Log.i(TAG, "bytesToBeSent: " + printStr.toString().getBytes().length);
+                if(PowerTesting) {
+                    /* frame and write to cp if power testing flag is true */
+                    frameNotificationAttrCmd(uid);
+                }
                 printStr.append('\n');
             } else if (value[0] == CommandIDGetAppAttributes) {
+                printStr.setLength(0);
                 printStr.append("AppAttr\t");
                 for (i = 1; i < value.length; i++) {
                     if (value[i] == '\0') {
