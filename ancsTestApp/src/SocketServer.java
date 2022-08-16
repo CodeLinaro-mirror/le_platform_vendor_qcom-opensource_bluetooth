@@ -328,14 +328,14 @@ public class SocketServer {
                             }
                         }
                         else if (tmp[0].equals("DoNotificationAction")) {
-                            AncsParse.NotificationAction notificationAction = new AncsParse.NotificationAction();
-                            notificationAction.NotificationUID[0] = Byte.parseByte(tmp[1].substring(0, 2));
-                            notificationAction.NotificationUID[1] = Byte.parseByte(tmp[1].substring(2, 4));
-                            notificationAction.NotificationUID[2] = Byte.parseByte(tmp[1].substring(4, 6));
-                            notificationAction.NotificationUID[3] = Byte.parseByte(tmp[1].substring(6, 8));
+                            AncsParse.NotificationAction notificationAction =
+                                                new AncsParse.NotificationAction();
+                            notificationAction.NotificationUID =
+                                                intToByteArray(Integer.parseInt(tmp[1]));;
                             notificationAction.NotificationAction = tmp[2];
                             msg = AncsService.mStateMachine.obtainMessage(
-                                    AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ACTION, notificationAction);
+                                    AncsService.NCStateMachine.MSG_NC_SM_NOTIFICATION_ACTION,
+                                    notificationAction);
                             AncsService.mStateMachine.sendMessage(msg);
                         } else if (tmp[0].equals("SetCategoryAttrs")) {
                             String attrString[] = tmp[2].split(";");

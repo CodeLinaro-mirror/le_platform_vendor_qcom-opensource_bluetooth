@@ -346,8 +346,8 @@ public class AncsService extends Service {
     private void processGattRegisterOfflodableAdapter() {
         Log.d(TAG, "processGattRegisterOfflodableAdapter()");
         mNotificationAdapter = new NotificationOffloadAdapter(mAppContext);
-       if (mOffloadcallbacks != null) {
-           Log.d(TAG,"yes");
+        if (mOffloadcallbacks != null) {
+            Log.d(TAG,"mOffloadcallbacks registered");
         }
         if(BT_FAIL == mNotificationAdapter.register(mOffloadcallbacks)) {
             Log.d(TAG, "failed to register notification offload adapter");
@@ -360,51 +360,79 @@ public class AncsService extends Service {
     }
 
     private void processGattDRegisterOfflodableAdapter() {
-        Log.d(TAG, "processGattDRegisterOfflodableAdapter()");
-        mNotificationAdapter.unregister();
-        printStr.setLength(0);
-        printStr.append("OffloadableApp Deregistered");
-        SocketServer.sendSocketData(printStr.toString());
+        if(null == mNotificationAdapter) {
+            Log.d(TAG, "processGattDRegisterOfflodableAdapter() failed");
+            printStr.setLength(0);
+            printStr.append("processGattDRegisterOfflodableAdapter failed,\
+            please register offloadable app!!");
+            SocketServer.sendSocketData(printStr.toString());
+        } else {
+            Log.d(TAG, "processGattDRegisterOfflodableAdapter()");
+            mNotificationAdapter.unregister();
+            printStr.setLength(0);
+            printStr.append("OffloadableApp Deregistered");
+            SocketServer.sendSocketData(printStr.toString());
+        }
     }
 
     private void processGattSetSubscribedGattHandles(String handles) {
-        Log.d(TAG, "processGattSetSubscribedGattHandles() Handles: " + handles);
-        ArrayList<SubscribedGattHandles> list = new ArrayList<SubscribedGattHandles>();
+        if(null == mNotificationAdapter) {
+            Log.d(TAG, "processGattSetSubscribedGattHandles() failed");
+            printStr.setLength(0);
+            printStr.append("setSubscribedGattHandles failed, please register offloadable app!!");
+            SocketServer.sendSocketData(printStr.toString());
+        } else {
+            Log.d(TAG, "processGattSetSubscribedGattHandles() Handles: " + handles);
+            ArrayList<SubscribedGattHandles> list = new ArrayList<SubscribedGattHandles>();
 
-        String[] strList = handles.split(",");
-        /*ArrayList<Integer> handlesList = new ArrayList<Integer>();
-        for (int j=0; j<strList.length; j++) {
-            handlesList.add(Integer.parseInt(strList[j]));
-        }*/
-        int[] handleList = Arrays.stream(strList).mapToInt(Integer::parseInt).toArray();
-        SubscribedGattHandles gattHandlesParam = new SubscribedGattHandles(mDevice.getAddress(), handleList);
-        Log.d(TAG, "addr:" + mDevice.getAddress());
-        //gattHandlesParam.handles = handlesList;
-        //gattHandlesParam.remoteAddr = mDevice.getAddress();
+            String[] strList = handles.split(",");
+            /*ArrayList<Integer> handlesList = new ArrayList<Integer>();
+            for (int j=0; j<strList.length; j++) {
+                handlesList.add(Integer.parseInt(strList[j]));
+            }*/
+            int[] handleList = Arrays.stream(strList).mapToInt(Integer::parseInt).toArray();
+            SubscribedGattHandles gattHandlesParam = new SubscribedGattHandles(mDevice.getAddress(), handleList);
+            Log.d(TAG, "addr:" + mDevice.getAddress());
+            //gattHandlesParam.handles = handlesList;
+            //gattHandlesParam.remoteAddr = mDevice.getAddress();
 
-        list.add(gattHandlesParam);
-        mNotificationAdapter.setSubscribedGattHandles(list);
-        printStr.setLength(0);
-        printStr.append("setSubscribedGattHandles Done");
-        SocketServer.sendSocketData(printStr.toString());
+            list.add(gattHandlesParam);
+            mNotificationAdapter.setSubscribedGattHandles(list);
+            printStr.setLength(0);
+            printStr.append("setSubscribedGattHandles Done");
+            SocketServer.sendSocketData(printStr.toString());
+        }
     }
 
     private void processSetMode(int mode) {
-        Log.d(TAG, "processSetMode() mode: " + mode);
-
-        mNotificationAdapter.transitionToPwrState(mode);
-        printStr.setLength(0);
-        printStr.append("sent transitionToPwrState");
-        SocketServer.sendSocketData(printStr.toString());
+        if(null == mNotificationAdapter) {
+            Log.d(TAG, "processSetMode() failed");
+            printStr.setLength(0);
+            printStr.append("processSetMode failed, please register offloadable app!!");
+            SocketServer.sendSocketData(printStr.toString());
+        } else {
+            Log.d(TAG, "processSetMode() mode: " + mode);
+            mNotificationAdapter.transitionToPwrState(mode);
+            printStr.setLength(0);
+            printStr.append("sent transitionToPwrState");
+            SocketServer.sendSocketData(printStr.toString());
+        }
     }
 
     private void processSetAppContext(byte[] blob) {
-        Log.i(TAG, "processSetAppContext() blob: " + Arrays.toString(blob));
-        ArrayList<Byte> blobBytes = new ArrayList<Byte>();
-        for (int i = 0; i < blob.length; i++) {
-            blobBytes.add(blob[i]);
+        if(null == mNotificationAdapter) {
+            Log.d(TAG, "processSetAppContext() failed");
+            printStr.setLength(0);
+            printStr.append("processSetAppContext failed, please register offloadable app!!");
+            SocketServer.sendSocketData(printStr.toString());
+        } else {
+            Log.i(TAG, "processSetAppContext() blob: " + Arrays.toString(blob));
+            ArrayList<Byte> blobBytes = new ArrayList<Byte>();
+            for (int i = 0; i < blob.length; i++) {
+                blobBytes.add(blob[i]);
+            }
+            //mNotificationAdapter.setAppSpecificContextInfo(blob);
         }
-        //mNotificationAdapter.setAppSpecificContextInfo(blobBytes);
     }
 
     /**
@@ -507,6 +535,9 @@ public class AncsService extends Service {
             }
         }
 
+    /**
+     * Callback to receive information about the advertisement process.
+     */
     private AdvertiseCallback mAdvertiseCallback = new AdvertiseCallback() {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
