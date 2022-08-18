@@ -48,6 +48,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.SystemProperties;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -922,8 +923,9 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         mEditTextBrowseOffsetValue.setText(String.valueOf(mBrowseValueOffset));
 
         try {
-            //setPhoneBookRoot(); Set phonebook will be called explicitly from app, so no need to double set it
-
+            if(SystemProperties.getBoolean("vendor.bt.pts.pce.browse", false)) {
+              setPhoneBookRoot(); //Set phonebook will be called explicitly from app or from property for PTS
+            }
             boolean started = pullVcardListing(path, order, mBrowseValueSearchAttr,
                 searchValue, mBrowseValueMaxCount, mBrowseValueOffset);
 
