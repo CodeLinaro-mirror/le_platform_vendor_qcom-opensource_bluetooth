@@ -112,6 +112,7 @@ public class AncsService extends Service {
     public static NCStateMachine mStateMachine;
     public static boolean stateMachineStarted = false;
     private static boolean mReceiverRegistered = false;
+    public static boolean power_testing = false;
     public StringBuilder printStr = new StringBuilder();
 
     private static IState ncPreviousState;
@@ -135,6 +136,8 @@ public class AncsService extends Service {
     public static final int MSG_AS_SET_MODE = 3;
     public static final int MSG_AS_SET_APP_CONTEXT = 4;
 
+    public static ParcelUuid ANCS_POWER_TESTING_SERVICE_UUID =
+                    ParcelUuid.fromString("90000007-1000-1000-1000-100000000000");
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -311,6 +314,10 @@ public class AncsService extends Service {
             switch (message.what) {
                 case MSG_AS_REGISTER_OFFLODABLE_ADAPTER:
                     processGattRegisterOfflodableAdapter();
+                    if(power_testing) {
+                        Log.d(TAG, "conn update to relaxed interval");
+                        mBluetoothGatt.requestLeConnectionUpdate(24,40,7,500, 0, 0);
+                    }
                     break;
                 case MSG_AS_DREGISTER_OFFLODABLE_ADAPTER:
                     processGattDRegisterOfflodableAdapter();
@@ -460,6 +467,9 @@ public class AncsService extends Service {
                     Log.w(TAG, "power testing property set to false");
                 } else {
                     uuid = ParcelUuid.fromString(readLine);
+                    if(true == uuid.equals(ANCS_POWER_TESTING_SERVICE_UUID)) {
+                        power_testing = true;
+                    }
                     Log.w(TAG, "uuid:"+ uuid);
                 }
             }
@@ -479,8 +489,8 @@ public class AncsService extends Service {
 
         AdvertiseData.Builder ancsData = new AdvertiseData.Builder();
 
+        if(power_testing == true) {
         /* set the uuid read from property */
-        if(uuid != null) {
             ancsData.addServiceUuid(uuid);
         } else {
             ancsData.setIncludeDeviceName(true);
@@ -739,14 +749,26 @@ public class AncsService extends Service {
         }
 
         @Override
+        public void onConnectionUpdated(BluetoothGatt gatt, int interval, int latency,
+                                            int timeout, int status) {
+            if ((status == BluetoothGatt.GATT_SUCCESS)) {
+                Log.i(TAG, "on Conn updated:"
+                + " interval=" + interval + " latency=" + latency
+                + " timeout=" + timeout + " status=" + status);
+            } else {
+                Log.i(TAG, "conn update failed");
+            }
+        }
+
+        @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
             byte[] value = characteristic.getValue();
-            Log.d(TAG, "onCharacteristicChanged Data: " + Arrays.toString(value));
+            Log.d(TAG, "onCharacteristicChanged Data: " + Arrays.toString(value) + "len:" + value.length);
 
             if (characteristic == notificationSourceChar) {
-                AncsParse.processNotificationSource(value);
                 mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_NOTIFICATION_RECEIVED);
+                AncsParse.processNotificationSource(value);
             } else if (characteristic == dataSourceChar) {
                 AncsParse.processDataSource(value);
                 mStateMachine.sendMessage(NCStateMachine.MSG_NC_SM_DATA_SOURCE_NOTIFICATION_RECEIVED);
@@ -1178,7 +1200,7 @@ public class AncsService extends Service {
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
 
-                /*dequeue and process */
+                /*dequeue and process message */
                 dequeueMessage();
                 if(AncsParse.NotificationSourceList.size() > 0) {
                     AncsParse.printNotificationSource();
