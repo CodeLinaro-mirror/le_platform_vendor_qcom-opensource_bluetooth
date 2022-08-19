@@ -370,8 +370,8 @@ public class AncsService extends Service {
         if(null == mNotificationAdapter) {
             Log.d(TAG, "processGattDRegisterOfflodableAdapter() failed");
             printStr.setLength(0);
-            printStr.append("processGattDRegisterOfflodableAdapter failed,\
-            please register offloadable app!!");
+            printStr.append("processGattDRegisterOfflodableAdapter failed");
+            printStr.append("please register offloadable app!!");
             SocketServer.sendSocketData(printStr.toString());
         } else {
             Log.d(TAG, "processGattDRegisterOfflodableAdapter()");
