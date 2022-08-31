@@ -1,0 +1,22 @@
+android_app {
+    name: "NewBTTestApp",
+    system_ext_specific: true,
+
+    srcs: [
+        "src/**/*.java",
+    ],
+
+    static_libs: [
+        "com.android.vcard",
+        "androidx.legacy_legacy-support-v4",
+    ],
+
+    certificate: "platform",
+
+    owner: "qti",
+
+    optimize: {
+        enabled: false,
+    },
+    platform_apis: true,
+}
