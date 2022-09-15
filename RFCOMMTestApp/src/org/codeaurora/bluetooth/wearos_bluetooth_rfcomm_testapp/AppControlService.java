@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -49,6 +83,8 @@ import android.Manifest;
 import android.app.IntentService;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import vendor.qti.bluetooth_offload.BluetoothOffloadCallback;
@@ -73,13 +109,16 @@ import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.app.Notification;
+import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothProfile;
+import androidx.annotation.WorkerThread;
 
 
 public class AppControlService extends Service {
     private static final String TAG = "BluetoothTxRxApp Service";
     private static BluetoothAdapter bluetoothAdapter = BluetoothAdapter
             .getDefaultAdapter();
-    BluetoothDevice btDeviceToPair = null;
+    static BluetoothDevice btDeviceToPair = null;
     private BluetoothSocket mmSocket;
     private Context mContext;
     ConfigFileParser parser;
@@ -102,6 +141,16 @@ public class AppControlService extends Service {
     public static final int TWM_STATE = 1;
     public static final int DS_STATE = 2;
     public static final int TRACKER_STATE = 0;
+    private BluetoothHidDevice service;
+    //HID Service
+    BluetoothHidDevice mHIDservice;
+    BluetoothDevice remotedevice;
+    public static boolean HidAppRegistered = false;
+    public static int mbtState = 0;
+    public static boolean CUR_STATUS = false;
+    //private final byte[] mouseData = "0100".getBytes();
+    private final byte[] mouseData = "BXYW".getBytes();
+    public static int x=0,y=0,i=0,xrev=0,yrev=0;
     //offload callback status values
     public static final int BT_FAIL = 0;
     public static final int BT_OK = 1;
@@ -273,6 +322,7 @@ public class AppControlService extends Service {
                                 + " is Terminated");
                         Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                         Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                        Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                         if (Utils.isThroughputStateMachineUnderProcessing == true) {
                             Message message = Message.obtain();
                             message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
@@ -283,6 +333,15 @@ public class AppControlService extends Service {
                             message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED;
                             Utils.notificationOffloadStateMachine
                             .sendMessage(message);
+                        }
+                        if(Utils.isHidControlStateMachineUnderProcessing == true){
+                            CUR_STATUS = false;
+                            Message message = Message.obtain();
+                            if(HidAppRegistered == true)
+                                message.what = Utils.HidStateMachineMessageConstants.STATE_CONNECT_BLUETOOTH_HID;
+                            else
+                                message.what = Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED;
+                            Utils.appControlStateMachine.sendMessage(message);
                         }
                     }
                 }
@@ -458,12 +517,20 @@ public class AppControlService extends Service {
         if (Utils.bdAddressFromConfig != null) {
             btDeviceToPair = bluetoothAdapter
                     .getRemoteDevice(Utils.bdAddressFromConfig.toUpperCase());
+             Log.d(TAG, "btDeviceToPair  "+btDeviceToPair);
         } else {
             SocketServer
                 .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
             return;
         }
-        startConnectionProcess();
+        SocketServer
+                .sendSocketData("Connecting Device...Please wait...!!!");
+        if(Utils.isHidControlStateMachineUnderProcessing != true){
+                startConnectionProcess();
+        }
+        else{
+            device_connect_HID(btDeviceToPair);
+        }
     }
 
     public void startConnectionProcess() {
@@ -554,6 +621,7 @@ public class AppControlService extends Service {
                 Log.d(TAG, "Socket Connected");
                 Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                 Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                 if (Utils.isThroughputStateMachineUnderProcessing == true) {
                     Message message = Message.obtain();
                     message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
@@ -567,7 +635,12 @@ public class AppControlService extends Service {
                     message.obj = mmSocket.getRemoteDevice();
                     mNotificationOffloadStateMachine.sendMessage(message);
                 }
-
+                if(Utils.isHidControlStateMachineUnderProcessing == true){
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                    message.obj = mmSocket.getRemoteDevice();
+                    mAppControlStateMachine.sendMessage(message);
+                }
             } catch (IOException connectException) {
                 Log.e(TAG, "Unable to connect; close the socket and return",
                         connectException);
@@ -575,6 +648,7 @@ public class AppControlService extends Service {
                     mmSocket.close();
                     Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                     Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
+                    Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
                     if (Utils.isThroughputStateMachineUnderProcessing == true) {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
@@ -584,6 +658,11 @@ public class AppControlService extends Service {
                         Message message = Message.obtain();
                         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTION_FAILED;
                         mNotificationOffloadStateMachine.sendMessage(message);
+}
+                    if(Utils.isHidControlStateMachineUnderProcessing == true){
+                        Message message = Message.obtain();
+                        message.what = Utils.HidStateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                        mAppControlStateMachine.sendMessage(message);
                     }
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket",
@@ -695,7 +774,7 @@ public class AppControlService extends Service {
                     + (tx_end_time - tx_start_time));
 
             // throughput calculations
-            float TxTput = ((float) senttext.length() * 8 * 1000)
+            float TxTput = ((float) senttext.length() * 8 * 1000 * chunksize)
                     / (tx_end_time - tx_start_time);
             float TxTputk = TxTput / 1000;
             Log.d(TAG, "write: Through put (send) is (in kbps): " + TxTputk);
@@ -1769,4 +1848,203 @@ public class AppControlService extends Service {
             mNotificationMgr.release_pm_wakelock();
         }
     }
+
+    public void registerBluetoothHid() {
+        Log.d(TAG, "registerBluetoothHid");
+        bluetoothAdapter.getProfileProxy(
+              mContext, new ServiceListener(), BluetoothProfile.HID_DEVICE);
+    }
+
+    public void de_registerBluetoothHid(){
+        SocketServer
+                .sendSocketData("Deregistering Bluetooth HID");
+        if(mHIDservice.unregisterApp()== true ){
+            Log.d(TAG, "de_registerBluetoothHid");
+        }
+    }
+
+    public void device_connect_HID(BluetoothDevice mRemotedevice){
+        if(mRemotedevice != null)
+        {
+            Log.d(TAG, "hid_status_check :: device is :: "+mRemotedevice);
+            if(mHIDservice.connect(mRemotedevice)== true){
+                Log.d(TAG, "Connecting device: "+mRemotedevice);
+            }
+        }
+    }
+
+     public void mouse_ctrl(BluetoothDevice mRemotedevice){
+        if(mRemotedevice != null){
+                mouse_movement();
+        }
+    }
+    public void device_disconnect_HID(){
+        if(btDeviceToPair != null)
+        {
+            if(mHIDservice.disconnect(btDeviceToPair)== true){
+                Log.d(TAG, "Disconnecting Device "+btDeviceToPair);
+            }
+        }
+    }
+    @WorkerThread
+    public void mouse_movement(){
+        Arrays.fill(mouseData, (byte) 0);
+        while(CUR_STATUS){
+            mHIDservice.sendReport(btDeviceToPair, Constants.ID_MOUSE, mouseData);
+            try {
+                Thread.sleep(3);
+            } catch (Exception e) {
+                Thread.currentThread().interrupt();
+            }
+            if( x < 255 && x >= 0){
+                mouseData[1] = (byte)x;
+                xrev=x;
+                x += 15;
+            }
+            else if(xrev <= 255 && xrev > 0){
+                    mouseData[1] = (byte)xrev;
+                    xrev -= 15;
+            }
+            else
+            {
+                x=xrev;
+            }
+        }
+    }
+    public static void wait(int ms)
+    {
+        try
+        {
+            Thread.sleep(ms);
+        }
+        catch(InterruptedException ex)
+        {
+            Thread.currentThread().interrupt();
+        }
+    }
+    private final class ServiceListener implements BluetoothProfile.ServiceListener {
+    @Override
+    public void onServiceConnected(int profile, BluetoothProfile proxy) {
+        Log.d(TAG, "onServiceConnected :: profile is :: "+profile+ " proxy is :: "+proxy);
+            if(profile == BluetoothProfile.HID_DEVICE){
+                mHIDservice = (BluetoothHidDevice)proxy;
+                if(mHIDservice.registerApp(Constants.SDP_RECORD, null, Constants.QOS_OUT, Runnable::run, callback))
+                {
+                    SocketServer.sendSocketData("Registering Bluetooth HID");
+                    Log.d(TAG, "Registering_HID Services\n");
+                }
+            }
+        }
+    @Override
+    public void onServiceDisconnected(int profile) {
+        Log.d(TAG, "onServiceDisconnected :: profile is :: "+profile);
+        if(mHIDservice.unregisterApp())
+            Log.d(TAG, "De-registered_HID Services\n");
+        }
+    }
+
+    private final BluetoothHidDevice.Callback callback =
+            new BluetoothHidDevice.Callback() {
+                @Override
+                public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+                    super.onAppStatusChanged(pluggedDevice, registered);
+                    Log.d(TAG, "onAppStatusChanged");
+                    Log.d(TAG, "onAppStatusChanged :: pluggedDevice is :: "+pluggedDevice+ " registered :: "+registered);
+                    remotedevice=pluggedDevice;
+                    HidAppRegistered=registered;
+                    if(HidAppRegistered == true){
+                        SocketServer.sendSocketData("Hid_AppRegistered");
+                        SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                        SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    }
+                    else {
+                        SocketServer.sendSocketData("Hid_AppNotRegistered or DeRegistered");
+                        SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_TESTING_MENU;
+                        SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_TESTING_MENU;
+                    }
+                    SocketServer.updateSocketClient();
+                }
+
+                @Override
+                public void onConnectionStateChanged(BluetoothDevice device, int state) {
+                    super.onConnectionStateChanged(device, state);
+                    btDeviceToPair=device;
+                    mbtState=state;
+                    if(state == 1)
+                        SocketServer.sendSocketData("Connecting Device to HID Service");
+                    else {
+                        if(state == 2)
+                        {
+                            SocketServer.sendSocketData("Device Connected to HID Service");
+                            SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                            SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                            SocketServer.updateSocketClient();
+                        }
+                        else if(state == 0){
+                            SocketServer.sendSocketData("Device Disconnected to HID Service");
+                            btDeviceToPair= null;
+                            CUR_STATUS=false;
+                            SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                            SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                            SocketServer.updateSocketClient();
+                        }
+                        else if(state == 3){
+                            SocketServer.sendSocketData("Disconnecting Device to HID Service");
+                        }
+                    }
+                }
+
+                @Override
+                public void onGetReport(BluetoothDevice device, byte type, byte id, int bufferSize) {
+                    super.onGetReport(device, type, id, bufferSize);
+                    if (mHIDservice != null) {
+                      /*  if (type != BluetoothHidDevice.REPORT_TYPE_INPUT) {
+                            mHIDservice.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_UNSUPPORTED_REQ);
+                        } else if (!replyReport(device, type, id)) {
+                            mHIDservice.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
+                        }*/
+                        Log.d(TAG, "BluetoothHidDevice.REPORT_TYPE_INPUT "+BluetoothHidDevice.REPORT_TYPE_INPUT+"type "+type);
+                        if (replyReport(device, type, id));
+                        else if(type == 2 )
+                            mHIDservice.reportError(
+                                    device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID);
+                    }
+                }
+
+                @Override
+                public void onSetReport(BluetoothDevice device, byte type, byte id, byte[] data) {
+                    super.onSetReport(device, type, id, data);
+                    if (mHIDservice != null) {
+                        mHIDservice.reportError(device, BluetoothHidDevice.ERROR_RSP_SUCCESS);
+                    }
+                }
+    };
+
+    private boolean replyReport(BluetoothDevice device, byte type, byte id) {
+        byte[] report = getReport(id);
+        if (report == null) {
+            return false;
+        }
+
+        if (mHIDservice != null) {
+            mHIDservice.replyReport(device, type, id, report);
+        }
+        return true;
+    }
+
+    private byte[] getReport(byte id) {
+        final byte[] keyboardData = "M0ABCDEF".getBytes();
+        if (id < 0) {
+            Log.d(TAG, "getReport - null");
+            return null;
+        }
+        else if(id == Constants.ID_MOUSE)
+        {
+            return mouseData;
+        }
+        return keyboardData;
+    }
+
 }

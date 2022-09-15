@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -40,6 +74,7 @@ public class Utils {
     public static SocketServer socServer = SocketServer.getInstance();
     public static boolean isThroughputStateMachineUnderProcessing = false;
     public static boolean isOffloadStateMachineUnderProcessing = false;
+    public static boolean isHidControlStateMachineUnderProcessing = false;
 
     public static class AppControlConstants {
 
@@ -95,6 +130,7 @@ public class Utils {
         static final int STATE_GAP_TEST_CASE_END_DISCOVERY = 22;
         static final int STATE_END_GAP_TEST_CASES = 23;
         static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
+        //static final int STATE_REGISTER_BLUETOOTH_HID = 25;
     }
 
     public static class NotificationOffloadStateMachineMessageConstants {
@@ -126,6 +162,24 @@ public class Utils {
         static final UUID APP_SERVER_UUID = UUID
             .fromString("8ce255c0-200a-11e0-ac64-0800200c9a77");
         static UUID INCOMING_CONNECTION_UUID = null;
+    }
+/*HID Service */
+        public static class HidStateMachineMessageConstants {
+        static final int STATE_DISCONNECTED = 0;
+        static final int STATE_READY_TO_CONNECT = 1;
+        static final int STATE_CONNECTED = 2;
+        static final int STATE_CONNECTION_FAILED = 3;
+        static final int STATE_NOT_PROCESS_START = 4;
+        static final int STATE_NOT_PROCESS_END = 5;
+        static final int STATE_REGISTER_BLUETOOTH_HID = 6;
+        static final int STATE_DE_REGISTER_BLUETOOTH_HID=7;
+        static final int STATE_DISCONNECT_BLUETOOTH_HID=8;
+        static final int STATE_CONNECT_BLUETOOTH_HID=9;
+        static final int START_MOUSE_MOVEMENT =10;
+        static final int STOP_MOUSE_MOVEMENT = 11;
+        static final int STATE_RE_REGISTER_BLUETOOTH_HID=12;
+        static final int STATE_START_BLUETOOTH_HID_TEST_CASES = 13;
+        static final int STATE_STOP_BLUETOOTH_HID_TEST_CASES=14;
     }
 
 }

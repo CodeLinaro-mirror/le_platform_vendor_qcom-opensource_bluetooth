@@ -25,6 +25,40 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the
+ * disclaimer below) provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -59,6 +93,7 @@ public class AppControlStateMachine extends StateMachine {
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
+    private HidTestState mHidTestState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -75,6 +110,7 @@ public class AppControlStateMachine extends StateMachine {
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
         mReadyToAcceptConnection = new ReadyToAcceptConnection();
+        mHidTestState = new HidTestState();
 
         // Adding States
         addState(mInitState);
@@ -86,6 +122,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDisconnectedState);
         addState(mGapTestState);
         addState(mReadyToAcceptConnection);
+        addState(mHidTestState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -139,6 +176,10 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
                 transitionTo(mGapTestState);
                 Log.d(TAG, "Going to GAP Test Cases state");
+                break;
+
+           case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
+                transitionTo(mHidTestState);
                 break;
             }
             return retvalue;
@@ -471,7 +512,14 @@ public class AppControlStateMachine extends StateMachine {
 
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 break;
-
+             case Utils.HidStateMachineMessageConstants.START_MOUSE_MOVEMENT:
+                transitionTo(mHidTestState);
+                SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_MOUSE_STOP;
+                SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_MOUSE_STOP;
+                SocketServer.updateSocketClient();
+                mAppControlService.CUR_STATUS = true;
+                mAppControlService.mouse_ctrl(mAppControlService.btDeviceToPair);
+                break;
             }
 
             return retvalue;
@@ -526,4 +574,91 @@ public class AppControlStateMachine extends StateMachine {
         }
     }
 
+    private class HidTestState extends State {
+        private static final String TAG = "BluetoothTxRxApp :: AppControlStateMachine :: HidTestState";
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+        }
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+            case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
+                SocketServer.sendSocketData("Start Bluetooth HID Test Cases");
+                Log.d(TAG, "Start Bluetooth HID Test Cases");
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_REGISTER_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                    Log.d(TAG, "Going to registerBluetoothHid");
+                    mAppControlService.registerBluetoothHid();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DE_REGISTER_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                        Log.d(TAG, "Going to de_registerBluetoothHid");
+                        mAppControlService.de_registerBluetoothHid();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_CONNECT_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                    mAppControlService.device_connect_HID(mAppControlService.btDeviceToPair);
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_READY_TO_CONNECT:
+                if (mAppControlService != null) {
+                    mAppControlService.initializeTestSetup();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DISCONNECT_BLUETOOTH_HID:
+                if (mAppControlService != null) {
+                    mAppControlService.device_disconnect_HID();
+                    Log.d(TAG, "Going to device disconnect to HID");
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_DISCONNECTED:
+                mAppControlService.closeConnection();
+                transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
+                SocketServer.updateSocketClient();
+                break;
+            case Utils.HidStateMachineMessageConstants.START_MOUSE_MOVEMENT:
+                if (mAppControlService != null) {
+                    SocketServer.sendSocketData("Mouse_Movement_Started");
+                    SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_MOUSE_STOP;
+                    SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_MOUSE_STOP;
+                    SocketServer.updateSocketClient();
+                    mAppControlService.CUR_STATUS = true;
+                    mAppControlService.mouse_ctrl(mAppControlService.btDeviceToPair);
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STOP_MOUSE_MOVEMENT:
+                if (mAppControlService != null) {
+                    mAppControlService.CUR_STATUS = false;
+                    SocketServer.sendSocketData("Mouse_Movement_Stopped");
+                    SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                    SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_MOUSE_START;
+                    SocketServer.updateSocketClient();
+                }
+                break;
+            case Utils.HidStateMachineMessageConstants.STATE_RE_REGISTER_BLUETOOTH_HID:
+                    SocketServer.sendSocketData("Already Hid_AppRegistered");
+                    SocketServer.mainMenuState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    SocketServer.processOutputState = SocketServer.BLUETOOTH_HID_CONNECT;
+                    SocketServer.updateSocketClient();
+            break;
+            case Utils.HidStateMachineMessageConstants.STATE_STOP_BLUETOOTH_HID_TEST_CASES:
+                    transitionTo(mInitState);
+                    Log.d(TAG, "Going to Init state");
+            break;
+            }
+            return retvalue;
+        }
+    }
 }
