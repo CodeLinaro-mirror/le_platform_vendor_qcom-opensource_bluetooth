@@ -74,7 +74,7 @@ AM_CONDITIONAL([MDM_PRONTO], [test "x$TARGET" = "xapq8009" -o "x$TARGET" = "xapq
 AM_CONDITIONAL([MDM_CHEROKEE], [test "x$TARGET" = "xapq8098" -o "x$TARGET" = "xsdmsteppe"])
 AM_CONDITIONAL([MDM_HASTINGS], [test "x$TARGET" = "xqrb5165" -o "x$TARGET" = "xsxr2130" -o "x$TARGET" = "xneo"])
 AM_CONDITIONAL([MDM_MOSELLE], [test "x$TARGET" = "xneo"])
-AM_CONDITIONAL([MDM_HAMILTON], [test "x$TARGET" = "xneo"])
+AM_CONDITIONAL([MDM_HAMILTON], [test "x$TARGET" = "xneo" -o "x$TARGET" = "xsdx75"])
 
 # BTC support
 # make below flag to true to enable the BTC
