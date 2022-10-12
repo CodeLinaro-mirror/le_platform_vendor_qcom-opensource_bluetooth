@@ -6,4 +6,5 @@ libbtvendorhal_la_CFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/bluetooth/hal/
 libbtvendorhal_la_CPPFLAGS = -DLINUX_ENABLED -fpermissive -D__GLIBC__
 libbtvendorhal_la_CPPFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/system/bt/include
 libbtvendorhal_la_CPPFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/bluetooth/hal/include
+libbtvendorhal_la_CPPFLAGS += -I${WORKSPACE}/vendor/qcom/opensource/bluetooth/tools/btconfig
 libbtvendorhal_la_LDFLAGS = -lcutils -llog -ldl -D__GLIBC__

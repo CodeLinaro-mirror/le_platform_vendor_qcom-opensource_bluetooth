@@ -27,9 +27,10 @@
 #include <pthread.h>
 #include <errno.h>
 #include <limits.h>
-
+#include <btconfig.h>
 #define LOG_TAG "HAL"
 #include <utils/Log.h>
+
 /** Base path of the hal modules */
 #if defined(__LP64__)
 #ifdef LINUX_ENABLED
@@ -168,7 +169,7 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
     if (inst)
         snprintf(name, PATH_MAX, "%s.%s", class_id, inst);
     else
-        strncpy(name, class_id, PATH_MAX);
+        strlcpy(name, class_id, PATH_MAX);
 
     /*
      * Here we rely on the fact that calling dlopen multiple times on
