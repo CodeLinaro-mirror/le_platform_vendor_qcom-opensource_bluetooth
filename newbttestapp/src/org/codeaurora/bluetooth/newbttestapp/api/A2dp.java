@@ -52,6 +52,20 @@ final class A2dp extends BluetoothProfileBase
                 BluetoothProfile.STATE_DISCONNECTED;
     }
 
+    public String getMediaPlayer(BluetoothDevice device) {
+        logd("getMediaPlayer device: " + device);
+        return mBluetoothA2dp != null ?
+                mBluetoothA2dp.getMediaPlayer(device) :
+                "";
+    }
+
+    public boolean setMediaPlayer(BluetoothDevice device, String mediaPlayer) {
+        logd("setMediaPlayer device: " + device + ", media player: " + mediaPlayer);
+        return mBluetoothA2dp != null ?
+                mBluetoothA2dp.setMediaPlayer(device, mediaPlayer) :
+                false;
+    }
+
     @Override
     protected void handleServiceConnected(int profile, BluetoothProfile proxy) {
         if (profile == BluetoothProfile.A2DP) {

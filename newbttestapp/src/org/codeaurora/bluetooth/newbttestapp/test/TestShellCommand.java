@@ -93,6 +93,12 @@ final class TestShellCommand extends ShellCommand {
     private static final String PARAM_ALLOW = "allow";
     private static final String PARAM_REJECT = "reject";
 
+    private static final String PARAM_GET_MEDIA_PLAYER = "get_media_player";
+    private static final String PARAM_SET_MEDIA_PLAYER = "set_media_player";
+    private static final String PARAM_CLEAR_MEDIA_PLAYER = "clear_media_player";
+    private static final String PARAM_START_MEDIA_PLAYER = "start_media_player";
+    private static final String PARAM_DUMP_MEDIA_PLAYER_LIST = "dump_media_player_list";
+
     private static final int RESULT_OK = 0;
     private static final int RESULT_ERROR = -1; // Arbitrary value, any non-0 is fine
 
@@ -192,8 +198,16 @@ final class TestShellCommand extends ShellCommand {
         pw.println("\thfp connect|disconnect|connect_audio|disconnect_audio device");
         pw.println("\t  Test HFP(AG) in new Bluetooth adapter.");
         pw.println("\t  device is remote Bluetooth device's address. E.g. 11:22:33:44:AA:BB");
-        pw.println("\ta2dp connect|disconnect device");
+        pw.println("\ta2dp connect|disconnect|get_media_player|set_media_player" +
+                "|start_media_player|dump_media_player_list");
         pw.println("\t  Test A2DP(Source) in new Bluetooth adapter.");
+        pw.println("\t    get_media_player device");
+        pw.println("\t    set_media_player device media_player");
+        pw.println("\t      - device: remote Bluetooth device's address");
+        pw.println("\t      - media_player: media player's name");
+        pw.println("\t    clear_media_player device");
+        pw.println("\t    start_media_player media_player");
+        pw.println("\t    dump_media_player_list");
         pw.println("\tpbap disconnect|allow|reject device");
         pw.println("\t  Test PBAP(PSE) in new Bluetooth adapter.");
         pw.println("\thidh connect|disconnect device");
@@ -265,7 +279,7 @@ final class TestShellCommand extends ShellCommand {
                 break;
             }
             case COMMAND_A2DP: {
-                if (args.length < 3) {
+                if (args.length < 2) {
                     return showInvalidArguments(writer);
                 }
                 runA2dp(args);
@@ -474,14 +488,47 @@ final class TestShellCommand extends ShellCommand {
 
     private void runA2dp(String[] args) {
         logd("runA2dp args: " + args);
-        String para = args[1];
-        BluetoothDevice device = getRemoteDevice(args[2]);
-        if (PARAM_CONNECT.equalsIgnoreCase(para)) {
-            mTestA2dp.connect(device);
-        } else if (PARAM_DISCONNECT.equalsIgnoreCase(para)) {
-            mTestA2dp.disconnect(device);
-        } else {
-            throw new IllegalArgumentException("Invalid a2dp parameter: " + para);
+        String para = args[1].toLowerCase();
+        BluetoothDevice device = !para.equals(PARAM_DUMP_MEDIA_PLAYER_LIST)
+                && !para.equals(PARAM_START_MEDIA_PLAYER) ?
+                getRemoteDevice(args[2]) :
+                null;
+        switch (para) {
+            case PARAM_CONNECT: {
+                mTestA2dp.connect(device);
+                break;
+            }
+            case PARAM_DISCONNECT: {
+                mTestA2dp.disconnect(device);
+                break;
+            }
+            case PARAM_GET_MEDIA_PLAYER: {
+                mTestA2dp.getMediaPlayer(device);
+                break;
+            }
+            case PARAM_SET_MEDIA_PLAYER: {
+                checkArgsLength(args, PARAM_SET_MEDIA_PLAYER, 4);
+                String mediaPlayer = args[3];
+                mTestA2dp.setMediaPlayer(device, mediaPlayer);
+                break;
+            }
+            case PARAM_CLEAR_MEDIA_PLAYER: {
+                mTestA2dp.clearMediaPlayer(device);
+                break;
+            }
+            case PARAM_START_MEDIA_PLAYER: {
+                checkArgsLength(args, PARAM_START_MEDIA_PLAYER, 3);
+                String mediaPlayer = args[2];
+                mTestA2dp.startMediaPlayer(mediaPlayer);
+                break;
+            }
+            case PARAM_DUMP_MEDIA_PLAYER_LIST: {
+                mTestA2dp.dumpMediaPlayerList();
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException("Invalid a2dp parameter: " + para);
+            }
         }
     }
 
@@ -552,11 +599,11 @@ final class TestShellCommand extends ShellCommand {
     }
 
     private BluetoothDevice getRemoteDevice(String address) {
-        return Adapter.getRemoteDevice(address, ADAPTER_1);
+        return Adapter.getRemoteDevice(address.toUpperCase(), ADAPTER_1);
     }
 
     private BluetoothDevice getRemoteDevice(String address, int adapterIndex) {
-        return Adapter.getRemoteDevice(address, adapterIndex);
+        return Adapter.getRemoteDevice(address.toUpperCase(), adapterIndex);
     }
 
     private void checkArgsLength(String[] args, String command, int expectedLen) {
