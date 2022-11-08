@@ -399,6 +399,7 @@ public class AppControlService extends Service {
             mOutputStream = tmpOut;
         }
 
+        @Override
         public void run() {
             Log.d(TAG, "ServerConnectedThread Running run()");
             byte[] buffer = new byte[1024]; //buffer to store the stream
@@ -469,6 +470,7 @@ public class AppControlService extends Service {
             mmServerSocket = tmp;
         }
 
+        @Override
         public void run() {
             Log.d(TAG, "AcceptThread Running run()");
             BluetoothSocket socket = null;
@@ -718,8 +720,8 @@ public class AppControlService extends Service {
             mpattern = pattern;
         }
 
+        @Override
         public void run() {
-
             OutputStream outputStream = null;
             long tx_start_time, tx_end_time;
             try {
@@ -801,11 +803,6 @@ public class AppControlService extends Service {
         }
     }
 
-    Runnable txOperationRunnable = new Runnable() {
-        public void run() {
-        }
-    };
-
     public void startRxOperation() {
         OutputStream outputStream = null;
         Log.d(TAG, "startRxOperation");
@@ -826,6 +823,7 @@ public class AppControlService extends Service {
     }
 
     Runnable rxOperationRunnable = new Runnable() {
+        @Override
         public void run() {
             InputStream inputStream = null;
             long rx_start_time = 0, rx_end_time = 0;
@@ -852,7 +850,6 @@ public class AppControlService extends Service {
                                 new FileOutputStream(file,false).close();
                                 fos = new FileOutputStream(file,false);
                             }
-                            Log.d(TAG,"writing to file is :: "+incomingMsg);
                             fos.write(mmBuffer,0,numBytes);
                         }else {
                             if (incomingMsg.contains("Start")) {
@@ -1170,6 +1167,7 @@ public class AppControlService extends Service {
             mmServerSocket = tmp;
         }
 
+        @Override
         public void run() {
             Log.d(TAG, "AcceptThread Running run()");
 
@@ -1253,6 +1251,7 @@ public class AppControlService extends Service {
     }
 
     Runnable notRcvOperationRunnable = new Runnable() {
+        @Override
         public void run() {
             InputStream inputStream = null;
             byte[] mBuffer = new byte[1024];
@@ -1725,6 +1724,7 @@ public class AppControlService extends Service {
 
     private final BluetoothOffloadCallback mOffloadcallbacks = new BluetoothOffloadCallback() {
 
+       @Override
        public void onNotifyStartDone(int status) {
            if(status == BT_OK) {
                Log.d(TAG, "Offload Register Done");
@@ -1733,6 +1733,7 @@ public class AppControlService extends Service {
            }
        }
 
+       @Override
        public void onNotifyStopDone(int status) {
            if(status == BT_OK) {
                Log.d(TAG, "Offload Deregister Done");
@@ -1741,6 +1742,7 @@ public class AppControlService extends Service {
            }
        }
 
+       @Override
        public int onNotifyEnableOffload(int mode) {
            Log.d(TAG, "notifyOffloadEnable Mode: " + mode);
            mNotificationOffloadStateMachine.ncPreviousState = mNotificationOffloadStateMachine.getCurrentState();
@@ -1751,6 +1753,7 @@ public class AppControlService extends Service {
            return 0;
        }
 
+       @Override
        public int onNotifyDisableOffload(byte[] blob) {
            Log.d(TAG, "notifyOffloadDisable");
            Message message = Message.obtain();
@@ -1782,10 +1785,12 @@ public class AppControlService extends Service {
            return 0;
        }
 
+       @Override
        public void onNotifyAsyncErr(int status) {
             Log.i(TAG, "notifyAsyncErr status: " + status);
        }
 
+       @Override
        public void onTransitionToPwrStateDone(int status) {
            Log.d(TAG, "transitionToPwrStateDone status " + status);
            if (status == 0) {
@@ -2152,8 +2157,8 @@ public class AppControlService extends Service {
             mFileName = fileName;
         }
 
+        @Override
         public void run() {
-
             OutputStream outputStream = null;
             try {
                 outputStream = mmSocket.getOutputStream();
@@ -2175,8 +2180,6 @@ public class AppControlService extends Service {
                 byte[] start_send_file_bytes = start_send_file.getBytes();
                 outputStream.write(start_send_file_bytes,0,start_send_file_bytes.length);
                 while ((len = bis.read(buffer)) != -1) {
-                    String strFileContents = new String(buffer, 0, len);
-                    Log.d(TAG,"strFileContents is :: "+strFileContents);
                     outputStream.write(buffer,0,len);
                 }
                 String end_send_file = "SPP_END_SENDING_FILE";

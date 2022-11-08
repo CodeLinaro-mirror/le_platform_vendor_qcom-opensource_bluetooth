@@ -144,7 +144,6 @@ public class AppControlStateMachine extends StateMachine {
         @Override
         public void enter() {
             Log.d(TAG, "enter()");
-
         }
 
         @Override
