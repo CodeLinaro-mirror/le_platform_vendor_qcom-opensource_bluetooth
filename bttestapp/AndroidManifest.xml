@@ -48,11 +48,6 @@
             android:configChanges="orientation|keyboardHidden|screenSize" />
         <activity android:name=".VcardFilterActivity" />
         <activity
-            android:name="DipTestActivity"
-            android:label="@string/dip_test_label"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            />
-        <activity
             android:name=".HfpTestActivity"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:launchMode="singleTop" />

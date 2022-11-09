@@ -37,7 +37,6 @@ import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.bluetooth.OobData;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -62,9 +61,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.IOException;
-import java.io.ByteArrayOutputStream;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -95,8 +92,7 @@ public class MainActivity extends MonkeyActivity {
     private ServicesFragment mServicesFragment = null;
 
     private BluetoothAdapter mBtAdapter;
-    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond,
-            mBtnGetLinkKey, mBtnReadLocalOobDataButton, mBtnCreateOobBond;
+    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond;
     private static long current_time, switch_time;
 
     private Eir128bitUUIDSample EirSample1 = null,EirSample2 = null,EirSample3 = null;
@@ -260,18 +256,6 @@ public class MainActivity extends MonkeyActivity {
                     Logger.e(TAG, " can not find linkkey ");
                     Toast.makeText(MainActivity.this, "can not find linkkey ", Toast.LENGTH_LONG).show();
                 }
-
-            } else if (action.equals(BluetoothAdapter.ACTION_LOCAL_OOB_DATA)) {
-                OobData oobData = intent.getParcelableExtra(BluetoothAdapter.EXTRA_LOCAL_OOB_DATA);
-                int res = intent.getIntExtra(BluetoothAdapter.EXTRA_OOB_RESULT, -1);
-                if (res == 0) {
-                    Logger.d(TAG, "localC192 is " + byteArrayToString(oobData.getC192())
-                             + "\nlocalR192 is " + byteArrayToString(oobData.getR192())
-                             + "\nlocalC256 is " + byteArrayToString(oobData.getC256())
-                             + "\nlocalR256 is " + byteArrayToString(oobData.getR256()));
-                } else {
-                    Logger.e(TAG, "read local oob data fail");
-                }
             }
         }
     };
@@ -342,7 +326,6 @@ public class MainActivity extends MonkeyActivity {
         filter.addAction(BluetoothA2dpSink.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED);
         filter.addAction(ProfileService.ACTION_CUSTOM_ACTION_RESULT);
-        filter.addAction(BluetoothAdapter.ACTION_LOCAL_OOB_DATA);
         registerReceiver(mReceiver, filter);
 
         if (BluetoothAdapter.getDefaultAdapter().isEnabled() == false) {
@@ -356,9 +339,6 @@ public class MainActivity extends MonkeyActivity {
         mBtnDiscoverService=(Button) findViewById(R.id.discover_services);
         mBtnSelectDevice=(Button) findViewById(R.id.select_device);
         mBtnAddOobBond=(Button) findViewById(R.id.add_oob_bond_dev);
-        mBtnGetLinkKey=(Button) findViewById(R.id.get_link_key);
-        mBtnReadLocalOobDataButton = (Button) findViewById(R.id.read_local_oob_data);
-        mBtnCreateOobBond = (Button) findViewById(R.id.create_oob_bond);
         mSinkButton = (Button) findViewById(R.id.id_a2dp_sink);
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -468,7 +448,7 @@ public class MainActivity extends MonkeyActivity {
 
                 if (isValidLinkKey()) {
                     // get dev info from saved variable
-                    mDevice.addOutOfBandBondDevice(mLinkKey, mKeyType, 0);
+                    //mDevice.addOutOfBandBondDevice(mLinkKey, mKeyType, 0);
                     Toast.makeText(MainActivity.this, "Adding oob bond device, linkkey " + mLinkKey,
                                        Toast.LENGTH_SHORT).show();
                 } else {
@@ -494,34 +474,8 @@ public class MainActivity extends MonkeyActivity {
                                        Toast.LENGTH_SHORT).show();
 
                     Logger.d(TAG, "linkKey " + linkKey + " keyType " + dev[0] + " pinLen " + dev[1]);
-                    mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
+                    //mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
                 }
-            }
-
-        } else if (v.getId() == R.id.get_link_key) {
-            if (mDevice != null && mProfileService != null) {
-                Logger.v(TAG, "get link key");
-                mDevice.getLinkKey();
-            }
-
-        } else if (v.getId() == R.id.read_local_oob_data) {
-            Logger.v(TAG, "read local oob data");
-            mBtAdapter.readLocalOobData();
-
-        } else if (v.getId() == R.id.create_oob_bond) {
-            if (mDevice != null && mProfileService != null) {
-                Logger.v(TAG, "oob bonding");
-                String fileName = "/data/misc/bluedroid/remote.key";
-                File file = new File(fileName);
-                OobData oob = new OobData();
-
-                if (file.exists()) {
-                    getRemoteOobFromFile(file, oob);
-                } else {
-                    Logger.d(TAG, "No remote oob data");
-                }
-
-                mDevice.createBondOutOfBand(1, oob); // transport:1 BR/EDR
             }
         }
     }
@@ -529,11 +483,6 @@ public class MainActivity extends MonkeyActivity {
     public void showCoveArtActivity(View v) {
         Log.i(TAG," showCoveArtActivity");
         startActivity(new Intent(this,AvrcpCoverArtActivity.class));
-    }
-
-    public void showDipTestActivity(View v) {
-        Log.i(TAG," showDipTestActivity");
-        startActivity(new Intent(this, DipTestActivity.class));
     }
 
     private BluetoothProfile.ServiceListener ma2dpSinkServiceListener =
@@ -566,6 +515,7 @@ public class MainActivity extends MonkeyActivity {
         Log.i(TAG," showHidHost");
         startActivity(new Intent(this, HidTestApp.class));
     }
+
 
     private void updateDevice(BluetoothDevice device) {
         SharedPreferences.Editor prefs = getPreferences(MODE_PRIVATE).edit();
@@ -641,35 +591,16 @@ public class MainActivity extends MonkeyActivity {
             mBtnDiscoverService.setEnabled(true);
             mBtnSelectDevice.setEnabled(true);
             mBtnAddOobBond.setEnabled(true);
-            mBtnGetLinkKey.setEnabled(true);
-            mBtnReadLocalOobDataButton.setEnabled(true);
-            mBtnCreateOobBond.setEnabled(true);
         } else {
             mBtnDiscoverService.setEnabled(false);
             mBtnSelectDevice.setEnabled(false);
             mBtnAddOobBond.setEnabled(false);
-            mBtnGetLinkKey.setEnabled(false);
-            mBtnReadLocalOobDataButton.setEnabled(false);
-            mBtnCreateOobBond.setEnabled(false);
         }
     }
 
     private boolean isValidLinkKey() {
         boolean ret = ((mLinkKey != null && mLinkKey.isEmpty()) || mKeyType < 0) ? false : true;
         return ret;
-    }
-
-    private static String byteArrayToString(byte[] valueBuf) {
-        StringBuilder sb = new StringBuilder();
-        if (valueBuf != null) {
-            for (int idx = 0; idx < valueBuf.length; idx++) {
-                if (idx != 0) {
-                    sb.append(" ");
-                }
-                sb.append(String.format("%02x", valueBuf[idx]));
-            }
-        }
-        return sb.toString();
     }
 
     private void getDevInfoFromFile(File file, char[] keys, int[] dev) {
@@ -707,56 +638,6 @@ public class MainActivity extends MonkeyActivity {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void getRemoteOobFromFile(File file, OobData oob) {
-        InputStream is = null;
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        try {
-            is = new FileInputStream(file);
-            int bufferSize = is.available();
-            int ret = 0;
-
-            byte[] buffer = new byte[bufferSize];
-            byte[] retVal = new byte[bufferSize];
-
-            while ((ret = is.read(buffer)) != -1) {
-                os.write(buffer, 0, ret);
-            }
-            retVal = os.toByteArray();
-
-            Logger.d(TAG, "buffer byte size = " + bufferSize
-                     + " ret = " + ret);
-
-            byte[] c192 = new byte[16];
-            byte[] r192 = new byte[16];
-            byte[] c256 = new byte[16];
-            byte[] r256 = new byte[16];
-
-            // copy oob data from buffer
-            System.arraycopy(retVal, 0, c192, 0 , 16);
-            System.arraycopy(retVal, 16, r192, 0 , 16);
-
-            if (bufferSize == 64) {
-                System.arraycopy(retVal, 32, c256, 0 , 16);
-                System.arraycopy(retVal, 48, r256, 0 , 16);
-            }
-
-            // set oob data to oobdata object
-            oob.setC192(c192);
-            oob.setR192(r192);
-            oob.setC256(c256);
-            oob.setR256(r256);
-
-            Logger.d(TAG, "oob data set");
-
-            if (os != null) os.close();
-            if (is != null) is.close();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error reading part data", e);
             e.printStackTrace();
         }
     }
