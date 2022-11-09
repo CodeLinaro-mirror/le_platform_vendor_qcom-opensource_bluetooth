@@ -75,6 +75,8 @@ public class Utils {
     public static boolean isThroughputStateMachineUnderProcessing = false;
     public static boolean isOffloadStateMachineUnderProcessing = false;
     public static boolean isHidControlStateMachineUnderProcessing = false;
+    public static boolean isSppFileTransferOngoing = false;
+    public static boolean isSppConnection = false;
 
     public static class AppControlConstants {
 
@@ -131,6 +133,13 @@ public class Utils {
         static final int STATE_END_GAP_TEST_CASES = 23;
         static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
         //static final int STATE_REGISTER_BLUETOOTH_HID = 25;
+
+        static final int STATE_START_SPP_TEST_CASES = 25;
+        static final int STATE_SPP_CONNECTED = 26;
+        static final int STATE_START_SEND_FILE = 27;
+        static final int STATE_END_SEND_FILE = 28;
+        static final int STATE_START_RECEIVE_FILE = 29;
+        static final int STATE_END_RECEIVE_FILE = 30;
     }
 
     public static class NotificationOffloadStateMachineMessageConstants {
@@ -161,6 +170,8 @@ public class Utils {
                 .fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
         static final UUID APP_SERVER_UUID = UUID
             .fromString("8ce255c0-200a-11e0-ac64-0800200c9a77");
+        static final UUID SPP_UUID = UUID
+            .fromString("00001101-0000-1000-8000-00805f9b34fb");
         static UUID INCOMING_CONNECTION_UUID = null;
     }
 /*HID Service */
@@ -181,5 +192,4 @@ public class Utils {
         static final int STATE_START_BLUETOOTH_HID_TEST_CASES = 13;
         static final int STATE_STOP_BLUETOOTH_HID_TEST_CASES=14;
     }
-
 }

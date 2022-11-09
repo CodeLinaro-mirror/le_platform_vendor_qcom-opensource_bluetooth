@@ -96,12 +96,6 @@ public class MainActivity extends Activity {
                                               Context.POWER_SERVICE);
             wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WakeLock");
 
-            /* Request for location access */
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        PERMISSION_REQUEST_FINE_LOCATION);
-            }
-
             socServer = SocketServer.getInstance();
 
             Intent intent = new Intent(this, AncsService.class);
@@ -126,21 +120,6 @@ public class MainActivity extends Activity {
         Log.d(TAG, "onRestoreInstanceState called");
         wl_acquired = savedInstanceState.getBoolean("wl_acquired");
     }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[],
-                                           int[] grantResults) {
-        switch (requestCode) {
-            case PERMISSION_REQUEST_FINE_LOCATION: {
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.i(TAG, "Permission granted!");
-                } else {
-                    Log.e(TAG, "Needs location permission");
-                }
-            }
-        }
-    }
-
 
     @Override
     protected void onStart() {

@@ -94,6 +94,7 @@ public class AppControlStateMachine extends StateMachine {
     private GapTestState mGapTestState;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
     private HidTestState mHidTestState;
+    private SppTestState mSppTestState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -111,6 +112,7 @@ public class AppControlStateMachine extends StateMachine {
         mGapTestState = new GapTestState();
         mReadyToAcceptConnection = new ReadyToAcceptConnection();
         mHidTestState = new HidTestState();
+        mSppTestState = new SppTestState();
 
         // Adding States
         addState(mInitState);
@@ -123,6 +125,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mGapTestState);
         addState(mReadyToAcceptConnection);
         addState(mHidTestState);
+        addState(mSppTestState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -178,7 +181,7 @@ public class AppControlStateMachine extends StateMachine {
                 Log.d(TAG, "Going to GAP Test Cases state");
                 break;
 
-           case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
+            case Utils.HidStateMachineMessageConstants.STATE_START_BLUETOOTH_HID_TEST_CASES:
                 transitionTo(mHidTestState);
                 break;
             }
@@ -226,6 +229,16 @@ public class AppControlStateMachine extends StateMachine {
                 SocketServer.mainMenuState = SocketServer.INIT_MENU;
                 SocketServer.processOutputState = SocketServer.INIT_MENU;
                 SocketServer.updateSocketClient();
+                break;
+
+            case Utils.StateMachineMessageConstants.STATE_SPP_CONNECTED:
+                SocketServer.sendSocketData("Spp Connection Successful");
+                mAppControlService.startRxOperation();
+                SocketServer.mainMenuState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+                SocketServer.processOutputState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+                SocketServer.updateSocketClient();
+                Log.d(TAG, "Going to SPP Test state");
+                transitionTo(mSppTestState);
                 break;
             }
             return retvalue;
@@ -657,6 +670,56 @@ public class AppControlStateMachine extends StateMachine {
                     transitionTo(mInitState);
                     Log.d(TAG, "Going to Init state");
             break;
+            }
+            return retvalue;
+        }
+    }
+
+
+    private class SppTestState extends State {
+        private static final String TAG = "BluetoothTxRxApp SppTestState";
+
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+            Utils.isSppFileTransferOngoing = true;
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+
+                case Utils.StateMachineMessageConstants.STATE_START_SEND_FILE:
+                String fileName = (String) message.obj;
+                mAppControlService.startSendingFile(fileName);
+                break;
+
+                case Utils.StateMachineMessageConstants.STATE_END_SEND_FILE:
+                break;
+
+                case Utils.StateMachineMessageConstants.STATE_START_RECEIVE_FILE:
+                SocketServer.sendSocketData("File Receive Started");
+                break;
+
+                case Utils.StateMachineMessageConstants.STATE_END_RECEIVE_FILE:
+                SocketServer.sendSocketData("File Receive Complete");
+                break;
+
+                case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                mAppControlService.closeConnection();
+                Utils.isSppConnection = false;
+                transitionTo(mInitState);
+                Log.d(TAG, "Going to Init state");
+                SocketServer.mainMenuState = SocketServer.INIT_MENU;
+                SocketServer.processOutputState = SocketServer.INIT_MENU;
+                SocketServer.updateSocketClient();
+                break;
             }
             return retvalue;
         }

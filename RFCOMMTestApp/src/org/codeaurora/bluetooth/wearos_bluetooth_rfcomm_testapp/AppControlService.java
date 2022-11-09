@@ -70,6 +70,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.BufferedInputStream;
+
 import java.util.Set;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
@@ -104,6 +109,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
+import android.os.Environment;
 import android.util.Log;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
@@ -120,6 +126,7 @@ public class AppControlService extends Service {
             .getDefaultAdapter();
     static BluetoothDevice btDeviceToPair = null;
     private BluetoothSocket mmSocket;
+    private FileOutputStream fos = null;
     private Context mContext;
     ConfigFileParser parser;
     AppControlStateMachine mAppControlStateMachine;
@@ -523,8 +530,8 @@ public class AppControlService extends Service {
                 .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
             return;
         }
-        SocketServer
-                .sendSocketData("Connecting Device...Please wait...!!!");
+        //SocketServer
+        //        .sendSocketData("Connecting Device...Please wait...!!!");
         if(Utils.isHidControlStateMachineUnderProcessing != true){
                 startConnectionProcess();
         }
@@ -573,12 +580,20 @@ public class AppControlService extends Service {
             }
 
             try {
-                Log.d(TAG, "Creating a BluetoothSocket to create a connection to a remote device");
-                device.sdpSearch(ParcelUuid.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66"));
+                Log.d(TAG, "Creating a BluetoothSocket to create a connection to a remote device... isSppConnection :: "+Utils.isSppConnection);
+                if(Utils.isSppConnection){
+                    device.sdpSearch(ParcelUuid.fromString("00001101-0000-1000-8000-00805f9b34fb"));
+                }else{
+                    device.sdpSearch(ParcelUuid.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66"));
+                }
                 getSdpSearchSem.acquire();
                 if (sdpRecordFound) {
                     SocketServer.sendSocketData("SDP Record found and Creating RFComm Socket");
-                    tmp = device.createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.APP_UUID);
+                    if(Utils.isSppConnection){
+                        tmp = device.createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.SPP_UUID);
+                    }else{
+                        tmp = device.createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.APP_UUID);
+                    }
                     sdpRecordFound = false;
                 } else {
                     SocketServer.sendSocketData("SDP Record not found for this UUID on Remote Device");
@@ -622,9 +637,17 @@ public class AppControlService extends Service {
                 Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                 Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
                 Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
-                if (Utils.isThroughputStateMachineUnderProcessing == true) {
+                if (Utils.isThroughputStateMachineUnderProcessing == true ||
+                        Utils.isHidControlStateMachineUnderProcessing == true) {
                     Message message = Message.obtain();
                     message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                    message.obj = mmSocket.getRemoteDevice();
+                    mAppControlStateMachine.sendMessage(message);
+                }
+
+                if(Utils.isSppConnection){
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_SPP_CONNECTED;
                     message.obj = mmSocket.getRemoteDevice();
                     mAppControlStateMachine.sendMessage(message);
                 }
@@ -635,12 +658,7 @@ public class AppControlService extends Service {
                     message.obj = mmSocket.getRemoteDevice();
                     mNotificationOffloadStateMachine.sendMessage(message);
                 }
-                if(Utils.isHidControlStateMachineUnderProcessing == true){
-                    Message message = Message.obtain();
-                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
-                    message.obj = mmSocket.getRemoteDevice();
-                    mAppControlStateMachine.sendMessage(message);
-                }
+
             } catch (IOException connectException) {
                 Log.e(TAG, "Unable to connect; close the socket and return",
                         connectException);
@@ -649,7 +667,8 @@ public class AppControlService extends Service {
                     Log.d(TAG,"Utils.isThroughputStateMachineUnderProcessing :: "+Utils.isThroughputStateMachineUnderProcessing);
                     Log.d(TAG,"Utils.isOffloadStateMachineUnderProcessing :: "+Utils.isOffloadStateMachineUnderProcessing);
                     Log.d(TAG,"Utils.isHidControlStateMachineUnderProcessing :: "+Utils.isHidControlStateMachineUnderProcessing);
-                    if (Utils.isThroughputStateMachineUnderProcessing == true) {
+                    if (Utils.isThroughputStateMachineUnderProcessing == true ||
+                            Utils.isHidControlStateMachineUnderProcessing == true || Utils.isSppConnection == true) {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
                         mAppControlStateMachine.sendMessage(message);
@@ -658,11 +677,6 @@ public class AppControlService extends Service {
                         Message message = Message.obtain();
                         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTION_FAILED;
                         mNotificationOffloadStateMachine.sendMessage(message);
-}
-                    if(Utils.isHidControlStateMachineUnderProcessing == true){
-                        Message message = Message.obtain();
-                        message.what = Utils.HidStateMachineMessageConstants.STATE_CONNECTION_FAILED;
-                        mAppControlStateMachine.sendMessage(message);
                     }
                 } catch (IOException closeException) {
                     Log.e(TAG, "Could not close the client socket",
@@ -794,19 +808,19 @@ public class AppControlService extends Service {
 
     public void startRxOperation() {
         OutputStream outputStream = null;
-        Log.d(TAG, "startNotRcvOperation");
+        Log.d(TAG, "startRxOperation");
         try {
             outputStream = mmSocket.getOutputStream();
         } catch (IOException e) {
             Log.e(TAG, "Error occurred when creating output stream", e);
         }
-        try {
-            outputStream.write("Device connected and ready to receive notifications".getBytes());
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when sending data", e);
-        } catch (Exception e) {
-            Log.e(TAG, "Error occurred when sending data", e);
-        }
+        // try {
+        //     outputStream.write("Device connected and ready to receive notifications".getBytes());
+        // } catch (IOException e) {
+        //     Log.e(TAG, "Error occurred when sending data", e);
+        // } catch (Exception e) {
+        //     Log.e(TAG, "Error occurred when sending data", e);
+        // }
         Thread rxOperation = new Thread(rxOperationRunnable);
         rxOperation.start();
     }
@@ -818,6 +832,7 @@ public class AppControlService extends Service {
             byte[] mmBuffer = new byte[1024];
             int numBytes; // bytes returned from read()
             int totalBytes = 0; // totalBytes received
+            File file = null;
             try {
                 inputStream = mmSocket.getInputStream();
             } catch (IOException e) {
@@ -826,59 +841,79 @@ public class AppControlService extends Service {
 
             while (true) {
                 try {
-                    numBytes = inputStream.read(mmBuffer);
-                    totalBytes = totalBytes + numBytes;
-                    String incomingMsg = new String(mmBuffer, 0, numBytes);
-
-                    if (incomingMsg.contains("Start")) {
-                        rx_start_time = SystemClock.elapsedRealtime();
-                        Log.d(TAG, "start_time: " + rx_start_time);
-                    }
-
-                    if (incomingMsg.contains("end")) {
-                        rx_end_time = SystemClock.elapsedRealtime();
-                        Log.d(TAG, "end_time: " + rx_end_time);
-                        Log.d(TAG, "end_time - start_time = "
-                                + ((rx_end_time - rx_start_time) / 1000));
-                        Log.d(TAG, "totalBytes = " + totalBytes);
-                        Log.d(TAG, "totalBits =  " + (totalBytes * 8));
-                        // throughput calculation start
-                        float RxTput = ((float) totalBytes * 8 * 1000)
-                                / (rx_end_time - rx_start_time);
-                        float RxTputk = RxTput / 1000;
-                        // throughput calculation end
-                        Log.d(TAG,
-                                "write: Through put (receive) is approximately(in kbps): "
+                    while((numBytes = inputStream.read(mmBuffer, 0, mmBuffer.length)) != -1) {
+                        totalBytes = totalBytes + numBytes;
+                        String incomingMsg = new String(mmBuffer, 0, numBytes);
+                        if(Utils.isSppFileTransferOngoing == true){
+                            if(incomingMsg.contains("SPP_START_SENDING_FILE")){
+                                file = new File(Environment.getExternalStorageDirectory() + "/" + "test_spp_from_remote.txt");
+                                boolean created = file.createNewFile();
+                                Log.d(TAG,"is file created :: "+created);
+                                new FileOutputStream(file,false).close();
+                                fos = new FileOutputStream(file,false);
+                            }
+                            Log.d(TAG,"writing to file is :: "+incomingMsg);
+                            fos.write(mmBuffer,0,numBytes);
+                        }else {
+                            if (incomingMsg.contains("Start")) {
+                                rx_start_time = SystemClock.elapsedRealtime();
+                                Log.d(TAG, "start_time: " + rx_start_time);
+                            }
+                            if (incomingMsg.contains("end")) {
+                                rx_end_time = SystemClock.elapsedRealtime();
+                                Log.d(TAG, "end_time: " + rx_end_time);
+                                Log.d(TAG, "end_time - start_time = "
+                                        + ((rx_end_time - rx_start_time) / 1000));
+                                Log.d(TAG, "totalBytes = " + totalBytes);
+                                Log.d(TAG, "totalBits =  " + (totalBytes * 8));
+                                // throughput calculation start
+                                float RxTput = ((float) totalBytes * 8 * 1000)
+                                        / (rx_end_time - rx_start_time);
+                                float RxTputk = RxTput / 1000;
+                                // throughput calculation end
+                                Log.d(TAG,
+                                        "write: Through put (receive) is approximately(in kbps): "
+                                                + RxTputk);
+                                SocketServer
+                                .sendSocketData("Throughput (receive) is (in kbps): "
                                         + RxTputk);
-                        SocketServer
-                        .sendSocketData("Throughput (receive) is (in kbps): "
-                                + RxTputk);
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
-                        mAppControlStateMachine.sendMessage(message);
-                        totalBytes = 0;
-                        // break;
-                    }
+                                Message message = Message.obtain();
+                                message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
+                                mAppControlStateMachine.sendMessage(message);
+                                totalBytes = 0;
+                                // break;
+                            }
+                        }
 
-                    if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_WAKEABLE;
-                        mAppControlStateMachine.sendMessage(message);
-                        break;
-                    }
+                        if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
+                            Message message = Message.obtain();
+                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_WAKEABLE;
+                            mAppControlStateMachine.sendMessage(message);
+                            break;
+                        }
 
-                    if (incomingMsg.contains("ACTIONABLE_NOTIFICATION_END")) {
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_ACTIONABLE;
-                        mAppControlStateMachine.sendMessage(message);
-                        break;
-                    }
+                        if (incomingMsg.contains("ACTIONABLE_NOTIFICATION_END")) {
+                            Message message = Message.obtain();
+                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_ACTIONABLE;
+                            mAppControlStateMachine.sendMessage(message);
+                            break;
+                        }
 
-                    if (incomingMsg.contains("CACHEABLE_NOTIFICATION_END")) {
+                        if (incomingMsg.contains("CACHEABLE_NOTIFICATION_END")) {
+                            Message message = Message.obtain();
+                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_CACHEABLE;
+                            mAppControlStateMachine.sendMessage(message);
+                            break;
+                        }
+                    }
+                    Log.d(TAG,"Breaking out from Input Stream reading");
+                    if(Utils.isSppFileTransferOngoing == true){
                         Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_CACHEABLE;
+                        message.what = Utils.StateMachineMessageConstants.STATE_END_RECEIVE_FILE;
                         mAppControlStateMachine.sendMessage(message);
-                        break;
+                        SocketServer.mainMenuState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+                        SocketServer.processOutputState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+                        SocketServer.updateSocketClient();
                     }
 
                 } catch (IOException e) {
@@ -1160,6 +1195,13 @@ public class AppControlService extends Service {
                         message.what = Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTED;
                         message.obj = mmSocket.getRemoteDevice();
                         mNotificationOffloadStateMachine.sendMessage(message);
+                    }
+
+                    if(Utils.isSppConnection){
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_SPP_CONNECTED;
+                        message.obj = mmSocket.getRemoteDevice();
+                        mAppControlStateMachine.sendMessage(message);
                     }
 
                     break;
@@ -2045,6 +2087,107 @@ public class AppControlService extends Service {
             return mouseData;
         }
         return keyboardData;
+    }
+
+    public void startSendingFile(String fileName){
+        Log.d(TAG, "Inside startSendingFile fileName is :: "+fileName);
+
+        File sdcard = Environment.getExternalStorageDirectory();
+        File srcFile = new File(sdcard,fileName);
+        File dstFile = new File(mContext.getFilesDir(), fileName);
+        if(srcFile.exists() && !srcFile.isDirectory()){
+            try{
+                copyFile(srcFile,dstFile);
+            }catch(IOException e){
+                Log.e(TAG,"Caught IOException while copying file :: "+e);
+            }
+            if(dstFile.exists() && !dstFile.isDirectory()) {
+                SocketServer.sendSocketData("File Exists...Transferring File\n");
+                Runnable sendFileRunnable = new SendFileRunnable(fileName);
+                try{
+                    Thread sendFile = new Thread(sendFileRunnable);
+                    sendFile.start();
+                    sendFile.join();
+                }catch(InterruptedException e){
+                    Log.e(TAG,"Caught InterruptedException while starting thread :: "+e);
+                }
+            }else{
+                SocketServer.sendSocketData("Something went wrong...Please try again\n");
+            }
+        }else{
+            SocketServer.sendSocketData("Source File Doesn't exist\n");
+        }
+        Message message = Message.obtain();
+        message.what = Utils.StateMachineMessageConstants.STATE_END_SEND_FILE;
+        mAppControlStateMachine.sendMessage(message);
+        SocketServer.mainMenuState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+        SocketServer.processOutputState = SocketServer.BLUETOOTH_SPP_TESTING_MENU;
+        SocketServer.updateSocketClient();
+    }
+
+    public void copyFile(File src, File dst) throws IOException {
+        InputStream in = new FileInputStream(src);
+        try {
+            OutputStream out = new FileOutputStream(dst);
+            try {
+                // Transfer bytes from in to out
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
+    }
+
+    private class SendFileRunnable implements Runnable {
+
+        String mFileName;
+
+        public SendFileRunnable(String fileName) {
+            mFileName = fileName;
+        }
+
+        public void run() {
+
+            OutputStream outputStream = null;
+            try {
+                outputStream = mmSocket.getOutputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+            File myFile = new File(mContext.getFilesDir(), mFileName);
+            Log.d(TAG,"file created success!");
+
+            byte[] mybytearray = new byte[(int)myFile.length()];
+            Log.d(TAG,"file length() =" + (int)myFile.length());
+
+            try{
+                FileInputStream fis = new FileInputStream(myFile);
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                byte[] buffer = new byte[1024];
+                int len = -1;
+                String start_send_file = "SPP_START_SENDING_FILE";
+                byte[] start_send_file_bytes = start_send_file.getBytes();
+                outputStream.write(start_send_file_bytes,0,start_send_file_bytes.length);
+                while ((len = bis.read(buffer)) != -1) {
+                    String strFileContents = new String(buffer, 0, len);
+                    Log.d(TAG,"strFileContents is :: "+strFileContents);
+                    outputStream.write(buffer,0,len);
+                }
+                String end_send_file = "SPP_END_SENDING_FILE";
+                byte[] end_send_file_bytes = end_send_file.getBytes();
+                outputStream.write(end_send_file_bytes,0,end_send_file_bytes.length);
+
+                SocketServer.sendSocketData("File Transfer Complete");
+            }catch(Exception e){
+                Log.e(TAG,"Caught Error :: "+e);
+            }
+        }
     }
 
 }

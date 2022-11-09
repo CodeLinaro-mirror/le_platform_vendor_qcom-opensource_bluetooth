@@ -115,12 +115,16 @@ public class SocketServer {
     static final int SOC_CLOSE_ACK = 8;
     static final int NONE = 9;
     static final int CONNECTION_TEST_MENU = 999;
-//HID
+    //HID
     static final int BLUETOOTH_HID_TESTING_MENU = 10;
     static final int STATE_CONNECT_BLUETOOTH_HID = 11;
     static final int BLUETOOTH_HID_CONNECT =12;
     static final int BLUETOOTH_HID_MOUSE_START =13;
     static final int BLUETOOTH_HID_MOUSE_STOP =14;
+
+    // SPP
+    static final int BLUETOOTH_SPP_CONNECT_MENU = 15;
+    static final int BLUETOOTH_SPP_TESTING_MENU = 16;
 
     static int mainMenuState = INIT_MENU;
     static int processOutputState = INIT_MENU;
@@ -267,6 +271,7 @@ public class SocketServer {
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Throughput_Testing\n");
             sendStr.append("                     Offload_Testing\n");
+            sendStr.append("                     Spp_Testing\n");
             sendStr.append("                     GAP\n");
             sendStr.append("                     HID_Testing\n");
             sendStr.append("                     Close\n");
@@ -315,6 +320,21 @@ public class SocketServer {
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
+
+        case BLUETOOTH_SPP_CONNECT_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+        break;
+
+        case BLUETOOTH_SPP_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Send_File file_name\n");
+            //sendStr.append("                     Receive_File\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+        break;
         case BLUETOOTH_HID_TESTING_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Register_HIDservice\n");
@@ -388,6 +408,10 @@ public class SocketServer {
                     processOutputState = OFFLOAD_TESTING_MENU;
                     Utils.isOffloadStateMachineUnderProcessing = true;
                     Utils.isHidControlStateMachineUnderProcessing = false;
+                } else if(inputString.equals("Spp_Testing")){
+                    mainMenuState = BLUETOOTH_SPP_CONNECT_MENU;
+                    processOutputState = BLUETOOTH_SPP_CONNECT_MENU;
+                    Utils.isSppConnection = true;
                 } else if (inputString.equals("Close")) {
                     closeReceived = true;
                     mainMenuState = INIT_MENU;
@@ -415,7 +439,7 @@ public class SocketServer {
                     Utils.isHidControlStateMachineUnderProcessing = true;
                     Utils.isThroughputStateMachineUnderProcessing = false;
                     Utils.isOffloadStateMachineUnderProcessing = false;
-                } else {
+                }else {
                     Log.d(TAG, "Invalid");
                     processOutputState = INVALID_INPUT;
                     Utils.isThroughputStateMachineUnderProcessing = false;
@@ -645,7 +669,7 @@ public class SocketServer {
             if (inputString.equals("Throughput")) {
                 mainMenuState = THROUGHPUT_MENU;
                 processOutputState = THROUGHPUT_MENU;
-            } else if (inputString.equals("Back")) {
+            }else if (inputString.equals("Back")) {
                 Message message = Message.obtain();
                 message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
                 Utils.appControlStateMachine.sendMessage(message);
@@ -843,6 +867,82 @@ public class SocketServer {
                 processOutputState = INVALID_INPUT;
             }
             break;
+        case BLUETOOTH_SPP_CONNECT_MENU:
+        tmp = inputString.split(" ", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("Connect")) {
+                Connect connectParam = parser.connectParse(tmp[1]);
+                if (connectParam != null) {
+                    Utils.bdAddressFromConfig = connectParam.BDaddress;
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_CONNECT;
+                    Utils.appControlStateMachine.sendMessage(message);
+                } else {
+                    processOutputState = INVALID_INPUT;
+                    mainMenuState = INIT_MENU;
+                }
+            } else if (tmp[0].equals("Incoming_Connection")) {
+                IncomingConnection incomingConnection = parser
+                        .incomingConnectionParse(tmp[1]);
+                if (incomingConnection != null) {
+                    processOutputState = NONE;
+                    Utils.UUIDConstants.INCOMING_CONNECTION_UUID = UUID
+                            .fromString(incomingConnection.uuid);
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION;
+                    Utils.appControlStateMachine.sendMessage(message);
+                } else {
+                    processOutputState = INVALID_INPUT;
+                    mainMenuState = INIT_MENU;
+                }
+            }
+        } else if (inputString.equals("Back")) {
+            mainMenuState = INIT_MENU;
+            processOutputState = INIT_MENU;
+            Utils.isThroughputStateMachineUnderProcessing = false;
+            Utils.isOffloadStateMachineUnderProcessing = false;
+        } else {
+            processOutputState = INVALID_INPUT;
+        }
+        break;
+
+        case BLUETOOTH_SPP_TESTING_MENU:
+            tmp = inputString.split(" ", 2);
+            if (tmp.length == 2) {
+                if (tmp[0].equals("Send_File")) {
+                    Log.d(TAG, "Inside Send_File :: tmp[1] is :: "+tmp[1]);
+                    if(tmp[1] != null){
+                        processOutputState = NONE;
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_START_SEND_FILE;
+                        message.obj = tmp[1];
+                        Utils.appControlStateMachine.sendMessage(message);
+                    }else{
+                        processOutputState = INVALID_INPUT;
+                    }
+                }
+            }else if (tmp.length == 1){
+                if(tmp[0].equals("Receive_File")){
+                    Log.d(TAG, "Inside Receive_File");
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_START_RECEIVE_FILE;
+                    Utils.appControlStateMachine.sendMessage(message);
+                } else if (tmp[0].equals("Back")) {
+                    Utils.isSppFileTransferOngoing = false;
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                    Utils.appControlStateMachine.sendMessage(message);
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isOffloadStateMachineUnderProcessing = false;
+                } else {
+                    processOutputState = INVALID_INPUT;
+                }
+            } else {
+                processOutputState = INVALID_INPUT;
+            }
+        break;
         }
     }
 
