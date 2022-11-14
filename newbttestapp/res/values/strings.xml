@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 -->
 <resources>
@@ -36,7 +41,7 @@
 <string name=""></string>
 -->
     <!-- General -->
-    <string name="app_name">BTTestApp</string>
+    <string name="app_name">NewBTTestApp</string>
     <string name="blank"></string>
     <string name="cancel">Cancel</string>
 
@@ -53,11 +58,16 @@
     <string name="showHidHost">Hid host qualification</string>
     <string name="discover_services">Discover</string>
     <string name="add_oob_bond_dev">Add OOB Bond</string>
+    <string name="get_link_key">Get Link Key</string>
+    <string name="read_local_oob_data">Read LOCAL OOB DATA</string>
+    <string name="create_oob_bond">CREATE OOB BOND</string>
     <string name="clear">Clear</string>
     <string name="list_empty">No records found!</string>
     <string name="a2dp_source">A2DP Source</string>
     <string name="a2dp_sink">A2DP Sink</string>
     <string name="a2dp_role">A2DP Role</string>
+    <string name="dip_test">Dip Test</string>
+
     <!-- Dialogs -->
     <string name="dialog_title_create_msg_filter">Create message filter:</string>
     <string name="dialog_title_pick_date_time">Pick date and time:</string>
@@ -69,6 +79,20 @@
     <string name="title_avrcp_test">AVRCP Test</string>
     <string name="title_vcard_filter">Filter Attributes</string>
     <string name="title_message_filter">Select Message Parameters</string>
+
+    <!-- DIP -->
+    <string name="dip_start_test">Start Test</string>
+    <string name="dip_test_label">Dip</string>
+    <string name="dip_clear">Clear</string>
+    <string name="dip_specification_id_title">Specification Id:</string>
+    <string name="dip_vendor_id_title">Vendor Id:</string>
+    <string name="dip_vendor_id_source_title">Vendor Id Source:</string>
+    <string name="dip_product_id_title">Product Id:</string>
+    <string name="dip_version_title">Version:</string>
+    <string name="dip_primary_record_title">Primary Record:</string>
+    <string name="dip_client_executable_url_title">Client Executable Url:</string>
+    <string name="dip_service_description_title">Service Description:</string>
+    <string name="dip_documentation_url_title">Documentation Url:</string>
 
     <!-- PBAP -->
     <string name="phonebook_prompt">Choose a phonebook:</string>

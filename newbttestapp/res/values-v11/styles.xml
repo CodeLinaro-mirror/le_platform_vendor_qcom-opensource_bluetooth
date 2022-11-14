@@ -29,14 +29,12 @@
 -->
 <resources>
 
-    <!-- Default screen margins, per the Android Design guidelines. -->
-    <dimen name="activity_horizontal_margin">40dp</dimen>
-    <dimen name="activity_vertical_margin">16dp</dimen>
+    <!--
+        Base application theme for API 11+. This theme completely replaces
+        AppBaseTheme from res/values/styles.xml on API 11+ devices.
+    -->
+    <style name="AppBaseTheme" parent="android:Theme.Holo.Light">
+        <!-- API 11 theme customizations can go here. -->
+    </style>
 
-    <dimen name="activity_base_margin">5dp</dimen>
-
-    <dimen name="layout_vertical_margin">32dp</dimen>
-
-    <!-- Use fix width for two text view  -->
-    <dimen name="activity_avrcp_textview_width">250dp</dimen>
 </resources>
