@@ -881,27 +881,6 @@ public class AppControlService extends Service {
                                 // break;
                             }
                         }
-
-                        if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
-                            Message message = Message.obtain();
-                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_WAKEABLE;
-                            mAppControlStateMachine.sendMessage(message);
-                            break;
-                        }
-
-                        if (incomingMsg.contains("ACTIONABLE_NOTIFICATION_END")) {
-                            Message message = Message.obtain();
-                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_ACTIONABLE;
-                            mAppControlStateMachine.sendMessage(message);
-                            break;
-                        }
-
-                        if (incomingMsg.contains("CACHEABLE_NOTIFICATION_END")) {
-                            Message message = Message.obtain();
-                            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_CACHEABLE;
-                            mAppControlStateMachine.sendMessage(message);
-                            break;
-                        }
                     }
                     Log.d(TAG,"Breaking out from Input Stream reading");
                     if(Utils.isSppFileTransferOngoing == true){
@@ -923,81 +902,6 @@ public class AppControlService extends Service {
             }
         }
     };
-
-    public void startWakeableNotificationOperation(int timer) {
-        OutputStream outputStream = null;
-        try {
-            outputStream = mmSocket.getOutputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating output stream", e);
-        }
-        Log.d(TAG, "timer is :: " + timer);
-        String start = "WAKEABLE_NOTIFICATION_START";
-        String timerStart = "WAKEABLE_NOTIFICATION_TIMER_START";
-        String timerEnd = "WAKEABLE_NOTIFICATION_TIMER_END";
-        try {
-            outputStream.write(start.getBytes());
-            outputStream.write(timerStart.getBytes());
-            outputStream.write(Integer.toString(timer).getBytes());
-            outputStream.write(timerEnd.getBytes());
-            startRxOperation();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when sending data", e);
-            Message message = Message.obtain();
-            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
-            mAppControlStateMachine.sendMessage(message);
-        }
-    }
-
-    public void startActionableNotificationOperation(int timer) {
-        OutputStream outputStream = null;
-        try {
-            outputStream = mmSocket.getOutputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating output stream", e);
-        }
-        Log.d(TAG, "timer is :: " + timer);
-        String start = "ACTIONABLE_NOTIFICATION_START";
-        String timerStart = "ACTIONABLE_NOTIFICATION_TIMER_START";
-        String timerEnd = "ACTIONABLE_NOTIFICATION_TIMER_END";
-        try {
-            outputStream.write(start.getBytes());
-            outputStream.write(timerStart.getBytes());
-            outputStream.write(Integer.toString(timer).getBytes());
-            outputStream.write(timerEnd.getBytes());
-            startRxOperation();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when sending data", e);
-            Message message = Message.obtain();
-            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
-            mAppControlStateMachine.sendMessage(message);
-        }
-    }
-
-    public void startCacheableNotificationOperation(int timer) {
-        OutputStream outputStream = null;
-        try {
-            outputStream = mmSocket.getOutputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating output stream", e);
-        }
-        Log.d(TAG, "timer is :: " + timer);
-        String start = "CACHEABLE_NOTIFICATION_START";
-        String timerStart = "CACHEABLE_NOTIFICATION_TIMER_START";
-        String timerEnd = "CACHEABLE_NOTIFICATION_TIMER_END";
-        try {
-            outputStream.write(start.getBytes());
-            outputStream.write(timerStart.getBytes());
-            outputStream.write(Integer.toString(timer).getBytes());
-            outputStream.write(timerEnd.getBytes());
-            startRxOperation();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when sending data", e);
-            Message message = Message.obtain();
-            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
-            mAppControlStateMachine.sendMessage(message);
-        }
-    }
 
     public void setScanMode(int scanMode) {
         boolean result = false;

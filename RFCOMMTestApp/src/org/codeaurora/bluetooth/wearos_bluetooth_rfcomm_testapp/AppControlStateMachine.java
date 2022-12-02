@@ -323,26 +323,6 @@ public class AppControlStateMachine extends StateMachine {
                         + txParam.chunkSize);
                 mAppControlService.startTxOperation(txParam.chunkSize, txParam.pattern);
                 break;
-            case Utils.StateMachineMessageConstants.STATE_START_DATA_TX_WAKEABLE:
-                transitionTo(mDataTxState);
-                Wakeable wakeableParam = (Wakeable) message.obj;
-                SocketServer
-                .sendSocketData("Offload Wakeable Usecase Started with timer :"
-                        + wakeableParam.timer);
-                mAppControlService
-                .startWakeableNotificationOperation(wakeableParam.timer);
-                Log.d(TAG, "Going to DataTx state");
-                break;
-            case Utils.StateMachineMessageConstants.STATE_START_DATA_TX_ACTIONABLE:
-                transitionTo(mDataTxState);
-                Log.d(TAG, "Going to DataTx state");
-                Actionable actionableParam = (Actionable) message.obj;
-                SocketServer
-                .sendSocketData("Offload Actionable Usecase Started with timer :"
-                        + actionableParam.timer);
-                mAppControlService
-                .startActionableNotificationOperation(actionableParam.timer);
-                break;
 
             case Utils.StateMachineMessageConstants.STATE_START_DATA_RX:
                 transitionTo(mDataRxState);
@@ -383,9 +363,6 @@ public class AppControlStateMachine extends StateMachine {
             boolean retvalue = HANDLED;
             switch (message.what) {
             case Utils.StateMachineMessageConstants.STATE_END_DATA_TX:
-            case Utils.StateMachineMessageConstants.STATE_END_DATA_TX_WAKEABLE:
-            case Utils.StateMachineMessageConstants.STATE_END_DATA_TX_ACTIONABLE:
-            case Utils.StateMachineMessageConstants.STATE_END_DATA_TX_CACHEABLE:
                 transitionTo(mReadyState);
                 Log.d(TAG, "Going to Ready state");
                 SocketServer.processOutputState = SocketServer.THROUGHPUT_MENU;
