@@ -53,6 +53,10 @@
     <string name="showHidHost">Hid host qualification</string>
     <string name="discover_services">Discover</string>
     <string name="add_oob_bond_dev">Add OOB Bond</string>
+    <string name="read_local_oob_data">Read Local OOB Data</string>
+    <string name="create_oob_bond">Create OOB Bond(Initiator)</string>
+    <string name="load_remote_oob_data">Load Remote OOB Data(Acceptor)</string>
+    <string name="remove_bond">Remove Bond</string>
     <string name="clear">Clear</string>
     <string name="list_empty">No records found!</string>
     <string name="a2dp_source">A2DP Source</string>

@@ -101,36 +101,60 @@
                 android:id="@+id/discover_services"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:onClick="onButtonClick"
-                android:text="@string/discover_services" />
+                android:text="@string/discover_services"
+                android:layout_margin="@dimen/activity_base_margin" />
 
             <Button
                 android:id="@+id/select_device"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:onClick="onButtonClick"
-                android:text="@string/select_device" />
+                android:text="@string/select_device"
+                android:layout_margin="@dimen/activity_base_margin" />
 
-             <Button
+            <Button
                 android:id="@+id/add_oob_bond_dev"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:onClick="onButtonClick"
-                android:text="@string/add_oob_bond_dev" />
-
+                android:text="@string/add_oob_bond_dev"
+                android:layout_margin="@dimen/activity_base_margin" />
         </LinearLayout>
-        <Button
+
+        <LinearLayout
+            android:id="@+id/linearLayout2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:onClick="showCoveArtActivity"
-            android:text="@string/showCoverArt"
-            android:layout_below="@id/linearLayout1"
-            android:layout_alignEnd="@+id/linearLayout1"
-            android:layout_margin="@dimen/activity_base_margin"
-            />
+            android:layout_below="@+id/linearLayout1"
+            android:layout_alignParentRight="true"
+            android:gravity="center"
+            android:orientation="horizontal" >
+
+            <Button
+                android:id="@+id/read_local_oob_data"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onButtonClick"
+                android:text="@string/read_local_oob_data"
+                android:layout_margin="@dimen/activity_base_margin" />
+
+            <Button
+                android:id="@+id/create_oob_bond"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onButtonClick"
+                android:text="@string/create_oob_bond"
+                android:layout_margin="@dimen/activity_base_margin" />
+            <Button
+                android:id="@+id/load_remote_oob_data"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onButtonClick"
+                android:text="@string/load_remote_oob_data"
+                android:layout_margin="@dimen/activity_base_margin" />
+
+        </LinearLayout>
 
         <ToggleButton
             android:id="@+id/toggleButton1"
@@ -140,6 +164,54 @@
             android:layout_below="@+id/linearLayout1"
             android:layout_marginRight="36dp"
             android:onClick="onToggleClicked" android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/linearLayout3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/linearLayout2"
+            android:layout_alignParentRight="true"
+            android:gravity="center"
+            android:orientation="horizontal" >
+
+            <Button
+                android:id="@+id/remove_bond"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onButtonClick"
+                android:text="@string/remove_bond"
+                android:layout_margin="@dimen/activity_base_margin" />
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="showCoveArtActivity"
+                android:text="@string/showCoverArt"
+                android:layout_margin="@dimen/activity_base_margin" />
+
+            <ToggleButton
+                android:id="@+id/toggleButton1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="36dp"
+                android:onClick="onToggleClicked" android:visibility="gone" />
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="showHidHost"
+                android:text="@string/showHidHost"
+                android:layout_below="@id/linearLayout1"
+                android:layout_alignEnd="@+id/linearLayout1"
+                android:layout_margin="@dimen/activity_base_margin" />
+
+            <ToggleButton
+                android:id="@+id/toggleButton2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="36dp"
+                android:onClick="onToggleClicked" android:visibility="gone" />
+        </LinearLayout>
 
     </RelativeLayout>
 

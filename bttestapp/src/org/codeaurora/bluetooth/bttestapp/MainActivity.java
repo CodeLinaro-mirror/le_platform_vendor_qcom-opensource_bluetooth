@@ -37,6 +37,7 @@ import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothUuid;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
+import android.bluetooth.OobData;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -58,14 +59,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.UUID;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.io.IOException;
+import java.util.concurrent.Executors;
 
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
@@ -92,7 +97,11 @@ public class MainActivity extends MonkeyActivity {
     private ServicesFragment mServicesFragment = null;
 
     private BluetoothAdapter mBtAdapter;
-    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond;
+
+    private Button mBtnDiscoverService, mBtnSelectDevice, mSinkButton, mSourceButton, mBtnAddOobBond,
+            mBtnGetLinkKey, mBtnReadLocalOobDataButton, mBtnCreateOobBond, mBtnLoadRemoteOobDataButton,
+            mBtnRemoveBond;
+
     private static long current_time, switch_time;
 
     private Eir128bitUUIDSample EirSample1 = null,EirSample2 = null,EirSample3 = null;
@@ -339,6 +348,10 @@ public class MainActivity extends MonkeyActivity {
         mBtnDiscoverService=(Button) findViewById(R.id.discover_services);
         mBtnSelectDevice=(Button) findViewById(R.id.select_device);
         mBtnAddOobBond=(Button) findViewById(R.id.add_oob_bond_dev);
+        mBtnReadLocalOobDataButton = (Button) findViewById(R.id.read_local_oob_data);
+        mBtnCreateOobBond = (Button) findViewById(R.id.create_oob_bond);
+        mBtnLoadRemoteOobDataButton = (Button) findViewById(R.id.load_remote_oob_data);
+        mBtnRemoveBond = (Button) findViewById(R.id.remove_bond);
         mSinkButton = (Button) findViewById(R.id.id_a2dp_sink);
         mSourceButton = (Button) findViewById(R.id.id_a2dp_source);
         mBtAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -442,43 +455,67 @@ public class MainActivity extends MonkeyActivity {
             Logger.v(TAG, "fetching UUIDs");
             mDiscoveryInProgress = mDevice.fetchUuidsWithSdp();
 
-        } else if (v.getId() == R.id.add_oob_bond_dev) {
-            if (mDevice != null && mProfileService != null) {
-                Logger.v(TAG, "add bond device");
+        } else if (v.getId() == R.id.read_local_oob_data) {
+            Logger.v(TAG, "read local oob data");
+            mBtAdapter.generateLocalOobData(BluetoothDevice.TRANSPORT_BREDR, Executors.newSingleThreadExecutor(), mOobDataCallback);
 
-                if (isValidLinkKey()) {
-                    // get dev info from saved variable
-                    //mDevice.addOutOfBandBondDevice(mLinkKey, mKeyType, 0);
-                    Toast.makeText(MainActivity.this, "Adding oob bond device, linkkey " + mLinkKey,
-                                       Toast.LENGTH_SHORT).show();
+        } else if (v.getId() == R.id.create_oob_bond) {
+           Logger.v(TAG, "click create_oob_bond");
+           if (mDevice != null && mProfileService != null) {
+                Logger.v(TAG, "start oob bonding");
+                String fileName = "/data/misc/bluedroid/remote.key";
+                File file = new File(fileName);
+
+                if (file.exists()) {
+                    getRemoteOobFromFile(file, true);
                 } else {
-                    // get dev info from file
-                    String fileName = "/etc/bluetooth/remote_dev.txt";
-                    File file = new File(fileName);
-
-                    if (!file.exists()) {
-                        Logger.e(TAG, "File " + fileName + " don't exist ");
-
-                        Toast.makeText(MainActivity.this, "Error! File is not exist, try to click GET LINK KEY when bonded or prepare file before click  ",
-                                       Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    char[] keys = new char[32];
-                    int[]  dev  = new int[2];
-
-                    getDevInfoFromFile(file, keys, dev);
-                    String linkKey = new String(keys);
-
-                    Toast.makeText(MainActivity.this, "File exist, Adding oob bond device, linkkey " + linkKey,
-                                       Toast.LENGTH_SHORT).show();
-
-                    Logger.d(TAG, "linkKey " + linkKey + " keyType " + dev[0] + " pinLen " + dev[1]);
-                    //mDevice.addOutOfBandBondDevice(linkKey, dev[0], dev[1]);
+                    Logger.d(TAG, "No remote oob data, createbond instead");
+                    mDevice.createBond();
                 }
+            } else {
+               Logger.v(TAG, mDevice == null ? "mDevice is null" : "mDevice is not null");
+               Logger.v(TAG, mProfileService == null ? "mProfileService is null" : "mProfileService is not null");
+            }
+        } else if (v.getId() == R.id.load_remote_oob_data) {
+            Logger.v(TAG, "click load_remote_oob_data");
+            if (mDevice != null && mProfileService != null) {
+                 Logger.v(TAG, "start load remote's oob data");
+                 String fileName = "/data/misc/bluedroid/remote.key";
+                 File file = new File(fileName);
+
+                 if (file.exists()) {
+                     getRemoteOobFromFile(file, false);
+                 } else {
+                     Logger.d(TAG, "No remote oob data");
+                 }
+             } else {
+                Logger.v(TAG, mDevice == null ? "mDevice is null" : "mDevice is not null");
+                Logger.v(TAG, mProfileService == null ? "mProfileService is null" : "mProfileService is not null");
+             }
+
+        } else if (v.getId() == R.id.remove_bond) {
+            Logger.v(TAG, "click remove_bond");
+            if (mDevice != null && mProfileService != null) {
+                Logger.v(TAG, "start remove bond");
+                mDevice.removeBond();
+            } else {
+                Logger.v(TAG, mDevice == null ? "mDevice is null" : "mDevice is not null");
+                Logger.v(TAG, mProfileService == null ? "mProfileService is null" : "mProfileService is not null");
             }
         }
     }
+
+    private BluetoothAdapter.OobDataCallback mOobDataCallback = new BluetoothAdapter.OobDataCallback() {
+        @Override
+        public void onOobData(int transport, OobData oobData) {
+            Logger.v(TAG, "onOobData transport = " + transport);
+            Logger.v(TAG, oobData.toString());
+            writeLocalOobToFile(oobData);
+        }
+        public void onError(int errorCode) {
+            Logger.v(TAG, "errorCode = " + errorCode);
+        }
+    };
 
     public void showCoveArtActivity(View v) {
         Log.i(TAG," showCoveArtActivity");
@@ -591,16 +628,49 @@ public class MainActivity extends MonkeyActivity {
             mBtnDiscoverService.setEnabled(true);
             mBtnSelectDevice.setEnabled(true);
             mBtnAddOobBond.setEnabled(true);
+            mBtnReadLocalOobDataButton.setEnabled(true);
+            mBtnCreateOobBond.setEnabled(true);
+            mBtnLoadRemoteOobDataButton.setEnabled(true);
+            mBtnRemoveBond.setEnabled(true);
         } else {
             mBtnDiscoverService.setEnabled(false);
             mBtnSelectDevice.setEnabled(false);
             mBtnAddOobBond.setEnabled(false);
+            mBtnReadLocalOobDataButton.setEnabled(false);
+            mBtnCreateOobBond.setEnabled(false);
+            mBtnLoadRemoteOobDataButton.setEnabled(false);
+            mBtnRemoveBond.setEnabled(false);
         }
     }
 
     private boolean isValidLinkKey() {
         boolean ret = ((mLinkKey != null && mLinkKey.isEmpty()) || mKeyType < 0) ? false : true;
         return ret;
+    }
+
+    private static String byteArrayToString(byte[] valueBuf) {
+        StringBuilder sb = new StringBuilder();
+        if (valueBuf != null) {
+            for (int idx = 0; idx < valueBuf.length; idx++) {
+                if (idx != 0) {
+                    sb.append(" ");
+                }
+                sb.append(String.format("%02x", valueBuf[idx]));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static byte[] stringToByteArray(String String) {
+        String[] str = String.split(" ");
+        int len = str.length;
+        byte[] bytes =  new byte[len];
+
+        for (int i = 0; i < len; i++) {
+            bytes[i] = (byte) Integer.parseInt(str[i],16);
+        }
+
+        return bytes;
     }
 
     private void getDevInfoFromFile(File file, char[] keys, int[] dev) {
@@ -638,6 +708,81 @@ public class MainActivity extends MonkeyActivity {
                 }
             }
         } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void writeLocalOobToFile(OobData oob) {
+        String file_local = "/data/misc/bluedroid/local.key";
+        File localOobDataFile = new File(file_local);
+
+        if (localOobDataFile.exists()){
+            localOobDataFile.delete();
+            Logger.d(TAG, "Old local OOB data file exists, delete it");
+        }
+        try {
+            localOobDataFile.createNewFile();
+            Logger.d(TAG, "creat new file to store local OOB data");
+
+            FileWriter writer = new FileWriter(localOobDataFile);
+
+            writer.write(byteArrayToString(oob.getClassicLength()) + "\n"
+                + byteArrayToString(oob.getDeviceAddressWithType()) + "\n"
+                + byteArrayToString(oob.getConfirmationHash()) + "\n"
+                + byteArrayToString(oob.getRandomizerHash()) + "\n"
+                + byteArrayToString(oob.getConfirmationExtendedHash()) + "\n"
+                + byteArrayToString(oob.getRandomizerExtendedHash()));
+
+            writer.flush();
+            writer.close();
+
+         } catch (Exception e){
+            Log.e(TAG, "Error write OOB data", e);
+            e.printStackTrace();
+         }
+    }
+
+    private void getRemoteOobFromFile(File file, boolean isStartBonding) {
+        Log.i(TAG," getRemoteOobFromFile");
+        try {
+
+            byte[] classicLength = new byte[2];
+            byte[] deviceAddress = new byte[7];
+            byte[] c192 = new byte[16];
+            byte[] r192 = new byte[16];
+            byte[] c256 = new byte[16];
+            byte[] r256 = new byte[16];
+            byte[] no_data = new byte[16];
+
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            String line = "";
+
+            if ((line = br.readLine()) != null)
+                classicLength = stringToByteArray(line);
+            if ((line = br.readLine()) != null)
+                deviceAddress = stringToByteArray(line);
+            if ((line = br.readLine()) != null)
+                c192 = stringToByteArray(line);
+            if ((line = br.readLine()) != null)
+                r192 = stringToByteArray(line);
+            if ((line = br.readLine()) != null)
+                c256 = stringToByteArray(line);
+            if ((line = br.readLine()) != null)
+                r256 = stringToByteArray(line);
+
+            br.close();
+
+            OobData oob192 = new OobData(classicLength,deviceAddress,c192,r192,no_data,no_data);
+            OobData oob256 = new OobData(classicLength,deviceAddress,c256,r256,no_data,no_data);
+            Logger.v(TAG, oob192.toString());
+            Logger.v(TAG, oob256.toString());
+            if (isStartBonding)
+                mDevice.createBondOutOfBand(BluetoothDevice.TRANSPORT_BREDR, oob192, oob256); // transport:1 BR/EDR
+            else
+                mDevice.loadRemoteOobData(BluetoothDevice.TRANSPORT_BREDR, oob192, oob256);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading part data", e);
             e.printStackTrace();
         }
     }
