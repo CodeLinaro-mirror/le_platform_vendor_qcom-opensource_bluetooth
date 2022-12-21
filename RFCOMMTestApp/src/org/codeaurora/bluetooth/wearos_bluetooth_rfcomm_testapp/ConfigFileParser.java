@@ -98,51 +98,6 @@ public class ConfigFileParser {
         return tx;
     }
 
-    public Wakeable wakeableParse(String input) {
-        Wakeable wakeable = new Wakeable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                wakeable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                wakeable = null;
-            }
-        } else {
-            wakeable = null;
-        }
-        return wakeable;
-    }
-
-    public Actionable actionableParse(String input) {
-        Actionable actionable = new Actionable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                actionable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                actionable = null;
-            }
-        } else {
-            actionable = null;
-        }
-        return actionable;
-    }
-
-    public Cacheable cacheableParse(String input) {
-        Cacheable cacheable = new Cacheable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                cacheable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                cacheable = null;
-            }
-        } else {
-            cacheable = null;
-        }
-        return cacheable;
-    }
-
     public ConnectionTest connectionTestParse(String input) {
         ConnectionTest connectionTest = new ConnectionTest();
         String tmp[] = input.split(":", 2);

@@ -1777,15 +1777,6 @@ public class AppControlService extends Service {
         }
     }
 
-    private void processSetAppContext(byte[] blob) {
-        Log.i(TAG, "processSetAppContext() blob: " + Arrays.toString(blob));
-        ArrayList<Byte> blobBytes = new ArrayList<Byte>();
-        for (int i = 0; i < blob.length; i++) {
-            blobBytes.add(blob[i]);
-        }
-        //mNotificationMgr.setAppSpecificContextInfo(blobBytes);
-    }
-
     public void acquirePMLock() {
         pmLockStatus = true;
         if (mNotificationMgr != null) {
