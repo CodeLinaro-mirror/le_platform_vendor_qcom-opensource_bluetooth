@@ -59,6 +59,8 @@ final class TestShellCommand extends ShellCommand {
     private static final String COMMAND_GATT = "gatt";
     /* Command for GATT in new Bluetooth adapter */
     private static final String COMMAND_GATT1 = "gatt1";
+    /* Command for testing VoIP */
+    private static final String COMMAND_VOIP = "voip";
 
     private static final String PARAM_ENABLE = "enable";
     private static final String PARAM_DISABLE = "disable";
@@ -99,6 +101,12 @@ final class TestShellCommand extends ShellCommand {
     private static final String PARAM_START_MEDIA_PLAYER = "start_media_player";
     private static final String PARAM_DUMP_MEDIA_PLAYER_LIST = "dump_media_player_list";
 
+    private static final String PARAM_SET_ACTIVE_DEVICE = "set_active_device";
+    private static final String PARAM_START = "start";
+    private static final String PARAM_STOP = "stop";
+    private static final String PARAM_START_BT_SCO = "start_bt_sco";
+    private static final String PARAM_STOP_BT_SCO = "stop_bt_sco";
+
     private static final int RESULT_OK = 0;
     private static final int RESULT_ERROR = -1; // Arbitrary value, any non-0 is fine
 
@@ -113,6 +121,7 @@ final class TestShellCommand extends ShellCommand {
     private final TestAdapter mTestAdapter;
     private final TestAdapter mTestAdapter1;
     private final TestHfp mTestHfp;
+    private final TestVoIP mTestVoIP;
     private final TestA2dp mTestA2dp;
     private final TestPbap mTestPbap;
     private final TestHidh mTestHidh;
@@ -149,6 +158,7 @@ final class TestShellCommand extends ShellCommand {
         mTestSpp1 = new TestSpp(mContext, ADAPTER_1);
         mTestGatt = sTestDefaultAdapter ? new TestGatt(mContext) : null;
         mTestGatt1 = new TestGatt(mContext, ADAPTER_1);
+        mTestVoIP = new TestVoIP(mContext);
     }
 
     @Override
@@ -218,6 +228,7 @@ final class TestShellCommand extends ShellCommand {
         }
         pw.println("\tspp1 connect|disconnect device");
         pw.println("\t  Test SPP in new Bluetooth adapter.");
+        pw.println("\tvoip start|stop");
     }
 
     private static int showInvalidArguments(IndentingPrintWriter pw) {
@@ -323,6 +334,10 @@ final class TestShellCommand extends ShellCommand {
             }
             case COMMAND_GATT1: {
                 runGatt1(args);
+                break;
+            }
+            case COMMAND_VOIP: {
+                runVoIP(args);
                 break;
             }
             default: {
@@ -481,6 +496,8 @@ final class TestShellCommand extends ShellCommand {
             mTestHfp.connectAudio(device);
         } else if (PARAM_DISCONNECT_AUDIO.equalsIgnoreCase(para)) {
             mTestHfp.disconnectAudio(device);
+        } else if (PARAM_SET_ACTIVE_DEVICE.equalsIgnoreCase(para)) {
+            mTestHfp.setActiveDevice(device);
         } else {
             throw new IllegalArgumentException("Invalid hfp parameter: " + para);
         }
@@ -596,6 +613,20 @@ final class TestShellCommand extends ShellCommand {
     private void runGatt1(String[] args) {
         logd("runGatt1 args: " + args);
         runGatt(args, mTestGatt1, ADAPTER_1);
+    }
+
+    private void runVoIP(String[] args) {
+        logd("runVoIP args: " + args);
+        String para = args[1];
+        if (PARAM_START.equalsIgnoreCase(para)) {
+            mTestVoIP.startVoIPSimulate();
+        } else if (PARAM_STOP.equalsIgnoreCase(para)) {
+            mTestVoIP.stopVoIPSimulate();
+        } else if (PARAM_START_BT_SCO.equalsIgnoreCase(para)) {
+            mTestVoIP.startBluetoothSco();
+        } else if (PARAM_STOP_BT_SCO.equalsIgnoreCase(para)) {
+            mTestVoIP.stopBluetoothSco();
+        }
     }
 
     private BluetoothDevice getRemoteDevice(String address) {

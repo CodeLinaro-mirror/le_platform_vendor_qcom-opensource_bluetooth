@@ -9,16 +9,18 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadset;
 import android.bluetooth.BluetoothProfile;
+import android.media.AudioManager;
+
 import android.content.Context;
 import android.content.Intent;
 
+import java.io.IOException;
 import java.util.Objects;
 
 class TestHfp extends TestBase
         implements Hfp.IBluetoothHeadsetIntent {
 
     private static final String TAG = "TestHfp";
-
     private final Hfp mHfp;
 
     TestHfp(Context context) {
@@ -94,6 +96,23 @@ class TestHfp extends TestBase
         outputResult("disconnectAudio", isAudioDisconnected(device));
     }
 
+    public void setActiveDevice(BluetoothDevice device) {
+        logd("setActiveDevice device: " + device);
+        if (!isConnected(device)) {
+            // hfp should be connected firstly, return
+            outputFail("setActiveDevice");
+            return;
+        }
+
+        mDevice = Objects.requireNonNull(device);
+        if (!mHfp.setActiveDevice(device)) {
+            outputFail("setActiveDevice");
+            return;
+        }
+        lock();
+        outputResult("setActiveDevice", isConnected(device));
+    }
+
     @Override
     public void handleActionConnectionStateChanged(BluetoothDevice device, int state) {
         logd("handleActionConnectionStateChanged device: " + device + ", state " +
@@ -118,6 +137,9 @@ class TestHfp extends TestBase
     @Override
     public void handleActionActiveDeviceChanged(BluetoothDevice device) {
         logd("handleActionActiveDeviceChanged device: " + device);
+        if (isSameDevice(device)) {
+            unlock();
+        }
     }
 
     private boolean isConnected(BluetoothDevice device) {

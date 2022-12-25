@@ -35,7 +35,7 @@ Run the script:
                          accept_pair|reject_pair|get_supported_profiles
                             : test new Bluetooth adapter
 
-                hfp connect|disconnect|connect_audio|disconnect_audio device
+                hfp connect|disconnect|connect_audio|disconnect_audio|set_active_device device
                             : test hfp(ag) in new Bluetooth adapter
                             : device is remote Bluetooth device's address
                             : E.g. 11:22:33:44:AA:BB
@@ -51,6 +51,8 @@ Run the script:
 
                 spp1 connect|disconnect device
                             : test spp in new Bluetooth adapter
+                voip start|stop|start_bt_sco|stop_bt_sco
+                            : test voip simulation
 
 Examples:
     $0 -r : restart test app

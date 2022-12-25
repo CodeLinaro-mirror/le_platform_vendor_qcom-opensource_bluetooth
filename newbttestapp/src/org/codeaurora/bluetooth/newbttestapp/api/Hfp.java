@@ -70,6 +70,11 @@ final class Hfp extends BluetoothProfileBase
         return mBluetoothHeadset != null && mBluetoothHeadset.disconnectAudio();
     }
 
+    public boolean setActiveDevice(BluetoothDevice device) {
+        logd("setActiveDevice device: " + device);
+        return mBluetoothHeadset != null && mBluetoothHeadset.setActiveDevice(device);
+    }
+
     @Override
     protected void handleServiceConnected(int profile, BluetoothProfile proxy) {
         if (profile == BluetoothProfile.HEADSET) {
