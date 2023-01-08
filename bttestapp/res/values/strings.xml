@@ -422,6 +422,12 @@
         <item>200000</item>
         <item>400000</item>
     </string-array>
+    <string-array name="array_send_message_type">
+        <item>EMAIL</item>
+        <item>SMS_GSM</item>
+        <item>SMS_CDMA</item>
+        <item>MMS</item>
+    </string-array>
 
   <!-- MAP -->
   <string name="map_test">Test Map</string>
@@ -448,6 +454,7 @@
   <string name="map_msg_type_no_sms_cdma">no SMS_CDMA</string>
   <string name="map_msg_type_no_email">no EMAIL</string>
   <string name="map_msg_type_no_mms">no MMS</string>
+  <string name="map_msg_type_no_im">no IM</string>
   <string name="map_filter_any_status">Any status</string>
   <string name="map_filter_any_priority">Any priority</string>
   <string name="map_filter_without_message_type">Filter out message type:</string>

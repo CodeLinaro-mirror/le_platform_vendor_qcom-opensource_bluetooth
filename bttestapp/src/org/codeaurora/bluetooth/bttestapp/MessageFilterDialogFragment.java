@@ -168,6 +168,7 @@ public class MessageFilterDialogFragment extends DialogFragment {
         CheckBox type_sms_cdma = null;
         CheckBox type_email = null;
         CheckBox type_mms = null;
+        CheckBox type_im = null;
         RadioButton status_read_all = null;
         RadioButton status_unread = null;
         RadioButton status_read = null;
@@ -186,6 +187,7 @@ public class MessageFilterDialogFragment extends DialogFragment {
             type_sms_cdma = (CheckBox) row.findViewById(R.id.map_filter_type_sms_cdma);
             type_email = (CheckBox) row.findViewById(R.id.map_filter_type_email);
             type_mms = (CheckBox) row.findViewById(R.id.map_filter_type_mms);
+            type_im = (CheckBox) row.findViewById(R.id.map_filter_type_im);
             status_read_all = (RadioButton) row.findViewById(R.id.map_filter_read_status_all);
             status_unread = (RadioButton) row.findViewById(R.id.map_filter_read_status_unread);
             status_read = (RadioButton) row.findViewById(R.id.map_filter_read_status_read);
@@ -219,6 +221,7 @@ public class MessageFilterDialogFragment extends DialogFragment {
             type_sms_cdma.setChecked((mMessageType & MessagesFilter.MESSAGE_TYPE_NO_SMS_CDMA) != 0);
             type_email.setChecked((mMessageType & MessagesFilter.MESSAGE_TYPE_NO_EMAIL) != 0);
             type_mms.setChecked((mMessageType & MessagesFilter.MESSAGE_TYPE_NO_MMS) != 0);
+            type_im.setChecked((mMessageType & MessagesFilter.MESSAGE_TYPE_NO_IM) != 0);
             status_read_all.setChecked(mReadStatus == MessagesFilter.READ_STATUS_ANY);
             status_read.setChecked(mReadStatus == MessagesFilter.READ_STATUS_READ);
             status_unread.setChecked(mReadStatus == MessagesFilter.READ_STATUS_UNREAD);
@@ -273,6 +276,10 @@ public class MessageFilterDialogFragment extends DialogFragment {
                 mMessageType |= MessagesFilter.MESSAGE_TYPE_NO_MMS;
             }
 
+            if (type_im.isChecked()) {
+                mMessageType |= MessagesFilter.MESSAGE_TYPE_NO_IM;
+            }
+
             if (status_read.isChecked()) {
                 mReadStatus = MessagesFilter.READ_STATUS_READ;
             } else if (status_unread.isChecked()) {
@@ -320,6 +327,7 @@ public class MessageFilterDialogFragment extends DialogFragment {
         public final static byte MESSAGE_TYPE_NO_SMS_CDMA = 0x02;
         public final static byte MESSAGE_TYPE_NO_EMAIL = 0x04;
         public final static byte MESSAGE_TYPE_NO_MMS = 0x08;
+        public final static byte MESSAGE_TYPE_NO_IM = 0x10;
 
         public final static byte READ_STATUS_ANY = 0x00;
         public final static byte READ_STATUS_UNREAD = 0x01;

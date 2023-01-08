@@ -42,6 +42,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.SystemProperties;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -75,6 +76,9 @@ public class ServicesFragment extends ListFragment {
     private MainActivity mActivity;
 
     private ServicesAdapter mAdapter;
+
+    // Instance id under pts test
+    private final static String BLUETOOTH_MAP_INSTANCE_UNDER_TEST = "vendor.bt.pts.mce.instance";
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
 
@@ -248,7 +252,8 @@ public class ServicesFragment extends ListFragment {
 
             TextView txtTitle = (TextView) v.findViewById(R.id.service_title);
             if (srv.mType.equals(Service.Type.MAP)) {
-                txtTitle.setText(srv.mSdpMasRecord.getServiceName());
+                txtTitle.setText(srv.mSdpMasRecord.getServiceName() +
+                        " INSTANCE " + srv.mSdpMasRecord.getMasInstanceId());
             } else {
                 txtTitle.setText("");
             }
@@ -542,6 +547,10 @@ public class ServicesFragment extends ListFragment {
                 }
                 break;
             case MAP:
+                Logger.d(TAG, "Set " + BLUETOOTH_MAP_INSTANCE_UNDER_TEST + " " +
+                        srv.mSdpMasRecord.getMasInstanceId());
+                SystemProperties.set(BLUETOOTH_MAP_INSTANCE_UNDER_TEST,
+                        srv.mSdpMasRecord.getMasInstanceId() + "");
                 intent = new Intent(getActivity(), MapTestActivity.class);
                 break;
             default:

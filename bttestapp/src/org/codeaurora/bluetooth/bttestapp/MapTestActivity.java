@@ -64,6 +64,7 @@ import android.view.ViewGroup;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -73,6 +74,8 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Spinner;
+import android.widget.SpinnerAdapter;
 import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
@@ -94,7 +97,7 @@ import org.json.JSONObject;
 import org.codeaurora.bluetooth.bttestapp.util.Logger;
 
 public class MapTestActivity extends MonkeyActivity implements OnClickListener,
-        IBluetoothConnectionObserver {
+        IBluetoothConnectionObserver, OnItemSelectedListener {
     private static final String TAG = "MapTestActivity";
     private static final int MAX_MESSAGES = 20;
     /* Default content len to push message */
@@ -109,6 +112,11 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private final String[] mActionBarTabsNames = {
             TAB_BROWSE, TAB_PUSH
     };
+
+    private final static String BLUETOOTH_MAP_TEST_UPLOAD =
+            "vendor.bt.pts.mce.test.upload";
+    private static final String SEND_MESSAGE_TYPE =
+            "persist.bluetooth.pts.mapclient.sendmessagetype";
 
     private BluetoothDevice mDevice = null;
     private BluetoothAdapter mBluetoothAdapter;
@@ -126,6 +134,8 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
     private BluetoothMapMessageAdapter mAdapterMessages = null;
     private PendingIntent mSentIntent;
     private PendingIntent mDeliveredIntent;
+
+    private Spinner mPushType;
 
     Object mLock = new Object();
 
@@ -188,8 +198,12 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
                 mCurrentTab = tab.getText().toString();
 
                 if (mCurrentTab.equals(TAB_BROWSE)) {
+                    Logger.d(TAG, "TAB_BROWSE: Set " + BLUETOOTH_MAP_TEST_UPLOAD + " false ");
+                    SystemProperties.set(BLUETOOTH_MAP_TEST_UPLOAD, "false");
                     mViewFlipper.setDisplayedChild(0);
                 } else if (mCurrentTab.equals(TAB_PUSH)) {
+                    Logger.d(TAG, "TAB_PUSH: Set " + BLUETOOTH_MAP_TEST_UPLOAD + " true ");
+                    SystemProperties.set(BLUETOOTH_MAP_TEST_UPLOAD, "true");
                     mViewFlipper.setDisplayedChild(1);
                 }
                 invalidateOptionsMenu();
@@ -210,6 +224,8 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);
         bindService(intent, mMapConnection, BIND_AUTO_CREATE);
+
+        mPushType = initSpinner(R.id.push_message_type_spinner);
     }
 
     @Override
@@ -753,5 +769,42 @@ public class MapTestActivity extends MonkeyActivity implements OnClickListener,
         Logger.d(TAG, "clearMessages");
         mAdapterMessages.clear();
 //        updateListEmptyView(true);
+    }
+
+    private Spinner initSpinner(int id) {
+        return initSpinner(id, 1);
+    }
+
+    private Spinner initSpinner(int id, int pos) {
+        Spinner spinner = (Spinner) findViewById(id);
+        if (spinner != null) {
+            spinner.setOnItemSelectedListener(this);
+            spinner.setSelection(pos, true);
+            spinner.setEnabled(true);
+            return spinner;
+        } else {
+            Logger.w(TAG, "initSpinner can't find id " + id);
+            return null;
+        }
+    }
+
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+        Logger.d(TAG, "parent " + parent + " view " + view + " position " + position + " id " + id);
+
+        if (parent == mPushType) {
+            // In Bmessage.java:
+            //  public enum Type {
+            //        EMAIL, SMS_GSM, SMS_CDMA, MMS
+            //  }
+            String type = mPushType.getSelectedItem().toString();
+            Logger.d(TAG, "Set type " + type + ":" + SEND_MESSAGE_TYPE + " " + position);
+            SystemProperties.set(SEND_MESSAGE_TYPE, position + "");
+        }
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+        Logger.d(TAG, "onNothingSelected parent " + parent);
     }
 }
