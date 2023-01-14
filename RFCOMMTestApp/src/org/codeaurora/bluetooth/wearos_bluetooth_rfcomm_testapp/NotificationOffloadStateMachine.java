@@ -51,7 +51,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
     // Declaring the States
     private InitState mInitState;
     private ReadyToConnect mReadyToConnect;
-    private ReadyToAcceptConnection mReadyToAcceptConnection;
     private ConnectedState mConnectedState;
     public NotificationReceiveState mNotRcvState;
     private DisconnectedState mDisconnectedState;
@@ -69,7 +68,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
         // Initializing States
         mInitState = new InitState();
         mReadyToConnect = new ReadyToConnect();
-        mReadyToAcceptConnection = new ReadyToAcceptConnection();
         mConnectedState = new ConnectedState();
         mDisconnectedState = new DisconnectedState();
         mNotRcvState = new NotificationReceiveState();
@@ -79,7 +77,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
         // Adding States
         addState(mInitState);
         addState(mReadyToConnect);
-        addState(mReadyToAcceptConnection);
         addState(mConnectedState);
         addState(mDisconnectedState);
         addState(mNotRcvState);
@@ -130,10 +127,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
                 Log.d(TAG, "Going to Ready to Connect state");
                 break;
 
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_READY_TO_ACCEPT_CONNECTION:
-                transitionTo(mReadyToAcceptConnection);
-                Log.d(TAG, "Going to Ready to Accept Connect state");
-                break;
             case Utils.MSG_NC_SM_OFFLOADED:
                 Log.d(TAG, "Going to Offloaded state");
                 transitionTo(mOffloaded);
@@ -192,56 +185,6 @@ public class NotificationOffloadStateMachine extends StateMachine {
         }
     }
 
-    private class ReadyToAcceptConnection extends State {
-        private static final String TAG = "NotificationOffloadStateMachine ReadyToAcceptConnection State";
-
-        @Override
-        public void enter() {
-            Log.d(TAG, "enter()");
-            if (mAppControlService != null) {
-                mAppControlService.startReadyToAcceptConnection();
-            }
-            SocketServer
-            .sendSocketData("Accepting Incoming Connection with UUID :: "
-                    + Utils.UUIDConstants.INCOMING_CONNECTION_UUID
-                    .toString());
-        }
-
-        @Override
-        public void exit() {
-            Log.d(TAG, "exit()");
-        }
-
-        @Override
-        public boolean processMessage(Message message) {
-            boolean retvalue = HANDLED;
-            switch (message.what) {
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTED:
-                transitionTo(mConnectedState);
-                mConnectedDevice = (BluetoothDevice) message.obj;
-                Log.d(TAG, "Going to Connected state");
-                break;
-
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_CONNECTION_FAILED:
-                transitionTo(mInitState);
-                Log.d(TAG, "Going to Init state");
-                SocketServer
-                .sendSocketData("Connection Failed...Please Restart Phone App");
-                break;
-
-            case Utils.NotificationOffloadStateMachineMessageConstants.STATE_DISCONNECTED:
-                transitionTo(mInitState);
-                SocketServer.mainMenuState = SocketServer.INIT_MENU;
-                SocketServer.processOutputState = SocketServer.INIT_MENU;
-                SocketServer.updateSocketClient();
-                break;
-            case Utils.MSG_NC_SM_OFFLOADED:
-                transitionTo(mOffloaded);
-                break;
-            }
-            return retvalue;
-        }
-    }
 
     private class ConnectedState extends State {
         private static final String TAG = "NotificationOffloadStateMachine Connected State";
