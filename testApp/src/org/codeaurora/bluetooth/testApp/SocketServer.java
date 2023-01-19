@@ -298,6 +298,7 @@ public class SocketServer {
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");
+                    sendStr.append("                       SetPhy                       (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -695,6 +696,16 @@ public class SocketServer {
                             msg = MainActivity.msghandler.obtainMessage(
                                         MainActivity.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
                             MainActivity.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("SetPhy")) {
+                            PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
+                            if (phyUpdateParam != null) {
+                              processOutputState = NONE;
+                              msg = MainActivity.msghandler.obtainMessage(
+                                      MainActivity.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
+                              MainActivity.msghandler.sendMessage(msg);
+                            } else {
+                              processOutputState = INVALID_INPUT;
+                            }
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
@@ -714,7 +725,7 @@ public class SocketServer {
                              MainActivity.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
-                       }
+                        }
                     } else {
                      processOutputState = INVALID_INPUT;
                     }

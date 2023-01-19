@@ -177,7 +177,6 @@ public class MainActivity extends Activity {
     public static final int MSG_SM_START_BLE_LATENCY_TEST = 29;
     public static final int MSG_SM_START_BLE_GATT_DISC = 30;
 
-
     /* GATT Server Actions */
 
     public static final int MSG_GS_START_BLE_ADD_SERVICE = 50;
@@ -187,6 +186,7 @@ public class MainActivity extends Activity {
     public static final int MSG_GS_START_BLE_GET_SERVICES = 54;
     public static final int MSG_GS_START_BLE_CLEAR_SERVICES = 55;
     public static final int MSG_GS_START_BLE_CONNECT = 56;
+    public static final int MSG_GS_START_BLE_PHY_UPDATE = 57;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -687,6 +687,12 @@ public class MainActivity extends Activity {
                 case MSG_GS_START_BLE_GET_SERVICES:
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                             mgattserver.MSG_START_BLE_GET_SERVICES, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_PHY_UPDATE:
+                    phyUpdateObj = (PhyUpdate) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                             mgattserver.MSG_START_BLE_PHY_UPDATE, phyUpdateObj);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 default:
