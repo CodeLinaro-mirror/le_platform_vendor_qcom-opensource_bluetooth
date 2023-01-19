@@ -684,6 +684,11 @@ public class MainActivity extends Activity {
                             mgattserver.MSG_START_BLE_CLEAR_SERVICES, null);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
+                case MSG_GS_START_BLE_GET_SERVICES:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_GET_SERVICES, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
