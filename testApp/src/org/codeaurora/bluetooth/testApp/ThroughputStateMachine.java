@@ -607,6 +607,9 @@ public class ThroughputStateMachine {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                if(MainActivity.isActivityRunning == false){
+                    transitionTo(mTADisconnect);
+                }
             }
 
             @Override

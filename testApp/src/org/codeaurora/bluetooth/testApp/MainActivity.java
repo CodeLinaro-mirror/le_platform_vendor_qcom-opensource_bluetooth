@@ -34,6 +34,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.widget.Toast;
 import android.Manifest;
 import android.util.Log;
@@ -104,6 +105,7 @@ public class MainActivity extends Activity {
     public static MainActivityMessageHandler msghandler;
 
     private Context mAppContext;
+    public static boolean isActivityRunning = false;
 
     /* Location permissions */
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
@@ -130,6 +132,7 @@ public class MainActivity extends Activity {
 
     public static WakeLock wl;
     public static boolean wl_acquired=false;
+    public Looper mlooper;
 
     /* Variable to keep track of calling source of pair request
      (MainActivity or Gatt Client or Throughput SM) */
@@ -237,6 +240,27 @@ public class MainActivity extends Activity {
             Intent adv_intent = new Intent(this, AdvertiserService.class);
             startService(adv_intent);
             bindService(adv_intent, madvertiserConnection, Context.BIND_AUTO_CREATE);
+
+            IntentFilter Pairingfilter = new IntentFilter();
+            Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+            registerReceiver(mPairingReceiver, Pairingfilter);
+            mReceiverRegistered = true;
+
+            HandlerThread Thread = new HandlerThread("MainActivityMessageHandler");
+            Thread.start();
+
+            mlooper = Thread.getLooper();
+            /* start main activity message handler */
+            msghandler = new MainActivityMessageHandler(mAppContext, mlooper);
+
+            /* start throughput state machine */
+            start_testapp_tput_state_machine();
+
+            /* start gatt client */
+            mgattclient = new GattClient(mAppContext);
+
+            /*start gatt server*/
+            mgattserver = new GattServer(mAppContext);
         }
     }
 
@@ -271,6 +295,17 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private boolean isMyServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service :
+            manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -296,28 +331,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
-
-        IntentFilter Pairingfilter = new IntentFilter();
-        Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        registerReceiver(mPairingReceiver, Pairingfilter);
-        mReceiverRegistered = true;
-
-        HandlerThread thread = new HandlerThread("MainActivityMessageHandler");
-        thread.start();
-
-        Looper looper = thread.getLooper();
-        /* start main activity message handler */
-        msghandler = new MainActivityMessageHandler(mAppContext, looper);
-
-        /* start throughput state machine */
-        start_testapp_tput_state_machine();
-
-         /* start gatt client */
-        mgattclient = new GattClient(mAppContext);
-
-         /*start gatt server*/
-        mgattserver = new GattServer(mAppContext);
-
+        isActivityRunning = true;
+        Log.d(TAG, "onStart");
     }
 
     @Override
@@ -335,8 +350,52 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        isActivityRunning = false;
         Log.d(TAG, "onDestroy");
+        /* if wakelock is acquired data tx/rx is going on,
+           so don't stop SM */
+        if(!wl_acquired) {
+            Log.d(TAG, "onDestroy - wakelock");
+            /* Unbind from the "ADVERTISER" service */
+            if (boundA) {
+                unbindService(madvertiserConnection);
+                boundA = false;
+            }
+            if(isMyServiceRunning(ScannerService.class)) {
+                stopService(new Intent(this, ScannerService.class));
+            }
+            /* Unbind from the "SCANNER" service */
+            if (boundS) {
+                unbindService(mscannerConnection);
+                boundS = false;
+            }
+            if(isMyServiceRunning(AdvertiserService.class)) {
+                stopService(new Intent(this, AdvertiserService.class));
+            }
+            /* Stopping throughput state machine */
+            if (throughputSMClass.mStateMachine != null) {
+                throughputSMClass.mStateMachine.doQuit();
+            }
+
+            /* Unregistering Paring Receiver */
+            try{
+                if(mReceiverRegistered) {
+                    unregisterReceiver(mPairingReceiver);
+                    mReceiverRegistered = false;
+                }
+            }catch(Exception E) {
+                Log.d(TAG, "not able to unregister");
+            }
+
+            /* stop Gatt Client handler */
+            mgattclient.cleanup();
+
+            /* stop Ble App Service msg hdlr looper*/
+            mlooper.quitSafely();
+
+        }
     }
+
 
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
@@ -358,34 +417,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
-        /* if wakelock is acquired data tx/rx is going on,
-           so don't stop SM */
-        if(!wl_acquired) {
-            /* Unbind from the "ADVERTISER" service */
-            if (boundA) {
-                unbindService(madvertiserConnection);
-                boundA = false;
-            }
-            /* Unbind from the "SCANNER" service */
-            if (boundS) {
-                unbindService(mscannerConnection);
-                boundS = false;
-            }
-            /* Stopping throughput state machine */
-            if (throughputSMClass.mStateMachine != null) {
-                throughputSMClass.mStateMachine.doQuit();
-            }
-
-            /* Unregistering Paring Receiver */
-            try{
-                if(mReceiverRegistered) {
-                    unregisterReceiver(mPairingReceiver);
-                    mReceiverRegistered = false;
-                }
-            }catch(Exception E) {
-                Log.d(TAG, "not able to unregister");
-            }
-        }
+        Log.d(TAG, "onStop");
     }
 
     /* function to start testapp throughput state machine */
@@ -455,10 +487,10 @@ public class MainActivity extends Activity {
         StringBuilder PrintStr = new StringBuilder();
 
         public MainActivityMessageHandler(Context contxt, Looper looper) {
-        super(looper);
-        mMsgContext = contxt;
-        if(MainActivity.LOG_LEVEL >= 2)
-            Log.d(TAG, "MainActivityMessageHandler");
+            super(looper);
+            mMsgContext = contxt;
+            if(MainActivity.LOG_LEVEL >= 2)
+                Log.d(TAG, "MainActivityMessageHandler");
         }
 
         @Override
