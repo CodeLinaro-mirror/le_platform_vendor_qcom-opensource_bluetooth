@@ -102,6 +102,7 @@ public class GattServer{
     public static int rxPhyReq;
     public GattServerMessageHandler mGattServerHandler = null;
     public BleGattServer mgattServer;
+    public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
     private BluetoothManager mManager;
     private BluetoothDevice mdevice;
@@ -110,12 +111,14 @@ public class GattServer{
     public static final int MSG_ADD_SERVICE_DONE = 1;
     public static final int MSG_START_BLE_REMOVE_SERVICE = 2;
     public static final int MSG_START_BLE_CLEAR_SERVICES = 3;
-    public static final int  MSG_START_BLE_GET_SERVICES = 4;
+    public static final int MSG_START_BLE_GET_SERVICES = 4;
     public static final int MSG_START_BLE_PHY_UPDATE = 5;
     public static final int MSG_PHY_UPDATE_DONE = 6;
     public static final int MSG_START_BLE_READ_PHY = 7;
     public static final int MSG_PHY_READ_DONE = 8;
+    public static final int MSG_START_GET_CONNECTED_DEVICES = 9;
     public static int LOG_LEVEL = 3;
+    public static final int GATT_SERVER = 8;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
@@ -266,6 +269,9 @@ public class GattServer{
                 case MSG_START_BLE_READ_PHY:
                     processReadPhyReq();
                     break;
+                case MSG_START_GET_CONNECTED_DEVICES:
+                    getconnecteddevices();
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -390,6 +396,18 @@ public class GattServer{
         private void processReadPhyReq() {
             Log.i(TAG, "Read Phy");
             mgattServer.mBluetoothGattserver.readPhy(mdevice);
+        }
+
+        private void getconnecteddevices() {
+             connectedDevices=mManager.getConnectedDevices(GATT_SERVER);
+             PrintStr.setLength(0);
+             PrintStr.append("Connected Device:");
+             for (int i = 0; i < connectedDevices.size(); i++)  {
+                 Log.i(TAG,connectedDevices.get(i).getAddress());
+                 PrintStr.append(connectedDevices.get(i).getAddress());
+                 PrintStr.append("  ");
+             }
+             SocketServer.sendSocketData(PrintStr.toString());
         }
 
     }
