@@ -34,16 +34,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Semaphore;
 
+import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 public class SocketServer {
     private static SocketServer INSTANCE = null;
     private static Semaphore mutex = new Semaphore(1);
 
+    private Context mContext;
     private static final String TAG = "SocketServer";
     final String SOCKET_ADDRESS = "BtTestAppSocket";
     static int socSendBufferSize = 4096;
@@ -74,8 +77,9 @@ public class SocketServer {
     static int mainMenuState = MAIN_MENU;
     static int processOutputState = MAIN_MENU;
 
-    private SocketServer() {
+    private SocketServer(Context mAppContext) {
         Log.d(TAG, "SocketServer()");
+        mContext = mAppContext;
         socRcvBuffer = new byte[socRcvBufferSize];
 
         parse = new InputParse();
@@ -83,9 +87,9 @@ public class SocketServer {
         localServer.start();
     }
 
-    public static synchronized SocketServer getInstance() {
+    public static synchronized SocketServer getInstance(Context mAppContext) {
         if(INSTANCE == null) {
-            INSTANCE = new SocketServer();
+            INSTANCE = new SocketServer(mAppContext);
         }
         return INSTANCE;
     }
@@ -163,6 +167,8 @@ public class SocketServer {
                 } catch (IOException e) {
                     Log.e(TAG, "There is an exception when reading socket");
                     e.printStackTrace();
+                    closeSocketServer();
+                    INSTANCE.showMessage("Socket closed, restart app");
                     break;
                 }
 
@@ -176,8 +182,8 @@ public class SocketServer {
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    processOutputState = NONE;
-                    closeReceived = true;
+                    closeSocketServer();
+                    break;
                 }
 
                 if (processOutputState != NONE) {
@@ -763,6 +769,10 @@ public class SocketServer {
         INSTANCE = null;
     }
 
+    private void showMessage(String msg) {
+        Toast.makeText(mContext, msg, Toast.LENGTH_SHORT).show();
+    }
+
     public static void sendSocketData(String data) {
         if (socketOpen) {
             try {
@@ -780,6 +790,8 @@ public class SocketServer {
                     } catch (IOException e) {
                         Log.e(TAG, "There is an exception when writing to socket");
                         e.printStackTrace();
+                        INSTANCE.closeSocketServer();
+                        INSTANCE.showMessage("Socket closed, restart app");
                     }
                 } finally {
                     mutex.release();

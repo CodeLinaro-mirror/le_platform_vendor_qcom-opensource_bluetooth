@@ -121,7 +121,7 @@ public class MainActivity extends Activity {
     public static AdvertiserService mAdvertiseService = null;
     public static ScannerService mScannerService = null;
 
-    public static SocketServer socServer;
+    public static SocketServer socServer = null;
 
     /* Variable to keep track of calling source of scan
      (MainActivity or Gatt Client or Throughput SM) */
@@ -227,7 +227,7 @@ public class MainActivity extends Activity {
                                     PERMISSION_REQUEST_FINE_LOCATION);
             }
 
-            socServer = SocketServer.getInstance();
+            socServer = SocketServer.getInstance(mAppContext);
 
             // Bind to the "SCANNER" service
             Log.d("CREATION", "BINDING TO SCANNER ");
