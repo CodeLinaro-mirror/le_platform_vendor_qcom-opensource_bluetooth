@@ -113,6 +113,8 @@ public class GattServer{
     public static final int  MSG_START_BLE_GET_SERVICES = 4;
     public static final int MSG_START_BLE_PHY_UPDATE = 5;
     public static final int MSG_PHY_UPDATE_DONE = 6;
+    public static final int MSG_START_BLE_READ_PHY = 7;
+    public static final int MSG_PHY_READ_DONE = 8;
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
@@ -173,6 +175,7 @@ public class GattServer{
 
              @Override
              public void onPhyUpdate(BluetoothDevice device, int txPhy, int rxPhy, int status) {
+
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
@@ -192,6 +195,23 @@ public class GattServer{
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
              }
+
+            @Override
+            public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
+                if(status == GATT_SUCCESS){
+                     Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
+                     PhyUpdate tmp_phy = new PhyUpdate();
+                     tmp_phy.txPhy = txPhy;
+                     tmp_phy.rxPhy = rxPhy;
+                     msg = mGattServerHandler.obtainMessage(MSG_PHY_READ_DONE, tmp_phy);
+                     mGattServerHandler.sendMessage(msg);
+                 } else{
+                     Log.i(TAG, "Read Phy failed");
+                     PrintStr.setLength(0);
+                     PrintStr.append("Read Phy failed with status: "+ status);
+                     SocketServer.sendSocketData(PrintStr.toString());
+                 }
+            }
         };
 
         public void startServer(){
@@ -243,6 +263,9 @@ public class GattServer{
                     PhyUpdate phyUpdate = (PhyUpdate) msg.obj;
                     processPhyUpdateReq(phyUpdate);
                     break;
+                case MSG_START_BLE_READ_PHY:
+                    processReadPhyReq();
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -254,6 +277,15 @@ public class GattServer{
                     PrintStr.setLength(0);
                     phyUpdate = (PhyUpdate) msg.obj;
                     PrintStr.append("Phy Update done, Tx Phy :");
+                    PrintStr.append(phyUpdate.txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(phyUpdate.rxPhy);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_PHY_READ_DONE:
+                    PrintStr.setLength(0);
+                    phyUpdate = (PhyUpdate) msg.obj;
+                    PrintStr.append("Current Phy: Tx Phy :");
                     PrintStr.append(phyUpdate.txPhy);
                     PrintStr.append(" Rx Phy :");
                     PrintStr.append(phyUpdate.rxPhy);
@@ -335,14 +367,14 @@ public class GattServer{
         }
 
         private void processGattClearServiceReq() {
-
             Log.d(TAG, "Clearing all the services");
             mgattServer.mBluetoothGattserver.clearServices();
             Service_List.clear();
         }
 
-        private void processGattGetServiceReq() {
 
+
+        private void processGattGetServiceReq() {
             Log.d(TAG, "Listing all the services");
             PrintStr.setLength(0);
             PrintStr.append("Services UUIDS :");
@@ -354,5 +386,11 @@ public class GattServer{
              }
             SocketServer.sendSocketData(PrintStr.toString());
         }
+
+        private void processReadPhyReq() {
+            Log.i(TAG, "Read Phy");
+            mgattServer.mBluetoothGattserver.readPhy(mdevice);
+        }
+
     }
 }
