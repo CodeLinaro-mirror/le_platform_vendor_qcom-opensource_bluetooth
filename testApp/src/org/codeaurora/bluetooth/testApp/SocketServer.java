@@ -41,7 +41,7 @@ import android.os.Message;
 import android.util.Log;
 
 public class SocketServer {
-    private static SocketServer INSTANCE = new SocketServer();
+    private static SocketServer INSTANCE = null;
     private static Semaphore mutex = new Semaphore(1);
 
     private static final String TAG = "SocketServer";
@@ -54,8 +54,8 @@ public class SocketServer {
     private static boolean closeReceived = false;
     InputStream input;
     private static OutputStream output;
-    LocalServerSocket server;
-    LocalSocket client;
+    LocalServerSocket server = null;
+    LocalSocket client = null;
     localServerSocket localServer;
     communicationHandler commHandler;
     static InputParse parse;
@@ -83,8 +83,11 @@ public class SocketServer {
         localServer.start();
     }
 
-    public static SocketServer getInstance() {
-        return (INSTANCE);
+    public static synchronized SocketServer getInstance() {
+        if(INSTANCE == null) {
+            INSTANCE = new SocketServer();
+        }
+        return INSTANCE;
     }
 
     private class localServerSocket extends Thread {
@@ -163,6 +166,10 @@ public class SocketServer {
                     break;
                 }
 
+                if(!socketOpen) {
+                    break; // If socket is closed, stop the thread
+                }
+
                 if (bytesRead >= 0) {
                     String inputStr = new String(socRcvBuffer, 0, bytesRead);
                     Log.i(TAG, "Received: " + inputStr);
@@ -178,27 +185,7 @@ public class SocketServer {
                 }
 
                 if (closeReceived) {
-                    socketOpen = false;
-                    closeReceived = false;
-                    if (client != null) {
-                        try {
-                            client.close();
-                            Log.i(TAG, "client socket closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "client socket close failed");
-                            e.printStackTrace();
-                        }
-                    }
-
-                    if (server != null) {
-                        try {
-                            server.close();
-                            Log.i(TAG, "server closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "server close failed");
-                            e.printStackTrace();
-                        }
-                    }
+                    closeSocketServer();
                     break;
                 }
             }
@@ -743,6 +730,37 @@ public class SocketServer {
                     break;
             }
         }
+    }
+
+    public void closeSocketServer() {
+        Log.i(TAG, "closeSocketServer()");
+        closeReceived = false;
+        socketOpen = false;
+        mainMenuState = MAIN_MENU;
+        processOutputState = MAIN_MENU;
+
+        if (client != null) {
+            try {
+                client.close();
+                Log.i(TAG, "client socket closed");
+            } catch (IOException e) {
+                Log.e(TAG, "client socket close failed");
+                e.printStackTrace();
+            }
+            client = null;
+        }
+
+        if (server != null) {
+            try {
+                server.close();
+                Log.i(TAG, "server closed");
+            } catch (IOException e) {
+                Log.e(TAG, "server close failed");
+                e.printStackTrace();
+            }
+            server = null;
+        }
+        INSTANCE = null;
     }
 
     public static void sendSocketData(String data) {
