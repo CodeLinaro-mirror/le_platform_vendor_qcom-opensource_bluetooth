@@ -49,8 +49,9 @@ Run the script:
                 hidh connect|disconnect device
                             : test hid(host) in new Bluetooth adapter
 
-                spp1 connect|disconnect device
+                spp1 connect|disconnect|accept|read|write device
                             : test spp in new Bluetooth adapter
+
                 voip start|stop|start_bt_sco|stop_bt_sco
                             : test voip simulation
 

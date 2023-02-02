@@ -88,6 +88,9 @@ final class TestShellCommand extends ShellCommand {
 
     private static final String PARAM_CONNECT = "connect";
     private static final String PARAM_DISCONNECT = "disconnect";
+    private static final String PARAM_ACCEPT = "accept";
+    private static final String PARAM_READ = "read";
+    private static final String PARAM_WRITE = "write";
 
     private static final String PARAM_CONNECT_AUDIO = "connect_audio";
     private static final String PARAM_DISCONNECT_AUDIO = "disconnect_audio";
@@ -226,7 +229,7 @@ final class TestShellCommand extends ShellCommand {
             pw.println("\tspp connect|disconnect device");
             pw.println("\t  Test SPP in default Bluetooth adapter.");
         }
-        pw.println("\tspp1 connect|disconnect device");
+        pw.println("\tspp1 connect|disconnect|accept|read|write device");
         pw.println("\t  Test SPP in new Bluetooth adapter.");
         pw.println("\tvoip start|stop");
     }
@@ -311,7 +314,7 @@ final class TestShellCommand extends ShellCommand {
                 break;
             }
             case COMMAND_SPP: {
-                if (args.length < 3 ||
+                if (args.length < 2 ||
                     !sTestDefaultAdapter) {
                     return showInvalidArguments(writer);
                 }
@@ -319,7 +322,7 @@ final class TestShellCommand extends ShellCommand {
                 break;
             }
             case COMMAND_SPP1: {
-                if (args.length < 3) {
+                if (args.length < 2) {
                     return showInvalidArguments(writer);
                 }
                 runSpp1(args);
@@ -579,13 +582,35 @@ final class TestShellCommand extends ShellCommand {
 
     private void runSpp(String[] args, TestSpp testSpp, int adapterIndex) {
         String para = args[1];
-        BluetoothDevice device = getRemoteDevice(args[2], adapterIndex);
-        if (PARAM_CONNECT.equalsIgnoreCase(para)) {
-            testSpp.connect(device);
-        } else if (PARAM_DISCONNECT.equalsIgnoreCase(para)) {
-            testSpp.disconnect(device);
-        } else {
-            throw new IllegalArgumentException("Invalid spp parameter: " + para);
+        BluetoothDevice device = null;
+        if (args.length >= 3)
+            device = getRemoteDevice(args[2], adapterIndex);
+
+        switch (para) {
+            case PARAM_CONNECT: {
+                testSpp.connect(device);
+                break;
+            }
+            case PARAM_DISCONNECT: {
+                testSpp.disconnect(device);
+                break;
+            }
+            case PARAM_READ: {
+                testSpp.read(device);
+                break;
+            }
+            case PARAM_WRITE: {
+                checkArgsLength(args, PARAM_WRITE, 4);
+                testSpp.write(device, args[3]);
+                break;
+            }
+            case PARAM_ACCEPT: {
+                testSpp.accept();
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException("Invalid spp parameter: " + para);
+            }
         }
     }
 
