@@ -55,6 +55,7 @@ public class MainActivity extends MonkeyActivity {
     private HidhMain mHidhMain;
     private PbapMain mPbapMain;
     private SppMain mSppMain;
+    private TestShellCommand mShellCommand;
 
     private void initMain(Context context) {
         mAdapterMain = new AdapterMain(context);
@@ -72,6 +73,7 @@ public class MainActivity extends MonkeyActivity {
         mContext = getApplicationContext();
         // [TODO] Restore later when UI is added into test app
         // initMain(mContext);
+        mShellCommand = new TestShellCommand(mContext);
     }
 
     @Override
@@ -132,7 +134,7 @@ public class MainActivity extends MonkeyActivity {
     }
 
     private void execShellCmd(String[] args, IndentingPrintWriter writer) {
-        newTestShellCommand().exec(args, writer);
+        mShellCommand.exec(args, writer);
     }
 
     private TestShellCommand newTestShellCommand() {
