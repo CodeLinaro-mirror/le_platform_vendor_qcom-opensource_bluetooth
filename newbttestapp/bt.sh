@@ -55,6 +55,18 @@ Run the script:
                 voip start|stop|start_bt_sco|stop_bt_sco
                             : test voip simulation
 
+                gattclient1 start_scanning|stop_scanning|connect device|discover_service
+                        device|disconnect device
+                            : test gatt client in new Bluetooth adapter
+                            : device is remote Bluetooth(LE) device's address
+                            : E.g. 00:00:02:22:66:22
+
+                gattserver1 start_advertising|stop_advertising|add_service|remove_service
+                      |connect device|disconnect device|close_server
+                            : test gatt in new Bluetooth adapter
+                            : device is remote Bluetooth(LE) device's address
+                            : E.g. 00:00:02:22:66:22
+
 Examples:
     $0 -r : restart test app
     $0 -t \"adapter1 enable\" : enable new Bluetooth adapter
