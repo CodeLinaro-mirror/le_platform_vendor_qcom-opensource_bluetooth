@@ -44,7 +44,6 @@ class TestVoIP {
 
     public boolean startVoIPSimulate() {
         mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-        mAudioManager.setSpeakerphoneOn(false);
         createServerSocket();
         startUplinkThread();
         startDownlinkThread();
@@ -63,7 +62,9 @@ class TestVoIP {
 
     public void startBluetoothSco() {
         if (mAudioManager != null) {
+            mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
             mAudioManager.startBluetoothSco();
+            mAudioManager.setBluetoothScoOn(true);
         } else {
             Log.e(TAG, "mAudioManager is null!");
         }
@@ -71,7 +72,9 @@ class TestVoIP {
 
     public void stopBluetoothSco() {
         if (mAudioManager != null) {
+            mAudioManager.setMode(AudioManager.MODE_NORMAL);
             mAudioManager.stopBluetoothSco();
+            mAudioManager.setBluetoothScoOn(false);
         } else {
             Log.e(TAG, "mAudioManager is null!");
         }
@@ -191,15 +194,15 @@ class TestVoIP {
                 return;
             }
 
-            int minBufferSize = AudioRecord.getMinBufferSize(48000,
+            int minBufferSize = AudioRecord.getMinBufferSize(8000,
                               AudioFormat.CHANNEL_IN_MONO,
                               AudioFormat.ENCODING_PCM_16BIT);
 
             while (!stopped) {
                 // Add some capture logic here
                 if (mRecord == null) {
-                    mRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
-                                              48000,
+                    mRecord = new AudioRecord(MediaRecorder.AudioSource.VOICE_COMMUNICATION,
+                                              8000,
                                               AudioFormat.CHANNEL_IN_MONO,
                                               AudioFormat.ENCODING_PCM_16BIT,
                                               minBufferSize * 4);
@@ -266,8 +269,8 @@ class TestVoIP {
                 return;
             }
 
-            int bufferSizeInBytes = AudioTrack.getMinBufferSize(48000,
-                                                                AudioFormat.CHANNEL_CONFIGURATION_MONO,
+            int bufferSizeInBytes = AudioTrack.getMinBufferSize(8000,
+                                                                AudioFormat.CHANNEL_OUT_MONO,
                                                                 AudioFormat.ENCODING_PCM_16BIT);
             if (bufferSizeInBytes == AudioTrack.ERROR_BAD_VALUE) {
                 Log.w(TAG, "Invalid parameter!");
@@ -277,8 +280,8 @@ class TestVoIP {
             while (!stopped) {
                 // Add some playback logic here
                 if (mTrack == null) {
-                    mTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, 48000,
-                                            AudioFormat.CHANNEL_CONFIGURATION_MONO,
+                    mTrack = new AudioTrack(AudioManager.STREAM_VOICE_CALL, 8000,
+                                            AudioFormat.CHANNEL_OUT_MONO,
                                             AudioFormat.ENCODING_PCM_16BIT,
                                             bufferSizeInBytes,
                                             AudioTrack.MODE_STREAM);
