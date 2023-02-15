@@ -71,7 +71,8 @@ public class GattServer{
     public static final int MSG_START_BLE_PHY_UPDATE = 4;
     public static final int MSG_START_BLE_READ_PHY = 5;
     public static final int MSG_START_GET_CONNECTED_DEVICES = 6;
-    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_GET_CONNECTED_DEVICES;
+    public static final int MSG_START_BLE_PAIR = 7;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_PAIR;
 
     public static final int MSG_ADD_SERVICE_DONE = MSG_GS_ACTION_MAX_VALUE + 1;
     public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_ADD_SERVICE_DONE;
@@ -244,6 +245,10 @@ public class GattServer{
                 case MSG_START_GET_CONNECTED_DEVICES:
                     processGetConnectedDevices();
                     break;
+                case MSG_START_BLE_PAIR:
+                    String remoteDevice = (String) msg.obj;
+                    processStartPair(remoteDevice);
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -382,6 +387,29 @@ public class GattServer{
                  PrintStr.append("  ");
              }
              SocketServer.sendSocketData(PrintStr.toString());
+        }
+
+        private void processStartPair(String bdAddr) {
+            BluetoothDevice mdevice = getRemoteDevice(bdAddr);
+            if (mdevice != null) {
+                if(mdevice.getBondState() != BluetoothDevice.BOND_BONDED){
+                    Log.i(TAG, "Pairing!");
+                    if(!mdevice.createBond(BluetoothDevice.TRANSPORT_LE)) {
+                        Log.i(TAG, "Couldn't start pairing");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Pairing failed!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    }
+                } else {
+                    Log.i(TAG, "Device already bonded");
+                }
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Device not in connected list");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         }
 
         private void processConnectReq(BluetoothDevice mdevice) {
