@@ -32,7 +32,9 @@ import android.util.Log;
 import android.util.IndentingPrintWriter;
 import android.util.SparseArray;
 
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.List;
 
 final class TestShellCommand extends ShellCommand {
 
@@ -55,10 +57,14 @@ final class TestShellCommand extends ShellCommand {
     private static final String COMMAND_SPP = "spp";
     /* Command for SPP in new Bluetooth adapter */
     private static final String COMMAND_SPP1 = "spp1";
-    /* Command for GATT in legacy Bluetooth adapter */
-    private static final String COMMAND_GATT = "gatt";
-    /* Command for GATT in new Bluetooth adapter */
-    private static final String COMMAND_GATT1 = "gatt1";
+    /* Command for GATT(Client) in legacy Bluetooth adapter */
+    private static final String COMMAND_GATTCLIENT = "gattclient";
+    /* Command for GATT(Client) in new Bluetooth adapter */
+    private static final String COMMAND_GATTCLIENT1 = "gattclient1";
+    /* Command for GATT(Server) in legacy Bluetooth adapter */
+    private static final String COMMAND_GATTSERVER = "gattserver";
+    /* Command for GATT(Server) in new Bluetooth adapter */
+    private static final String COMMAND_GATTSERVER1 = "gattserver1";
     /* Command for testing VoIP */
     private static final String COMMAND_VOIP = "voip";
 
@@ -110,6 +116,30 @@ final class TestShellCommand extends ShellCommand {
     private static final String PARAM_START_BT_SCO = "start_bt_sco";
     private static final String PARAM_STOP_BT_SCO = "stop_bt_sco";
 
+    private static final String PARAM_START_ADVERTISING = "start_advertising";
+    private static final String PARAM_STOP_ADVERTISING = "stop_advertising";
+    private static final String PARAM_ADD_SERVICE = "add_service";
+    private static final String PARAM_REMOVE_SERVICE = "remove_service";
+    private static final String PARAM_CLOSE_SERVER = "close_server";
+
+    private static final String PARAM_START_SCANNING = "start_scanning";
+    private static final String PARAM_STOP_SCANNING = "stop_scanning";
+    private static final String PARAM_DISCOVER_SERVICE = "discover_service";
+
+    private static final List<String> GATT_SERVER_CMD_NO_BDDR =
+        new ArrayList<String>(Arrays.asList(
+            PARAM_START_ADVERTISING,
+            PARAM_STOP_ADVERTISING,
+            PARAM_ADD_SERVICE,
+            PARAM_REMOVE_SERVICE,
+            PARAM_CLOSE_SERVER
+    ));
+    private static final List<String> GATT_CLIENT_CMD_NO_BDDR =
+        new ArrayList<String>(Arrays.asList(
+            PARAM_START_SCANNING,
+            PARAM_STOP_SCANNING
+    ));
+
     private static final int RESULT_OK = 0;
     private static final int RESULT_ERROR = -1; // Arbitrary value, any non-0 is fine
 
@@ -130,8 +160,10 @@ final class TestShellCommand extends ShellCommand {
     private final TestHidh mTestHidh;
     private final TestSpp mTestSpp;
     private final TestSpp mTestSpp1;
-    private final TestGatt mTestGatt;
-    private final TestGatt mTestGatt1;
+    private final TestGattClient mTestGattClient;
+    private final TestGattClient mTestGattClient1;
+    private final TestGattServer mTestGattServer; 
+    private final TestGattServer mTestGattServer1;
 
     private ExecThread mExecThread;
 
@@ -159,8 +191,10 @@ final class TestShellCommand extends ShellCommand {
         mTestHidh = new TestHidh(mContext);
         mTestSpp = sTestDefaultAdapter ? new TestSpp(mContext) : null;
         mTestSpp1 = new TestSpp(mContext, ADAPTER_1);
-        mTestGatt = sTestDefaultAdapter ? new TestGatt(mContext) : null;
-        mTestGatt1 = new TestGatt(mContext, ADAPTER_1);
+        mTestGattClient = sTestDefaultAdapter ? new TestGattClient(mContext) : null;
+        mTestGattClient1 = new TestGattClient(mContext, ADAPTER_1);
+        mTestGattServer = sTestDefaultAdapter ? new TestGattServer(mContext) : null;
+        mTestGattServer1 = new TestGattServer(mContext, ADAPTER_1);
         mTestVoIP = new TestVoIP(mContext);
     }
 
@@ -232,6 +266,12 @@ final class TestShellCommand extends ShellCommand {
         pw.println("\tspp1 connect|disconnect|accept|read|write device");
         pw.println("\t  Test SPP in new Bluetooth adapter.");
         pw.println("\tvoip start|stop");
+        pw.println("\tgattclient1 start_advertising|stop_advertising|add_service|remvove_service" +
+                "|connect device|disconnect device|close_server");
+        pw.println("\t  Test GATT client in new Bluetooth adapter.");
+        pw.println("\tgattserver1 start_scanning|stop_scanning|connect device|disconnect device" +
+                "|discover_service device");
+        pw.println("\t  Test GATT server in new Bluetooth adapter.");
     }
 
     private static int showInvalidArguments(IndentingPrintWriter pw) {
@@ -328,15 +368,26 @@ final class TestShellCommand extends ShellCommand {
                 runSpp1(args);
                 break;
             }
-            case COMMAND_GATT: {
+            case COMMAND_GATTCLIENT: {
                 if (!sTestDefaultAdapter) {
                     return showInvalidArguments(writer);
                 }
-                runGatt(args);
+                runGattClient(args);
                 break;
             }
-            case COMMAND_GATT1: {
-                runGatt1(args);
+            case COMMAND_GATTCLIENT1: {
+                runGattClient1(args);
+                break;
+            }
+            case COMMAND_GATTSERVER: {
+                if (!sTestDefaultAdapter) {
+                    return showInvalidArguments(writer);
+                }
+                runGattServer(args);
+                break;
+            }
+            case COMMAND_GATTSERVER1: {
+                runGattServer1(args);
                 break;
             }
             case COMMAND_VOIP: {
@@ -624,20 +675,102 @@ final class TestShellCommand extends ShellCommand {
         runSpp(args, mTestSpp1, ADAPTER_1);
     }
 
-    private void runGatt(String[] args, TestGatt testGatt, int adapterIndex) {
-        String para = args[1];
-        BluetoothDevice device = getRemoteDevice(args[2], adapterIndex);
-        // TODO
+    private void runGattServer(String[] args, TestGattServer testGattServer, int adapterIndex) {
+        String para = args[1].toLowerCase();
+        BluetoothDevice device = null;
+
+        if (!GATT_SERVER_CMD_NO_BDDR.contains(para)) {
+            device = getRemoteDevice(args[2], adapterIndex);
+        }
+
+        switch (para) {
+            case PARAM_START_ADVERTISING: {
+                testGattServer.startAdvertisingSet();
+                break;
+            }
+            case PARAM_STOP_ADVERTISING: {
+                testGattServer.stopAdvertisingSet();
+                break;
+            }
+            case PARAM_ADD_SERVICE: {
+                testGattServer.addService();
+                break;
+            }
+            case PARAM_REMOVE_SERVICE: {
+                testGattServer.removeService();
+                break;
+            }
+            case PARAM_CONNECT: {
+                testGattServer.connect(device);
+                break;
+            }
+            case PARAM_DISCONNECT: {
+                testGattServer.disconnect(device);
+                break;
+            }
+            case PARAM_CLOSE_SERVER: {
+                testGattServer.close();
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException("Invalid gatt server parameter: " + para);
+            }
+        }
     }
 
-    private void runGatt(String[] args) {
-        logd("runGatt args: " + args);
-        runGatt(args, mTestGatt, ADAPTER_DEFAULT);
+    private void runGattServer(String[] args) {
+        logd("runGattSerer args: " + args);
+        runGattServer(args, mTestGattServer, ADAPTER_DEFAULT);
     }
 
-    private void runGatt1(String[] args) {
-        logd("runGatt1 args: " + args);
-        runGatt(args, mTestGatt1, ADAPTER_1);
+    private void runGattServer1(String[] args) {
+        logd("runGattServer1 args: " + args);
+        runGattServer(args, mTestGattServer1, ADAPTER_1);
+    }
+
+    private void runGattClient(String[] args, TestGattClient testGattClient, int adapterIndex) {
+        String para = args[1].toLowerCase();
+        BluetoothDevice device = null;
+
+        if (!GATT_CLIENT_CMD_NO_BDDR.contains(para)) {
+            device = getRemoteDevice(args[2], adapterIndex);
+        }
+
+        switch (para) {
+            case PARAM_START_SCANNING: {
+                testGattClient.startScanning();
+                break;
+            }
+            case PARAM_STOP_SCANNING: {
+                testGattClient.stopScanning();
+                break;
+            }
+            case PARAM_CONNECT: {
+                testGattClient.connect(device);
+                break;
+            }
+            case PARAM_DISCONNECT: {
+                testGattClient.disconnect(device);
+                break;
+            }
+            case PARAM_DISCOVER_SERVICE: {
+                testGattClient.discoverService(device);
+                break;
+            }
+            default: {
+                throw new IllegalArgumentException("Invalid gatt client parameter: " + para);
+            }
+        }
+    }
+
+    private void runGattClient(String[] args) {
+        logd("runGattClient args: " + args);
+        runGattClient(args, mTestGattClient, ADAPTER_DEFAULT);
+    }
+
+    private void runGattClient1(String[] args) {
+        logd("runGattClient1 args: " + args);
+        runGattClient(args, mTestGattClient1, ADAPTER_1);
     }
 
     private void runVoIP(String[] args) {
