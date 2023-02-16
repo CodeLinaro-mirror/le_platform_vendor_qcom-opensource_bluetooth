@@ -220,6 +220,14 @@ public class GattServer{
                                           devs, characteristic, true);
                 }
             }
+
+            @Override
+            public void onDescriptorReadRequest(BluetoothDevice device, int requestId,
+                                                int offset, BluetoothGattDescriptor descriptor) {
+                Log.d(TAG, "onDescriptorReadRequest from device " + device.getAddress());
+                mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                                                                      0, descriptor.getValue());
+            }
         };
 
         public void startServer() {
