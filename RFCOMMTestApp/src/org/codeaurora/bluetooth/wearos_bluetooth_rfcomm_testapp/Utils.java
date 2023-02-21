@@ -114,15 +114,6 @@ public class Utils {
         static final int STATE_END_DATA_RX = 8;
         static final int STATE_DATA_RX_FAILED = 9;
 
-        static final int STATE_START_DATA_TX_WAKEABLE = 10;
-        static final int STATE_END_DATA_TX_WAKEABLE = 11;
-
-        static final int STATE_START_DATA_TX_ACTIONABLE = 12;
-        static final int STATE_END_DATA_TX_ACTIONABLE = 13;
-
-        static final int STATE_START_DATA_TX_CACHEABLE = 14;
-        static final int STATE_END_DATA_TX_CACHEABLE = 15;
-
         static final int STATE_START_GAP_TEST_CASES = 16;
         static final int STATE_GAP_TEST_CASE_OFF_ON = 17;
         static final int STATE_GAP_TEST_CASE_SCAN_MODE = 18;

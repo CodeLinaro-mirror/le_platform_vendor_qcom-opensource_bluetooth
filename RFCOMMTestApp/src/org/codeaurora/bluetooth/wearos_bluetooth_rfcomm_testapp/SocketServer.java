@@ -314,9 +314,6 @@ public class SocketServer {
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Tx(Select chunkSize and pattern 1(Default) 2(Binary) or 3(PRBS9)) (Ex: Tx chunkSize:1000 pattern:1)\n");
             sendStr.append("                     Rx (Ex: Rx )\n");
-            sendStr.append("                     Wakeable (Ex: Wakeable timer:1000)\n");
-            sendStr.append("                     Actionable (Ex: Actionable timer:1000)\n");
-            sendStr.append("                     Cacheable (Ex: Cacheable timer:1000)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -811,39 +808,6 @@ public class SocketServer {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX;
                         message.obj = txParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Wakeable")) {
-                    Wakeable wakeableParam = parser.wakeableParse(tmp[1]);
-                    if (wakeableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_WAKEABLE;
-                        message.obj = wakeableParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Actionable")) {
-                    Actionable actionableParam = parser.actionableParse(tmp[1]);
-                    if (actionableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_ACTIONABLE;
-                        message.obj = actionableParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Cacheable")) {
-                    Cacheable cacheableParam = parser.cacheableParse(tmp[1]);
-                    if (cacheableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_CACHEABLE;
-                        message.obj = cacheableParam;
                         Utils.appControlStateMachine.sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;

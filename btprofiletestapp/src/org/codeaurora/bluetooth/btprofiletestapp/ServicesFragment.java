@@ -255,12 +255,22 @@ public class ServicesFragment extends ListFragment {
 
             Switch swSrv = (Switch) v.findViewById(R.id.service_switch);
             swSrv.setTag(Integer.valueOf(position));
+            if (srv.mType.equals(Service.Type.MAP)) {
+                swSrv.setText("UI_MAP");
+            } else if (srv.mType.equals(Service.Type.PBAP)) {
+                swSrv.setText("UI_PBAP");
+            } else if (srv.mType.equals(Service.Type.HFP)) {
+                swSrv.setText("UI_HFP");
+            } else {
+                swSrv.setText("UI_AVRCP");
+            }
             swSrv.setOnCheckedChangeListener(this);
 
             Switch swNotif = (Switch) v.findViewById(R.id.notification_switch);
             if (srv.mType.equals(Service.Type.MAP)) {
                 swNotif.setVisibility(View.VISIBLE);
                 swNotif.setTag(Integer.valueOf(position));
+                swNotif.setText("UI_MAP_NOTIF");
                 swNotif.setOnCheckedChangeListener(this);
             } else {
                 swNotif.setVisibility(View.INVISIBLE);
