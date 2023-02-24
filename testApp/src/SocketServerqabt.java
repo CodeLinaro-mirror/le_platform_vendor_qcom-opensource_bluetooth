@@ -26,6 +26,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+ /* Changes from Qualcomm Innovation Center are provided under the following license:
+ Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ SPDX-License-Identifier: BSD-3-Clause-Clear
+*/
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
@@ -41,6 +45,7 @@ import android.net.LocalSocketAddress;
 import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
+
 class SocketServer {
     private static SocketServer INSTANCE = null;
     private static Semaphore mutex = new Semaphore(1);
@@ -93,7 +98,7 @@ class SocketServer {
         return INSTANCE;
     }
 
-    class localServerSocket extends Thread {
+    private class localServerSocket extends Thread {
         public localServerSocket() {
             Log.d(TAG, "localServerSocket()");
             bytesRead = 0;
@@ -211,11 +216,6 @@ class SocketServer {
                     sendStr.append("                     HoldWakeLock\n");
                     sendStr.append("                     ReleaseWakeLock\n");
                     sendStr.append("                     GattServer\n");
-                    sendStr.append("                     GetConnectedDevices\n");
-                    sendStr.append("                     Pair   (Ex: Pair 11:22:33:44:55:66)\n");
-                    sendStr.append("                     UnPair   (Ex: UnPair 11:22:33:44:55:66)\n");
-                    sendStr.append("                     Disconnect  (Ex: Disconnect 11:22:33:44:55:66)\n");
-                    sendStr.append("                     GetBondedDevices\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -237,7 +237,7 @@ class SocketServer {
                     sendStr.append("                     ScanStart      (Ex: ScanStart DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
                     sendStr.append("                                                   SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                   ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
-                    sendStr.append("                                                   ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
+                    sendStr.append("                                                   ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ScanStop\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*****************************************************\n");
@@ -248,10 +248,7 @@ class SocketServer {
                     sendStr.append("                     Connect        (Ex: Connect DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
                     sendStr.append("                                                 SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                 ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
-                    sendStr.append("                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
-                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
-                    sendStr.append("                     CancelConnect\n");
-                    sendStr.append("                     ConnUpdate     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
+                    sendStr.append("                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     Pair\n");
@@ -270,18 +267,19 @@ class SocketServer {
                     sendStr.append("                     Connect        (Ex:    Connect DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
                     sendStr.append("                                                    SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                    ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
-                    sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
+                    sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
                     sendStr.append("                     CancelConnect\n");
-                    sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
+                    sendStr.append("                     Pair\n");
+                    sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
                     sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
-                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;Value:10)\n");
+                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;)\n");
                     sendStr.append("                     RegNotifications               (Ex: RegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
@@ -292,15 +290,15 @@ class SocketServer {
                     break;
                 case GATT_SERVER_MENU:
                     sendStr.append("\n******************** Gatt Server Menu ********************\n");
-                    sendStr.append("                       Register\n");
                     sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10,0x01;Permissions:0x01,0x10;Value:0x12)\n");
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
+                    sendStr.append("                       Pair                         (Ex: Pair 11:22:33:44:55:66)\n");
+                    sendStr.append("                       GetConnectedDevices\n");
                     sendStr.append("                       Disconnect                   (Ex: Disconnect 11:22:33:44:55:66)\n");
-                    sendStr.append("                       Deregister\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -327,100 +325,45 @@ class SocketServer {
 
             switch (mainMenuState) {
                 case MAIN_MENU:
-                    tmp = inputString.split(" ", 2);
-                    if (tmp.length == 1) {
-                        if (inputString.equals("Advertiser")) {
-                            mainMenuState = ADV_MENU;
-                            processOutputState = ADV_MENU;
-                        } else if (inputString.equals("Scanner")) {
-                            mainMenuState = SCAN_MENU;
-                            processOutputState = SCAN_MENU;
-                        } else if (inputString.equals("Throughput")) {
-                            mainMenuState = THROUGHPUT_MENU;
-                            processOutputState = THROUGHPUT_MENU;
-                        } else if (inputString.equals("GattClient")) {
-                            mainMenuState = GATT_CLIENT_MENU;
-                            processOutputState = GATT_CLIENT_MENU;
-                        } else if (inputString.equals("HoldWakeLock")) {
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = NONE;
-                            MainActivity.wl.acquire();
-                            MainActivity.wl_acquired = true;
-                            Log.d(TAG,"Wakelock acquired");
-                            sendStr.setLength(0);
-                            sendStr.append("Wakelock acquired");
-                            SocketServer.sendSocketData(sendStr.toString());
-                        } else if (inputString.equals("ReleaseWakeLock")) {
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = NONE;
-                            MainActivity.wl.release();
-                            MainActivity.wl_acquired = false;
-                            Log.d(TAG,"Wakelock released");
-                            sendStr.setLength(0);
-                            sendStr.append("Wakelock released");
-                            SocketServer.sendSocketData(sendStr.toString());
-                        } else if (inputString.equals("GattServer")) {
-                            mainMenuState = GATT_SERVER_MENU;
-                            processOutputState = GATT_SERVER_MENU;
-                        } else if (inputString.equals("GetConnectedDevices")) {
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                         BleAppService.MSG_MA_GET_CONNECTED_DEVICES, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if (inputString.equals("GetBondedDevices")) {
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                         BleAppService.MSG_MA_GET_PAIRED_DEVICES, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if (inputString.equals("Close")) {
-                            closeReceived = true;
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = SOC_CLOSE_ACK;
-                        } else {
-                            mainMenuState = MAIN_MENU;
-                            processOutputState = INVALID_INPUT;
-                        }
-                    } else if (tmp.length == 2) {
-                        if (tmp[0].equals("Pair")) {
-                            if (BleAppService.bleAdapter.
-                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_MA_START_BLE_PAIR,
-                                        tmp[1].toUpperCase());
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        } else if (tmp[0].equals("UnPair")) {
-                            if (BleAppService.bleAdapter.
-                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_MA_START_BLE_UNPAIR,
-                                        tmp[1].toUpperCase());
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        } else if (tmp[0].equals("Disconnect")) {
-                            if (BleAppService.bleAdapter.
-                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_MA_START_BLE_DISCONNECT,
-                                        tmp[1].toUpperCase());
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        } else {
+                    if (inputString.equals("Advertiser")) {
+                        mainMenuState = ADV_MENU;
+                        processOutputState = ADV_MENU;
+                    } else if (inputString.equals("Scanner")) {
+                        mainMenuState = SCAN_MENU;
+                        processOutputState = SCAN_MENU;
+                    } else if (inputString.equals("Throughput")) {
+                        mainMenuState = THROUGHPUT_MENU;
+                        processOutputState = THROUGHPUT_MENU;
+                    } else if (inputString.equals("GattClient")) {
+                        mainMenuState = GATT_CLIENT_MENU;
+                        processOutputState = GATT_CLIENT_MENU;
+                    } else if (inputString.equals("HoldWakeLock")) {
                         mainMenuState = MAIN_MENU;
-                        processOutputState = INVALID_INPUT;
-                        }
+                        processOutputState = NONE;
+                        MainActivity.wl.acquire();
+                        MainActivity.wl_acquired = true;
+                        Log.d(TAG,"Wakelock acquired");
+                        sendStr.setLength(0);
+                        sendStr.append("Wakelock acquired");
+                        SocketServer.sendSocketData(sendStr.toString());
+                    } else if (inputString.equals("ReleaseWakeLock")) {
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = NONE;
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        Log.d(TAG,"Wakelock released");
+                        sendStr.setLength(0);
+                        sendStr.append("Wakelock released");
+                        SocketServer.sendSocketData(sendStr.toString());
+                    } else if (inputString.equals("GattServer")) {
+                        mainMenuState = GATT_SERVER_MENU;
+                        processOutputState = GATT_SERVER_MENU;
+                    } else if (inputString.equals("Close")) {
+                        closeReceived = true;
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = SOC_CLOSE_ACK;
                     } else {
+                        mainMenuState = MAIN_MENU;
                         processOutputState = INVALID_INPUT;
                     }
                     break;
@@ -503,26 +446,6 @@ class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                        } else if (tmp[0].equals("ConnectToBdaddr")) {
-                            if (BleAppService.bleAdapter.checkBluetoothAddress(tmp[1].toUpperCase())) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_SM_BLE_CONNECT_TO_BDADDR,
-                                        tmp[1].toUpperCase());
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        } else if (tmp[0].equals("ConnUpdate")) {
-                            ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
-                            if (connUpdateParam != null) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_SM_START_BLE_CONN_UPDATE, connUpdateParam);
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
                         } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
@@ -572,12 +495,7 @@ class SocketServer {
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_SM_START_BLE_READ_PHY, null);
                             BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("CancelConnect")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_SM_BLE_GATT_CANCEL_CONNECT, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        }  else if (tmp[0].equals("Pair")) {
+                        } else if (tmp[0].equals("Pair")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_SM_START_BLE_PAIR, null);
@@ -632,16 +550,6 @@ class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        } else if (tmp[0].equals("SetPhy")) {
-                            PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
-                            if (phyUpdateParam != null) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_GC_START_BLE_PHY_UPDATE, phyUpdateParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
@@ -717,15 +625,20 @@ class SocketServer {
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_READ_PHY, null);
                             BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("Pair")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_PAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("UnPair")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_UNPAIR, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("DiscoverServices")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_GATT_DISCOVER, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("RefreshServices")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GC_START_BLE_GATT_REFRESH_SERVICES, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("AbortReliableWrite")) {
                             processOutputState = NONE;
@@ -796,7 +709,18 @@ class SocketServer {
                             } else {
                               processOutputState = INVALID_INPUT;
                             }
-                        } else if (tmp[0].equals("Disconnect")) {
+                        } else if (tmp[0].equals("Pair")) {
+                            if (BleAppService.bleAdapter.
+                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_START_BLE_PAIR,
+                                        tmp[1].toUpperCase());
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        }  else if (tmp[0].equals("Disconnect")) {
                             if (BleAppService.bleAdapter.
                                     checkBluetoothAddress(tmp[1].toUpperCase())) {
                                 processOutputState = NONE;
@@ -824,15 +748,10 @@ class SocketServer {
                              msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GS_START_BLE_GET_SERVICES, null);
                              BleAppService.msghandler.sendMessage(msg);
-                        }  else if(tmp[0].equals("Register")) {
+                        } else if(tmp[0].equals("GetConnectedDevices")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GS_START_BLE_REGISTER, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if(tmp[0].equals("Deregister")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GS_START_BLE_DEREGISTER, null);
+                                     BleAppService.MSG_GS_START_GET_CONNECTED_DEVICES, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;

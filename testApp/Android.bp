@@ -36,24 +36,26 @@ qc_bt_BleTestApp {
     name: "qc_bt_BleTestApp-src",
     soong_config_variables: {
         qc_bt_enable_disable_BleTestApp : {
-            enabled : {
-                srcs: [
-                    "src/**/*.java",
-                ],
-                exclude_srcs: [
-                    "src/**/GattClient.java",
-                    "src/**/ThroughputStateMachine.java",
-                    "src/**/SocketServer.java",
-                ],
-            },
             disabled : {
                 srcs: [
-                    "src/**/*.java",
+                    "src/*.java",
                 ],
                 exclude_srcs: [
-                    "src/**/ThroughputStateMachineqabt.java",
-                    "src/**/GattClientqabt.java",
-                    "src/**/SocketServerqabt.java",
+                    "src/GattClient.java",
+                    "src/ThroughputStateMachine.java",
+                    "src/SocketServer.java",
+                    "src/GattServer.java",
+                ],
+            },
+            enabled : {
+                srcs: [
+                    "src/*.java",
+                ],
+                exclude_srcs: [
+                    "src/ThroughputStateMachineqabt.java",
+                    "src/GattClientqabt.java",
+                    "src/SocketServerqabt.java",
+                    "src/GattServerqabt.java",
                 ],
             },
         },

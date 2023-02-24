@@ -26,6 +26,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+ /* Changes from Qualcomm Innovation Center are provided under the following license:
+ Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ SPDX-License-Identifier: BSD-3-Clause-Clear
+  */
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.util.Log;
@@ -57,7 +61,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothGattDescriptor;
 
- class ThroughputStateMachine {
+class ThroughputStateMachine {
     public static final UUID CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
                                  = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final String TAG = "ThroughputStateMachine";
@@ -66,7 +70,7 @@ import android.bluetooth.BluetoothGattDescriptor;
     public BleConnectionClass mBleConnect = null;
     private Context mcontext = null;
     public static TestAppThroughputStateMachine mStateMachine;
-    public BluetoothDevice mDevice = null;
+    private BluetoothDevice mDevice = null;
 
     /* Mutex required for writing characteristics and descriptors */
     private final Object write_mutex = new Object();
@@ -186,31 +190,6 @@ import android.bluetooth.BluetoothGattDescriptor;
                     Log.d(TAG, "onServicesDiscovered received: " + status);
                     PrintStr.setLength(0);
                     PrintStr.append("Service discovery failed with status: "+ status);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-            }
-
-            @Override
-            public void onConnectionUpdated(BluetoothGatt gatt, int interval, int latency,
-                                                int timeout, int status) {
-                if ((status == GATT_SUCCESS)) {
-                    Log.i(TAG, "on Conn updated:"
-                         + " interval=" + interval + " latency=" + latency
-                        + " timeout=" + timeout + " status=" + status);
-                    if((interval == connIntervalReq)|| ((connIntervalReq >= CONN_INTERVAL_MIN) &&
-                       (connIntervalReq <= CONN_INTERVAL_MIN_COEX) &&
-                       (interval == CONN_INTERVAL_MIN_COEX)) ||connIntervalReq == 0xFF) {
-                        Log.d(TAG, "Conn Update Interval matched");
-                        String name = (String) gatt.getDevice().getName();
-                        msg = mStateMachine.obtainMessage(
-                        mStateMachine.MSG_TA_SM_CONNECTION_UPDATED,Integer.toString(interval));
-                        mStateMachine.sendMessage(msg);
-                        connIntervalReq = 0;
-                    }
-                } else {
-                    Log.i(TAG, "conn update failed");
-                    PrintStr.setLength(0);
-                    PrintStr.append("Connection Update failed with status: "+ status);
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
@@ -343,10 +322,6 @@ import android.bluetooth.BluetoothGattDescriptor;
             }
         }
 
-        public void disconnect() {
-            mBleConnect.mBluetoothGatt.disconnect();
-        }
-
         public void pair(){
             if(mDevice.getBondState() != BluetoothDevice.BOND_BONDED){
                 Log.i(TAG, "Pairing!");
@@ -422,8 +397,6 @@ import android.bluetooth.BluetoothGattDescriptor;
         public static final int MSG_TA_SM_DATA_RX_TEST = 19;
         public static final int MSG_TA_SM_LATENCY_TEST = 20;
         public static final int MSG_TA_SM_PAIR_DEV = 21;
-        public static final int MSG_TA_SM_CONNECT_TO_BDADDR = 22;
-        public static final int MSG_TA_SM_CANCEL_CONNECT = 23;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
@@ -499,17 +472,11 @@ import android.bluetooth.BluetoothGattDescriptor;
                             PrintStr.append("Connect failed, there is an ongoing scan");
                             SocketServer.sendSocketData(PrintStr.toString());
                         }else {
-                            Log.i(TAG, "starting scanning");
                             BleAppService.mScannerService.set_scan_parameters(scn);
+                            PrintStr.setLength(0);
+                            PrintStr.append("Scanning Started!");
+                            SocketServer.sendSocketData(PrintStr.toString());
                         }
-                        break;
-                    case MSG_TA_SM_CONNECT_TO_BDADDR:
-                        String bdAddr = (String) message.obj;
-                        processConnectToBdaddr(bdAddr);
-                        break;
-                    case MSG_TA_SM_CANCEL_CONNECT:
-                        processCancelConnect();
-                        transitionTo(mTAIdle);
                         break;
                     case MSG_TA_SM_DEV_FOUND:
                         BluetoothDevice device = (BluetoothDevice) message.obj;
@@ -521,16 +488,6 @@ import android.bluetooth.BluetoothGattDescriptor;
                 return retValue;
             }
 
-            private void processConnectToBdaddr(String bdAddr) {
-                if(BleAppService.bleAdapter != null) {
-                    Log.i(TAG, "Connect to Address: " + bdAddr);
-                    BluetoothDevice remoteDevice =
-                            BleAppService.bleAdapter.getRemoteDevice(bdAddr);
-                    mBleConnect.connect(remoteDevice);
-                    transitionTo(mTAConnectPending);
-                }
-            }
-
             private void processSMDevFoundEvent(BluetoothDevice device) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
                 if(BleAppService.mScannerService.mScanstatus) {
@@ -538,20 +495,6 @@ import android.bluetooth.BluetoothGattDescriptor;
                 }
                 mBleConnect.connect(device);
                 transitionTo(mTAConnectPending);
-            }
-
-            private void processCancelConnect() {
-                if(BleAppService.mScannerService.mScanstatus) {
-                    BleAppService.mScannerService.stopScan();
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scan Stopped for connect");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                } else {
-                    PrintStr.setLength(0);
-                    PrintStr.append("No Connection in Pending");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-
             }
         }
 
@@ -577,10 +520,6 @@ import android.bluetooth.BluetoothGattDescriptor;
                         transitionTo(mTAIdle);
                         Log.i(TAG, "BT Adapter is off");
                         break;
-                    case MSG_TA_SM_CANCEL_CONNECT:
-                        processCancelConnect();
-                        transitionTo(mTAIdle);
-                        break;
                     case MSG_TA_SM_REM_DEV_CONNECTED:
                         PrintStr.setLength(0);
                         String name = (String) message.obj;
@@ -600,13 +539,6 @@ import android.bluetooth.BluetoothGattDescriptor;
                         return NOT_HANDLED;
                 }
                 return retValue;
-            }
-
-            private void processCancelConnect() {
-                mBleConnect.disconnect();
-                PrintStr.setLength(0);
-                PrintStr.append("Connection cancelled!");
-                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
@@ -632,17 +564,6 @@ import android.bluetooth.BluetoothGattDescriptor;
 
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_CANCEL_CONNECT:
-                        PrintStr.setLength(0);
-                        PrintStr.append("CancelConnect: Already Connected");
-                        SocketServer.sendSocketData(PrintStr.toString());
-                        break;
-                    case MSG_TA_SM_CONN_UPDATE:
-                        ConnUpdate ConnUpdateObj = (ConnUpdate) message.obj;
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
-                            Log.d(TAG,"ConnUpdateflag");
-                        processConnUpdateReq(ConnUpdateObj);
-                        break;
                     case MSG_TA_SM_PAIR_DEV:
                         mBleConnect.pair();
                         break;
@@ -874,30 +795,9 @@ import android.bluetooth.BluetoothGattDescriptor;
                                                 new BufferedReader(
                                                     new InputStreamReader(proc.getInputStream()));
                                 String readLine = reader.readLine();
-                                if(readLine.equals("true")) {
-                                    /* If Property is set to true, send one packet from app,
-                                       rest of the packets from bta */
-                                     Log.d(TAG, "system property is true");
-                                    mCharacteristic.setWriteType(
-                                              BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-                                    mCharacteristic.setValue(String.valueOf(str));
-                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
-                                                                    mCharacteristic);
-                                    synchronized (write_mutex) {
-                                        // Wait for write response
-                                        if(!write_wait_signalled){
-                                            try {
-                                                write_mutex.wait();
-                                            } catch (InterruptedException e) {
-                                                Log.d(TAG, "Interrupted while waiting");
-                                            }
-                                        }
-                                        write_wait_signalled = false;
-                                    }
-                                }
-                                /* If system property is set to false or is not set,
+                                /* If system property is set to false,
                                    continue with sending the data from the app */
-                                else {
+                                if(readLine.equals("false")) {
                                     Log.d(TAG, "system property is false");
                                     long tx_start_time_stamp = SystemClock.elapsedRealtime();
                                     mCharacteristic.setWriteType(
@@ -966,6 +866,26 @@ import android.bluetooth.BluetoothGattDescriptor;
                                     float txTputmr = txTputkr / 1000;
                                     Log.i(TAG, "Intr Tx tput in kbps: "+txTputkr+
                                                 " in mbps: "+txTputmr);
+                                } else {
+                                    /* If Property is set to true, send one packet from app,
+                                       rest of the packets from bta */
+                                     Log.d(TAG, "system property is true");
+                                    mCharacteristic.setWriteType(
+                                              BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                                    mCharacteristic.setValue(String.valueOf(str));
+                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                    mCharacteristic);
+                                    synchronized (write_mutex) {
+                                        // Wait for write response
+                                        if(!write_wait_signalled){
+                                            try {
+                                                write_mutex.wait();
+                                            } catch (InterruptedException e) {
+                                                Log.d(TAG, "Interrupted while waiting");
+                                            }
+                                        }
+                                        write_wait_signalled = false;
+                                    }
                                 }
                                 /* Signal SM that TX Test is done*/
                                 Message msg = mStateMachine.obtainMessage(
