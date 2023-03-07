@@ -51,6 +51,7 @@ import android.os.Looper;
 
 import java.lang.*;
 import java.util.List;
+import java.util.Set;
 
 import libcore.io.IoUtils;
 import android.app.Service;
@@ -106,7 +107,8 @@ public class BleAppService extends Service {
     public static final int MSG_MA_ADV_STOPPED = 6;
     public static final int MSG_MA_GET_CONNECTED_DEVICES = 7;
     public static final int MSG_MA_START_BLE_PAIR = 8;
-    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_START_BLE_PAIR;
+    public static final int MSG_MA_GET_PAIRED_DEVICES = 9;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_GET_PAIRED_DEVICES;
 
     /* Gatt Client Actions */
     public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
@@ -509,6 +511,9 @@ public class BleAppService extends Service {
                     bdAddr = (String) message.obj;
                     processPairRequest(bdAddr);
                     break;
+                case MSG_MA_GET_PAIRED_DEVICES:
+                    processGetBondedDevices();
+                    break;
                 case MSG_GC_START_BLE_CONNECT:
                     scnObj = (Scan) message.obj;
                     scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
@@ -787,6 +792,25 @@ public class BleAppService extends Service {
                  }
             }
             return mdevice;
+        }
+
+        private void processGetBondedDevices() {
+             Set<BluetoothDevice> pairedDevices =
+                            bleAdapter.getBondedDevices();
+             PrintStr.setLength(0);
+             if (pairedDevices.size() != 0) {
+                 PrintStr.append("Paired Device:");
+                 for (BluetoothDevice mdevice: pairedDevices)  {
+                     PrintStr.append("Device Address:  ");
+                     PrintStr.append(mdevice.getAddress());
+                     PrintStr.append("    Device name: ");
+                     PrintStr.append(mdevice.getName());
+                     PrintStr.append("\n");
+                 }
+             } else {
+                 PrintStr.append("No Paired Devices");
+             }
+             SocketServer.sendSocketData(PrintStr.toString());
         }
     }
 }
