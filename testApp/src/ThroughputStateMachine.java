@@ -493,10 +493,8 @@ public class ThroughputStateMachine {
                             PrintStr.append("Connect failed, there is an ongoing scan");
                             SocketServer.sendSocketData(PrintStr.toString());
                         }else {
+                            Log.i(TAG, "starting scanning");
                             BleAppService.mScannerService.set_scan_parameters(scn);
-                            PrintStr.setLength(0);
-                            PrintStr.append("Scanning Started!");
-                            SocketServer.sendSocketData(PrintStr.toString());
                         }
                         break;
                     case MSG_TA_SM_DEV_FOUND:
