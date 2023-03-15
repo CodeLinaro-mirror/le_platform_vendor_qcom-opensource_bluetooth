@@ -142,7 +142,8 @@ public class BleAppService extends Service {
     public static final int MSG_SM_START_BLE_DATA_RX_TEST = MSG_GC_MAX_ACTION_VALUE + 8;
     public static final int MSG_SM_START_BLE_LATENCY_TEST = MSG_GC_MAX_ACTION_VALUE + 9;
     public static final int MSG_SM_START_BLE_GATT_DISC = MSG_GC_MAX_ACTION_VALUE + 10;
-    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_DISC;
+    public static final int MSG_SM_BLE_CONNECT_TO_BDADDR = MSG_GC_MAX_ACTION_VALUE + 11;
+    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_BLE_CONNECT_TO_BDADDR;
 
     /* GATT Server Actions */
     public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
@@ -622,6 +623,12 @@ public class BleAppService extends Service {
                     scan_called = SCAN_CALLED_FROM_THROUGHPUT_SM;
                     msg = throughputSMClass.mStateMachine.obtainMessage(
                           throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT, scnObj);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_SM_BLE_CONNECT_TO_BDADDR:
+                    bdAddr = (String) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                              throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT_TO_BDADDR, bdAddr);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 case MSG_SM_START_BLE_CONN_UPDATE:
