@@ -63,9 +63,11 @@ public class GattServer{
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
+    public Map<BluetoothGattCharacteristic,String> mMap_char;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_indicate;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_notify;
     public List<BluetoothGattService> services;
+    public BluetoothDevice PrepWriteDevice;
     private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
@@ -91,6 +93,7 @@ public class GattServer{
                             BluetoothProfile.GATT_SERVER);
         mMap_indicate = new HashMap<>();
         mMap_notify = new HashMap<>();
+        mMap_char = new HashMap<>();
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -105,6 +108,7 @@ public class GattServer{
         private BluetoothGattServer mBluetoothGattserver;
         private Context context;
         private int GATT_SUCCESS = 0x00;
+        private int GATT_FAILURE = 0x101;
         Message msg;
 
         public BleGattServer(Context context) {
@@ -210,6 +214,27 @@ public class GattServer{
                          BluetoothGattCharacteristic characteristic, boolean preparedWrite,
                          boolean responseNeeded, int offset, byte[] value) {
                 Log.d(TAG, "onCharacteristicWriteRequest from device " + device.getName());
+                if (preparedWrite) {
+                    if (PrepWriteDevice == null ||
+                        device.getAddress().equalsIgnoreCase(PrepWriteDevice.getAddress())) {
+                        if (responseNeeded)
+                            mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                 GATT_SUCCESS, 0, value);
+                        PrepWriteDevice = device;
+                        if (mMap_char.containsKey(characteristic)){
+                            String new_value = (String)mMap_char.get(
+                                 characteristic)+ new String(value);
+                            mMap_char.replace(characteristic,new_value);
+                        } else {
+                            mMap_char.put(characteristic , new String(value));
+                        }
+                    } else {
+                          if (responseNeeded)
+                            mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                 GATT_FAILURE, 0, value);
+                    }
+                    return;
+                }
                 characteristic.setValue(value);
                 if (responseNeeded) {
                     mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
@@ -236,6 +261,50 @@ public class GattServer{
                                           devs, characteristic, true);
                         }
                     }
+                }
+            }
+
+            @Override
+            public void onExecuteWrite(BluetoothDevice device, int requestId, boolean execute) {
+                Log.d(TAG, "onExecuteWrite from device " + device.getAddress());
+                if ( device.getAddress().equalsIgnoreCase(PrepWriteDevice.getAddress())) {
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                        GATT_SUCCESS,0,null);
+                    for (BluetoothGattCharacteristic characteristic : mMap_char.keySet()) {
+                        characteristic.setValue(((String)mMap_char.get(
+                                 characteristic)).getBytes());
+                        if ((characteristic.getProperties() &
+                                        BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+                            for(BluetoothDevice devs:mMap_notify.keySet()) {
+                                List<BluetoothGattCharacteristic> lList_notify =
+                                                                     mMap_notify.get(devs);
+                                if(lList_notify.contains(characteristic)) {
+                                    Log.d(TAG, "notify_sendresponse " + devs.getAddress());
+                                    mgattServer.mBluetoothGattserver.
+                                    notifyCharacteristicChanged(
+                                    devs, characteristic, false);
+                                }
+                            }
+                        }
+                        if ((characteristic.getProperties() &
+                                         BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0) {
+                            for(BluetoothDevice devs:mMap_indicate.keySet()) {
+                                List<BluetoothGattCharacteristic> lList_indicate =
+                                                                      mMap_indicate.get(devs);
+                                if(lList_indicate.contains(characteristic)) {
+                                    Log.d(TAG, "indicate_sendresponse " + devs.getAddress());
+                                    mgattServer.mBluetoothGattserver.
+                                    notifyCharacteristicChanged(
+                                    devs, characteristic, true);
+                                }
+                            }
+                        }
+                    }
+                    PrepWriteDevice = null;
+                    mMap_char.clear();
+                } else {
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_FAILURE,
+                                                                      0,null);
                 }
             }
 
