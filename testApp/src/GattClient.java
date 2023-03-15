@@ -192,7 +192,8 @@ public class GattClient {
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 Log.i(TAG, "onConnectionStateChange device :" + gatt.getDevice() +
                       " status :" + status + " newState :" + newState);
-                if (gatt.getDevice() == null || status != GATT_SUCCESS) {
+                if ((gatt.getDevice() == null || status != GATT_SUCCESS) &&
+                                               (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                     if(GattClient.LOG_LEVEL >= 1) {
                         Log.e(TAG, "onConnectionStateChange:Unexpected error! state: " + newState);
                     }
