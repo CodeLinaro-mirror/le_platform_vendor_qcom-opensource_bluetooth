@@ -66,7 +66,7 @@ public class ThroughputStateMachine {
     public BleConnectionClass mBleConnect = null;
     private Context mcontext = null;
     public static TestAppThroughputStateMachine mStateMachine;
-    private BluetoothDevice mDevice = null;
+    public BluetoothDevice mDevice = null;
 
     /* Mutex required for writing characteristics and descriptors */
     private final Object write_mutex = new Object();

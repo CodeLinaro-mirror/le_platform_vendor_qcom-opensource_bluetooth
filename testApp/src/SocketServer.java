@@ -215,6 +215,7 @@ public class SocketServer {
                     sendStr.append("                     GetConnectedDevices\n");
                     sendStr.append("                     Pair   (Ex: Pair 11:22:33:44:55:66)\n");
                     sendStr.append("                     UnPair   (Ex: UnPair 11:22:33:44:55:66)\n");
+                    sendStr.append("                     Disconnect  (Ex: Disconnect 11:22:33:44:55:66)\n");
                     sendStr.append("                     GetBondedDevices\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
@@ -398,6 +399,17 @@ public class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_MA_START_BLE_UNPAIR,
+                                        tmp[1].toUpperCase());
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("Disconnect")) {
+                            if (BleAppService.bleAdapter.
+                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_START_BLE_DISCONNECT,
                                         tmp[1].toUpperCase());
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {

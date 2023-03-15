@@ -81,7 +81,7 @@ public class GattClient {
 
     public BleGattClient mgattClient = null;
     private Context mcontext = null;
-    private BluetoothDevice mDevice = null;
+    public BluetoothDevice mDevice = null;
 
     //Actions
     public GattClientMessageHandler mGattClientHandler = null;
