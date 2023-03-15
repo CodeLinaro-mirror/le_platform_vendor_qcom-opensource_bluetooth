@@ -862,20 +862,24 @@ public class BleAppService extends Service {
         private void processDisconnectRequest(String bdAddr){
             BluetoothDevice mdevice = getDevice(bdAddr);
             if (mdevice != null) {
-                if (mgattclient.mDevice.getAddress().equals(bdAddr)) {
-                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                if (mgattclient.mDevice != null) {
+                    if (mgattclient.mDevice.getAddress().equals(bdAddr)) {
+                        msg = mgattclient.mGattClientHandler.obtainMessage(
                               mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
-                    mgattclient.mGattClientHandler.sendMessage(msg);
+                        mgattclient.mGattClientHandler.sendMessage(msg);
+                    }
                 }
                 if (mgattserver.connectedDevices.contains(mdevice)) {
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                                 mgattserver.MSG_START_BLE_DISCONNECT, bdAddr);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                 }
-                if (throughputSMClass.mDevice.getAddress().equals(bdAddr)) {
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                        throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
-                    throughputSMClass.mStateMachine.sendMessage(msg);
+                if (throughputSMClass.mDevice != null) {
+                    if (throughputSMClass.mDevice.getAddress().equals(bdAddr)) {
+                        msg = throughputSMClass.mStateMachine.obtainMessage(
+                            throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
+                        throughputSMClass.mStateMachine.sendMessage(msg);
+                    }
                 }
             } else {
                 PrintStr.setLength(0);
