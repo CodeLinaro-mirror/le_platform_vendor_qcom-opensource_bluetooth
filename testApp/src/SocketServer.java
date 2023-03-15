@@ -250,6 +250,7 @@ public class SocketServer {
                     sendStr.append("                                                 ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
                     sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
+                    sendStr.append("                     CancelConnect\n");
                     sendStr.append("                     ConnUpdate     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
@@ -558,7 +559,12 @@ public class SocketServer {
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_SM_START_BLE_READ_PHY, null);
                             BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("Pair")) {
+                        } else if (tmp[0].equals("CancelConnect")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_BLE_GATT_CANCEL_CONNECT, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        }  else if (tmp[0].equals("Pair")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_SM_START_BLE_PAIR, null);
