@@ -14,7 +14,7 @@ PKG_CHECK_MODULES([LIBHARDWARE], [hardware])
 AC_SUBST([LIBHARDWARE_CFLAGS])
 AC_SUBST([LIBHARDWARE_LIBS])
 
-PKG_CHECK_MODULES([SYSTEM_BT], [system_bt])
+#PKG_CHECK_MODULES([SYSTEM_BT], [system_bt])
 AC_SUBST([SYSTEM_BT_CFLAGS])
 AC_SUBST([SYSTEM_BT_LIBS])
 
@@ -30,6 +30,10 @@ AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 fi
 
+AC_ARG_WITH([glib],
+        AC_HELP_STRING([--with-glib],
+        [enable glib, building bthost-ipc which use glib]))
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 
@@ -40,7 +44,7 @@ AC_ARG_ENABLE(target,
 )
 
 # Use new audio hal for qrb5165
-AM_CONDITIONAL([NEW_AUDIO_HAL], [test "x$TARGET" = "xqrb5165" -o "x$TARGET" = "xqrbx210-rbx"])
+#:AM_CONDITIONAL([NEW_AUDIO_HAL], [test "x$TARGET" = "xqrb5165" -o "x$TARGET" = "xqrbx210-rbx"])
 
 AC_HEADER_STDBOOL
 AC_C_INLINE

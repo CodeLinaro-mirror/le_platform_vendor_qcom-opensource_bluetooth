@@ -42,6 +42,10 @@ AC_ARG_WITH([hardware_libraries],
                                      [hardware_libdir=$withval],
                                           with_hardware_libraries=no)
 
+AC_ARG_WITH([glib],
+         AC_HELP_STRING([--with-glib],
+		        [enable glib, building hidl-client which use glib]))
+
 if test "x$with_hardware_libraries" != "xno"; then
     LDFLAGS="${LDFLAGS} -L${hardware_libdir}"
 fi
