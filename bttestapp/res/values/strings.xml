@@ -297,6 +297,8 @@
     <string name="scheme">Scheme</string>
     <string name="avrcp_play">Play</string>
     <string name="avrcp_stop">Stop</string>
+    <string name="avrcp_forward">Forward</string>
+    <string name="avrcp_backward">Backward</string>
     <string name="avrcp_fastforward">Fastforward</string>
     <string name="avrcp_rewind">Rewind</string>
     <string name="avrcp_next_group">NextGroup</string>

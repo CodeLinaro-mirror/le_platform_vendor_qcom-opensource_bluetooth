@@ -104,6 +104,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
     private Button mBtnNextGroup;
     private Button mBtnSetShuffleMode;
     private Button mBtnSetRepeatMode;
+    private Button mBtnForward;
+    private Button mBtnBackward;
 
     private Button mBtnTestCmd;
     private Spinner mSpTestCmd;
@@ -321,6 +323,8 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         mBtnNextGroup = initButton(R.id.id_btn_next_group);
         mBtnSetShuffleMode = initButton(R.id.id_btn_set_shuffle_mode);
         mBtnSetRepeatMode = initButton(R.id.id_btn_set_repeat_mode);
+        mBtnForward = initButton(R.id.id_btn_forward);
+        mBtnBackward = initButton(R.id.id_btn_backward);
 
         mBtnTestCmd = initButton(R.id.id_btn_test_cmd);
         mSpTestCmd = initSpinner(R.id.id_sp_test_cmd, 1);   // Default "GetItemAttributes"
@@ -475,6 +479,12 @@ public class AvrcpTestActivity extends MonkeyActivity implements
         } else if (v == mBtnSetRepeatMode) {
             Logger.d(TAG, "onClick mBtnSetRepeatMode");
             setRepeatMode();
+        } else if (v == mBtnForward) {
+            Logger.d(TAG, "onClick mBtnForward");
+            forward();
+        } else if (v == mBtnBackward) {
+            Logger.d(TAG, "onClick mBtnBackward");
+            backward();
         } else {
             Logger.d(TAG, "onClick View: " + v);
         }
@@ -1317,6 +1327,34 @@ public class AvrcpTestActivity extends MonkeyActivity implements
 
         try {
             mAvrcp.stop();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void forward() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.forward();
+        } catch (Exception e) {
+            Logger.e(TAG, e.toString());
+            e.printStackTrace();
+        }
+    }
+
+    private void backward() {
+        if (mAvrcp == null) {
+            Logger.d(TAG, " Service not connected ");
+            return;
+        }
+
+        try {
+            mAvrcp.backward();
         } catch (Exception e) {
             Logger.e(TAG, e.toString());
             e.printStackTrace();
