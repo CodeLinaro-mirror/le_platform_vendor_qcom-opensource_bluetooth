@@ -9,15 +9,19 @@ AM_CFLAGS = -Wall \
 
 AM_CPPFLAGS= \
         -I. \
+        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/include \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/types \
         -I${WORKSPACE}/vendor/qcom/opensource/system/bt/utils/include \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
+        -I$(bdroid_C_INCLUDES)
+
+if !NEW_AUDIO_HAL
+AM_CPPFLAGS += \
         -I${WORKSPACE}/frameworks/system/media/audio/include \
         -I${WORKSPACE}/hardware/libhardware/include \
-        -I${WORKSPACE}/system/core/include \
-        -I$(bdroid_C_INCLUDES)
+        -I${WORKSPACE}/system/core/include
+endif
 
 common_LDFLAGS = -lpthread  -lrt -llog @GLIB_LIBS@
 common_CFLAGS =  $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -DUSE_GLIB @GLIB_CFLAGS@

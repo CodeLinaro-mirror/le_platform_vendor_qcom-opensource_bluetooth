@@ -33,8 +33,8 @@
 /** Base path of the hal modules */
 #if defined(__LP64__)
 #ifdef LINUX_ENABLED
-#define HAL_LIBRARY_PATH1 "/usr/lib64"
-#define HAL_LIBRARY_PATH2 "/usr/lib64/hw"
+#define HAL_LIBRARY_PATH1 "/usr/lib"
+#define HAL_LIBRARY_PATH2 "/usr/lib/hw"
 #else
 #define HAL_LIBRARY_PATH1 "/system/lib64/hw"
 #define HAL_LIBRARY_PATH2 "/vendor/lib64/hw"
