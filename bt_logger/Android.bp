@@ -1,4 +1,5 @@
 cc_binary {
+    enabled: false,
     name: "bt_logger",
     system_ext_specific: true,
     init_rc: ["init.qti.bt.logger.rc"],

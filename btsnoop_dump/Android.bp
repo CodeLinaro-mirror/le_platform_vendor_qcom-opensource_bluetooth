@@ -1,4 +1,5 @@
 cc_binary {
+    enabled: false,
     name: "btsnoop",
     system_ext_specific: true,
 
