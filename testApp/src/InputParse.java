@@ -296,6 +296,36 @@ public class InputParse {
         }
     }
 
+ public LecocConnect LecocConnectParse(String input){
+        Log.d(TAG, "LecocConnectParse()");
+        LecocConnect LecocConnectParam = new LecocConnect();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("DeviceAddress")) {
+                    LecocConnectParam.DeviceAddress = tmp2[1];
+                } else if (tmp2[0].equals("psm")) {
+                    LecocConnectParam.psm = Integer.parseInt(tmp2[1]);
+                }else if (tmp2[0].equals("secure_flag")) {
+                    LecocConnectParam.secure_flag = Boolean.parseBoolean(tmp2[1]);
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return LecocConnectParam;
+        }else{
+            return null;
+        }
+    }
+
     public Scan ScanParse(String input){
         Log.d(TAG, "ScanParse()");
         Scan scanParam = new Scan();

@@ -68,6 +68,11 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothGattDescriptor;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import android.bluetooth.BluetoothSocket;
+import android.bluetooth.BluetoothServerSocket;
+import java.io.OutputStream;
 
 
 public class GattClient {
@@ -116,7 +121,11 @@ public class GattClient {
     public static final int MSG_DISC_SRVC_UUID = 21;
     public static final int MSG_START_BLE_GATT_UNREG = 22;
     public static final int MSG_START_BLE_GATT_EXECUTE_WRITE = 23;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_GATT_EXECUTE_WRITE;
+	public static final int MSG_START_BLE_COC_CONNECT = 24;
+	public static final int MSG_START_BLE_COC_WRITE = 25;
+	public static final int MSG_START_BLE_LISTEN = 26;
+	public static final int MSG_START_BLE_COC_CLOSE = 27;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_CLOSE;
 
 
     private static final int GATT_WRITE = 1;
@@ -133,6 +142,8 @@ public class GattClient {
     public static final int BLE_STATE_CONNECTED = 2;
     public static final int BLE_STATE_DISCONNECTING = 3;
     public static final int BLE_STATE_DISCONNECTED = 4;
+	private BluetoothSocket mSocket;
+	private BluetoothServerSocket mmServerSocket;
 
     private static int length_offset = 0;
     private static String offset_value = null;
@@ -151,6 +162,152 @@ public class GattClient {
     private List<BluetoothGattService> mServices;
     private List<BluetoothGattCharacteristic> mCharacteristics;
     private List<BluetoothGattDescriptor> mDescriptors;
+    private AcceptThread mSecureAcceptThread;
+    private AcceptThread mInsecureAcceptThread;
+    private ConnectedThread mConnectedThread;
+    private TxOperationRunnable mtxOperationRunnable;
+    StringBuilder PrintStr = new StringBuilder();
+
+	public class TxOperationRunnable implements Runnable {
+        int mChunkSize;
+        private OutputStream mOutputStream;
+        public TxOperationRunnable(int ChunkSize) {
+            mChunkSize = ChunkSize;
+        }
+        public void run() {
+            try {
+				 StringBuilder sb = new StringBuilder(mChunkSize);
+                 Log.d(TAG, "TxOperationRunnable ");
+				 mOutputStream = mSocket.getOutputStream();
+				 for (int i = 0 ; i < mChunkSize; i++ ) {
+					 sb.append('a');
+				 }
+                 mOutputStream.write(sb.toString().getBytes());
+                 mOutputStream.flush();
+            } catch (Exception e) {
+                  Log.e(TAG, "ServerConnectedThread: could not write the message" + e.getMessage());
+            }
+        }
+    }
+
+    public class AcceptThread extends Thread {
+        boolean mSecureFlag;
+        private InputStream mInputStream;
+        private BluetoothServerSocket mmServerSocket;
+		private BluetoothSocket socket;
+        public AcceptThread(boolean SecureFlag) {
+            mSecureFlag = SecureFlag;
+            try {
+                if(mSecureFlag == true)
+                {
+                    Log.d(TAG, "RxThread secure L2CAP Channel ");
+                    mmServerSocket = bluetoothAdapter.listenUsingL2capChannel();
+                }
+                else
+                {
+                    Log.d(TAG, "RxThread In secure L2CAP Channel ");
+                    mmServerSocket = bluetoothAdapter.listenUsingInsecureL2capChannel();
+                }
+                PrintStr.setLength(0);
+                PrintStr.append("listening at channel:" +mmServerSocket.getPsm());
+                SocketServer.sendSocketData(PrintStr.toString());
+                Log.d(TAG,"Server psm" + mmServerSocket.getPsm());
+                mSocket = mmServerSocket.accept();
+            } catch(Exception e) {
+                Log.d(TAG,"exception caught in listen" + e );
+                return ;
+            }
+
+        }
+        public void run() {
+            byte[] buffer = new byte[1024];
+            int bytes;
+            while(true) {
+                try {
+                    mInputStream = mSocket.getInputStream();
+                    bytes = mInputStream.read(buffer);
+                    String incomingMsg = new String(buffer, 0, bytes);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Received data in Server socket :" +incomingMsg );
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    Log.d(TAG, "Received data in Server socket "+ incomingMsg);
+                } catch (Exception e) {
+                    Log.e(TAG, "Accept Thread ServerConnectedThread: could not read any more data" + e.getMessage());
+                    break;
+                }
+            }
+        }
+
+        public void cancel() {
+            try {
+                mSocket.close();
+                PrintStr.setLength(0);
+                PrintStr.append("Server Socket Disconnected" + mSecureFlag);
+                SocketServer.sendSocketData(PrintStr.toString());
+            } catch (Exception e) {
+                Log.e(TAG, "close() of connect socket failed", e);
+                PrintStr.setLength(0);
+                PrintStr.append("close() of connect socket failed");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+        }
+    }
+
+    public class ConnectedThread extends Thread {
+            private final BluetoothSocket mmSocket;
+            private final InputStream mmInStream;
+
+            public ConnectedThread(BluetoothSocket socket) {
+                Log.d(TAG, "create ConnectedThread" );
+                mmSocket = socket;
+                InputStream tmpIn = null;
+
+                // Get the BluetoothSocket input stream
+                try {
+                    tmpIn = socket.getInputStream();
+                } catch (Exception e) {
+                    Log.e(TAG, "temp sockets not created", e);
+                }
+                mmInStream = tmpIn;
+            }
+
+            public void run() {
+                Log.i(TAG, "BEGIN mConnectedThread");
+                int bytes;
+
+                // Keep listening to the InputStream while connected
+                while (true) {
+                    try {
+                        byte[] buffer = new byte[1024];
+                        // Read from the InputStream
+                        bytes = mmInStream.read(buffer);
+                        String incomingMsg = new String(buffer, 0, bytes);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Received data in Client socket :" +incomingMsg );
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        Log.d(TAG, "Received data in Client socket "+ incomingMsg);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Client Thread - ConnectedThread: could not read any more data", e);
+                        break;
+                    }
+                }
+            }
+
+            public void cancel() {
+                try {
+                    mmSocket.close();
+                    PrintStr.setLength(0);
+                    PrintStr.append(" Client Socket Disconnected");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } catch (Exception e) {
+                    Log.e(TAG, "close() of connect socket failed", e);
+                    PrintStr.setLength(0);
+                    PrintStr.append("close() of connect socket failed");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
+        }
+
 
 
     public GattClient(Context mcontext) {
@@ -797,6 +954,21 @@ public class GattClient {
                 case MSG_START_BLE_GATT_EXECUTE_WRITE:
                     processGattExecuteWrite();
                     break;
+                case MSG_START_BLE_COC_CONNECT:
+                    LecocConnect LecocConnClass = (LecocConnect) msg.obj;
+					processGattLeCocConnect(LecocConnClass);
+					break;
+				case MSG_START_BLE_COC_WRITE:
+					processGattLeCocWrite((int)msg.obj);
+					break;
+				case MSG_START_BLE_LISTEN:
+                    boolean SecureFlag = (boolean) msg.obj;
+				    processGattLeCocListen(SecureFlag);
+					break;
+                case MSG_START_BLE_COC_CLOSE:
+                    boolean SecureFlag1 = (boolean) msg.obj;
+				    processGattLeCocClose(SecureFlag1);
+					break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
@@ -1290,6 +1462,95 @@ public class GattClient {
             is_op_in_progress = false;
         }
 
+        private void processGattLeCoCRead(BluetoothSocket socket)
+        {
+            // Cancel any thread currently running a connection
+            if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
+
+            // Cancel the accept thread because we only want to connect to one device
+            if (mSecureAcceptThread != null) {
+                mSecureAcceptThread.cancel();
+                mSecureAcceptThread = null;
+            }
+            if (mInsecureAcceptThread != null) {
+                mInsecureAcceptThread.cancel();
+                mInsecureAcceptThread = null;
+            }
+
+            // Start the thread to manage the connection and perform transmissions
+            mConnectedThread = new ConnectedThread(socket);
+            mConnectedThread.start();
+        }
+
+        private void processGattLeCocConnect(LecocConnect LecocConnClass) {
+            try {
+                BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(LecocConnClass.DeviceAddress);
+                if(LecocConnClass.secure_flag == true)
+                {
+                    Log.d(TAG, "processGattLeCocConnect - Secure  ");
+                    mSocket = remoteDevice.createL2capChannel(LecocConnClass.psm);
+                }
+                else{
+                    Log.d(TAG, "processGattLeCocConnect - In Secure  ");
+                    mSocket = remoteDevice.createInsecureL2capChannel(LecocConnClass.psm);
+                }
+                mSocket.connect();
+            } catch(Exception e) {
+                Log.e(TAG,"got error while executing createL2CapChannel" + e);
+                // Close the socket
+                try {
+                    mSocket.close();
+                } catch (Exception e2) {
+                    Log.e(TAG, "unable to close() socket during connection failure"+ e2);
+                }
+
+            }
+            if(mSocket!=null)
+            {
+                PrintStr.setLength(0);
+                PrintStr.append("LE COC Connect Successfull" +LecocConnClass.psm);
+                SocketServer.sendSocketData(PrintStr.toString());
+                processGattLeCoCRead(mSocket);
+            }
+        }
+        private void processGattLeCocWrite (int ChunkSize) {
+            Log.d(TAG, "processGattLeCocWrite ");
+             mtxOperationRunnable = new TxOperationRunnable(ChunkSize);
+			Thread t1 = new Thread(mtxOperationRunnable);
+			t1.start();
+		}
+        private void processGattLeCocListen (boolean SecureFlag) {
+            if (SecureFlag && mSecureAcceptThread == null) {
+                mSecureAcceptThread = new AcceptThread(true);
+                mSecureAcceptThread.start();
+            }
+            if (!SecureFlag && mInsecureAcceptThread == null) {
+                mInsecureAcceptThread = new AcceptThread(false);
+                mInsecureAcceptThread.start();
+            }
+            /*
+               RxOperationRunnable mRxOperationRunnable = new RxOperationRunnable(SecureFlag);
+               Thread t1 = new Thread(mRxOperationRunnable);
+               t1.start();*/
+
+        }
+        private void processGattLeCocClose (boolean SecureFlag) {
+            if (mConnectedThread != null) {
+                mConnectedThread.cancel();
+                mConnectedThread = null;
+            }
+            if(mtxOperationRunnable !=null) {
+               mtxOperationRunnable = null;
+              }
+            if (SecureFlag &&  mSecureAcceptThread != null) {
+                mSecureAcceptThread.cancel();
+                mSecureAcceptThread = null;
+            }
+            if (!SecureFlag && mInsecureAcceptThread != null) {
+                mInsecureAcceptThread.cancel();
+                mInsecureAcceptThread = null;
+            }
+        }
         private void processGattExecuteWrite(){
             /*execute write*/
             if(mgattClient.mBluetoothGatt.executeReliableWrite()) {

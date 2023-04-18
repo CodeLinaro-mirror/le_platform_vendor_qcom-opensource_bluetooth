@@ -156,7 +156,11 @@ public class BleAppService extends Service {
     public static final int MSG_GC_READ_CHAR_UUID = MSG_MA_MAX_ACTION_VALUE + 20;
     public static final int MSG_GC_DISC_SRVC_UUID = MSG_MA_MAX_ACTION_VALUE + 21;
     public static final int MSG_GC_START_BLE_GATT_UNREG = MSG_MA_MAX_ACTION_VALUE + 22;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_GATT_UNREG;
+	public static final int MSG_GC_START_BLE_LISTEN = MSG_MA_MAX_ACTION_VALUE + 23;
+	public static final int MSG_GC_START_BLE_COC_WRITE = MSG_MA_MAX_ACTION_VALUE + 24;
+	public static final int MSG_GC_START_BLE_COC_CONNECT = MSG_MA_MAX_ACTION_VALUE + 25;
+	public static final int MSG_GC_START_BLE_COC_CLOSE = MSG_MA_MAX_ACTION_VALUE + 26;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_COC_CLOSE;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -787,6 +791,27 @@ public class BleAppService extends Service {
                 case MSG_GC_START_BLE_GATT_DISC:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                           mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
+			    case MSG_GC_START_BLE_LISTEN:
+                    boolean SecureFlag = (boolean) message.obj;
+					msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_LISTEN, SecureFlag);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_START_BLE_COC_CLOSE:
+                    boolean SecureFlag1 = (boolean) message.obj;
+					msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_COC_CLOSE, SecureFlag1);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+				case MSG_GC_START_BLE_COC_WRITE:
+					msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_COC_WRITE, message.obj);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+				case MSG_GC_START_BLE_COC_CONNECT:
+                    LecocConnect LecocConnObj = (LecocConnect) message.obj;
+					msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_COC_CONNECT, LecocConnObj);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_SM_START_BLE_CONNECT:
