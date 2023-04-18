@@ -78,6 +78,7 @@ public class SocketServer {
     static final int SOC_CLOSE_ACK = 7;
     static final int NONE = 8;
     static final int GATT_SERVER_MENU = 9;
+    static final int LE_COC_MENU = 10;
 
     static int mainMenuState = MAIN_MENU;
     static int processOutputState = MAIN_MENU;
@@ -213,6 +214,7 @@ public class SocketServer {
                     sendStr.append("                     Advertiser\n");
                     sendStr.append("                     Scanner\n");
                     sendStr.append("                     Throughput\n");
+                    sendStr.append("                     LECOC\n");
                     sendStr.append("                     GattClient\n");
                     sendStr.append("                     HoldWakeLock\n");
                     sendStr.append("                     ReleaseWakeLock\n");
@@ -283,7 +285,15 @@ public class SocketServer {
                     sendStr.append("                     Back\n");
                     sendStr.append("*********************************************************\n");
                     break;
-
+                case LE_COC_MENU:
+                    sendStr.append("\n******************** LE COC Menu ********************\n");
+                    sendStr.append("                     LeCoC_Connect                  (Ex : LeCoC_Connect DeviceAddress:73:B5:C0:E6:62:A4;psm:1;secure_flag:true\n");
+					sendStr.append("                     LeCoC_Write                    (Ex : LeCoC_Write Data:500\n");
+                    sendStr.append("                     LeCoC_listen                   (Ex : LeCoC_listen secure_flag:true\n");
+                    sendStr.append("                     LeCoC_Close                    (Ex : LeCoC_Close secure_flag:true\n");
+                    sendStr.append("                     Back\n");
+                    sendStr.append("*********************************************************\n");
+                    break;
                 case GATT_CLIENT_MENU:
                     sendStr.append("\n******************** Gatt Client Menu ********************\n");
                     sendStr.append("                     StartBREDRDiscovery            \n");
@@ -367,6 +377,9 @@ public class SocketServer {
                         } else if (inputString.equals("GattClient")) {
                             mainMenuState = GATT_CLIENT_MENU;
                             processOutputState = GATT_CLIENT_MENU;
+                        } else if (inputString.equals("LECOC")) {
+                            mainMenuState = LE_COC_MENU;
+                            processOutputState = LE_COC_MENU;
                         } else if (inputString.equals("HoldWakeLock")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = NONE;
@@ -720,7 +733,64 @@ public class SocketServer {
                         processOutputState = INVALID_INPUT;
                     }
                     break;
+                case LE_COC_MENU:
+                    tmp = inputString.split(" ", 2);
+                    if (tmp.length == 2) {
+                        if(tmp[0].equals("LeCoC_Connect")) {
+                            LecocConnect lecocConnectParam = parse.LecocConnectParse(tmp[1]);
+                            if (lecocConnectParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_COC_CONNECT, lecocConnectParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("LeCoC_Write")) {
+                            String[] val = tmp[1].split(":", 2);
+                            if (val.length == 2) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_COC_WRITE, Integer.valueOf(val[1]));
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("LeCoC_Close")) {
+                            String[] val1 = tmp[1].split(":", 2);
+                            if (val1.length == 2) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_COC_CLOSE, Boolean.parseBoolean(val1[1]));
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("LeCoC_listen")) {
+                            String[] val1 = tmp[1].split(":", 2);
+                            if (val1.length == 2) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_LISTEN, Boolean.parseBoolean(val1[1]));
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
 
+                    } else if (tmp.length == 1){
+                        if (tmp[0].equals("Back")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = MAIN_MENU;
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+                    }else {
+                        processOutputState = INVALID_INPUT;
+                    }
+                    break;
                 case GATT_CLIENT_MENU:
                     tmp = inputString.split(" ", 2);
                     if (tmp.length == 2) {
