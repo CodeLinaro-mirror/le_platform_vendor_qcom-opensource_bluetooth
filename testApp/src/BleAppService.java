@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
@@ -110,7 +115,23 @@ public class BleAppService extends Service {
     public static final int MSG_MA_GET_PAIRED_DEVICES = 9;
     public static final int MSG_MA_START_BLE_UNPAIR = 10;
     public static final int MSG_MA_START_BLE_DISCONNECT = 11;
-    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_START_BLE_DISCONNECT;
+    public static final int MSG_MA_BLE_ENABLE_ADV = 12;
+    public static final int MSG_MA_BLE_SET_ADV_DATA = 13;
+    public static final int MSG_MA_BLE_SET_SCAN_RESP_DATA = 14;
+    public static final int MSG_MA_BLE_SET_ADV_PARAM = 15;
+    public static final int MSG_MA_BLE_SET_PERIODIC_ADV_PARAM = 16;
+    public static final int MSG_MA_BLE_SET_PERIODIC_DATA = 17;
+    public static final int MSG_MA_BLE_ENABLE_PERIODIC_ADV = 18;
+    public static final int MSG_MA_BLE_GET_OWN_ADDRESS = 19;
+    public static final int MSG_MA_BLE_ADV_ENABLED_EVENT = 20;
+    public static final int MSG_MA_BLE_ADV_DATA_EVENT = 21;
+    public static final int MSG_MA_BLE_SCAN_RESP_DATA_EVENT = 22;
+    public static final int MSG_MA_BLE_ADV_PARAM_UPDATED_EVENT = 23;
+    public static final int MSG_MA_BLE_PERIODIC_ADV_PARAM_UPDATED_EVENT = 24;
+    public static final int MSG_MA_BLE_PERIODIC_ADV_DATA_EVENT = 25;
+    public static final int MSG_MA_BLE_PERIODIC_ADV_ENABLED_EVENT = 26;
+    public static final int MSG_MA_BLE_GET_OWN_ADDRESS_EVENT = 27;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_BLE_GET_OWN_ADDRESS_EVENT;
 
     /* Gatt Client Actions */
     public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
@@ -487,6 +508,38 @@ public class BleAppService extends Service {
                     int advId = (int)message.obj;
                     mAdvertiseService.stopAdvertising(advId);
                     break;
+                case MSG_MA_BLE_ENABLE_ADV:
+                    EnableAdv Enadv = (EnableAdv)message.obj;
+                    mAdvertiseService.enableAdvSet(Enadv);
+                    break;
+                case MSG_MA_BLE_SET_ADV_DATA:
+                    AdvDataInfo advdata = (AdvDataInfo)message.obj;
+                    mAdvertiseService.setAdverData(advdata);
+                    break;
+                case MSG_MA_BLE_SET_SCAN_RESP_DATA:
+                    AdvDataInfo scanrespdata = (AdvDataInfo)message.obj;
+                    mAdvertiseService.setScanData(scanrespdata);
+                    break;
+                case MSG_MA_BLE_SET_ADV_PARAM:
+                    SetAdvParam advparam = (SetAdvParam)message.obj;
+                    mAdvertiseService.setAdvParam(advparam);
+                    break;
+                case MSG_MA_BLE_SET_PERIODIC_ADV_PARAM:
+                    SetPerAdvParam peradvparam = (SetPerAdvParam)message.obj;
+                    mAdvertiseService.setPeriAdvParam(peradvparam);
+                    break;
+                case MSG_MA_BLE_SET_PERIODIC_DATA:
+                    SetPerAdvData peradvdata = (SetPerAdvData)message.obj;
+                    mAdvertiseService.setPeriAdvData(peradvdata);
+                    break;
+                case MSG_MA_BLE_ENABLE_PERIODIC_ADV:
+                    EnablePerAdv enperadv = (EnablePerAdv)message.obj;
+                    mAdvertiseService.EnablePeriAdv(enperadv);
+                    break;
+                case MSG_MA_BLE_GET_OWN_ADDRESS:
+                    int advId1 = (int)message.obj;
+                    mAdvertiseService.getOwnaddset(advId1);
+                    break;
                 case MSG_MA_STOP_BLE_SCAN:
                     scan_called = 0;
                     Log.d(TAG, "scan stop(main activity)");
@@ -509,6 +562,63 @@ public class BleAppService extends Service {
                     String disableId = (String) message.obj;
                     PrintStr.append("Advertising stopped for instance Id:");
                     PrintStr.append(disableId);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_ADV_ENABLED_EVENT:
+                    PrintStr.setLength(0);
+                    String instId = (String) message.obj;
+                    PrintStr.append("Advertising set Enabled Event instance Id:");
+                    PrintStr.append(instId);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_ADV_DATA_EVENT:
+                    PrintStr.setLength(0);
+                    String instId1 = (String) message.obj;
+                    PrintStr.append("Advertising Data Event instance Id:");
+                    PrintStr.append(instId1);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_SCAN_RESP_DATA_EVENT:
+                    PrintStr.setLength(0);
+                    String instId2 = (String) message.obj;
+                    PrintStr.append("Scan Resp Data Event instance Id:");
+                    PrintStr.append(instId2);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_ADV_PARAM_UPDATED_EVENT:
+                    PrintStr.setLength(0);
+                    String instId3 = (String) message.obj;
+                    PrintStr.append("Advertising Parameters Updated Event instance Id:");
+                    PrintStr.append(instId3);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_PERIODIC_ADV_PARAM_UPDATED_EVENT:
+                    PrintStr.setLength(0);
+                    String instId4 = (String) message.obj;
+                    PrintStr.append("Periodic Adv Param Updated Event instance Id:");
+                    PrintStr.append(instId4);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_PERIODIC_ADV_DATA_EVENT:
+                    PrintStr.setLength(0);
+                    String instId5 = (String) message.obj;
+                    PrintStr.append("Periodic Adv Data Event instance Id:");
+                    PrintStr.append(instId5);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_PERIODIC_ADV_ENABLED_EVENT:
+                    PrintStr.setLength(0);
+                    String instId6 = (String) message.obj;
+                    PrintStr.append("Periodic Advertising Enable Event instance Id:");
+                    PrintStr.append(instId6);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_BLE_GET_OWN_ADDRESS_EVENT:
+                    PrintStr.setLength(0);
+                    bdAddr = (String) message.obj;
+                    PrintStr.append("Get Own Address Event: ");
+                    PrintStr.append(bdAddr);
+                    PrintStr.append("  ");
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
                 case MSG_MA_GET_CONNECTED_DEVICES:

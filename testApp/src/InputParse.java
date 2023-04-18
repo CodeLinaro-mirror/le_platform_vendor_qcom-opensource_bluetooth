@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
@@ -42,6 +47,193 @@ public class InputParse {
         Log.d(TAG, "InputParse()");
     }
 
+    public EnableAdv EnableAdvParse(String input){
+        Log.d(TAG, "EnableAdvParse()");
+        EnableAdv EnadvParam = new EnableAdv();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    EnadvParam.AdvId = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("Enableset")) {
+                    EnadvParam.Enableset = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("Duration")) {
+                    EnadvParam.Duration = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("MaxExtAdvEvents")) {
+                    EnadvParam.MaxAdvEvents = Integer.parseInt(tmp2[1]);
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return EnadvParam;
+        }else{
+            return null;
+        }
+    }
+
+    public AdvDataInfo AdvDataInfoParse(String input){
+        Log.d(TAG, "AdvDataInfoParse()");
+        AdvDataInfo DataInfo = new AdvDataInfo();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    DataInfo.AdvId = Integer.parseInt(tmp2[1]);
+                } else if ((tmp2[0].equals("AdvData")) || (tmp2[0].equals("ScanRespData"))) {
+                    DataInfo.AdvData = tmp2[1];
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return DataInfo;
+        }else{
+            return null;
+        }
+    }
+
+    public EnablePerAdv EnablePerAdvParse(String input){
+        Log.d(TAG, "EnablePerAdvParse()");
+        EnablePerAdv EnPerAdv = new EnablePerAdv();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    EnPerAdv.AdvId = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("Enableset")) {
+                    EnPerAdv.Enableset = Boolean.parseBoolean(tmp2[1]);
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return EnPerAdv;
+        }else{
+            return null;
+        }
+    }
+
+    public SetAdvParam SetAdvParamParse(String input){
+        Log.d(TAG, "SetAdvParamParse()");
+        SetAdvParam advParam = new SetAdvParam();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    advParam.AdvId = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("TxPower")) {
+                    advParam.TxPower = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("Legacy")) {
+                    advParam.Legacy = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("Connectable")) {
+                    advParam.Connectable = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("Scannable")) {
+                    advParam.Scannable = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("Anonymous")) {
+                    advParam.Anonymous = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("IncludePower")) {
+                    advParam.IncludePower = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("PrimaryPhy")) {
+                    advParam.PrimaryPhy = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("SecondaryPhy")) {
+                    advParam.SecondaryPhy = Integer.parseInt(tmp2[1]);
+                }  else if (tmp2[0].equals("Interval")) {
+                    advParam.Interval = Integer.parseInt(tmp2[1]);
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return advParam;
+        }else{
+            return null;
+        }
+    }
+
+   public SetPerAdvData SetPerAdvDataParse(String input){
+        Log.d(TAG, "AdvDataInfoParse()");
+        SetPerAdvData DataInfo = new SetPerAdvData();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    DataInfo.AdvId = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("PeriodicData")) {
+                    DataInfo.PeriodicData = tmp2[1];
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return DataInfo;
+        }else{
+            return null;
+        }
+    }
+
+   public SetPerAdvParam SetPerAdvParamParse(String input){
+        Log.d(TAG, "SetPerAdvParamParse()");
+        SetPerAdvParam peradvParam = new SetPerAdvParam();
+        String tmp[] = input.split(";");
+        String[] tmp2;
+        int i=0;
+        for(i=0; i<tmp.length; i++){
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("AdvId")) {
+                    peradvParam.AdvId = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("PerAdvInterval")) {
+                    peradvParam.PerAdvInterval = Integer.parseInt(tmp2[1]);
+                } else {
+                    break;
+                }
+            }else{
+                break;
+            }
+        }
+
+        if(i == tmp.length){
+            return peradvParam;
+        }else{
+            return null;
+        }
+    }
     public Adv AdvParse(String input){
         Log.d(TAG, "AdvParse()");
         Adv advParam = new Adv();

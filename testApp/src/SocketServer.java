@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
@@ -228,6 +233,15 @@ public class SocketServer {
                     sendStr.append("                                                 MaxExtAdvEvents:0;Interval:160;TimeOutLegacy:10000;AdvertiseMode:0;\n");
                     sendStr.append("                                                 ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;ManufacturerId:32;ManufacturerData:1,1,1;\n");
                     sendStr.append("                                                 ServiceDataUuid:0000FF01-0000-1000-8000-00805F9B34FB;ServiceData:abcdabcd(only for ext adv)\n");
+                    sendStr.append("                     EnableAdvSet  (Ex: EnableAdvSet AdvId:0;Enableset:true;Duration:0;MaxAdvEvents:0)\n");
+                    sendStr.append("                     SetAdvData    (Ex: SetAdvData AdvId:0;AdvData:abcdabcd)\n");
+                    sendStr.append("                     SetScanRespData  (Ex: SetScanRespData AdvId:0;ScanRespData:abcdabcd)\n");
+                    sendStr.append("                     SetAdvParams  (Ex: SetAdvParams AdvId:0;TxPower:1;Legacy:true;Connectable:true;Scannable:true;Anonymous:false;)\n");
+                    sendStr.append("                                                     Interval:160;IncludePower:false;PrimaryPhy:1;SecondaryPhy:1\n");
+                    sendStr.append("                     SetPeriodicAdvParams  (Ex: SetPeriodicAdvParams AdvId:0;PerAdvInterval:200)\n");
+                    sendStr.append("                     SetPeriodicAdvData  (Ex: SetPeriodicAdvData AdvId:0;PeriodicData:abcdabcd)\n");
+                    sendStr.append("                     EnablePeriodicAdvSet  (Ex: EnablePeriodicAdvSet AdvId:0;Enableset:true)\n");
+                    sendStr.append("                     GetOwnAddrSet  (Ex: GetOwnAddrSet 0)\n");
                     sendStr.append("                     AdvStop       (Ex: AdvStop 1)\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*****************************************************\n");
@@ -439,6 +453,81 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        }else if (tmp[0].equals("EnableAdvSet")) {
+                            EnableAdv EnadvParam = parse.EnableAdvParse(tmp[1]);
+                            if (EnadvParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_ENABLE_ADV, EnadvParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("SetAdvData")) {
+                            AdvDataInfo advdata = parse.AdvDataInfoParse(tmp[1]);
+                            if (advdata != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_SET_ADV_DATA, advdata);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("SetScanRespData")) {
+                            AdvDataInfo scanrespdata = parse.AdvDataInfoParse(tmp[1]);
+                            if (scanrespdata != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_SET_SCAN_RESP_DATA, scanrespdata);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("SetAdvParams")) {
+                            SetAdvParam advparam = parse.SetAdvParamParse(tmp[1]);
+                            if (advparam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_SET_ADV_PARAM, advparam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("SetPeriodicAdvParams")) {
+                            SetPerAdvParam peradvparam = parse.SetPerAdvParamParse(tmp[1]);
+                            if (peradvparam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_SET_PERIODIC_ADV_PARAM, peradvparam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("SetPeriodicAdvData")) {
+                            SetPerAdvData peradvdata = parse.SetPerAdvDataParse(tmp[1]);
+                            if (peradvdata != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_SET_PERIODIC_DATA, peradvdata);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("EnablePeriodicAdvSet")) {
+                            EnablePerAdv enperadv = parse.EnablePerAdvParse(tmp[1]);
+                            if (enperadv != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_BLE_ENABLE_PERIODIC_ADV, enperadv);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("GetOwnAddrSet")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_MA_BLE_GET_OWN_ADDRESS,
+                                    Integer.parseInt(tmp[1]));
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("AdvStop")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(BleAppService.MSG_MA_STOP_BLE_ADV,

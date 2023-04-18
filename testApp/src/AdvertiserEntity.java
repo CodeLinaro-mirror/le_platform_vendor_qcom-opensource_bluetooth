@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
@@ -40,9 +45,11 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.PeriodicAdvertisingParameters;
 import android.os.ParcelUuid;
 import android.util.Log;
+import android.os.Message;
 
 import java.nio.charset.Charset;
 import java.util.UUID;
+import java.util.HashMap;
 
 public class AdvertiserEntity {
 
@@ -72,6 +79,8 @@ public class AdvertiserEntity {
 
     public int adv_id = 0;
     public int adv_status = ADV_STOPPED;
+    public HashMap<Integer, AdvertisingSet> mAdvSetIdMap= new HashMap<>();
+    Message msg;
 
     class AdvSetCallback extends AdvertisingSetCallback {
         @Override
@@ -83,6 +92,7 @@ public class AdvertiserEntity {
                 adv_status = ADV_STARTED;
                 Log.d(TAG,"onAdvertisingSetStarted, adv_id:" + getAdv_id());
                 mAdvServiceCb.onAdvStarted(getAdv_id());
+                mAdvSetIdMap.put(getAdv_id(), advertisingSet);
             } else {
                 StringBuilder PrintStr = new StringBuilder();
 
@@ -105,39 +115,127 @@ public class AdvertiserEntity {
         public void onAdvertisingEnabled(AdvertisingSet advertisingSet,
                                          boolean enable, int status) {
             Log.d(TAG,"onAdvertisingEnabled");
+            msg = BleAppService.msghandler.obtainMessage(
+                    BleAppService.MSG_MA_BLE_ADV_ENABLED_EVENT, Integer.toString(getAdv_id()));
+            BleAppService.msghandler.sendMessage(msg);
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("onAdvertisingEnabled enable : ");
+            PrintStr.append(enable);
+            PrintStr.append(" status: ");
+            PrintStr.append(status);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         @Override
         public void onAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
             Log.d(TAG,"onAdvertisingDataSet");
+            msg = BleAppService.msghandler.obtainMessage(
+                    BleAppService.MSG_MA_BLE_ADV_DATA_EVENT, Integer.toString(getAdv_id()));
+            BleAppService.msghandler.sendMessage(msg);
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("onAdvertisingDataSet status: ");
+            PrintStr.append(status);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         @Override
         public void onScanResponseDataSet(AdvertisingSet advertisingSet, int status) {
             Log.d(TAG,"onScanResponseDataSet");
+            msg = BleAppService.msghandler.obtainMessage(
+                    BleAppService.MSG_MA_BLE_SCAN_RESP_DATA_EVENT, Integer.toString(getAdv_id()));
+            BleAppService.msghandler.sendMessage(msg);
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("onScanResponseDataSet status: ");
+            PrintStr.append(status);
+            SocketServer.sendSocketData(PrintStr.toString());
+
         }
 
         @Override
         public void onAdvertisingParametersUpdated(AdvertisingSet advertisingSet, int txPower,
                             int status) {
             Log.d(TAG,"onAdvertisingParametersUpdated");
+            msg = BleAppService.msghandler.obtainMessage(
+                    BleAppService.MSG_MA_BLE_ADV_PARAM_UPDATED_EVENT, Integer.toString(getAdv_id()));
+            BleAppService.msghandler.sendMessage(msg);
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("onAdvertisingParametersUpdated txPower: ");
+            PrintStr.append(txPower);
+            PrintStr.append("  status: ");
+            PrintStr.append(status);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         @Override
         public void onPeriodicAdvertisingParametersUpdated(AdvertisingSet advertisingSet,
                                                                int status) {
             Log.d(TAG,"onPeriodicAdvertisingParametersUpdated");
+            if(status == ADVERTISE_SUCCESS){
+                msg = BleAppService.msghandler.obtainMessage(
+                        BleAppService.MSG_MA_BLE_PERIODIC_ADV_PARAM_UPDATED_EVENT, Integer.toString(getAdv_id()));
+                BleAppService.msghandler.sendMessage(msg);
+            }else {
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("Failed to set periodic advertising parametes with error: ");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+
         }
 
         @Override
         public void onPeriodicAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
+            Log.d(TAG,"onPeriodicAdvertisingParametersUpdated");
+            if(status == ADVERTISE_SUCCESS){
+                msg = BleAppService.msghandler.obtainMessage(
+                        BleAppService.MSG_MA_BLE_PERIODIC_ADV_DATA_EVENT, Integer.toString(getAdv_id()));
+                BleAppService.msghandler.sendMessage(msg);
+            }else {
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("Failed to set periodic advertising data with error: ");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+
         }
 
         @Override
         public void onPeriodicAdvertisingEnabled(AdvertisingSet advertisingSet,
                                                      boolean enable, int status) {
             Log.d(TAG,"onPeriodicAdvertisingEnabled");
+            if(status == ADVERTISE_SUCCESS){
+                msg = BleAppService.msghandler.obtainMessage(
+                        BleAppService.MSG_MA_BLE_PERIODIC_ADV_ENABLED_EVENT, Integer.toString(getAdv_id()));
+                BleAppService.msghandler.sendMessage(msg);
+            }else {
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("Failed to set periodic advertising data with error: ");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         }
+/*
+ //! Since this API is hidden we can't push this particular change, hence commenting
+        @Override
+        public void onOwnAddressRead(AdvertisingSet advertisingSet, int addressType, String address) {
+            Log.d(TAG,"onOwnAddressRead");
+            msg = BleAppService.msghandler.obtainMessage(
+                    BleAppService.MSG_MA_BLE_GET_OWN_ADDRESS_EVENT, address);
+            BleAppService.msghandler.sendMessage(msg);
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("onOwnAddressRead addressType: ");
+            PrintStr.append(addressType);
+            SocketServer.sendSocketData(PrintStr.toString());
+        }
+*/
     };
 
     class AdvCallback extends AdvertiseCallback {
@@ -372,7 +470,9 @@ public class AdvertiserEntity {
            Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
            return status;
         }
-
+        mAdvData = null;
+        mScanResponseData = null;
+        mPeriodicData = null;
         try {
             if(adv_info.Legacy){
                 mAdvertiser.startAdvertising(mAdvSettings,mAdvData,mAdvCallback);
@@ -407,4 +507,200 @@ public class AdvertiserEntity {
         }
         return false;
     }
+
+    public boolean EnableAdvertisingSet(EnableAdv enadv_info) {
+        Log.d(TAG,"EnableAdvertisingSet");
+        int adv_id = enadv_info.AdvId;
+        try {
+               if(mAdvSetIdMap.containsKey(adv_id))
+                {
+                  AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                  mAdvSet.enableAdvertising(enadv_info.Enableset, enadv_info.Duration, enadv_info.MaxAdvEvents);
+                  return true;
+                }
+                return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean SetAdvertData(AdvDataInfo advdata_info) {
+        Log.d(TAG,"SetAdvertiseData");
+        int adv_id = advdata_info.AdvId;
+        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
+        AdvertiseData data = null;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                if((adv_info.ServiceUuid == null) && (advdata_info.AdvData != null)){
+                     data = new AdvertiseData.Builder()
+                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), advdata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                        .setIncludeTxPowerLevel(true)
+                        .build();
+                }else{
+                    if(advdata_info.AdvData != null){
+                        data = new AdvertiseData.Builder()
+                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), advdata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                            .setIncludeTxPowerLevel(true)
+                            .build();
+                    }
+                }
+                mAdvSet.setAdvertisingData(data);
+                  return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean SetScanRspData(AdvDataInfo scandata_info) {
+        Log.d(TAG,"SetScanRspData");
+        int adv_id = scandata_info.AdvId;
+        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
+        AdvertiseData data = null;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                if((adv_info.ServiceUuid == null ) && (scandata_info.AdvData != null)){
+                    data = new AdvertiseData.Builder()
+                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), scandata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                        .setIncludeTxPowerLevel(true)
+                        .build();
+                }else{
+                    if(scandata_info.AdvData != null){
+                        data = new AdvertiseData.Builder()
+                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), scandata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                            .setIncludeTxPowerLevel(true)
+                            .build();
+                    }
+                }
+                mAdvSet.setScanResponseData(data);
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean SetAdvertParam(SetAdvParam setadvparam_info) {
+        Log.d(TAG,"SetAdvertParam");
+        int adv_id = setadvparam_info.AdvId;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                AdvertisingSetParameters mParams = new AdvertisingSetParameters.Builder()
+                                                         .setConnectable(setadvparam_info.Connectable)
+                                                         .setScannable(setadvparam_info.Scannable)
+                                                         .setLegacyMode(setadvparam_info.Legacy)
+                                                         .setAnonymous(setadvparam_info.Anonymous)
+                                                         .setIncludeTxPower(setadvparam_info.IncludePower)
+                                                         .setPrimaryPhy(setadvparam_info.PrimaryPhy)
+                                                         .setSecondaryPhy(setadvparam_info.SecondaryPhy)
+                                                         .setInterval(setadvparam_info.Interval)
+                                                         .setTxPowerLevel(setadvparam_info.TxPower)
+                                                         .build();
+                mAdvSet.setAdvertisingParameters(mParams);
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean SetPerioAdvParam(SetPerAdvParam setperadvparam_info) {
+        Log.d(TAG,"SetPerioAdvParam");
+        int adv_id = setperadvparam_info.AdvId;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                PeriodicAdvertisingParameters mParams = new PeriodicAdvertisingParameters.Builder()
+                                                            .setIncludeTxPower(adv_info.IncludePower)
+                                                            .setInterval(setperadvparam_info.PerAdvInterval)
+                                                            .build();
+                mAdvSet.setPeriodicAdvertisingParameters(mParams);
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean SetPerioAdvData(SetPerAdvData setperadvdata_info) {
+       Log.d(TAG,"SetPerioAdvData");
+        int adv_id = setperadvdata_info.AdvId;
+        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
+        AdvertiseData data = null;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                if((adv_info.ServiceUuid == null) && (setperadvdata_info.PeriodicData != null)){
+                     data = new AdvertiseData.Builder()
+                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), setperadvdata_info.PeriodicData.getBytes(Charset.forName("UTF-8")))
+                        .setIncludeTxPowerLevel(true)
+                        .build();
+                }else{
+                    if(setperadvdata_info.PeriodicData != null){
+                        data = new AdvertiseData.Builder()
+                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), setperadvdata_info.PeriodicData.getBytes(Charset.forName("UTF-8")))
+                            .setIncludeTxPowerLevel(true)
+                            .build();
+                    }
+                }
+                mAdvSet.setPeriodicAdvertisingData(data);
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean EnablePerioAdv(EnablePerAdv enperadv_info) {
+       Log.d(TAG,"EnablePerioAdv");
+        int adv_id = enperadv_info.AdvId;
+        try {
+            if(mAdvSetIdMap.containsKey(adv_id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+                mAdvSet.setPeriodicAdvertisingEnabled(enperadv_info.Enableset);
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
+
+    public boolean Getownaddrset(int Adv_Id) {
+       Log.d(TAG,"Getownaddrset");
+        try {
+            if(mAdvSetIdMap.containsKey(Adv_Id))
+            {
+                AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
+               // mAdvSet.getOwnAddress();  //! Since this API is hidden we can't push this particular change, hence commenting
+            return true;
+            }
+            return false;
+        } catch (Exception e) {
+            Log.e(TAG,"Exception : "+ e.toString());
+        }
+        return false;
+    }
 }
+

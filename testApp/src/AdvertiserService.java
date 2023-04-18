@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
@@ -176,6 +181,221 @@ public class AdvertiserService extends Service {
         return status;
     }
 
+    public boolean enableAdvSet(EnableAdv enadv_info) {
+        boolean status = false;
+        int Adv_id = enadv_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"EnableAdvertisingSet invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.EnableAdvertisingSet(enadv_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean setAdverData(AdvDataInfo advdata_info) {
+        boolean status = false;
+        int Adv_id = advdata_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"setAdvertisingData invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.SetAdvertData(advdata_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean setScanData(AdvDataInfo scandata_info) {
+        boolean status = false;
+        int Adv_id = scandata_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"setScanData invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.SetScanRspData(scandata_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean setAdvParam(SetAdvParam setadvparam_info) {
+        boolean status = false;
+        int Adv_id = setadvparam_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"setAdvParam invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.SetAdvertParam(setadvparam_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean setPeriAdvParam(SetPerAdvParam setperadvparam_info) {
+        boolean status = false;
+        int Adv_id = setperadvparam_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"SetPerioAdvParam invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.SetPerioAdvParam(setperadvparam_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean setPeriAdvData(SetPerAdvData setperadvdata_info) {
+        boolean status = false;
+        int Adv_id = setperadvdata_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"SetPerioAdvData invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.SetPerioAdvData(setperadvdata_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean EnablePeriAdv(EnablePerAdv enperadv_info) {
+        boolean status = false;
+        int Adv_id = enperadv_info.AdvId;
+        if(Adv_id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"EnablePeriAdv invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.EnablePerioAdv(enperadv_info);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
+    public boolean getOwnaddset(int Adv_Id) {
+        boolean status = false;
+        if(Adv_Id >= MAX_ADVERTISEMENTS){
+            Log.e(TAG,"Getownaddset invalid adv_id");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Max advertisements limit reached!");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return status;
+        }
+        int adv_index = getAdvInfoArrayIndex(Adv_Id);
+        if(INVALID_INDEX != adv_index){
+            AdvertiserEntity advInstance = advertisements.get(adv_index);
+            status = advInstance.Getownaddrset(Adv_Id);
+        }
+        else {
+            Log.e(TAG, "Adv Index not found");
+            StringBuilder PrintStr = new StringBuilder();
+            PrintStr.setLength(0);
+            PrintStr.append("Adv Index not found!");
+            SocketServer.sendSocketData(PrintStr.toString());
+
+        }
+        return status;
+    }
+
     public class AdvServiceCallback {
         Message msg;
         public void onAdvStarted(int adv_id){
@@ -202,5 +422,30 @@ public class AdvertiserService extends Service {
                 Log.e(TAG, "Adv Index not found");
             }
         }
+        public void onAdvEnabled(int adv_id, boolean enable){
+            Log.d(TAG,"onAdvEnabled on adv_id : " + adv_id +
+                    "adv instance");
+            int adv_index = getAdvInfoArrayIndex(adv_id);
+            if(enable != true){
+                if(INVALID_INDEX != adv_index) {
+                    advertisements.remove(adv_index);
+                    Log.d(TAG,"Total adv instances after deleting: " + advertisements.size());
+                    removed_count++;
+                    removed_indices[removed_count] = adv_index;
+
+                    msg = BleAppService.msghandler.obtainMessage(
+                            BleAppService.MSG_MA_BLE_ADV_ENABLED_EVENT, Integer.toString(adv_index));
+                    BleAppService.msghandler.sendMessage(msg);
+                }
+                else {
+                    Log.e(TAG, "Adv Index not found");
+                }
+            }else{
+                    msg = BleAppService.msghandler.obtainMessage(
+                            BleAppService.MSG_MA_BLE_ADV_ENABLED_EVENT, Integer.toString(adv_index));
+                    BleAppService.msghandler.sendMessage(msg);
+            }
+        }
+
     }
 }
