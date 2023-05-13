@@ -1,4 +1,5 @@
 android_app {
+    enabled: false,
     name: "pxp-monitor",
     system_ext_specific: true,
 

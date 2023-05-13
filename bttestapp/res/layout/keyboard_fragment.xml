@@ -25,14 +25,42 @@
         OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
         IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-<resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="led_on">#008000</color>
-    <color name="led_off">#404040</color>
-</resources>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal" >
+
+        <TextView
+            android:id="@+id/led_numlock"
+            android:text="@string/led_numlock"
+            android:background="#00000000"
+            style="@style/keyboard_led" />
+
+        <TextView
+            android:id="@+id/led_capslock"
+            android:text="@string/led_capslock"
+            android:background="#00000000"
+            style="@style/keyboard_led" />
+
+        <TextView
+            android:id="@+id/led_scrolllock"
+            android:text="@string/led_scrolllock"
+            android:background="#00000000"
+            style="@style/keyboard_led" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/keyboard"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical" >
+
+    </LinearLayout>
+</LinearLayout>

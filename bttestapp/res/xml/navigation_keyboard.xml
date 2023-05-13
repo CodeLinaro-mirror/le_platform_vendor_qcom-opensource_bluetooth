@@ -1,4 +1,5 @@
-<!-- Copyright (c) 2021, The Linux Foundation. All rights reserved.
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2013, The Linux Foundation. All rights reserved.
 
         Redistribution and use in source and binary forms, with or without
         modification, are permitted provided that the following conditions are
@@ -25,14 +26,35 @@
         OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
         IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-<resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="led_on">#008000</color>
-    <color name="led_off">#404040</color>
-</resources>
+<Keyboard>
+    <Layout>
+        <Key keyLabel="Vol Down &#x21E9;" keyCode="0x86"/>
+        <Key keyLabel="Mute" keyCode="0x84"/>
+        <Key keyLabel="Vol Up &#x21E7;" keyCode="0x85"/>
+    </Layout>
+    <Layout>
+        <Key keyLabel="Print Screen" keyCode="0x46"/>
+        <Key keyLabel="Scroll Lock" keyCode="0x47"/>
+        <Key keyLabel="Pause" keyCode="0x48"/>
+    </Layout>
+    <Layout>
+        <Key keyLabel="Insert" keyCode="0x49"/>
+        <Key keyLabel="Home" keyCode="0x4A"/>
+        <Key keyLabel="Page Up" keyCode="0x4B"/>
+    </Layout>
+    <Layout>
+        <Key keyLabel="Delete" keyCode="0x4C"/>
+        <Key keyLabel="End" keyCode="0x4D"/>
+        <Key keyLabel="Page Down" keyCode="0x4E"/>
+    </Layout>
+    <Layout>
+        <Key visible="false"/>
+        <Key keyLabel="&#x2191;" keyCode="0x52"/>
+        <Key visible="false"/>
+    </Layout>
+    <Layout>
+        <Key keyLabel="&#x2190;" keyCode="0x50"/>
+        <Key keyLabel="&#x2193;" keyCode="0x51"/>
+        <Key keyLabel="&#x2192;" keyCode="0x4F"/>
+    </Layout>
+</Keyboard>

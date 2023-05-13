@@ -7,14 +7,10 @@ android_app {
         "src/**/*.java",
     ],
 
-    exclude_srcs: [
-        "src/org/codeaurora/bluetooth/bttestapp/services/IMapServiceCallback.java",
-    ],
-
-    static_libs: [
-        "com.android.vcard",
-        "androidx.legacy_legacy-support-v4",
-    ],
+     static_libs: [
+     "com.google.android.material_material",
+     "androidx.appcompat_appcompat",
+     ],
 
     certificate: "platform",
 
