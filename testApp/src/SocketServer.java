@@ -288,8 +288,10 @@ public class SocketServer {
                 case LE_COC_MENU:
                     sendStr.append("\n******************** LE COC Menu ********************\n");
                     sendStr.append("                     LeCoC_Connect                  (Ex : LeCoC_Connect DeviceAddress:73:B5:C0:E6:62:A4;psm:1;secure_flag:true\n");
-					sendStr.append("                     LeCoC_Write                    (Ex : LeCoC_Write Data:500\n");
+                    sendStr.append("                     LeCoC_Write                    (Ex : LeCoC_Write Data:500\n");
                     sendStr.append("                     LeCoC_listen                   (Ex : LeCoC_listen secure_flag:true\n");
+                    sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
+                    sendStr.append("                     Tx                             (Ex: Tx Packet_Size:2000;Num_Packets:1000 )\n");
                     sendStr.append("                     LeCoC_Close                    (Ex : LeCoC_Close secure_flag:true\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*********************************************************\n");
@@ -736,12 +738,32 @@ public class SocketServer {
                 case LE_COC_MENU:
                     tmp = inputString.split(" ", 2);
                     if (tmp.length == 2) {
-                        if(tmp[0].equals("LeCoC_Connect")) {
+                        if (tmp[0].equals("Tx")) {
+                            DataTx dataTxParam = parse.DataTxParse(tmp[1]);
+                            if (dataTxParam != null ) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_COC_DATA_TX, dataTxParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if(tmp[0].equals("LeCoC_Connect")) {
                             LecocConnect lecocConnectParam = parse.LecocConnectParse(tmp[1]);
                             if (lecocConnectParam != null) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_COC_CONNECT, lecocConnectParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ConnUpdate")) {
+                            ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
+                            if (connUpdateParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;

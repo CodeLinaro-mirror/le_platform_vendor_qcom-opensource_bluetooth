@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
@@ -68,7 +73,6 @@ import java.io.InputStreamReader;
 import android.bluetooth.BluetoothSocket;
 import android.bluetooth.BluetoothServerSocket;
 import java.io.OutputStream;
-
 
 public class GattClient {
     public static final UUID CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
@@ -120,8 +124,10 @@ public class GattClient {
 	public static final int MSG_START_BLE_COC_WRITE = 25;
 	public static final int MSG_START_BLE_LISTEN = 26;
 	public static final int MSG_START_BLE_COC_CLOSE = 27;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_CLOSE;
+    public static final int MSG_START_BLE_COC_DATA_TX = 28;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_DATA_TX;
 
+    public static final int LE_COC_HDR_LEN = 4;
 
     private static final int GATT_WRITE = 1;
     private static final int GATT_READ = 2;
@@ -161,9 +167,12 @@ public class GattClient {
     private AcceptThread mInsecureAcceptThread;
     private ConnectedThread mConnectedThread;
     private TxOperationRunnable mtxOperationRunnable;
+    private TputTxOperationRunnable mtputtxOperationRunnable;
     StringBuilder PrintStr = new StringBuilder();
 
-	public class TxOperationRunnable implements Runnable {
+    private final Object write_mutex = new Object();
+
+    public class TxOperationRunnable implements Runnable {
         int mChunkSize;
         private OutputStream mOutputStream;
         public TxOperationRunnable(int ChunkSize) {
@@ -188,8 +197,9 @@ public class GattClient {
     public class AcceptThread extends Thread {
         boolean mSecureFlag;
         private InputStream mInputStream;
+        private OutputStream mOutputStream;
         private BluetoothServerSocket mmServerSocket;
-		private BluetoothSocket socket;
+        private BluetoothSocket socket;
         public AcceptThread(boolean SecureFlag) {
             mSecureFlag = SecureFlag;
             try {
@@ -208,6 +218,9 @@ public class GattClient {
                 SocketServer.sendSocketData(PrintStr.toString());
                 Log.d(TAG,"Server psm" + mmServerSocket.getPsm());
                 mSocket = mmServerSocket.accept();
+                PrintStr.setLength(0);
+                PrintStr.append("Server Socket Connected");
+                SocketServer.sendSocketData(PrintStr.toString());
             } catch(Exception e) {
                 Log.d(TAG,"exception caught in listen" + e );
                 return ;
@@ -215,17 +228,55 @@ public class GattClient {
 
         }
         public void run() {
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[8010];
             int bytes;
+            long rx_start_time = 0, rx_end_time = 0;
+            int totalBytes = 0; // totalBytes received
             while(true) {
                 try {
                     mInputStream = mSocket.getInputStream();
+                    mOutputStream = mSocket.getOutputStream();
                     bytes = mInputStream.read(buffer);
+                    totalBytes = totalBytes + bytes;
                     String incomingMsg = new String(buffer, 0, bytes);
                     PrintStr.setLength(0);
-                    PrintStr.append("Received data in Server socket :" +incomingMsg );
+                    if (incomingMsg.contains("Start")) {
+                            rx_start_time = SystemClock.elapsedRealtime();
+                            Log.d(TAG, "start_time: " + rx_start_time);
+                    }
+                    else if (incomingMsg.contains("End") || incomingMsg.contains("nd") || incomingMsg.contains("d") ) {
+                        String end = "Ack";
+                        mOutputStream.write(end.getBytes());
+
+                        rx_end_time = SystemClock.elapsedRealtime();
+                        Log.d(TAG, "end_time: " + rx_end_time);
+                        Log.d(TAG, "end_time - start_time = "
+                                + ((rx_end_time - rx_start_time) / 1000));
+                        Log.d(TAG, "totalBytes = " + totalBytes);
+                        Log.d(TAG, "totalBits =  " + (totalBytes * 8));
+                        // throughput calculation start
+                        float RxTput = ((float) totalBytes * 8 * 1000)
+                                / (rx_end_time - rx_start_time);
+                        float RxTputk = RxTput / 1000;
+                        // throughput calculation end
+                        Log.d(TAG,
+                                "write: Through put (receive) is approximately(in kbps): "
+                                        + RxTputk);
+                        SocketServer.sendSocketData("Rx Results");
+                        SocketServer.sendSocketData("----------");
+                        SocketServer.sendSocketData("Throughput (in kbps) : "+RxTputk);
+                        totalBytes = 0;
+                    }
+                    else if(incomingMsg.contains("Ack")) {
+                    /* Release write mutex */
+                        Log.d(TAG, "Incoming msg ' Ack ' received  ");
+                        synchronized (write_mutex) {
+                            write_mutex.notify();
+                        }
+                    }
+                    PrintStr.append("Received data in Server socket :" +incomingMsg.length()  );
                     SocketServer.sendSocketData(PrintStr.toString());
-                    Log.d(TAG, "Received data in Server socket "+ incomingMsg);
+                    Log.d(TAG, "Received data in Server socket "+incomingMsg.length() );
                 } catch (Exception e) {
                     Log.e(TAG, "Accept Thread ServerConnectedThread: could not read any more data" + e.getMessage());
                     break;
@@ -248,9 +299,73 @@ public class GattClient {
         }
     }
 
+    private class TputTxOperationRunnable implements Runnable {
+        int mChunkSize;
+        long miterations;
+        private OutputStream mOutputStream;
+        public TputTxOperationRunnable(DataTx dataTxObj) {
+         mChunkSize = dataTxObj.Packet_Size;
+         miterations = dataTxObj.Num_Packets;
+        }
+
+        public void run() {
+            long tx_start_time, tx_end_time;
+            try
+            {
+               mOutputStream = mSocket.getOutputStream();
+            }
+            catch (Exception e)
+            {
+               Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+            Log.d(TAG, "chunkSize is :: " + mChunkSize);
+            StringBuilder sb = new StringBuilder(mChunkSize);
+            for(int i = 0; i < mChunkSize; i++) {
+                   sb.append('a');
+            }
+            try {
+                String senttext = sb.toString();
+                String start = "Start";
+                String end = "End";
+                tx_start_time = SystemClock.elapsedRealtime();
+                Log.d(TAG, "start time: " + tx_start_time);
+                Log.d(TAG, "senttext.length() :: " + senttext.length());
+                mOutputStream.write(start.getBytes());
+                for(int i = 0; i < miterations; i++) {
+                       Log.d(TAG, "writing packet:: " + i);
+                       mOutputStream.write(sb.toString().getBytes());
+                }
+                mOutputStream.write(end.getBytes());
+                synchronized (write_mutex) {
+                    // Wait for write response
+                    try {
+                        write_mutex.wait();
+                    } catch (InterruptedException e) {
+                        Log.d(TAG, "Interrupted while waiting");
+                    }
+                }
+                tx_end_time = SystemClock.elapsedRealtime();
+                Log.d(TAG, "end time: " + tx_end_time);
+                Log.d(TAG, "end_time - start_time: "
+                        + (float)(tx_end_time - tx_start_time));
+                // throughput calculations
+                float TxTput = ((((float) senttext.length()) + LE_COC_HDR_LEN) * 8 * 1000 * miterations)
+                        / (float)(tx_end_time - tx_start_time);
+                float TxTputk = TxTput / 1000;
+                Log.d(TAG, "write: Through put (send) is (in kbps): " + TxTputk);
+                SocketServer.sendSocketData("Tx Results");
+                SocketServer.sendSocketData("----------");
+                SocketServer.sendSocketData("Throughput (in kbps) : "+TxTputk);
+            } catch (Exception e) {
+                Log.e(TAG, "ServerConnectedThread: could not write the message" + e.getMessage());
+            }
+        }
+    }
+
     public class ConnectedThread extends Thread {
             private final BluetoothSocket mmSocket;
             private final InputStream mmInStream;
+            private OutputStream mOutputStream;
 
             public ConnectedThread(BluetoothSocket socket) {
                 Log.d(TAG, "create ConnectedThread" );
@@ -260,6 +375,7 @@ public class GattClient {
                 // Get the BluetoothSocket input stream
                 try {
                     tmpIn = socket.getInputStream();
+                    mOutputStream = socket.getOutputStream();
                 } catch (Exception e) {
                     Log.e(TAG, "temp sockets not created", e);
                 }
@@ -269,18 +385,54 @@ public class GattClient {
             public void run() {
                 Log.i(TAG, "BEGIN mConnectedThread");
                 int bytes;
+                long rx_start_time = 0, rx_end_time = 0;
+                int totalBytes = 0; // totalBytes received
 
                 // Keep listening to the InputStream while connected
                 while (true) {
                     try {
-                        byte[] buffer = new byte[1024];
+                        byte[] buffer = new byte[8010];
                         // Read from the InputStream
                         bytes = mmInStream.read(buffer);
+                        totalBytes = totalBytes + bytes;
                         String incomingMsg = new String(buffer, 0, bytes);
                         PrintStr.setLength(0);
-                        PrintStr.append("Received data in Client socket :" +incomingMsg );
+                        if (incomingMsg.contains("Start")) {
+                            rx_start_time = SystemClock.elapsedRealtime();
+                            Log.d(TAG, "start_time: " + rx_start_time);
+                        }
+                        else if (incomingMsg.contains("End") || incomingMsg.contains("nd") || incomingMsg.contains("d")) {
+                            String end = "Ack";
+                            mOutputStream.write(end.getBytes());
+                            rx_end_time = SystemClock.elapsedRealtime();
+                            Log.d(TAG, "end_time: " + rx_end_time);
+                            Log.d(TAG, "end_time - start_time = "
+                                    + ((rx_end_time - rx_start_time) / 1000));
+                            Log.d(TAG, "totalBytes = " + totalBytes);
+                            Log.d(TAG, "totalBits =  " + (totalBytes * 8));
+                            // throughput calculation start
+                            float RxTput = ((float) totalBytes * 8 * 1000)
+                                    / (rx_end_time - rx_start_time);
+                            float RxTputk = RxTput / 1000;
+                            // throughput calculation end
+                            Log.d(TAG,
+                                    "write: Through put (receive) is approximately(in kbps): "
+                                            + RxTputk);
+                            SocketServer.sendSocketData("Rx Results");
+                            SocketServer.sendSocketData("----------");
+                            SocketServer.sendSocketData("Throughput (in kbps) : "+RxTputk);
+                            totalBytes = 0;
+                        }
+                        else if(incomingMsg.contains("Ack")) {
+                        /* Release write mutex */
+                        Log.d(TAG, "Incoming msg ' Ack ' received  ");
+                            synchronized (write_mutex) {
+                                write_mutex.notify();
+                            }
+                        }
+                        PrintStr.append("Received data in Client socket :"  );
                         SocketServer.sendSocketData(PrintStr.toString());
-                        Log.d(TAG, "Received data in Client socket "+ incomingMsg);
+                        Log.d(TAG, "Length of Incoming msg received in ClientSocket "+incomingMsg.length());
                     } catch (Exception e) {
                         Log.e(TAG, "Client Thread - ConnectedThread: could not read any more data", e);
                         break;
@@ -964,6 +1116,10 @@ public class GattClient {
                     boolean SecureFlag1 = (boolean) msg.obj;
 				    processGattLeCocClose(SecureFlag1);
 					break;
+                case MSG_START_BLE_COC_DATA_TX:
+                    DataTx dataTxObj = (DataTx) msg.obj;
+                    startTxOperation(dataTxObj);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
@@ -1514,6 +1670,12 @@ public class GattClient {
 			Thread t1 = new Thread(mtxOperationRunnable);
 			t1.start();
 		}
+        private void startTxOperation (DataTx dataTxObj) {
+             Log.d(TAG, "startTxOperation ");
+             mtputtxOperationRunnable = new TputTxOperationRunnable( dataTxObj );
+             Thread t1 = new Thread(mtputtxOperationRunnable);
+             t1.start();
+        }
         private void processGattLeCocListen (boolean SecureFlag) {
             if (SecureFlag && mSecureAcceptThread == null) {
                 mSecureAcceptThread = new AcceptThread(true);
