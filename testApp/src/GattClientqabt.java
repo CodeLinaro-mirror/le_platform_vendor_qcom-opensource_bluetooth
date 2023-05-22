@@ -123,8 +123,10 @@ class GattClient {
 	public static final int MSG_START_BLE_COC_WRITE = 25;
 	public static final int MSG_START_BLE_LISTEN = 26;
 	public static final int MSG_START_BLE_COC_CLOSE = 27;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_CLOSE;
+    public static final int MSG_START_BLE_COC_DATA_TX = 28;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_DATA_TX;
 
+    public static final int LE_COC_HDR_LEN = 4;
 
     private static final int GATT_WRITE = 1;
     private static final int GATT_READ = 2;
