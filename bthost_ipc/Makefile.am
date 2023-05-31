@@ -9,11 +9,11 @@ AM_CFLAGS = -Wall \
 
 AM_CPPFLAGS= \
         -I. \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/include \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/types \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/utils/include \
-        -I${WORKSPACE}/vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
+        -I${WORKSPACE}/../vendor/qcom/opensource/system/bt \
+        -I${WORKSPACE}/../vendor/qcom/opensource/system/bt/include \
+        -I${WORKSPACE}/../vendor/qcom/opensource/system/bt/types \
+        -I${WORKSPACE}/../vendor/qcom/opensource/system/bt/utils/include \
+        -I${WORKSPACE}/../vendor/qcom/opensource/system/bt/audio_a2dp_hw/include \
         -I${WORKSPACE}/frameworks/system/media/audio/include \
         -I${WORKSPACE}/hardware/libhardware/include \
         -I${WORKSPACE}/system/core/include \

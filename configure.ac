@@ -7,6 +7,9 @@ AC_CONFIG_FILES([Makefile \
                  hal/Makefile
                  ])
 
+AC_SUBST([LIBHARDWAREVH_CFLAGS])
+AC_SUBST([LIBHARDWAREVH_LIBS])
+
 AC_PROG_CXX
 AC_PROG_CC
 
