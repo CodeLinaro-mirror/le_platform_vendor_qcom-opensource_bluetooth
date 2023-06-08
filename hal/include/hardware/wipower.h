@@ -31,7 +31,9 @@
 #define ANDROID_INCLUDE_WIPOWER_H
 
 #include <stdint.h>
+#ifndef USE_MUSL
 #include <sys/cdefs.h>
+#endif
 #include <sys/types.h>
 #include <stdbool.h>
 
@@ -39,7 +41,13 @@
 #include <hardware/bluetooth.h>
 #define BT_PROFILE_WIPOWER_VENDOR_ID "wipower"
 
+#ifdef USE_MUSL
+#ifdef __cplusplus
+extern "C" {
+#endif
+#else
 __BEGIN_DECLS
+#endif
 
 typedef enum {
    OFF =0,
@@ -115,6 +123,12 @@ typedef struct {
 } wipower_interface_t;
 
 
+#ifdef USE_MUSL
+#ifdef __cplusplus
+}
+#endif
+#else
 __END_DECLS
+#endif
 
 #endif /* ANDROID_INCLUDE_WIPOWER_H */
