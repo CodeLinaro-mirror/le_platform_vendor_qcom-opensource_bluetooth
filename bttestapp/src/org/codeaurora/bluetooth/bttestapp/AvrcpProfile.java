@@ -593,6 +593,22 @@ public class AvrcpProfile {
         }
     }
 
+    public void forward() {
+        Logger.d(TAG, "forward");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling forward()");
+            mMediaController.getTransportControls().skipToNext();
+        }
+    }
+
+    public void backward() {
+        Logger.d(TAG, "backward");
+        if (mMediaController != null) {
+            Logger.d(TAG, "calling backward()");
+            mMediaController.getTransportControls().skipToPrevious();
+        }
+    }
+
     public void setShuffleMode(int mode) {
         Logger.d(TAG, "setShuffleMode");
         if (mMediaController != null) {

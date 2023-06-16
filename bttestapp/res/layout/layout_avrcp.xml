@@ -82,12 +82,30 @@
             android:layout_margin="@dimen/activity_vertical_margin"
             android:textAllCaps="false"
             android:text="@string/avrcp_setshufflemode" />
+        <Button
+            android:id="@+id/id_btn_forward"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_forward" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
+        <Button
+            android:id="@+id/id_btn_backward"
+            style="@style/textview_normal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/activity_vertical_margin"
+            android:layout_weight="1"
+            android:textAllCaps="false"
+            android:text="@string/avrcp_backward" />
         <Button
             android:id="@+id/id_btn_volume_down"
             style="@style/textview_normal"
