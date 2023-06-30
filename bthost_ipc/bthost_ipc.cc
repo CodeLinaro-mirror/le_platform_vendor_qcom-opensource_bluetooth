@@ -741,7 +741,7 @@ int a2dp_ctrl_receive(struct a2dp_stream_common *common, void* buffer, int lengt
 
 int a2dp_command(struct a2dp_stream_common *common, char cmd)
 {
-    char ack;
+    char ack = '\0';
 
     INFO("A2DP COMMAND %s", dump_a2dp_ctrl_event(cmd));
 
@@ -795,8 +795,8 @@ int check_a2dp_ready(struct a2dp_stream_common *common)
 
 int a2dp_read_audio_config(struct a2dp_stream_common *common)
 {
-    uint32_t sample_rate;
-    uint8_t channel_count;
+    uint32_t sample_rate = 0;
+    uint8_t channel_count = 0;
 
     if (a2dp_command(common, A2DP_CTRL_GET_OUTPUT_AUDIO_CONFIG) < 0)
     {
@@ -820,7 +820,7 @@ int a2dp_read_audio_config(struct a2dp_stream_common *common)
 
 int a2dp_read_codec_config(struct a2dp_stream_common *common,uint8_t idx)
 {
-    char cmd[2],ack;
+    char cmd[2],ack = '\0';
     int i,len = 0;
     uint8_t *p_codec_cfg = common->codec_cfg;
     cmd[0] = A2DP_CTRL_GET_CODEC_CONFIG;
