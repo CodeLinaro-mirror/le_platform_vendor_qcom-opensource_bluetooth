@@ -531,7 +531,7 @@ int a2dp_avk_ctrl_receive(struct a2dp_avk_stream_common *common, void* buffer, i
 
 int a2dp_avk_command(struct a2dp_avk_stream_common *common, char cmd)
 {
-    char ack;
+    char ack = '\0';
 
     INFO("A2DP COMMAND %s", dump_a2dp_avk_ctrl_event(cmd));
 
@@ -803,7 +803,7 @@ int audio_sink_check_a2dp_ready()
 
 int audio_sink_session_setup_complete(uint64_t latency)
 {
-    char cmd[9],ack;
+    char cmd[9],ack = '\0';
     int i = 0;
     cmd[i++] = A2DP_AVK_CTRL_SESSION_SETUP_COMPLETE;
     cmd[i++] = (uint8_t)(latency & 0x00FF);
