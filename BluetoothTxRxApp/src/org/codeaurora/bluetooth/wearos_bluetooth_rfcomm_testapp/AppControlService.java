@@ -1,0 +1,497 @@
+/*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of The Linux Foundation nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
+
+import static android.widget.Toast.makeText;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Set;
+
+import android.Manifest;
+import android.app.IntentService;
+import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.os.Binder;
+import android.os.IBinder;
+import android.os.Message;
+import android.os.SystemClock;
+import android.util.Log;
+import android.widget.Toast;
+
+public class AppControlService extends Service {
+    private static final String TAG = "BluetoothTxRxApp Service";
+    private static BluetoothAdapter bluetoothAdapter = BluetoothAdapter
+            .getDefaultAdapter();
+    BluetoothDevice btDeviceToPair = null;
+    private BluetoothSocket mmSocket;
+    private Context mContext;
+    ConfigFileParser parser;
+    AppControlStateMachine mAppControlStateMachine;
+
+    public AppControlService() {
+        super();
+        // TODO Auto-generated constructor stub
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        mContext = this;
+        Log.d(TAG, "Service onCreate");
+        if (!initAdapter()) {
+            Log.d(TAG, "Unexpected error: Turning off BT");
+        } else {
+            startStateMachine();
+        }
+        registerReceiver();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        // TODO do something useful
+        super.onStartCommand(intent, flags, startId);
+        Log.d(TAG, "Service onStartCommand");
+        return Service.START_STICKY;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        mContext = null;
+    }
+
+    private final IBinder localBinder = new MyBinder();
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return localBinder;
+    }
+
+    public class MyBinder extends Binder {
+
+        public AppControlService getService() {
+            return AppControlService.this;
+
+        }
+    }
+
+    private boolean initAdapter() {
+        Log.d(TAG, "initAdapter()");
+        if (bluetoothAdapter == null) {
+            Log.d(TAG, "initAdapter: Bluetooth not supported");
+            return false;
+        } else if (!bluetoothAdapter.isEnabled()) {
+            Log.d(TAG, "enabling bluetooth ");
+            Intent enableBtIntent = new Intent(
+                    bluetoothAdapter.ACTION_REQUEST_ENABLE);
+            enableBtIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(enableBtIntent);
+            Log.d(TAG, "Bluetooth enabled returning true");
+            return true;
+        } else {
+            Log.d(TAG, "initAdapter: Bluetooth has been enabled now");
+            return true;
+        }
+    }
+
+    private void registerReceiver() {
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        mContext.registerReceiver(eventReceiver, intentFilter);
+    }
+
+    private BroadcastReceiver eventReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                Log.d(TAG, "Socket Disconnected");
+                SocketServer
+                        .sendSocketData("Connection to Remote Device is Terminated");
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                mAppControlStateMachine.sendMessage(message);
+            }
+        }
+    };
+
+    private void startStateMachine() {
+        mAppControlStateMachine = new AppControlStateMachine(
+                AppControlService.this);
+        mAppControlStateMachine.start();
+        Utils.appControlStateMachine = mAppControlStateMachine;
+    }
+
+    protected void initializeTestSetup() {
+        if (Utils.bdAddressFromConfig != null) {
+            btDeviceToPair = bluetoothAdapter
+                    .getRemoteDevice(Utils.bdAddressFromConfig);
+        } else {
+            SocketServer
+                    .sendSocketData("Unable to Process BT Address...Please Restart the Apps");
+            return;
+        }
+        startConnectionProcess();
+    }
+
+    public void startConnectionProcess() {
+        Log.d(TAG, "startConnectionProcess");
+        ConnectThread connectThread = new ConnectThread(btDeviceToPair);
+        connectThread.start();
+    }
+
+    private class ConnectThread extends Thread {
+        private static final String TAG = "BluetoothTxRxApp Connect Thread";
+
+        public ConnectThread(BluetoothDevice device) {
+            BluetoothSocket tmp = null;
+
+            if (device == null) {
+                Log.d(TAG, "ConnectThread: Remote Device is null");
+                SocketServer
+                        .sendSocketData("Remote Device is Null... Please close and restart the Process");
+                return;
+            } else {
+                Log.d(TAG, "ConnectThread: Device is not null");
+            }
+
+            try {
+                Log.d(TAG,
+                        "Creating a BluetoothSocket to create a connection to a remote device");
+                tmp = device
+                        .createInsecureRfcommSocketToServiceRecord(Utils.UUIDConstants.APP_UUID);
+            } catch (IOException e) {
+                Log.e(TAG, "Socket's create() method failed", e);
+            }
+
+            if (tmp == null) {
+                Log.d(TAG, "Socket is null");
+                SocketServer
+                        .sendSocketData("Communication Socket is not created... Please close and restart the Process");
+                return;
+            } else {
+                Log.d(TAG, "Socket is not null");
+            }
+
+            mmSocket = tmp;
+        }
+
+        @Override
+        public void run() {
+            // Cancel discovery because it otherwise slows down the connection.
+            bluetoothAdapter.cancelDiscovery();
+
+            try {
+                Log.d(TAG, "connecting to a remote device");
+                if (mmSocket != null) {
+                    mmSocket.connect();
+                } else {
+                    Log.d(TAG, "Socket is null");
+                    SocketServer
+                            .sendSocketData("Communication Socket is not created... Please close and restart the Process");
+                    return;
+                }
+                Log.d(TAG, "Socket Connected");
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_CONNECTED;
+                mAppControlStateMachine.sendMessage(message);
+
+            } catch (IOException connectException) {
+                Log.e(TAG, "Unable to connect; close the socket and return",
+                        connectException);
+                try {
+                    mmSocket.close();
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_CONNECTION_FAILED;
+                    mAppControlStateMachine.sendMessage(message);
+                } catch (IOException closeException) {
+                    Log.e(TAG, "Could not close the client socket",
+                            closeException);
+                }
+                return;
+            }
+        }
+
+        public void cancel() {
+            try {
+                mmSocket.close();
+                mmSocket.getInputStream().close();
+                mmSocket.getOutputStream().close();
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_DISCONNECTED;
+                mAppControlStateMachine.sendMessage(message);
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the client socket", e);
+            }
+        }
+    }
+
+    public void startTxOperation(int chunkSize) {
+        Runnable txOperationRunnable = new TxOperationRunnable(chunkSize);
+        new Thread(txOperationRunnable).start();
+    }
+
+    private class TxOperationRunnable implements Runnable {
+
+        int mChunkSize;
+
+        public TxOperationRunnable(int chunkSize) {
+            mChunkSize = chunkSize;
+        }
+
+        public void run() {
+
+            OutputStream outputStream = null;
+            long tx_start_time, tx_end_time;
+            try {
+                outputStream = mmSocket.getOutputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+            int chunksize = mChunkSize;
+            chunksize = chunksize * 1024;
+            Log.d(TAG, "chunkSize is :: " + chunksize);
+            StringBuilder sb = new StringBuilder(chunksize);
+            for (int i = 0; i < chunksize; i++) {
+                sb.append('a');
+            }
+            String senttext = sb.toString();
+            String start = "Start";
+            String end = "End";
+            bluetoothAdapter.cancelDiscovery();
+            tx_start_time = SystemClock.elapsedRealtime();
+            Log.d(TAG, "start time: " + tx_start_time);
+            Log.d(TAG, "senttext.length() :: " + senttext.length());
+            try {
+                outputStream.write(start.getBytes());
+                outputStream.write(senttext.getBytes());
+                outputStream.write(end.getBytes());
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when sending data", e);
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
+                mAppControlStateMachine.sendMessage(message);
+            }
+            tx_end_time = SystemClock.elapsedRealtime();
+            Log.d(TAG, "end time: " + tx_end_time);
+            Log.d(TAG, "end_time - start_time: "
+                    + (tx_end_time - tx_start_time));
+
+            // throughput calculations
+            float TxTput = ((float) senttext.length() * 8 * 1000)
+                    / (tx_end_time - tx_start_time);
+            float TxTputk = TxTput / 1000;
+            Log.d(TAG, "write: Through put (send) is (in kbps): " + TxTputk);
+            SocketServer.sendSocketData("Throughput (send) is (in kbps): "
+                    + TxTputk);
+            Message message = Message.obtain();
+            message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX;
+            mAppControlStateMachine.sendMessage(message);
+
+        }
+    }
+
+    Runnable txOperationRunnable = new Runnable() {
+        public void run() {
+        }
+    };
+
+    public void startRxOperation() {
+
+        Thread txOperation = new Thread(rxOperationRunnable);
+        txOperation.start();
+    }
+
+    Runnable rxOperationRunnable = new Runnable() {
+        public void run() {
+            InputStream inputStream = null;
+            long rx_start_time = 0, rx_end_time = 0;
+            byte[] mmBuffer = new byte[1024];
+            int numBytes; // bytes returned from read()
+            int totalBytes = 0; // totalBytes received
+            try {
+                inputStream = mmSocket.getInputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+
+            while (true) {
+                try {
+                    numBytes = inputStream.read(mmBuffer);
+                    totalBytes = totalBytes + numBytes;
+                    String incomingMsg = new String(mmBuffer, 0, numBytes);
+
+                    if (incomingMsg.contains("Start")) {
+                        rx_start_time = SystemClock.elapsedRealtime();
+                        Log.d(TAG, "start_time: " + rx_start_time);
+                    }
+
+                    if (incomingMsg.contains("end")) {
+                        rx_end_time = SystemClock.elapsedRealtime();
+                        Log.d(TAG, "end_time: " + rx_end_time);
+                        Log.d(TAG, "end_time - start_time = "
+                                + ((rx_end_time - rx_start_time) / 1000));
+                        Log.d(TAG, "totalBytes = " + totalBytes);
+                        Log.d(TAG, "totalBits =  " + (totalBytes * 8));
+                        // throughput calculation start
+                        float RxTput = ((float) totalBytes * 8 * 1000)
+                                / (rx_end_time - rx_start_time);
+                        float RxTputk = RxTput / 1000;
+                        // throughput calculation end
+                        Log.d(TAG,
+                                "write: Through put (receive) is approximately(in kbps): "
+                                        + RxTputk);
+                        SocketServer
+                                .sendSocketData("Throughput (receive) is (in kbps): "
+                                        + RxTputk);
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_RX;
+                        mAppControlStateMachine.sendMessage(message);
+                        break;
+                    }
+
+                    if (incomingMsg.contains("WAKEABLE_NOTIFICATION_END")) {
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_WAKEABLE;
+                        mAppControlStateMachine.sendMessage(message);
+                        break;
+                    }
+
+                    if (incomingMsg.contains("ACTIONABLE_NOTIFICATION_END")) {
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_ACTIONABLE;
+                        mAppControlStateMachine.sendMessage(message);
+                        break;
+                    }
+
+                    if (incomingMsg.contains("CACHEABLE_NOTIFICATION_END")) {
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_END_DATA_TX_CACHEABLE;
+                        mAppControlStateMachine.sendMessage(message);
+                        break;
+                    }
+
+                } catch (IOException e) {
+                    Log.d(TAG, "Input stream was disconnected", e);
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_DATA_RX_FAILED;
+                    mAppControlStateMachine.sendMessage(message);
+                    break;
+                }
+            }
+
+        }
+    };
+
+    public void startWakeableNotificationOperation(int timer) {
+        OutputStream outputStream = null;
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        Log.d(TAG, "timer is :: " + timer);
+        String start = "WAKEABLE_NOTIFICATION_START";
+        String timerStart = "WAKEABLE_NOTIFICATION_TIMER_START";
+        String timerEnd = "WAKEABLE_NOTIFICATION_TIMER_END";
+        try {
+            outputStream.write(start.getBytes());
+            outputStream.write(timerStart.getBytes());
+            outputStream.write(Integer.toString(timer).getBytes());
+            outputStream.write(timerEnd.getBytes());
+            startRxOperation();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+            Message message = Message.obtain();
+            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
+            mAppControlStateMachine.sendMessage(message);
+        }
+    }
+
+    public void startActionableNotificationOperation(int timer) {
+        OutputStream outputStream = null;
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        Log.d(TAG, "timer is :: " + timer);
+        String start = "ACTIONABLE_NOTIFICATION_START";
+        String timerStart = "ACTIONABLE_NOTIFICATION_TIMER_START";
+        String timerEnd = "ACTIONABLE_NOTIFICATION_TIMER_END";
+        try {
+            outputStream.write(start.getBytes());
+            outputStream.write(timerStart.getBytes());
+            outputStream.write(Integer.toString(timer).getBytes());
+            outputStream.write(timerEnd.getBytes());
+            startRxOperation();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+            Message message = Message.obtain();
+            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
+            mAppControlStateMachine.sendMessage(message);
+        }
+    }
+
+    public void startCacheableNotificationOperation(int timer) {
+        OutputStream outputStream = null;
+        try {
+            outputStream = mmSocket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
+        }
+        Log.d(TAG, "timer is :: " + timer);
+        String start = "CACHEABLE_NOTIFICATION_START";
+        String timerStart = "CACHEABLE_NOTIFICATION_TIMER_START";
+        String timerEnd = "CACHEABLE_NOTIFICATION_TIMER_END";
+        try {
+            outputStream.write(start.getBytes());
+            outputStream.write(timerStart.getBytes());
+            outputStream.write(Integer.toString(timer).getBytes());
+            outputStream.write(timerEnd.getBytes());
+            startRxOperation();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+            Message message = Message.obtain();
+            message.what = Utils.StateMachineMessageConstants.STATE_DATA_TX_FAILED;
+            mAppControlStateMachine.sendMessage(message);
+        }
+    }
+
+}

@@ -27,8 +27,8 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package  org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
+package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
-public class Scan {
-    String BDaddress;
+public class Wakeable {
+    int timer;
 }
