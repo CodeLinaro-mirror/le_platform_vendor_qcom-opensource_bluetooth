@@ -137,4 +137,34 @@ public class ConfigFileParser {
         return cacheable;
     }
 
+    public ConnectionTest connectionTestParse(String input){
+        ConnectionTest connectionTest = new ConnectionTest();
+        String tmp[] = input.split(":",2);
+        if(tmp.length == 2){
+            if(tmp[0].equals("count")){
+                connectionTest.count = Integer.parseInt(tmp[1]);
+            }else{
+                connectionTest = null;
+            }
+        }else{
+            connectionTest = null;
+        }
+        return connectionTest;
+    }
+
+   public SetScanMode setScanModeParse(String input){
+       SetScanMode scanMode = new SetScanMode();
+       String tmp[] = input.split(":",2);
+       if(tmp.length == 2){
+           if(tmp[0].equals("mode")){
+               scanMode.scanMode = Integer.parseInt(tmp[1]);
+           }else{
+               scanMode = null;
+           }
+       }else{
+           scanMode = null;
+       }
+       return scanMode;
+   }
+
 }

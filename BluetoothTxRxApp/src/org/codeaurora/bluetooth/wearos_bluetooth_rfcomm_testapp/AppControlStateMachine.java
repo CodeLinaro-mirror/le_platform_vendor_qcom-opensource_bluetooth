@@ -54,6 +54,7 @@ public class AppControlStateMachine extends StateMachine {
     private DataTxState mDataTxState;
     private DataRxState mDataRxState;
     private DisconnectedState mDisconnectedState;
+    private GapTestState mGapTestState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -68,6 +69,7 @@ public class AppControlStateMachine extends StateMachine {
         mDataTxState = new DataTxState();
         mDataRxState = new DataRxState();
         mDisconnectedState = new DisconnectedState();
+        mGapTestState = new GapTestState();
 
         // Adding States
         addState(mInitState);
@@ -77,6 +79,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDataTxState);
         addState(mDataRxState);
         addState(mDisconnectedState);
+        addState(mGapTestState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -121,6 +124,9 @@ public class AppControlStateMachine extends StateMachine {
                 SocketServer.mainMenuState = SocketServer.CONNECT_INIT;
                 SocketServer.processOutputState = SocketServer.CONNECT_INIT;
                 SocketServer.updateSocketClient();
+                break;
+            case Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES:
+                transitionTo(mGapTestState);
                 break;
             }
             return retvalue;
@@ -369,6 +375,39 @@ public class AppControlStateMachine extends StateMachine {
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 break;
             }
+            return retvalue;
+        }
+    }
+
+    private class GapTestState extends State {
+        private static final String TAG="BluetoothTxRxApp GapTestState State";
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue=HANDLED;
+            switch(message.what)
+            {
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON:
+
+                break;
+            case Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_SCAN_MODE:
+                SetScanMode setScan = (SetScanMode) message.obj;
+                mAppControlService.setScanMode(setScan.scanMode);
+                break;
+            case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                break;
+
+            }
+
             return retvalue;
         }
     }

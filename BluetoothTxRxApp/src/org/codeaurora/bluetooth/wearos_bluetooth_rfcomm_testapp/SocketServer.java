@@ -72,6 +72,7 @@ public class SocketServer {
     static final int INVALID_INPUT = 6;
     static final int SOC_CLOSE_ACK = 7;
     static final int NONE = 8;
+    static final int CONNECTION_TEST_MENU = 999;
 
     static int mainMenuState = CONNECT_INIT;
     static int processOutputState = CONNECT_INIT;
@@ -218,7 +219,15 @@ public class SocketServer {
         case CONNECT_INIT:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     GAP\n");
             sendStr.append("                     Close\n");
+            sendStr.append("**************************************************************\n");
+            break;
+
+        case CONNECTION_TEST_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Set_Scan (Ex: Set_Scan mode:0/1/2)\n");
+            sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
 
@@ -277,12 +286,17 @@ public class SocketServer {
                             processOutputState = INVALID_INPUT;
                             mainMenuState = CONNECT_INIT;
                         }
-                    } else if (inputString.equals("Close")) {
-                        closeReceived = true;
-                        mainMenuState = CONNECT_INIT;
-                        processOutputState = SOC_CLOSE_ACK;
                     }
-                } else {
+                }else if (inputString.equals("Close")) {
+                    closeReceived = true;
+                    mainMenuState = CONNECT_INIT;
+                    processOutputState = SOC_CLOSE_ACK;
+                } else if(inputString.equals("GAP")){
+                    Log.d(TAG,"Gap Menu");
+                    mainMenuState = CONNECTION_TEST_MENU;
+                    processOutputState = CONNECTION_TEST_MENU;
+                }else {
+                    Log.d(TAG,"Invalid");
                     processOutputState = INVALID_INPUT;
                 }
             } catch (Exception e) {
@@ -303,6 +317,46 @@ public class SocketServer {
                 processOutputState = SOC_CLOSE_ACK;
             } else {
                 processOutputState = INVALID_INPUT;
+            }
+            break;
+
+        case CONNECTION_TEST_MENU:
+            Message gapTestMessage = Message.obtain();
+            gapTestMessage.what = Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES;
+            Utils.appControlStateMachine.sendMessage(gapTestMessage);
+
+            tmp = inputString.split(" ", 2);
+            if (tmp.length == 2) {
+                if (tmp[0].equalsIgnoreCase("OFF_ON")) {
+                    ConnectionTest connectionTestParam = parser.connectionTestParse(tmp[1]);
+                    if (connectionTestParam != null) {
+                        processOutputState = NONE;
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON;
+                        Utils.appControlStateMachine.sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                    }
+                }else if(tmp[0].equalsIgnoreCase("Set_Scan")){
+                    SetScanMode scanTestParam = parser.setScanModeParse(tmp[1]);
+                    if (scanTestParam != null) {
+                        processOutputState = NONE;
+                        Log.d(TAG,"Set Scan Mode :: "+scanTestParam.scanMode);
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_SCAN_MODE;
+                        message.obj = scanTestParam;
+                        Utils.appControlStateMachine.sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                    }
+                }
+            }else if (tmp.length == 1) {
+                if (tmp[0].equals("Back")) {
+                    mainMenuState = CONNECT_INIT;
+                    processOutputState = CONNECT_INIT;
+                } else {
+                    processOutputState = INVALID_INPUT;
+                }
             }
             break;
 
