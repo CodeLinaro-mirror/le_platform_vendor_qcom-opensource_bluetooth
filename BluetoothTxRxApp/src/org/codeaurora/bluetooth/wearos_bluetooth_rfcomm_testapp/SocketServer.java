@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -32,13 +37,19 @@ package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.Semaphore;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.HashMap;
 
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Message;
 import android.util.Log;
+import android.bluetooth.BluetoothSocket;
 
 public class SocketServer {
 
@@ -63,19 +74,24 @@ public class SocketServer {
     createServerSocketThread createSeverSocket;
     InputStream input;
     private static OutputStream output;
-
+    connectionHandler cnd;
     communicationHandler commHandler;
 
-    static final int CONNECT_INIT = 0;
+    static final int INIT_MENU = 0;
     static final int MAIN_MENU = 1;
-    static final int THROUGHPUT_MENU = 3;
-    static final int INVALID_INPUT = 6;
-    static final int SOC_CLOSE_ACK = 7;
-    static final int NONE = 8;
+    static final int THROUGHPUT_TESTING_MENU = 2;
+    static final int DEVICE_SELECTION_MENU = 4;
+    static final int NOT_RCV = 5;
+    static final int CTL_PT = 6;
+    static final int INVALID_INPUT = 7;
+    static final int SOC_CLOSE_ACK = 8;
+    static final int NONE = 9;
+    static final int TX_RX_MENU = 10;
+    //static final int BLUETOOTH_HID_TESTING_MENU = 10;
     static final int CONNECTION_TEST_MENU = 999;
 
-    static int mainMenuState = CONNECT_INIT;
-    static int processOutputState = CONNECT_INIT;
+    static int mainMenuState = INIT_MENU;
+    static int processOutputState = INIT_MENU;
 
     ConfigFileParser parser;
 
@@ -115,21 +131,33 @@ public class SocketServer {
             if (null != server) {
                 try {
                     Log.d(TAG, "localSocketServer begins to accept()");
-                    client = server.accept();
+                    while(true)
+                    {
+                        client = server.accept();
+                        socketOpen = true;
+                        Log.d(TAG, "localSocket accepted");
+                        cnd = new connectionHandler();
+                        cnd.start();
+                    }
                 } catch (IOException e) {
                     Log.e(TAG, "localSocketServer accept() failed !!!");
                     e.printStackTrace();
                 }
 
-                socketOpen = true;
-                Log.d(TAG, "localSocket accepted");
+            } else {
+                Log.d(TAG, "The LocalServerSocket is NULL");
+            }
+        }
+    }
 
-                try {
-                    input = client.getInputStream();
-                    Log.d(TAG, "getInputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getInputStream() failed !!!");
-                    e.printStackTrace();
+    private class connectionHandler extends Thread{
+        public void run(){
+            try {
+                   input = client.getInputStream();
+                   Log.d(TAG, "getInputStream");
+            } catch(IOException e) {
+                   Log.e(TAG, "getInputStream() failed !!!");
+                   e.printStackTrace();
                 }
 
                 try {
@@ -142,9 +170,6 @@ public class SocketServer {
 
                 commHandler = new communicationHandler();
                 commHandler.start();
-            } else {
-                Log.d(TAG, "The LocalServerSocket is NULL");
-            }
         }
     }
 
@@ -154,8 +179,8 @@ public class SocketServer {
             Log.d(TAG, "communicationHandler run()");
 
             // Display main menu and start receiving socket data
-            mainMenuState = CONNECT_INIT;
-            processOutputState = CONNECT_INIT;
+            mainMenuState = INIT_MENU;
+            processOutputState = INIT_MENU;
             sendSocketData(processOutput());
 
             while (true) {
@@ -169,13 +194,14 @@ public class SocketServer {
                     break;
                 }
 
-                if (bytesRead > 0) {
+                if (bytesRead >= 0) {
                     String inputStr = new String(socRcvBuffer, 0, bytesRead);
                     Log.i(TAG, "Received: " + inputStr);
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    processOutputState = INVALID_INPUT;
+                    processOutputState = NONE;
+                    closeReceived = true;
                 }
 
                 if (processOutputState != NONE) {
@@ -194,16 +220,6 @@ public class SocketServer {
                             e.printStackTrace();
                         }
                     }
-
-                    if (server != null) {
-                        try {
-                            server.close();
-                            Log.i(TAG, "server closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "server close failed");
-                            e.printStackTrace();
-                        }
-                    }
                     break;
                 }
             }
@@ -216,17 +232,30 @@ public class SocketServer {
         StringBuilder sendStr = new StringBuilder();
         Log.d(TAG, "processOutputState is ::" + processOutputState);
         switch (processOutputState) {
-        case CONNECT_INIT:
+        case INIT_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     Throughput_Testing\n");
             sendStr.append("                     GAP\n");
             sendStr.append("                     Close\n");
             sendStr.append("**************************************************************\n");
             break;
 
+        case THROUGHPUT_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF uuid:aaaa:bbbbbb:cccc)\n");
+            sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa:bbbbbb:cccc\n");
+            if(Utils.btAddrUUIDToBTSocketMap.size() != 0){
+            sendStr.append("                     Previous_Connections\n");
+            }
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+            break;
         case CONNECTION_TEST_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     OFF_ON (Ex: OFF_ON count:10)\n");
             sendStr.append("                     Set_Scan (Ex: Set_Scan mode:0/1/2)\n");
+            sendStr.append("                     Discovery (Ex: Discovery)\n");
+            sendStr.append("                     isConnected (Ex: isConnected bdAddress:AA:BB:CC:DD:EE:FF)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -234,17 +263,43 @@ public class SocketServer {
         case MAIN_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Throughput\n");
-            sendStr.append("                     Close\n");
+            sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
 
-        case THROUGHPUT_MENU:
+        case DEVICE_SELECTION_MENU:
+            int srlNum = 0;
+            String direction;
+            sendStr.append("\n******************** Use S.No to Select Device ********************\n");
+            sendStr.append("\nS.No." + "   Device Name"+ "      Device Address"+ "      UUID" +"                                     Connection Direction" +"\n");
+            Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.btAddrUUIDToBTSocketMap.entrySet().iterator();
+            while(itr.hasNext())
+            {
+                Map.Entry<String, BluetoothSocket> entry = itr.next();
+                BluetoothSocket socket = entry.getValue();
+                String address = socket.getRemoteDevice().getAddress();
+                String name = socket.getRemoteDevice().getName();
+                srlNum++;
+                HashMap<String, BluetoothSocket> connectionHandle = new HashMap<String, BluetoothSocket>();
+                connectionHandle.put(entry.getKey(),entry.getValue());
+                Utils.srlNumToConnectionMap.put(srlNum,connectionHandle);
+                String[] tmp = entry.getKey().split(" ", 3);
+                if(tmp[2] != null && tmp[2].equals("CLIENT")){
+                    direction = "Client(DUT to Remote)";
+                }else{
+                    direction = "Server(Remote to DUT)";
+                }
+                sendStr.append(srlNum+"       "+Utils.ellipsize(name,11)+"      "+address+"   "+tmp[1]+ "     "+direction+ "\n");
+            }
+            sendStr.append("Back\n");
+            sendStr.append("*********************************************************************\n");
+            break;
+
+        case TX_RX_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
-            sendStr.append("                     Tx (Ex: Tx chunkSize:1000)\n");
+            sendStr.append("                     Tx(Select chunkSize and pattern 1(Default) 2(Binary) or 3(PRBS9)) (Ex: Tx chunkSize:1000 pattern:1)\n");
             sendStr.append("                     Rx (Ex: Rx )\n");
-            sendStr.append("                     Wakeable (Ex: Wakeable timer:1000)\n");
-            sendStr.append("                     Actionable (Ex: Actionable timer:1000)\n");
-            sendStr.append("                     Cacheable (Ex: Cacheable timer:1000)\n");
+            sendStr.append("                     Disconnect (Ex: Disconnect)\n");
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
@@ -270,52 +325,126 @@ public class SocketServer {
         Log.d(TAG, "mainMenuState is ::" + mainMenuState);
         switch (mainMenuState) {
 
-        case CONNECT_INIT:
+        case INIT_MENU:
             try {
-                tmp = inputString.split(" ", 2);
-                if (tmp.length == 2) {
-                    if (tmp[0].equals("Connect")) {
-                        Connect connectParam = parser.connectParse(tmp[1]);
-                        if (connectParam != null) {
-                            Utils.bdAddressFromConfig = connectParam.BDaddress;
-                            processOutputState = NONE;
-                            Message message = Message.obtain();
-                            message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_CONNECT;
-                            Utils.appControlStateMachine.sendMessage(message);
-                        } else {
-                            processOutputState = INVALID_INPUT;
-                            mainMenuState = CONNECT_INIT;
-                        }
-                    }
-                }else if (inputString.equals("Close")) {
+                if (inputString.equals("Throughput_Testing")) {
+                    Log.d(TAG, "Throughput Menu");
+                    mainMenuState = THROUGHPUT_TESTING_MENU;
+                    processOutputState = THROUGHPUT_TESTING_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = true;
+                } else if (inputString.equals("Close")) {
                     closeReceived = true;
-                    mainMenuState = CONNECT_INIT;
+                    mainMenuState = INIT_MENU;
                     processOutputState = SOC_CLOSE_ACK;
-                } else if(inputString.equals("GAP")){
-                    Log.d(TAG,"Gap Menu");
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                } else if (inputString.equals("GAP")) {
+                    Log.d(TAG, "Gap Menu");
+                    Utils.mAppControlService.startStateMachineForGAP();
                     mainMenuState = CONNECTION_TEST_MENU;
                     processOutputState = CONNECTION_TEST_MENU;
-                }else {
-                    Log.d(TAG,"Invalid");
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                } else {
+                    Log.d(TAG, "Invalid");
                     processOutputState = INVALID_INPUT;
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                mainMenuState = CONNECT_INIT;
+                mainMenuState = INIT_MENU;
+                processOutputState = INVALID_INPUT;
+                Utils.isThroughputStateMachineUnderProcessing = false;
+            }
+            break;
+
+        case THROUGHPUT_TESTING_MENU:
+            tmp = inputString.split(" ", 3);
+            if(tmp.length == 3)
+            {
+                if(tmp[0].equals("Connect"))
+                {
+                    Connect connectParam = parser.connectParse(tmp[1], tmp[2]);
+                    boolean isAlreadyConnected = false;
+
+                    if(connectParam.bdAddress != null && connectParam.uuid != null)
+                    {
+                        processOutputState = NONE;
+
+                        if(Utils.mAppControlService != null)
+                        {
+                            String key = connectParam.bdAddress.toUpperCase()+" "+connectParam.uuid.toUpperCase()+ " " +"CLIENT";
+                            if(Utils.btAddrUUIDToBTSocketMap.containsKey(key)){
+                                isAlreadyConnected = true;
+                            }
+                            if(!isAlreadyConnected)
+                            {
+                                Log.d(TAG, "BT Address and UUID Combo is not connected, start Connection");
+                                Utils.mAppControlService.initializeOutgoingConnection(connectParam);
+                            }else{
+                                Log.d(TAG, "BT Address and UUID Combo is already connected, ignore Connection");
+                                sendSocketData("BT Address and UUID Combo is already connected\n");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = INIT_MENU;
+                    }
+                }
+                else
+                {
+                    processOutputState = INVALID_INPUT;
+                    mainMenuState = INIT_MENU;
+                }
+            }
+            else if(tmp.length == 2)
+            {
+                if(tmp[0].equals("Incoming_Connection"))
+                {
+                    IncomingConnection incomingConnection = parser.incomingConnectionParse(tmp[1]);
+                    if(incomingConnection != null)
+                    {
+                        processOutputState = NONE;
+                        if(Utils.mAppControlService != null)
+                        {
+                            Utils.mAppControlService.startReadyToAcceptConnection(incomingConnection);
+                        }
+                    }
+                }
+                else
+                {
+                    processOutputState = INVALID_INPUT;
+                    mainMenuState = INIT_MENU;
+                }
+            }
+            else if(inputString.equals("Back"))
+            {
+                mainMenuState = INIT_MENU;
+                processOutputState = INIT_MENU;
+                Utils.isThroughputStateMachineUnderProcessing = false;
+            }else if(inputString.equals("Previous_Connections")){
+                mainMenuState = DEVICE_SELECTION_MENU;
+                processOutputState = DEVICE_SELECTION_MENU;
+            }
+            else
+            {
                 processOutputState = INVALID_INPUT;
             }
-
             break;
 
         case MAIN_MENU:
-            if (inputString.equals("Throughput")) {
-                mainMenuState = THROUGHPUT_MENU;
-                processOutputState = THROUGHPUT_MENU;
-            } else if (inputString.equals("Close")) {
-                closeReceived = true;
-                mainMenuState = CONNECT_INIT;
-                processOutputState = SOC_CLOSE_ACK;
-            } else {
+            if(inputString.equals("Throughput")) {
+               mainMenuState = DEVICE_SELECTION_MENU;
+               processOutputState = DEVICE_SELECTION_MENU;
+            }
+            else if(inputString.equals("Back"))
+            {
+                Message message = Message.obtain();
+                message.what = Utils.StateMachineMessageConstants.STATE_READY_TO_CONNECT;
+                processOutputState = THROUGHPUT_TESTING_MENU;
+                mainMenuState = THROUGHPUT_TESTING_MENU;
+            }
+            else
+            {
                 processOutputState = INVALID_INPUT;
             }
             break;
@@ -323,17 +452,19 @@ public class SocketServer {
         case CONNECTION_TEST_MENU:
             Message gapTestMessage = Message.obtain();
             gapTestMessage.what = Utils.StateMachineMessageConstants.STATE_START_GAP_TEST_CASES;
-            Utils.appControlStateMachine.sendMessage(gapTestMessage);
+            Utils.appControlStateMachineforGAP.sendMessage(gapTestMessage);
 
             tmp = inputString.split(" ", 2);
             if (tmp.length == 2) {
                 if (tmp[0].equalsIgnoreCase("OFF_ON")) {
-                    ConnectionTest connectionTestParam = parser.connectionTestParse(tmp[1]);
+                    ConnectionTest connectionTestParam = parser
+                            .connectionTestParse(tmp[1]);
                     if (connectionTestParam != null) {
                         processOutputState = NONE;
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_OFF_ON;
-                        Utils.appControlStateMachine.sendMessage(message);
+                        message.obj = connectionTestParam;
+                        Utils.appControlStateMachineforGAP.sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
@@ -345,65 +476,97 @@ public class SocketServer {
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_SCAN_MODE;
                         message.obj = scanTestParam;
-                        Utils.appControlStateMachine.sendMessage(message);
+                        Utils.appControlStateMachineforGAP.sendMessage(message);
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
-                }
-            }else if (tmp.length == 1) {
-                if (tmp[0].equals("Back")) {
-                    mainMenuState = CONNECT_INIT;
-                    processOutputState = CONNECT_INIT;
+                } else if(tmp[0].equalsIgnoreCase("isConnected")){
+                    Utils.IsConnected isConnectedTestParam = parser.isConnectedParse(tmp[1]);
+                    if (isConnectedTestParam != null) {
+                        processOutputState = NONE;
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_IS_CONNECTED;
+                        message.obj = isConnectedTestParam;
+                        Utils.appControlStateMachineforGAP.sendMessage(message);
+                    } else {
+                        processOutputState = INVALID_INPUT;
+                    }
                 } else {
                     processOutputState = INVALID_INPUT;
                 }
+            }else if (tmp.length == 1) {
+                if (tmp[0].equals("Back")) {
+                    mainMenuState = INIT_MENU;
+                    processOutputState = INIT_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                    gapTestMessage = Message.obtain();
+                    gapTestMessage.what = Utils.StateMachineMessageConstants.STATE_END_GAP_TEST_CASES;
+                    Utils.appControlStateMachineforGAP.sendMessage(gapTestMessage);
+                } else if (tmp[0].equals("Discovery")) {
+                    processOutputState = NONE;
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_GAP_TEST_CASE_START_DISCOVERY;
+                    Utils.appControlStateMachineforGAP.sendMessage(message);
+                } else {
+                    processOutputState = INVALID_INPUT;
+                }
+            } else {
+                processOutputState = INVALID_INPUT;
             }
             break;
 
-        case THROUGHPUT_MENU:
-            tmp = inputString.split(" ", 2);
-            if (tmp.length == 2) {
+            case DEVICE_SELECTION_MENU:
+                try{
+                    int srlNum = Integer.parseInt(inputString);
+                    if(Utils.srlNumToConnectionMap.get(srlNum) != null){
+                        Utils.currentConnection = Utils.srlNumToConnectionMap.get(srlNum);
+                        mainMenuState = TX_RX_MENU;
+                        processOutputState = TX_RX_MENU;
+                    }else{
+                        processOutputState = INVALID_INPUT;
+                    }
+                }catch(NumberFormatException e){
+                    processOutputState = INVALID_INPUT;
+                    if(inputString.equals("Back"))
+                    {
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = MAIN_MENU;
+                    }else
+                    {
+                        processOutputState = INVALID_INPUT;
+                    }
+                }
+            break;
+
+        case TX_RX_MENU:
+            tmp = inputString.split(" ");
+            if (tmp.length == 2 || tmp.length==3) {
                 if (tmp[0].equals("Tx")) {
-                    Tx txParam = parser.txParse(tmp[1]);
+                    Tx txParam = new Tx();
+                    if(tmp.length == 2)
+                         txParam = parser.txParse(tmp[1], "pattern:1");
+                    else if(tmp.length == 3)
+                         txParam = parser.txParse(tmp[1], tmp[2]);
                     if (txParam != null) {
                         processOutputState = NONE;
                         Message message = Message.obtain();
                         message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX;
-                        message.obj = txParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Wakeable")) {
-                    Wakeable wakeableParam = parser.wakeableParse(tmp[1]);
-                    if (wakeableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_WAKEABLE;
-                        message.obj = wakeableParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Actionable")) {
-                    Actionable actionableParam = parser.actionableParse(tmp[1]);
-                    if (actionableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_ACTIONABLE;
-                        message.obj = actionableParam;
-                        Utils.appControlStateMachine.sendMessage(message);
-                    } else {
-                        processOutputState = INVALID_INPUT;
-                    }
-                } else if (tmp[0].equals("Cacheable")) {
-                    Cacheable cacheableParam = parser.cacheableParse(tmp[1]);
-                    if (cacheableParam != null) {
-                        processOutputState = NONE;
-                        Message message = Message.obtain();
-                        message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_TX_CACHEABLE;
-                        message.obj = cacheableParam;
-                        Utils.appControlStateMachine.sendMessage(message);
+                        Log.d(TAG,"Utils.currentConnection map is :: "+Utils.currentConnection);
+                        if(Utils.currentConnection.size() == 1){
+                            Log.d(TAG,"Tx Utils.currentConnection.size is 1");
+                            Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                            while(itr.hasNext())
+                            {
+                                Map.Entry<String, BluetoothSocket> entry = itr.next();
+                                txParam.bt_addr_uuid = entry.getKey();
+                                txParam.socket = entry.getValue();
+                                message.obj = txParam;
+                                Utils.btAddrUUIDToStateMachineMap.get(entry.getKey()).sendMessage(message);
+                            }
+                        }else{
+                            Log.d(TAG,"Utils.currentConnection.size is not 1. Something went wrong");
+                            sendSocketData("Something went wrong. Please try again\n");
+                        }
                     } else {
                         processOutputState = INVALID_INPUT;
                     }
@@ -413,12 +576,41 @@ public class SocketServer {
             } else if (tmp.length == 1) {
                 if (tmp[0].equals("Rx")) {
                     processOutputState = NONE;
+                    Rx rxParam = new Rx();
                     Message message = Message.obtain();
                     message.what = Utils.StateMachineMessageConstants.STATE_START_DATA_RX;
-                    Utils.appControlStateMachine.sendMessage(message);
+                    if(Utils.currentConnection.size() == 1){
+                        Log.d(TAG,"Rx Utils.currentConnection.size is 1");
+                        Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                        while(itr.hasNext())
+                        {
+                            Map.Entry<String, BluetoothSocket> entry = itr.next();
+                            rxParam.bt_addr_uuid = entry.getKey();
+                            rxParam.socket = entry.getValue();
+                            message.obj = rxParam;
+                            Utils.btAddrUUIDToStateMachineMap.get(entry.getKey()).sendMessage(message);
+                        }
+                    }else{
+                        Log.d(TAG,"Utils.currentConnection.size is not 1. Something went wrong");
+                        sendSocketData("Something went wrong. Please try again\n");
+                    }
+                }else if(tmp[0].equals("Disconnect")){
+                    processOutputState = NONE;
+                    if(Utils.currentConnection.size() == 1){
+                        Log.d(TAG,"Utils.currentConnection.size is 1");
+                        Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                        while(itr.hasNext())
+                        {
+                            Map.Entry<String, BluetoothSocket> entry = itr.next();
+                            Utils.mAppControlService.closeConnection(entry.getKey());
+                        }
+                    }else{
+                        Log.d(TAG,"Disconnect Utils.currentConnection.size is not 1. Something went wrong");
+                        sendSocketData("Something went wrong. Please try again\n");
+                    }
                 } else if (tmp[0].equals("Back")) {
-                    mainMenuState = MAIN_MENU;
-                    processOutputState = MAIN_MENU;
+                    mainMenuState = DEVICE_SELECTION_MENU;
+                    processOutputState = DEVICE_SELECTION_MENU;
                 } else {
                     processOutputState = INVALID_INPUT;
                 }
@@ -427,7 +619,6 @@ public class SocketServer {
             }
             break;
         }
-
     }
 
     public static void sendSocketData(String data) {
@@ -466,6 +657,29 @@ public class SocketServer {
 
     public static void updateSocketClient() {
         sendSocketData(INSTANCE.processOutput());
+    }
+
+    public static void cleanUp() {
+        sendSocketData("Application is Closed... Please restart");
+        if (INSTANCE.client != null) {
+            try {
+                INSTANCE.client.close();
+                Log.i(TAG, "client socket closed");
+            } catch (IOException e) {
+                Log.e(TAG, "client socket close failed");
+                e.printStackTrace();
+            }
+            if (INSTANCE.server != null) {
+                try {
+                    INSTANCE.server.close();
+                    Log.i(TAG, "server closed");
+                } catch (IOException e) {
+                    Log.e(TAG, "server close failed");
+                    e.printStackTrace();
+                }
+            }
+        }
+        INSTANCE.commHandler.interrupt();
     }
 
 }

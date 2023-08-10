@@ -25,17 +25,38 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
 
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
+
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class Utils {
 
     public static String bdAddressFromConfig = null;
-    public static AppControlStateMachine appControlStateMachine = null;
+    public static AppControlStateMachine appControlStateMachineforGAP = null;
+    public static AppControlService mAppControlService = null;
     public static SocketServer socServer = SocketServer.getInstance();
+    public static boolean isThroughputStateMachineUnderProcessing = false;
+
+    // Hashmap storing <BTAddr_UUID_ConnectionDirection, StateMachine>
+    public static HashMap<String, AppControlStateMachine> btAddrUUIDToStateMachineMap = new HashMap<String,AppControlStateMachine>();
+    // Hashmap storing <BTAddr_UUID_ConnectionDirection, Socket>
+    public static HashMap<String, BluetoothSocket> btAddrUUIDToBTSocketMap = new HashMap<String, BluetoothSocket>();
+    // Hashmap storing <SerialNum, HashMap<BTAddr_UUID_ConnectionDirection, BluetoothSocket>>
+    public static HashMap<Integer, HashMap<String, BluetoothSocket>> srlNumToConnectionMap = new HashMap<Integer, HashMap<String, BluetoothSocket>>();
+    // Current Connection Under Process
+    public static HashMap<String, BluetoothSocket> currentConnection = null;
 
     public static class AppControlConstants {
 
@@ -47,13 +68,12 @@ public class Utils {
         static final String BD_ADDRESS_NOT_AVAILABLE = "BD_ADDRESS_NOT_AVAILABLE";
         static final String END_TX_OPERATION = "END_TX_OPERATION";
         static final String END_RX_OPERATION = "END_RX_OPERATION";
+        static final String BT_OFF_COMMAND = "svc bluetooth disable";
+        static final String BT_ON_COMMAND = "svc bluetooth enable";
 
         // RFCOMM Use-case Commands
         static final String USE_CASE_RFCOMM_TPUT_TX = "USE_CASE_RFCOMM_TPUT_TX";
         static final String USE_CASE_RFCOMM_TPUT_RX = "USE_CASE_RFCOMM_TPUT_RX";
-        static final String USE_CASE_RFCOMM_OFFLOAD_WAKEABLE_NOTIFICATION = "USE_CASE_RFCOMM_OFFLOAD_WAKEABLE_NOTIFICATION";
-        static final String USE_CASE_RFCOMM_OFFLOAD_ACTIONABLE_NOTIFICATION = "USE_CASE_RFCOMM_OFFLOAD_ACTIONABLE_NOTIFICATION";
-        static final String USE_CASE_RFCOMM_OFFLOAD_CACHEABLE_NOTIFICATION = "USE_CASE_RFCOMM_OFFLOAD_CACHEABLE_NOTIFICATION";
 
     }
 
@@ -71,25 +91,44 @@ public class Utils {
         static final int STATE_END_DATA_RX = 8;
         static final int STATE_DATA_RX_FAILED = 9;
 
-        static final int STATE_START_DATA_TX_WAKEABLE = 10;
-        static final int STATE_END_DATA_TX_WAKEABLE = 11;
-
-        static final int STATE_START_DATA_TX_ACTIONABLE = 12;
-        static final int STATE_END_DATA_TX_ACTIONABLE = 13;
-
-        static final int STATE_START_DATA_TX_CACHEABLE = 14;
-        static final int STATE_END_DATA_TX_CACHEABLE = 15;
-
         static final int STATE_START_GAP_TEST_CASES = 16;
         static final int STATE_GAP_TEST_CASE_OFF_ON = 17;
         static final int STATE_GAP_TEST_CASE_SCAN_MODE = 18;
         static final int STATE_GAP_TEST_CASE_END_SCAN_MODE = 19;
-
+        static final int STATE_GAP_TEST_CASE_END_OFF_ON = 20;
+        static final int STATE_GAP_TEST_CASE_START_DISCOVERY = 21;
+        static final int STATE_GAP_TEST_CASE_END_DISCOVERY = 22;
+        static final int STATE_END_GAP_TEST_CASES = 23;
+        static final int STATE_READY_TO_ACCEPT_CONNECTION = 24;
+        static final int STATE_REGISTER_BLUETOOTH_HID = 25;
+        static final int STATE_GAP_TEST_CASE_IS_CONNECTED = 30;
     }
 
-    public static class UUIDConstants {
+    public static class UUIDConstants
+    {
         static final UUID APP_UUID = UUID
                 .fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
+        static final UUID APP_SERVER_UUID = UUID
+            .fromString("8ce255c0-200a-11e0-ac64-0800200c9a77");
+        static UUID INCOMING_CONNECTION_UUID = null;
+    }
+
+    public static class ConnectionUnderOperation{
+        String bt_addr_uuid;
+        BluetoothSocket socket;
+    }
+
+    public static String ellipsize(String input, int maxLength) {
+        String ellip = "...";
+        if (input == null || input.length() <= maxLength
+               || input.length() < ellip.length()) {
+            return input;
+        }
+        return input.substring(0, maxLength - ellip.length()).concat(ellip);
+    }
+
+    public static class IsConnected {
+        String BDaddress;
     }
 
 }

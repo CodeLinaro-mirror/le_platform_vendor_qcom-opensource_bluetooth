@@ -25,6 +25,11 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ *
  */
 
 package org.codeaurora.bluetooth.wearos_bluetooth_rfcomm_testapp;
@@ -43,46 +48,63 @@ public class ConfigFileParser {
 
     }
 
-    public void parseText() {
-        String file = "/system/bin/config.txt";
-        try {
-            BufferedInputStream bf = new BufferedInputStream(
-                    new FileInputStream(file));
-            BufferedReader br = new BufferedReader(new InputStreamReader(bf));
-            String data;
-            // Read till end of file
-            while ((data = br.readLine()) != null) {
-                String[] splitData = data.split("=");
-                if (splitData.length != 0) {
-                    Utils.bdAddressFromConfig = splitData[1];
-                }
-            }
-            br.close();
-        } catch (Exception e) {
-            System.out.println("Error is :: " + e);
-        }
-    }
-
-    public Connect connectParse(String input) {
+    public Connect connectParse(String input1, String input2) {
         Connect connect = new Connect();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("bdAddress")) {
-                connect.BDaddress = tmp[1];
+
+        String tmp1[] = input1.split(":", 2);
+        Log.d(TAG, "tmp1.length is ::" + tmp1.length);
+
+        String tmp2[] = input2.split(":", 2);
+        Log.d(TAG, "tmp2.length is ::" + tmp2.length);
+
+        if (tmp1.length == 2 && tmp2.length ==2) {
+            if (tmp1[0].equals("bdAddress") && tmp2[0].equals("uuid"))
+            {
+                Log.d(TAG, "tmp1[1] is ::" + tmp1[1]);
+                Log.d(TAG, "tmp2[1] is ::" + tmp2[1]);
+                connect.bdAddress = tmp1[1];
+                connect.uuid = tmp2[1];
             }
+            else
+            {
+                connect = null;
+            }
+        }
+        else
+        {
+            connect = null;
         }
         return connect;
     }
 
-    public Tx txParse(String input) {
-        Log.d(TAG, "txParse input is ::" + input);
-        Tx tx = new Tx();
+    public Utils.IsConnected isConnectedParse(String input) {
+        Log.d(TAG,"isConnectedParse :: "+input);
+        Utils.IsConnected isConnected = new Utils.IsConnected();
         String tmp[] = input.split(":", 2);
-        Log.d(TAG, "tmp.length is ::" + tmp.length);
         if (tmp.length == 2) {
-            if (tmp[0].equals("chunkSize")) {
-                Log.d(TAG, "tmp[1] is ::" + tmp[1]);
-                tx.chunkSize = Integer.parseInt(tmp[1]);
+            if (tmp[0].equals("bdAddress")) {
+                Log.d(TAG,"isConnectedParse :: "+tmp[1]);
+                isConnected.BDaddress = tmp[1];
+            }
+        }
+        return isConnected;
+    }
+
+    public Tx txParse(String input1, String input2) {
+        Log.d(TAG, "txParse input is ::" + input1 + " "+ input2);
+        Tx tx = new Tx();
+        String tmp1[] = input1.split(":", 2);
+        Log.d(TAG, "tmp1.length is ::" + tmp1.length);
+
+        String tmp2[] = input2.split(":", 2);
+        Log.d(TAG, "tmp2.length is ::" + tmp2.length);
+
+        if (tmp1.length == 2 && tmp2.length ==2) {
+            if (tmp1[0].equals("chunkSize") && tmp2[0].equals("pattern")) {
+                Log.d(TAG, "tmp1[1] is ::" + tmp1[1]);
+                Log.d(TAG, "tmp2[1] is ::" + tmp2[1]);
+                tx.chunkSize = Integer.parseInt(tmp1[1]);
+                tx.pattern = Integer.parseInt(tmp2[1]);
             } else {
                 tx = null;
             }
@@ -92,50 +114,6 @@ public class ConfigFileParser {
         return tx;
     }
 
-    public Wakeable wakeableParse(String input) {
-        Wakeable wakeable = new Wakeable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                wakeable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                wakeable = null;
-            }
-        } else {
-            wakeable = null;
-        }
-        return wakeable;
-    }
-
-    public Actionable actionableParse(String input) {
-        Actionable actionable = new Actionable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                actionable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                actionable = null;
-            }
-        } else {
-            actionable = null;
-        }
-        return actionable;
-    }
-
-    public Cacheable cacheableParse(String input) {
-        Cacheable cacheable = new Cacheable();
-        String tmp[] = input.split(":", 2);
-        if (tmp.length == 2) {
-            if (tmp[0].equals("timer")) {
-                cacheable.timer = Integer.parseInt(tmp[1]);
-            } else {
-                cacheable = null;
-            }
-        } else {
-            cacheable = null;
-        }
-        return cacheable;
-    }
 
     public ConnectionTest connectionTestParse(String input){
         ConnectionTest connectionTest = new ConnectionTest();
@@ -167,4 +145,72 @@ public class ConfigFileParser {
        return scanMode;
    }
 
+    public IncomingConnection incomingConnectionParse(String input) {
+        IncomingConnection incomingConnection = new IncomingConnection();
+        String tmp[] = input.split(":", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("uuid")) {
+                incomingConnection.uuid = tmp[1];
+            } else {
+                incomingConnection = null;
+            }
+        } else {
+            incomingConnection = null;
+        }
+        return incomingConnection;
+    }
+
+    public StringBuilder notificationInfoParse(byte[] bytes) {
+        StringBuilder notString = new StringBuilder();
+        String att_value;
+        byte att_id = bytes[5];
+        int att_length = 0xff & bytes[6];
+        att_value = new String(bytes, 7, att_length);
+        switch (att_id) {
+        case 0x01:
+            notString.append("Caller Number : ");
+            break;
+        case 0x02:
+            notString.append("Caller Name : ");
+            break;
+        case 0x03:
+            notString.append("Email Address : ");
+            break;
+        case 0x04:
+            notString.append("Email Subject :");
+            break;
+        case 0x05:
+            notString.append("Email Body\n");
+            break;
+        default:
+            Log.e(TAG, "Invalid get Attribute ID");
+            break;
+        }
+        notString.append(att_value);
+        notString.append("\n");
+        return notString;
+    }
+
+    public byte[] getActionPacket(byte action, byte getID, byte[] handle) {
+        byte[] actionPacket = new byte[7];
+        actionPacket[0] = 0x00;
+        actionPacket[1] = 0x06; // packet length
+        actionPacket[2] = (byte) 0xE4; // packet code
+        actionPacket[3] = handle[0]; //
+        actionPacket[4] = handle[1]; // Notification handle
+        actionPacket[5] = getID; // Notification Attribute ID
+        actionPacket[6] = action; // Notification Action ID
+        return actionPacket;
+    }
+
+    public byte[] getReadInfoPacket(byte getID, byte[] handle) {
+        byte[] readPacket = new byte[6];
+        readPacket[0] = 0x00;
+        readPacket[1] = 0x06; // packet length
+        readPacket[2] = (byte) 0xE2; // packet code
+        readPacket[3] = handle[0]; //
+        readPacket[4] = handle[1]; // Notification handle
+        readPacket[5] = getID; // Notification Attribute ID
+        return readPacket;
+    }
 }
