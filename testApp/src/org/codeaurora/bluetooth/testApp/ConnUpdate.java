@@ -30,9 +30,9 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class ConnUpdate {
-    int ConnIntervalMin;
-    int ConnIntervalMax;
-    int ConnSlaveLatency;
-    int ConnSupTO;
+    public int ConnIntervalMin;
+    public int ConnIntervalMax;
+    public int ConnSlaveLatency;
+    public int ConnSupTO;
 }
 

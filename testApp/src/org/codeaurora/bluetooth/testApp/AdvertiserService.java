@@ -40,7 +40,7 @@ public class AdvertiserService extends Service {
 
     private static String TAG = "ADV SERVICE";
     private ArrayList<AdvertiserEntity> advertisements;
-    private static final int MAX_ADVERTISEMENTS = 4;
+    private static final int MAX_ADVERTISEMENTS = 16;
     private AdvServiceCallback mAdvServiceCb;
 
     public class LocalBinder extends Binder {
@@ -64,7 +64,7 @@ public class AdvertiserService extends Service {
     @Override
     public void onCreate() {
         Log.d(TAG,"onCreate");
-        // max size of ArrayList is limited to 4 using MAX_ADVERTISEMENTS
+        // max size of ArrayList is limited to 16 using MAX_ADVERTISEMENTS
         advertisements = new ArrayList<AdvertiserEntity>();
         mAdvServiceCb = new AdvServiceCallback();
         super.onCreate();

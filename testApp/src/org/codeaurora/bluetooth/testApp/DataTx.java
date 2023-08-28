@@ -29,9 +29,11 @@
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
-    public class DataTx {
-           public String charData;
-	   public String txService;
-	   public String txChar;
-    }
+public class DataTx {
+    public int Mtu_Size;
+    public int Packet_Size;
+    public long Num_Packets;
+    public String txService;
+    public String txChar;
+}
 

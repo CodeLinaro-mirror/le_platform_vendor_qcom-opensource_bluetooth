@@ -54,8 +54,10 @@ public class AdvertiserEntity {
     public static final int ADV_STARTED = 0x00;
     public static final int ADV_STOPPED = 0x01;
     public static final int ADV_FAILED = 0x02;
+    private String invalidParam = "XX";
 
-    private int PERIODIC_INTERVAL = 200;//TODO: currently default 200 millisecs
+    private byte[] manuData;
+    private BluetoothAdapter mBTAdapter = MainActivity.bleAdapter;
 
     Adv adv_info;
     Timer advStopTimer = new Timer();
@@ -195,17 +197,12 @@ public class AdvertiserEntity {
         this.adv_info = adv_info;
         this.adv_id = adv_id;
         this.mAdvServiceCb = mAdvServiceCb;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mAdvertiser = BluetoothAdapter.getDefaultAdapter().getBluetoothLeAdvertiser();
-        }
+        // Advertiser
+        mAdvertiser = mBTAdapter.getBluetoothLeAdvertiser();
         //Set ADV callback
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mAdvCallback = new AdvCallback();
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            mAdvSetCallback = new AdvSetCallback();
-        }
+        mAdvCallback = new AdvCallback();
+        // Adv Set callback
+        mAdvSetCallback = new AdvSetCallback();
     }
 
     public Adv getAdv_info() {
@@ -272,32 +269,28 @@ public class AdvertiserEntity {
         Log.d(TAG,"BuildAdvertisementParameters");
         try {
             if(adv_info.Legacy) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    mAdvSettings = new AdvertiseSettings.Builder()//below values should be valid
-                            .setAdvertiseMode(adv_info.AdvertiseMode)
-                            .setTxPowerLevel(adv_info.TxPower)
-                            .setConnectable(adv_info.Connectable)
-                            .setTimeout(adv_info.Interval)
-                            .build();
-                    Log.d(TAG,"BuildAdvertisementParameters Legacy done");
-                    return true;
-                }
+                mAdvSettings = new AdvertiseSettings.Builder()//below values should be valid
+                        .setAdvertiseMode(adv_info.AdvertiseMode)
+                        .setTxPowerLevel(adv_info.TxPower)
+                        .setConnectable(adv_info.Connectable)
+                        .setTimeout(adv_info.TimeOutLegacy)
+                        .build();
+                Log.d(TAG,"BuildAdvertisementParameters Legacy done");
+                return true;
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    mAdvParams = new AdvertisingSetParameters.Builder()
-                            .setConnectable(adv_info.Connectable)
-                            .setScannable(adv_info.Scannable)
-                            .setLegacyMode(adv_info.Legacy)//TODO
-                            .setAnonymous(adv_info.Anonymous)
-                            .setIncludeTxPower(adv_info.IncludePower)
-                            .setPrimaryPhy(adv_info.PrimaryPhy)
-                            .setSecondaryPhy(adv_info.SecondaryPhy)
-                            .setInterval(adv_info.Interval)
-                            .setTxPowerLevel(adv_info.TxPower)
-                            .build();
-                    Log.d(TAG,"BuildAdvertisementParameters Ext done");
-                    return true;
-                }
+                mAdvParams = new AdvertisingSetParameters.Builder()
+                        .setConnectable(adv_info.Connectable)
+                        .setScannable(adv_info.Scannable)
+                        .setLegacyMode(adv_info.Legacy)//TODO
+                        .setAnonymous(adv_info.Anonymous)
+                        .setIncludeTxPower(adv_info.IncludePower)
+                        .setPrimaryPhy(adv_info.PrimaryPhy)
+                        .setSecondaryPhy(adv_info.SecondaryPhy)
+                        .setInterval(adv_info.Interval)
+                        .setTxPowerLevel(adv_info.TxPower)
+                        .build();
+                Log.d(TAG,"BuildAdvertisementParameters Ext done");
+                return true;
             }
         } catch (Exception e) {
             Log.e(TAG,"Exception : "+ e.toString());
@@ -309,36 +302,56 @@ public class AdvertiserEntity {
         Log.d(TAG,"BuildAdvertisementData");
         try {
             if(adv_info.Legacy){
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                AdvertiseData.Builder legacyData = new AdvertiseData.Builder();
+                legacyData.setIncludeDeviceName(true);
+                legacyData.setIncludeTxPowerLevel(adv_info.IncludePower);
+                if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
                     ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                    mAdvData = new AdvertiseData.Builder()
-                            .setIncludeDeviceName(true)
-                            .addServiceUuid(pUuid)
-                            .setIncludeTxPowerLevel(adv_info.IncludePower)
-                            //For legacy mode don't add service data and service UUID?
-                            //.addManufacturerData(adv_info.ManufacturerId,
-                            //adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")))
-                            //.addServiceData(pUuid,adv_info.ServiceData.getBytes(
-                            //Charset.forName("UTF-8")))
-                            .build();
-                    Log.d(TAG,"BuildAdvertisementData done");
-                    return true;
+                    legacyData.addServiceUuid(pUuid);
+                    Log.d(TAG, "service uuid added");
                 }
+                if(!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam))) {
+                  String[] manufacturerData = adv_info.ManufacturerData.split(",");
+                  if(manufacturerData!= null && (manufacturerData).length>0) {
+                      manuData = new byte[manufacturerData.length];
+                      for(int i=0; i< manuData.length; i++) {
+                          manuData[i] = Byte.parseByte(manufacturerData[i],16);
+                      }
+                  }
+                  if(manuData != null && manuData.length >0) {
+                    for(int j=0; j< manuData.length; j++) {
+                        Log.d(TAG, "manufacturerData::"+manuData[j]);
+                    }
+                }
+                  legacyData.addManufacturerData(adv_info.ManufacturerId,manuData);
+                  Log.d(TAG, "manu data added");
+                }
+                mAdvData = legacyData.build();
+                Log.d(TAG,"BuildAdvertisementData done");
+                return true;
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                    mAdvData = new AdvertiseData.Builder()
-                            .setIncludeDeviceName(true)
-                            .addServiceUuid(pUuid)
-                            .setIncludeTxPowerLevel(adv_info.IncludePower)
-                            .addManufacturerData(adv_info.ManufacturerId,
-                                adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")))
-                            //.addServiceData(pUuid,
-                            //adv_info.ServiceData.getBytes(Charset.forName("UTF-8")))
-                            .build();
-                    Log.d(TAG,"BuildAdvertisementData done");
-                    return true;
+                AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
+                dataBuilder.setIncludeDeviceName(true);
+                dataBuilder.setIncludeTxPowerLevel(adv_info.IncludePower);
+                if(!(adv_info.ServiceUuid.equalsIgnoreCase(invalidParam))) {
+                   Log.d(TAG,"Setting Service UUID");
+                   ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                   dataBuilder.addServiceUuid(pUuid);
+                   if(!(adv_info.ServiceData.equalsIgnoreCase(invalidParam))) {
+                       Log.d(TAG,"Setting Service data");
+                       dataBuilder.addServiceData(pUuid,
+                               adv_info.ServiceData.getBytes(Charset.forName("UTF-8")));
+                   }
                 }
+                if((adv_info.ManufacturerId != 0) ||
+                    (!(adv_info.ManufacturerData.equalsIgnoreCase(invalidParam)))) {
+                    Log.d(TAG,"Setting Manufacture data");
+                    dataBuilder.addManufacturerData(adv_info.ManufacturerId,
+                            adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")));
+                }
+                mAdvData = dataBuilder.build();
+                Log.d(TAG,"BuildAdvertisementData done");
+                return true;
             }
         } catch (Exception e) {
             Log.e(TAG,"Exception : " + e.toString());
@@ -350,13 +363,11 @@ public class AdvertiserEntity {
         Log.d(TAG,"SetPeriodicAdvParams");
         try {
             if(adv_info.Periodic){
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    mPeriodicAdvParams = new PeriodicAdvertisingParameters.Builder()
-                            .setIncludeTxPower(adv_info.IncludePower)
-                            .setInterval(PERIODIC_INTERVAL)
-                            .build();
-                    return true;
-                }
+                mPeriodicAdvParams = new PeriodicAdvertisingParameters.Builder()
+                        .setIncludeTxPower(adv_info.IncludePower)
+                        .setInterval(adv_info.PerAdvInterval)
+                        .build();
+                return true;
             } else {
                 mPeriodicAdvParams = null;
                 return true;
@@ -381,6 +392,9 @@ public class AdvertiserEntity {
         Log.d(TAG,"SetScanResponseData");
         if(adv_info.Scannable){
             mScanResponseData = mAdvData;
+            if(!adv_info.Legacy){
+                mAdvData = null;
+            }
         } else {
             mScanResponseData = null;
         }
@@ -420,24 +434,20 @@ public class AdvertiserEntity {
             return status;
         }
 
-        if(adv_info.Scannable) {
-           status = SetScanResponseData();
-           if(!status) {
-               Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
-               return status;
-           }
+       status = SetScanResponseData();
+       if(!status) {
+           Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
+           return status;
         }
+
         try {
             if(adv_info.Legacy){
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    mAdvertiser.startAdvertising(mAdvSettings,mAdvData,mAdvCallback);
-                }
+                mAdvertiser.startAdvertising(mAdvSettings,mAdvData,mAdvCallback);
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    mAdvertiser.startAdvertisingSet(mAdvParams,mAdvData,
-                                                    mScanResponseData,mPeriodicAdvParams,
-                                                    mPeriodicData,mAdvSetCallback);
-                }
+                Log.d(TAG, "Max Adv Events:"+adv_info.MaxAdvEvents);
+                mAdvertiser.startAdvertisingSet(mAdvParams,mAdvData,
+                                                mScanResponseData,mPeriodicAdvParams,
+                                                mPeriodicData,0,adv_info.MaxAdvEvents,mAdvSetCallback);
             }
             //timer has started
             mStopAdvTimer.schedule(mStopAdvTimerTask,adv_info.AdvTO);
@@ -452,15 +462,11 @@ public class AdvertiserEntity {
         Log.d(TAG,"StopAdvertisement");
         try {
             if(adv_info.Legacy){
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    mAdvertiser.stopAdvertising(mAdvCallback);
-                    return true;
-                }
+                mAdvertiser.stopAdvertising(mAdvCallback);
+                return true;
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    mAdvertiser.stopAdvertisingSet(mAdvSetCallback);
-                    return true;
-                }
+                mAdvertiser.stopAdvertisingSet(mAdvSetCallback);
+                return true;
             }
         } catch (Exception e) {
             Log.e(TAG,"Exception : "+ e.toString());
