@@ -135,6 +135,7 @@ public class GattClient {
     public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 14;
     public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 15;
     public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 16;
+    public static final int MSG_START_CANCEL_CONNECT = 34;
 
     public static final int MSG_REM_DEV_FAILED_TO_CONNECT = 17;
     public static final int MSG_REFRESH_SERV_DONE = 18;
@@ -586,6 +587,9 @@ public class GattClient {
                         processCheckAndStartBleScan(scn);
                     }
                     break;
+                case MSG_START_CANCEL_CONNECT:
+                    processCancelConnect();
+                    break;
                 case MSG_BLE_SCAN_DEV_FOUND:
                     BluetoothDevice device = (BluetoothDevice) msg.obj;
                     processScanDevFound(device);
@@ -755,6 +759,23 @@ public class GattClient {
             PrintStr.setLength(0);
             PrintStr.append("Scanning Started!");
             SocketServer.sendSocketData(PrintStr.toString());
+        }
+
+        private void processCancelConnect() {
+            Log.i(TAG, "processCancelConnect mConnectionStatus: " + mConnectionStatus
+                    + " mScanStatus: "+ MainActivity.mScannerService.mScanstatus);
+            if(MainActivity.mScannerService.mScanstatus) {
+                MainActivity.mScannerService.stopScan();
+                PrintStr.setLength(0);
+                PrintStr.append("Scan Stopped!");
+                SocketServer.sendSocketData(PrintStr.toString());
+            } else if (mConnectionStatus == BLE_STATE_CONNECTING) {
+                mConnectionStatus = BLE_STATE_DISCONNECTED;
+                mgattClient.disconnect();
+                PrintStr.setLength(0);
+                PrintStr.append("Connection cancelled!");
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         }
 
         private void processScanDevFound(BluetoothDevice device) {
