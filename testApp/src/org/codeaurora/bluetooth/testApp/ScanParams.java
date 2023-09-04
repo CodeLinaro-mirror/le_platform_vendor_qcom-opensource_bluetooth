@@ -108,6 +108,11 @@ public final class ScanParams {
             mDeviceName = this.DeviceName;
         }
 
+        if(this.ReportDelay != 0) {
+            Log.d(TAG, "Report delay" + this.ReportDelay);
+            MainActivity.batch_scan = true;
+        }
+
         if(this.DeviceAddress != null && (this.DeviceAddress.length() > 2)) {
             Log.d(TAG, "DeviceAddress::" + this.DeviceAddress);
             mDeviceAddress = this.DeviceAddress;
