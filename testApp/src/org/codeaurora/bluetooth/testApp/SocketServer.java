@@ -225,8 +225,8 @@ public class SocketServer {
                     sendStr.append("                     AdvStart      (Ex: AdvStart TxPower:1;Legacy:true;Periodic:false;PerAdvInterval:200;Connectable:true;\n");
                     sendStr.append("                                                 Scannable:true;Anonymous:false;IncludePower:true;PrimaryPhy:1;SecondaryPhy:1;\n");
                     sendStr.append("                                                 MaxExtAdvEvents:0;Interval:160;TimeOutLegacy:10000;AdvertiseMode:0;\n");
-                    sendStr.append("                                                 ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;ManufacturerId:32;ManufacturerData:adv;\n");
-                    sendStr.append("                                                 ServiceDataUuid:0000FF01-0000-1000-8000-00805F9B34FB;ServiceData:abcdabcdabcdabcdabcdab)\n");
+                    sendStr.append("                                                 ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;ManufacturerId:32;ManufacturerData:1,1,1;\n");
+                    sendStr.append("                                                 ServiceDataUuid:0000FF01-0000-1000-8000-00805F9B34FB;ServiceData:abcdabcd(only for ext adv)\n");
                     sendStr.append("                     AdvStop       (Ex: AdvStop 1)\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*****************************************************\n");
@@ -234,9 +234,9 @@ public class SocketServer {
 
                 case SCAN_MENU:
                     sendStr.append("\n******************** Bt Test App ********************\n");
-                    sendStr.append("                     ScanStart      (Ex: ScanStart DeviceName:Minato;DeviceAddress:XX;ServiceUuid:XX;\n");
-                    sendStr.append("                                                   SvcMaskUuid:XX;ManufacturerId:XX;ManufacturerData:XX;ManuMaskData:XX;\n");
-                    sendStr.append("                                                   ServiceDataUuid:XX;ServiceData:XX;SvcDataMask:XX;ScanMode:1;CallbackType:1;\n");
+                    sendStr.append("                     ScanStart      (Ex: ScanStart DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
+                    sendStr.append("                                                   SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
+                    sendStr.append("                                                   ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                   ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ScanStop\n");
                     sendStr.append("                     Back\n");
@@ -245,9 +245,9 @@ public class SocketServer {
 
                 case THROUGHPUT_MENU:
                     sendStr.append("\n******************** Throughput Menu ********************\n");
-                    sendStr.append("                     Connect        (Ex: Connect DeviceName:Minato;DeviceAddress:XX;ServiceUuid:XX;\n");
-                    sendStr.append("                                                 SvcMaskUuid:XX;ManufacturerId:XX;ManufacturerData:XX;ManuMaskData:XX;\n");
-                    sendStr.append("                                                 ServiceDataUuid:XX;ServiceData:XX;SvcDataMask:XX;ScanMode:1;CallbackType:1;\n");
+                    sendStr.append("                     Connect        (Ex: Connect DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
+                    sendStr.append("                                                 SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
+                    sendStr.append("                                                 ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ConnUpdate     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
@@ -265,10 +265,10 @@ public class SocketServer {
 
                 case GATT_CLIENT_MENU:
                     sendStr.append("\n******************** Gatt Client Menu ********************\n");
-                    sendStr.append("                     Connect                        (Ex: Connect DeviceName:Minato;DeviceAddress:XX;ServiceUuid:XX;\n");
-                    sendStr.append("                                                                 SvcMaskUuid:XX;ManufacturerId:XX;ManufacturerData:XX;ManuMaskData:XX;\n");
-                    sendStr.append("                                                                 ServiceDataUuid:XX;ServiceData:XX;SvcDataMask:XX;ScanMode:1;CallbackType:1;\n");
-                    sendStr.append("                                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
+                    sendStr.append("                     Connect        (Ex:    Connect DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
+                    sendStr.append("                                                    SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
+                    sendStr.append("                                                    ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
+                    sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
                     sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
@@ -277,11 +277,11 @@ public class SocketServer {
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
-                    sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1;ServiceUuid:XX;CharUuid:XX;Value:XX;WriteType:2)\n");
-                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2;ServiceUuid:XX;CharUuid:XX;DescUuid:XX;)\n");
-                    sendStr.append("                     RegNotifications               (Ex: RegNotifications ServiceUuid:XX;CharUuid:XX)\n");
-                    sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:XX;CharUuid:XX)\n");
-                    sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:XX;CharUuid:XX;Value:XX;WriteType:2)\n");
+                    sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2)\n");
+                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;)\n");
+                    sendStr.append("                     RegNotifications               (Ex: RegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2)\n");
                     sendStr.append("                     AbortReliableWrite\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");
