@@ -181,6 +181,7 @@ public class ScannerService extends Service {
     private void resetScanParams() {
         mScanSettings = null;
         mScanFilters = null;
+        MainActivity.batch_scan = false;
     }
 
     @Override
@@ -218,7 +219,7 @@ public class ScannerService extends Service {
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
             mDeviceList.add(bluetoothDevice);
             mScanResult.add(r);
-            
+
             MainActivity.scanList = new MainActivity.ScanList();
             MainActivity.scanList.devName = devName;
             MainActivity.scanList.devAddr = bluetoothDevice.getAddress();
@@ -236,7 +237,7 @@ public class ScannerService extends Service {
             if(ScannerService.LOG_LEVEL >= 2) {
                 Log.d(TAG, "current time stamp is " + SystemClock.elapsedRealtimeNanos());
                 Log.d(TAG, "onBatchScanResults - size " + batchResultSize);
-                MainActivity.batch_scan = true;
+
                 StringBuilder PrintStr = new StringBuilder();
 
                 if (!results.isEmpty()) {
@@ -261,6 +262,7 @@ public class ScannerService extends Service {
             if(ScannerService.LOG_LEVEL >= 2) {
                 Log.d(TAG, "Failed to start scan " + errorCode);
             }
+            MainActivity.batch_scan = false;
             StringBuilder PrintStr = new StringBuilder();
 
             PrintStr.setLength(0);
