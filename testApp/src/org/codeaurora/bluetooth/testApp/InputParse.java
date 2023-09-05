@@ -27,7 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package vendor.qti.wearos_ble_testapp;
+package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.util.Log;
 
