@@ -51,8 +51,6 @@ import android.os.Handler;
 import android.os.ParcelUuid;
 import android.os.Message;
 import android.os.RemoteException;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 
 import java.util.List;
 import java.util.UUID;
@@ -139,7 +137,6 @@ public class ThroughputStateMachine {
     private static DataRx DataRxClass;
     private static LatencyTest LatencyTestClass;
 
-    public static WakeLock wl;
 
     public ThroughputStateMachine(Context mcontext) {
         this.mcontext = mcontext;
@@ -780,7 +777,8 @@ public class ThroughputStateMachine {
                         mBleConnect.unpair();
                         break;
                     case MSG_TA_SM_TX_TEST_DONE:
-                        wl.release();
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
                         Log.d(TAG,"Release wakelock");
                         PrintStr.setLength(0);
                         String tput = (String) message.obj;
@@ -799,7 +797,8 @@ public class ThroughputStateMachine {
                             Thread t = new Thread(tt);
                             if(!t.isAlive()) {
                                 t.start();
-                                wl.acquire();
+                                MainActivity.wl.acquire();
+                                MainActivity.wl_acquired = true;
                                 Log.d(TAG,"acquire wakelock");
                                 PrintStr.setLength(0);
                                 PrintStr.append("Data Tx Thread Started");
@@ -970,16 +969,9 @@ public class ThroughputStateMachine {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                /* start rx thread */
-                DataRxthread rt = new DataRxthread();
-                Thread t = new Thread(rt);
-                if(!t.isAlive()) {
-                    t.start();
-                    PrintStr.setLength(0);
-                    PrintStr.append("Data Rx Thread Started");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                } else {
-                    Log.i(TAG, "Thread is already running");
+                /* MTU Exchange */
+                if(mBleConnect.mBluetoothGatt.requestMtu(DataRxClass.Mtu_Size)) {
+                    Log.i(TAG, "MTU size requested to max size");
                 }
             }
 
@@ -1003,7 +995,26 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_UNPAIR_DEV:
                         mBleConnect.unpair();
                         break;
+                    case MSG_TA_SM_MTU_EXCHANGE_DONE:
+                        Log.d(TAG,"MTU size exchanged");
+                        /* start rx thread */
+                        DataRxthread rt = new DataRxthread();
+                        Thread t = new Thread(rt);
+                        if(!t.isAlive()) {
+                            t.start();
+                            MainActivity.wl.acquire();
+                            MainActivity.wl_acquired = true;
+                            Log.d(TAG,"acquire wakelock");
+                            PrintStr.setLength(0);
+                            PrintStr.append("Data Rx Thread Started");
+                            SocketServer.sendSocketData(PrintStr.toString());
+                        } else {
+                            Log.i(TAG, "Thread is already running");
+                        }
+                       break;
                     case MSG_TA_SM_RX_TEST_DONE:
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
                         PrintStr.setLength(0);
                         String rxtput = (String) message.obj;
                         PrintStr.append("Data Rx Throughput in kbps:");
@@ -1027,6 +1038,10 @@ public class ThroughputStateMachine {
                     final UUID UUID_RX_CHAR = UUID.fromString(DataRxClass.rxChar);
                     final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
                     int rx_data_size = 244;
+                    /* Set the packet size to maximum possible if it exceeds mtu size */
+                    if(rx_data_size > (DataRxClass.Mtu_Size - 3)) {
+                        rx_data_size = DataRxClass.Mtu_Size - 3;
+                    }
                     wait_for_gatt_service_discovery();
                     //battery service and characteristic
                     BluetoothGattService mService =
@@ -1087,6 +1102,14 @@ public class ThroughputStateMachine {
                                         " in sec");
                                 }
                                 Thread.sleep((DataRxClass.NotificationsTime)*1000);
+                                }
+                            catch(InterruptedException e){
+                                Log.e(TAG, "error in thread sleep");
+                            }
+                            /* wait for extra 20 seconds incase of l2cap congestion on the remote */
+                            try {
+                                Log.d(TAG, "Sleep for 20 sec");
+                                Thread.sleep(20000);
                             }
                             catch(InterruptedException e){
                                 Log.e(TAG, "error in thread sleep");
