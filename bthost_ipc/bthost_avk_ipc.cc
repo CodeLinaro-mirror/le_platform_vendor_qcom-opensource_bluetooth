@@ -93,17 +93,26 @@ struct a2dp_avk_stream_common {
 };
 
 typedef struct {
+    uint32_t bitrate;
+    uint32_t bitrate_mode; // 0 - unknown, 1 - avg, 2 - max
+    uint32_t mtu;
+} audio_sink_buffer_config_t;
+
+typedef struct {
+    audio_sink_buffer_config_t snk_buffer;
+    uint32_t      audio_object_type; /* LC */
     uint16_t      aac_fmt_flag; /* LATM*/
-    uint16_t      audio_object_type; /* LC */
     uint16_t      channels; /* Stereo */
-    uint16_t      total_size_of_PCE_bits; /* 0 - only for channel conf PCE */
     uint32_t      sampling_rate; /* 8k, 11.025k, 12k, 16k, 22.05k, 24k, 32k,
                                   44.1k, 48k, 64k, 88.2k, 96k */
+    uint32_t      bits_per_sample;
 } audio_aac_decoder_config;
 
 typedef struct {
-    uint16_t      channels;
-    uint32_t      sampling_rate;
+    audio_sink_buffer_config_t snk_buffer;
+    uint16_t      sampling_rate;
+    uint8_t      channels;
+    uint32_t      bits_per_sample;
 } audio_sbc_decoder_config;
 
 typedef struct {
@@ -220,21 +229,29 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
     }
     else if (codec_cfg[CODEC_AVK_OFFSET] == CODEC_TYPE_SBC)
     {
-        uint32_t sbc_samp_freq;
+        uint16_t sbc_samp_freq;
         memset(&sbc_codec,0,sizeof(audio_sbc_decoder_config));
         p_cfg++;//skip length
         p_cfg++;//skip media type
         p_cfg++;//skip codec type
-
         sbc_samp_freq = *p_cfg++;
         sbc_samp_freq |= (*p_cfg++ << 8);
-        sbc_samp_freq |= (*p_cfg++ << 16);
-        sbc_samp_freq |= (*p_cfg++ << 24);
-        sbc_codec.sampling_rate = sbc_samp_freq;
         sbc_codec.channels = *p_cfg++;
+        sbc_codec.snk_buffer.bitrate = *p_cfg++;
+        sbc_codec.snk_buffer.bitrate |= (*p_cfg++ << 8);
+        sbc_codec.snk_buffer.bitrate |= (*p_cfg++ << 16);
+        sbc_codec.snk_buffer.bitrate |= (*p_cfg++ << 24);
 
+        sbc_codec.snk_buffer.bitrate_mode = *p_cfg++;
+
+        sbc_codec.snk_buffer.mtu = *p_cfg++;
+        sbc_codec.snk_buffer.mtu |= (*p_cfg++ << 8);
+
+        sbc_codec.bits_per_sample = *p_cfg;
+
+        sbc_codec.sampling_rate = sbc_samp_freq;
         *codec_type = AUDIO_FORMAT_SBC;
-        INFO("Codectype: SBC, samp freq: %d, channels: %d",sbc_samp_freq,sbc_codec.channels);
+        INFO("Codectype: SBC, samp freq: %d, channels: %d ",sbc_samp_freq,sbc_codec.channels);
         return ((void *)(&sbc_codec));
     } else if (codec_cfg[CODEC_AVK_OFFSET] == CODEC_TYPE_AAC)
     {
@@ -243,11 +260,8 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         memset(&aac_codec,0,sizeof(audio_aac_decoder_config));
         len = *p_cfg++;
         p_cfg++;//skip media type
-        len--;
         p_cfg++;//skip codec type
-        len--;
         byte = *p_cfg++;
-        len--;
         /*switch (byte & A2D_AAC_IE_OBJ_TYPE_MSK)
         {
             case A2D_AAC_IE_OBJ_TYPE_MPEG_2_AAC_LC:
@@ -272,12 +286,9 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         //Audio define proper constants
         aac_codec.aac_fmt_flag = 4;
         byte = *p_cfg++;
-        len--;
         aac_samp_freq = byte << 8; //1st byte of sample_freq
         byte = *p_cfg++;
-        len--;
         aac_samp_freq |= byte & 0x00F0; //1st nibble of second byte of samp_freq
-
         switch (aac_samp_freq) {
             case 0x8000: aac_codec.sampling_rate = 8000; break;
             case 0x4000: aac_codec.sampling_rate = 11025; break;
@@ -295,7 +306,6 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
                 ERROR("Invalid sample_freq: %x", aac_samp_freq);
         }
         INFO(" aac samp freq: %d",aac_codec.sampling_rate);
-
         switch (byte & A2D_AAC_IE_CHANNELS_MSK)
         {
             case A2D_AAC_IE_CHANNELS_1:
@@ -308,7 +318,19 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
                  ERROR("Unknow channel mode");
         }
         INFO("channels :%d",aac_codec.channels);
-        aac_codec.total_size_of_PCE_bits = 0;
+        byte = *p_cfg++;
+        aac_bit_rate = (byte << 16) & (0x7F << 16);
+        byte = *p_cfg++;
+        aac_bit_rate |= (byte << 8) & (0xFF << 8);
+        byte = *p_cfg++;
+        aac_bit_rate |= byte & 0xFF;
+        aac_codec.snk_buffer.bitrate = aac_bit_rate;
+        aac_codec.snk_buffer.bitrate_mode = *p_cfg++;
+
+        aac_codec.snk_buffer.mtu = *p_cfg++;
+        aac_codec.snk_buffer.mtu |= (*p_cfg++ << 8);
+
+        aac_codec.bits_per_sample = *p_cfg;
 
         *codec_type = AUDIO_FORMAT_AAC;
         INFO("AAC: Done copying full codec config");
@@ -887,7 +909,7 @@ int audio_sink_session_setup_complete(uint64_t latency)
         pthread_mutex_unlock(&audio_stream.lock);
         audio_stream.state = AUDIO_A2DP_AVK_STATE_SESSION_COMPLETE;
         INFO(" %s Done, State = %d ",__func__,audio_stream.state);
-        return 0;
+        return 1;
     }
     return -1;
 }
