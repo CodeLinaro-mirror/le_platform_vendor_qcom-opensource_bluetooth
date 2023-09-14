@@ -173,7 +173,9 @@ public class ScannerService extends Service {
 
     public void stopScan() {
         Log.d(TAG, "Stop Scan ");
-        mBTAdapter.getBluetoothLeScanner().stopScan(mScanCallback);
+
+        Message msg = mScannerHandler.obtainMessage(MSG_STOP_BLE_SCAN, null);
+        mScannerHandler.sendMessage(msg);
     }
 
     private void resetScanParams() {
