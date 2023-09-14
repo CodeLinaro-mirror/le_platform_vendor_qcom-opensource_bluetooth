@@ -1,0 +1,1256 @@
+/*
+ * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ *       copyright notice, this list of conditions and the following
+ *       disclaimer in the documentation and/or other materials provided
+ *       with the distribution.
+ *     * Neither the name of The Linux Foundation nor the names of its
+ *       contributors may be used to endorse or promote products derived
+ *       from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+package org.codeaurora.bluetooth.wearos_ble_testapp;
+
+import android.view.View;
+import android.view.Menu;
+import android.view.MenuItem;
+
+import android.widget.Toast;
+import android.Manifest;
+import android.util.Log;
+import android.util.*;
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+
+import android.os.Bundle;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.SystemClock;
+import android.os.SystemProperties;
+import android.os.Message;
+import android.os.Handler;
+import android.os.ParcelUuid;
+import android.os.Message;
+import android.os.RemoteException;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
+import java.util.Scanner;
+import java.lang.*;
+import java.util.concurrent.TimeUnit;
+import java.io.*;
+
+import libcore.io.IoUtils;
+
+import com.android.internal.util.IState;
+import com.android.internal.util.State;
+import com.android.internal.util.StateMachine;
+
+import android.content.Intent;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
+
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
+
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattCharacteristic;
+
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanRecord;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+
+public class ThroughputStateMachine {
+    public static final UUID CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
+                                 = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    private static final String TAG = "ThroughputStateMachine";
+    public static int LOG_LEVEL = 6;
+
+    public BleConnectionClass mBleConnect;
+    private Context mcontext;
+    public static TestAppThroughputStateMachine mStateMachine;
+    private BluetoothDevice mDevice = null;
+
+    /* Mutex required for writing characteristics and descriptors */
+    private final Object write_mutex = new Object();
+    private final Object service_discovery_mutex = new Object();
+
+    public boolean gatt_discovery_done=false;
+    public static boolean write_wait_signalled = false;
+
+    /* Variable required for calculating DataRx Tput*/
+    public static int num_of_notifications = 0;
+    public static long rx_start_time_stamp = 0x0;
+    public static long rx_end_time_stamp = 0x0;
+
+    /* MTU size required for MTU exchange */
+    public static final int MTU_SIZE_MIN = 23;
+    public static final int MTU_SIZE_MAX = 512;
+    public int mtu_size = MTU_SIZE_MIN;
+
+    public static final int TRANSPORT_LE = 2;
+
+    /* Variables to update connection interval before Data Tx */
+    public static int connIntervalReq;
+    public static final int CONN_INTERVAL_MIN = 6;
+    public static final int CONN_INTERVAL_MIN_COEX = 16;
+
+    /* Macros required for phy update */
+    public static int txPhyReq;
+    public static int rxPhyReq;
+    public static int LE_CODED_PHY = 4;
+    public static int ALL_PHY = 7;
+
+    private static DataTx DataTxClass;
+    private static DataRx DataRxClass;
+    private static LatencyTest LatencyTestClass;
+
+    public ThroughputStateMachine(Context mcontext) {
+        this.mcontext = mcontext;
+        /* Initialize classes */
+        mBleConnect = new BleConnectionClass(mcontext);
+        mStateMachine = new TestAppThroughputStateMachine(mcontext);
+    }
+
+    /* function to print the message on display */
+    private void showMessage(String msg) {
+        Toast.makeText(mcontext, msg, Toast.LENGTH_SHORT).show();
+    }
+
+    /* Connection Class */
+    public class BleConnectionClass {
+        private static final String TAG = "BleConnectionClass";
+
+        private BluetoothGatt mBluetoothGatt;
+        private BluetoothGattService mService;
+        private BluetoothGattCharacteristic mCharacteristic;
+        private BluetoothGattCharacteristic mreadChar;
+        private Context context;
+        private int mState;
+        private int GATT_SUCCESS = 0x00;
+
+        PhyUpdate tmp_phy;
+        Message msg;
+
+        public BleConnectionClass(Context context) {
+            this.context = context;
+        }
+
+        /**
+         * GATT callbacks
+         */
+        private final BluetoothGattCallback mGattCallbacks = new BluetoothGattCallback() {
+
+            @Override
+            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+                Log.i(TAG, "onConnectionStateChange device :" + gatt.getDevice() +
+                      " status :" + status + " newState :" + newState);
+                mState = newState;
+                int bondState = mDevice.getBondState();
+                if (gatt.getDevice() == null || (status != GATT_SUCCESS)&&
+                (mStateMachine.getCurrentState() == mStateMachine.mTAConnectPending)) {
+                    Log.e(TAG, "onConnectionStateChange:Unexpected error! mstate: " +  mState);
+                    mStateMachine.sendMessage(
+                                    TestAppThroughputStateMachine.MSG_TA_SM_DEV_FAILED_TO_CONNECT);
+                    return;
+                }
+                if (status != GATT_SUCCESS || newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    Log.i(TAG, "onConnectionStateChange:DISCONNECTED "
+                            + " remoteDevice: " + gatt.getDevice().getAddress());
+                    /*Send Message to SM */
+                    mStateMachine.sendMessage(
+                                    TestAppThroughputStateMachine.MSG_TA_SM_DEV_DISCONNECTED);
+                } else if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    Log.i(TAG, "onConnectionStateChange:CONNECTED "
+                            + " remoteDevice: " + gatt.getDevice().getAddress());
+                    /*Send Message to SM*/
+                    String name = (String) gatt.getDevice().getName();
+                    msg = mStateMachine.obtainMessage(
+                    mStateMachine.MSG_TA_SM_REM_DEV_CONNECTED, name);
+                    mStateMachine.sendMessage(msg);
+                    if (bondState == BluetoothDevice.BOND_BONDED) {
+                       Log.i(TAG, "Device paired");
+                    }
+                    if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                        Log.d(TAG, "starting discover services");
+                    }
+                    /* Remote is connected start service discovery */
+                    gatt.discoverServices();
+                }
+            }
+
+            @Override
+            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    Log.d(TAG, "onService discovery success");
+                    gatt_discovery_done = true;
+                    /* Release service discovery mutex */
+                    synchronized (service_discovery_mutex) {
+                        service_discovery_mutex.notify();
+                    }
+                } else {
+                        Log.d(TAG, "onServicesDiscovered received: " + status);
+                }
+            }
+
+            @Override
+            public void onConnectionUpdated(BluetoothGatt gatt, int interval, int latency,
+                                                int timeout, int status) {
+                if ((status == GATT_SUCCESS)) {
+                    Log.i(TAG, "on Conn updated:"
+                         + " interval=" + interval + " latency=" + latency
+                        + " timeout=" + timeout + " status=" + status);
+                    if((interval == connIntervalReq)/* || (connIntervalReq == CONN_INTERVAL_MIN
+                       && interval == CONN_INTERVAL_MIN_COEX)*/){
+                        Log.d(TAG, "Conn Update Interval matched");
+                        String name = (String) gatt.getDevice().getName();
+                        msg = mStateMachine.obtainMessage(
+                        mStateMachine.MSG_TA_SM_CONNECTION_UPDATED,Integer.toString(interval));
+                        mStateMachine.sendMessage(msg);
+                      connIntervalReq = 0;
+                    }
+                } else {
+                    Log.i(TAG, "conn update failed");
+                }
+            }
+
+            @Override
+            public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy,
+                                        int status) {
+                if ((status == GATT_SUCCESS)) {
+                    Log.i(TAG, "on Phy updated:"
+                         + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
+                    if((txPhyReq == txPhy && rxPhyReq == rxPhy) ||
+                          (txPhyReq == ALL_PHY && rxPhyReq == ALL_PHY)){
+                        PhyUpdate tmp_phy = new PhyUpdate();
+                        tmp_phy.txPhy = txPhy;
+                        tmp_phy.rxPhy = rxPhy;
+                        msg = mStateMachine.obtainMessage(
+                                       mStateMachine.MSG_TA_SM_PHY_UPDATED, tmp_phy);
+                        mStateMachine.sendMessage(msg);
+                        txPhyReq = rxPhyReq = 0;
+                    }
+                } else {
+                    Log.i(TAG, "phy update failed");
+                }
+            }
+
+            @Override
+            public void onCharacteristicWrite(BluetoothGatt gatt,
+                                                BluetoothGattCharacteristic characteristic,
+                                                int status) {
+                if ((status == GATT_SUCCESS)) {
+                    Log.i(TAG, "onCharacteristicWrite: " + status);
+                } else {
+                    Log.i(TAG, "write characteristic failed");
+                }
+                /* Release write mutex */
+                synchronized (write_mutex) {
+                    write_wait_signalled = true;
+                    write_mutex.notify();
+                }
+             }
+
+            @Override
+            public void onDescriptorWrite(BluetoothGatt gatt,
+                                            BluetoothGattDescriptor desc, int status) {
+                if ((status == GATT_SUCCESS)) {
+                    Log.i(TAG, "onDescriptorWrite: " + status);
+                } else {
+                    Log.i(TAG, "write descriptor failed");
+                }
+                /* Release write mutex */
+                synchronized (write_mutex) {
+                    write_wait_signalled = true;
+                    write_mutex.notifyAll();
+                    Log.d(TAG, "Mutex unlock");
+                }
+             }
+
+            @Override
+            public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
+                if(status == GATT_SUCCESS){
+                    Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
+                    PhyUpdate tmp_phy = new PhyUpdate();
+                    tmp_phy.txPhy = txPhy;
+                    tmp_phy.rxPhy = rxPhy;
+                    /* Send Message to SM */
+                    tmp_phy.txPhy = txPhy;
+                    tmp_phy.rxPhy = rxPhy;
+                    msg = mStateMachine.obtainMessage(
+                               mStateMachine.MSG_TA_SM_PHY_READ_DONE, tmp_phy);
+                    mStateMachine.sendMessage(msg);
+                } else{
+                    Log.i(TAG, "Read Phy failed");
+                }
+            }
+
+            @Override
+            public void onCharacteristicChanged(BluetoothGatt gatt,
+                                                BluetoothGattCharacteristic characteristic) {
+                num_of_notifications ++;
+                String charValue = characteristic.getStringValue(0);
+                /* Read the start time once we receive notification with "start" in it */
+                if (charValue.contains("start")) {
+                    rx_start_time_stamp = SystemClock.elapsedRealtime();
+                    if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                        Log.d(TAG, "rx_start_time_stamp:"+rx_start_time_stamp);
+                    }
+                } else {
+                    /* Keep reading the end time until we receive last notification */
+                    rx_end_time_stamp = SystemClock.elapsedRealtime();
+                    if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                        Log.d(TAG, "rx_end_time_stamp:"+rx_end_time_stamp);
+                    }
+                }
+            }
+
+            @Override
+            public void onMtuChanged (BluetoothGatt gatt, int mtu, int status) {
+               if (status == GATT_SUCCESS) {
+                    Log.i(TAG, "Gatt updated MTU" + mtu);
+                    mtu_size = mtu;
+                    /* Send Message to SM */
+                    mStateMachine.sendMessage(
+                        TestAppThroughputStateMachine.MSG_TA_SM_MTU_EXCHANGE_DONE);
+                }
+            }
+        };
+
+        public void connect(BluetoothDevice device){
+            if(MainActivity.bleAdapter!=null) {
+                Log.i(TAG, "Gatt Connect");
+                mDevice = device;
+                mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
+            }
+        }
+
+        public void pair(){
+            if(mDevice.getBondState() != BluetoothDevice.BOND_BONDED){
+                Log.i(TAG, "Pairing!");
+                if(!mDevice.createBond(TRANSPORT_LE)) {
+                    Log.i(TAG, "couldn't start pairing");
+                }
+                MainActivity.pairing_called = MainActivity.PAIRING_REQ_FROM_THROUGHPUT_SM;
+            }
+            else {
+                Log.i(TAG, "Already Paired!");
+            }
+        }
+
+        public void unpair() {
+            if(mDevice.getBondState() == BluetoothDevice.BOND_BONDED){
+                Log.i(TAG, "Unpairing!");
+                mDevice.removeBond();
+                Log.i(TAG, "Device unpaired");
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("Device unpaired");
+                SocketServer.sendSocketData(PrintStr.toString());
+                MainActivity.pairing_called = 0;
+            }
+        }
+
+        public BluetoothGattService getGattService(UUID serv_uuid){
+            BluetoothGattService mService = mBluetoothGatt.getService(serv_uuid);
+            if(mService != null){
+                Log.d(TAG, "Get Gatt Service");
+            } else {
+                Log.d(TAG, "Get Gatt Service not found");
+            }
+            return mService;
+        }
+    }
+
+    /* function to start service discovery if not yet started */
+    public void wait_for_gatt_service_discovery() {
+        Log.d(TAG, "Wait for service disc, thread name:" + Thread.currentThread().getName() +
+                "thread id:" + Thread.currentThread().getId());
+        if(!gatt_discovery_done){
+            /* Wait for service discovery done callback */
+            synchronized (service_discovery_mutex) {
+                try {
+                    service_discovery_mutex.wait();
+                } catch (InterruptedException e) {
+                    Log.d(TAG, "Interrupted while waiting for operation to complete");
+                }
+            }
+        }
+    }
+
+    public class TestAppThroughputStateMachine extends StateMachine {
+
+        public static final int MSG_TA_SM_DEV_FOUND = 0;
+        public static final int MSG_TA_SM_BT_ADAPTER_OFF = 1;
+        public static final int MSG_TA_SM_CONNECT = 3;
+        public static final int MSG_TA_SM_REM_DEV_CONNECTED = 4;
+        public static final int MSG_TA_SM_DEV_FAILED_TO_CONNECT = 5;
+        public static final int MSG_TA_SM_DISCONNECT = 6;
+        public static final int MSG_TA_SM_DEV_DISCONNECTED = 7;
+        public static final int MSG_TA_SM_TX_TEST_DONE = 8;
+        public static final int MSG_TA_SM_RX_TEST_DONE = 9;
+        public static final int MSG_TA_SM_LAT_TEST_DONE = 10;
+        public static final int MSG_TA_SM_CONNECTION_UPDATED = 11;
+        public static final int MSG_TA_SM_PHY_UPDATED = 12;
+        public static final int MSG_TA_SM_PHY_READ_DONE = 13;
+        public static final int MSG_TA_SM_MTU_EXCHANGE_DONE = 14;
+        public static final int MSG_TA_SM_REM_DEV_PAIRED = 15;
+        public static final int MSG_TA_SM_CONN_UPDATE = 16;
+        public static final int MSG_TA_SM_UNPAIR_DEV = 17;
+        public static final int MSG_TA_SM_PHY_UPDATE = 18;
+        public static final int MSG_TA_SM_READ_PHY = 19;
+        public static final int MSG_TA_SM_DATA_TX_TEST = 20;
+        public static final int MSG_TA_SM_DATA_RX_TEST = 21;
+        public static final int MSG_TA_SM_LATENCY_TEST = 22;
+        public static final int MSG_TA_SM_PAIR_DEV = 23;
+
+        /* Test App Connection states.*/
+        private TAIdle mTAIdle;
+        private TAConnectPending mTAConnectPending;
+        private TAConnected mTAConnected;
+        private TADataTx mTADataTx;
+        private TADataRx mTADataRx;
+        private TALatencyMeasurement mTALatencyMeasurement;
+        private TADisconnect mTADisconnect;
+        private Context mContext;
+
+        StringBuilder PrintStr = new StringBuilder();
+
+        private TestAppThroughputStateMachine(Context context) {
+            super("TestAppThroughputStateMachine");
+            mContext = context;
+            MainActivity.stateMachinestarted = true;
+
+            mTAIdle = new TAIdle();
+            mTAConnectPending = new TAConnectPending();
+            mTAConnected = new TAConnected();
+            mTADataTx = new TADataTx();
+            mTADataRx = new TADataRx();
+            mTALatencyMeasurement = new TALatencyMeasurement();
+            mTADisconnect = new TADisconnect();
+
+            addState(mTAIdle);
+            addState(mTAConnectPending);
+            addState(mTAConnected);
+            addState(mTADataTx);
+            addState(mTADataRx);
+            addState(mTALatencyMeasurement);
+            addState(mTADisconnect);
+
+            setInitialState(mTAIdle);
+        }
+
+        public void doQuit() {
+            Log.i("TestAppThroughputStateMachine", "Quit");
+            synchronized (TestAppThroughputStateMachine.this) {
+                MainActivity.stateMachinestarted = false;
+                quitNow();
+            }
+        }
+
+        private class TAIdle extends State {
+            private static final String TAG = "TAIdle";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter" + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit" + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_CONNECT:
+                        Scan scn = (Scan)message.obj;
+                        MainActivity.mScannerService.set_scan_parameters(scn);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Scanning Started!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    case MSG_TA_SM_DEV_FOUND:
+                        BluetoothDevice device = (BluetoothDevice) message.obj;
+                        processSMDevFoundEvent(device);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+
+            private void processSMDevFoundEvent(BluetoothDevice device) {
+                Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
+                mBleConnect.connect(device);
+                transitionTo(mTAConnectPending);
+            }
+        }
+
+        private class TAConnectPending extends State {
+            private static final String TAG = "TAConnectPending";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_REM_DEV_CONNECTED:
+                        PrintStr.setLength(0);
+                        String name = (String) message.obj;
+                        PrintStr.append("Connected to ");
+                        PrintStr.append(name);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        MainActivity.mScannerService.stopScan();
+                        transitionTo(mTAConnected);
+                        break;
+                    case MSG_TA_SM_DEV_FAILED_TO_CONNECT:
+                        Log.i(TAG, "Connection failed to establish, please try again");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Connection failed to establish, please try again!!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        transitionTo(mTAIdle);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+        }
+
+        private class TAConnected extends State {
+            private static final String TAG = "TAConnected";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_CONN_UPDATE:
+                        ConnUpdate ConnUpdateObj = (ConnUpdate) message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"ConnUpdateflag");
+                        processConnUpdateReq(ConnUpdateObj);
+                        break;
+                    case MSG_TA_SM_PAIR_DEV:
+                        mBleConnect.pair();
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_PHY_UPDATE:
+                        PhyUpdate phyUpdateObj = (PhyUpdate) message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"PhyUpdateflag");
+                        processPhyUpdateReq(phyUpdateObj);
+                        break;
+                    case MSG_TA_SM_READ_PHY:
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"ReadPhyflag");
+                        processReadPhyReq();
+                        break;
+                    case MSG_TA_SM_DATA_TX_TEST:
+                        DataTxClass = (DataTx)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"DataTxflag");
+                        transitionTo(mTADataTx);
+                        break;
+                    case MSG_TA_SM_DATA_RX_TEST:
+                        DataRxClass = (DataRx)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"DataRxflag");
+                        transitionTo(mTADataRx);
+                        break;
+                    case MSG_TA_SM_LATENCY_TEST:
+                        LatencyTestClass = (LatencyTest)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"LatencyTestflag");
+                        transitionTo(mTALatencyMeasurement);
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                    /*Disconnect*/
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"Disconnectflag");
+                        transitionTo(mTADisconnect);
+                        break;
+                    case MSG_TA_SM_REM_DEV_PAIRED:
+                        PrintStr.setLength(0);
+                        PrintStr.append("Remote device paired");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_CONNECTION_UPDATED:
+                        Log.d(TAG, "CONNECTION PARAM UPDATED");
+                        PrintStr.setLength(0);
+                        String interal = (String) message.obj;
+                        PrintStr.append("Connection Updated to");
+                        PrintStr.append(interal);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    case MSG_TA_SM_PHY_UPDATED:
+                        Log.d(TAG, "PHY UPDATED");
+                        PrintStr.setLength(0);
+                        PhyUpdate phyUpdate = (PhyUpdate) message.obj;
+                        PrintStr.append("Phy Update done, Tx Phy :");
+                        PrintStr.append(phyUpdate.txPhy);
+                        PrintStr.append(" Rx Phy :");
+                        PrintStr.append(phyUpdate.rxPhy);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    case MSG_TA_SM_PHY_READ_DONE:
+                        Log.d(TAG, "PHY READ Done");
+                        PrintStr.setLength(0);
+                        PhyUpdate readphy = (PhyUpdate) message.obj;
+                        PrintStr.append("Current Phy: Tx Phy :");
+                        PrintStr.append(readphy.txPhy);
+                        PrintStr.append(" Rx Phy :");
+                        PrintStr.append(readphy.rxPhy);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    default:
+                        Log.d(TAG, "Not handled");
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+
+            private void processConnUpdateReq(ConnUpdate ConnUpdateClass){
+                Log.i(TAG, "Conn Update");
+                /* Android version check */
+                try {
+                    if (Build.VERSION.SDK_INT >= 28) {
+                        mBleConnect.mBluetoothGatt.requestLeConnectionUpdate(
+                                                    ConnUpdateClass.ConnIntervalMin,
+                                                    ConnUpdateClass.ConnIntervalMax,
+                                                    ConnUpdateClass.ConnSlaveLatency,
+                                                    ConnUpdateClass.ConnSupTO, 0, 0);
+                        connIntervalReq = ConnUpdateClass.ConnIntervalMin;
+                    } else {
+                        Log.d(TAG, "Conn Update can't be done");
+                    }
+                } catch (Exception e) {
+                    Log.d(TAG, "Interrupted while waiting for operation to complete");
+                }
+            }
+
+            private void processReadPhyReq(){
+                Log.i(TAG, "Read Phy");
+                mBleConnect.mBluetoothGatt.readPhy();
+            }
+
+            private void processPhyUpdateReq(PhyUpdate phyUpdate){
+                Log.i(TAG, "Phy Update");
+                txPhyReq = phyUpdate.txPhy;
+                rxPhyReq = phyUpdate.rxPhy;
+                if(phyUpdate.txPhy == LE_CODED_PHY)
+                    txPhyReq -= 1;
+                if(phyUpdate.rxPhy == LE_CODED_PHY)
+                    rxPhyReq -= 1;
+                mBleConnect.mBluetoothGatt.setPreferredPhy(phyUpdate.txPhy,
+                                            phyUpdate.rxPhy, phyUpdate.phyOpt);
+            }
+        }
+
+        private class TADataTx extends State {
+            private static final String TAG = "TADataTx";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                /* MTU Exchange */
+                if(mBleConnect.mBluetoothGatt.requestMtu(DataTxClass.Mtu_Size)) {
+                    Log.i(TAG, "MTU size requested to max size");
+                }
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                        transitionTo(mTADisconnect);
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_TX_TEST_DONE:
+                        PrintStr.setLength(0);
+                        String tput = (String) message.obj;
+                        PrintStr.append("Data Tx Throughput in kbps:");
+                        PrintStr.append(tput);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Data Tx done, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
+                    case MSG_TA_SM_MTU_EXCHANGE_DONE:
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"MTU size exchanged");
+                         /* Start tx thread */
+                         DataTxthread tt = new DataTxthread();
+                         Thread t = new Thread(tt);
+                         if(!t.isAlive()) {
+                             t.start();
+                             PrintStr.setLength(0);
+                             PrintStr.append("Data Tx Thread Started");
+                             SocketServer.sendSocketData(PrintStr.toString());
+                         } else {
+                             Log.i(TAG, "Thread is already running");
+                         }
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+
+            public class DataTxthread implements Runnable {
+
+                @Override
+                public void run() {
+                    Log.i(TAG, "data tx thread start");
+                    final UUID UUID_TX_SERVICE = UUID.fromString(DataTxClass.txService);
+                    final UUID UUID_TX_CHAR = UUID.fromString(DataTxClass.txChar);
+                    float txTputkr = 0;
+
+                    wait_for_gatt_service_discovery();
+                    /* wait for 500ms for DLE event to be received */
+                    try {
+                        Thread.sleep(500);
+                    } catch(InterruptedException e){
+                        Log.e(TAG, "error in thread sleep");
+                    }
+
+                    int mtu_intr_size = DataTxClass.Packet_Size;
+                    /* Set the packet size to maximum possible if it exceeds mtu size */
+                    if(mtu_intr_size > (DataTxClass.Mtu_Size - 3)) {
+                        mtu_intr_size = DataTxClass.Mtu_Size - 3;
+                    }
+                    char[] str = new char[mtu_intr_size];
+                    long length = mtu_intr_size * (DataTxClass.Num_Packets);
+                    BluetoothGattService mService =
+                                            mBleConnect.mBluetoothGatt.getService(UUID_TX_SERVICE);
+                    if (mService != null) {
+                        BluetoothGattCharacteristic mCharacteristic =
+                                                        mService.getCharacteristic(UUID_TX_CHAR);
+                        if (mCharacteristic != null) {
+                            /* Filling the array with data */
+                            str[0]  = 41; str[1] = 42; str[2] = 43;
+                            Arrays.fill(str,3, mtu_intr_size-1,(char)'d');
+                            try {
+                                Process proc =
+                                    Runtime.getRuntime().exec("/system/bin/getprop"+" "
+                                                            +"persist.bluetooth.tx_test.enable");
+                                BufferedReader reader =
+                                                new BufferedReader(
+                                                    new InputStreamReader(proc.getInputStream()));
+                                String readLine = reader.readLine();
+                                /* If system property is set to false,
+                                   continue with sending the data from the app */
+                                if(readLine.equals("false")) {
+                                    Log.d(TAG, "system property is false");
+                                    long tx_start_time_stamp = SystemClock.elapsedRealtime();
+                                    mCharacteristic.setWriteType(
+                                            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                                    if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                                        Log.d(TAG, "chardata len:"+length+
+                                            "tx start time:"+tx_start_time_stamp);
+                                    }
+                                    for (long i = 1; i <= (DataTxClass.Num_Packets - 1) ; i++) {
+                                        /*Max packet size that can be sent using
+                                         write without response is MTU-3 Bytes*/
+                                        mCharacteristic.setValue(String.valueOf(str));
+                                        mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                            mCharacteristic);
+                                        synchronized (write_mutex) {
+                                            // Wait for write response
+                                            if(!write_wait_signalled) {
+                                                try {
+                                                    write_mutex.wait();
+                                                } catch (InterruptedException e) {
+                                                    Log.d(TAG, "Interrupted while waiting");
+                                                }
+                                            }
+                                            write_wait_signalled = false;
+                                        }
+                                     }
+                                     /* Write the last packet with response */
+                                    mCharacteristic.setWriteType(
+                                                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                                    mCharacteristic.setValue(String.valueOf(str));
+                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                    mCharacteristic);
+                                    long tx_intr_time_stamp = SystemClock.elapsedRealtime();
+                                    Log.d(TAG, "Intr time stamp:"+tx_intr_time_stamp);
+                                    synchronized (write_mutex) {
+                                        // Wait for write response
+                                        if(!write_wait_signalled){
+                                            try {
+                                                write_mutex.wait();
+                                            } catch (InterruptedException e) {
+                                                Log.d(TAG, "Interrupted while waiting");
+                                            }
+                                        }
+                                        write_wait_signalled = false;
+                                    }
+                                    long tx_end_time_stamp = SystemClock.elapsedRealtime();
+                                    if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                                        Log.d(TAG, "chardata len:"+length +
+                                            "tx end time:"+tx_end_time_stamp);
+                                    }
+                                    float txTput = (((float) length /
+                                            ((float) (tx_end_time_stamp - tx_start_time_stamp)))
+                                                *8 *1000);
+                                    float txTputk = txTput / 1000;
+                                    float txTputm = txTputk / 1000;
+                                    Log.i(TAG, "Tx tput in kbps: " + txTputk +
+                                            " in mbps: " + txTputm);
+                                    /* Another Tx Throughput value,
+                                        since response could take some time */
+                                    Log.d(TAG, "chardata len:"+length + "tx intr time:"
+                                                            +tx_intr_time_stamp);
+                                    float txTputr = (((float) length /
+                                            ((float) (tx_intr_time_stamp - tx_start_time_stamp)))
+                                            *8 *1000);
+                                    txTputkr = txTputr / 1000;
+                                    float txTputmr = txTputkr / 1000;
+                                    Log.i(TAG, "Intr Tx tput in kbps: "+txTputkr+
+                                                " in mbps: "+txTputmr);
+                                } else {
+                                    /* If Property is set to true, send one packet from app,
+                                       rest of the packets from bta */
+                                     Log.d(TAG, "system property is true");
+                                    mCharacteristic.setWriteType(
+                                              BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                                    mCharacteristic.setValue(String.valueOf(str));
+                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                    mCharacteristic);
+                                    synchronized (write_mutex) {
+                                        // Wait for write response
+                                        if(!write_wait_signalled){
+                                            try {
+                                                write_mutex.wait();
+                                            } catch (InterruptedException e) {
+                                                Log.d(TAG, "Interrupted while waiting");
+                                            }
+                                        }
+                                        write_wait_signalled = false;
+                                    }
+                                }
+                                /* Signal SM that TX Test is done*/
+                          Message msg = mStateMachine.obtainMessage(
+                          mStateMachine.MSG_TA_SM_TX_TEST_DONE,Float.toString(txTputkr));
+                                mStateMachine.sendMessage(msg);
+                            } catch (IOException e) {
+                                Log.e(TAG, "Exception handling");;
+                            }
+                        } else {
+                            Log.e(TAG, "Characteristic is null!");
+                        }
+                    } else {
+                        Log.d(TAG, "Service with UUID not found");
+                    }
+                }
+            }
+        }
+
+        private class TADataRx extends State {
+            private static final String TAG = "TADataRx";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                /* start rx thread */
+                DataRxthread rt = new DataRxthread();
+                Thread t = new Thread(rt);
+                if(!t.isAlive()) {
+                    t.start();
+                    PrintStr.setLength(0);
+                    PrintStr.append("Data Rx Thread Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Thread is already running");
+                }
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                        transitionTo(mTADisconnect);
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_RX_TEST_DONE:
+                        PrintStr.setLength(0);
+                        String rxtput = (String) message.obj;
+                        PrintStr.append("Data Rx Throughput in kbps:");
+                        PrintStr.append(rxtput);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Rx Data Done, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+
+            public class DataRxthread implements Runnable {
+
+                public void run() {
+                    Log.i(TAG, "data rx thread start");
+                    final UUID UUID_RX_SERVICE = UUID.fromString(DataRxClass.rxService);
+                    final UUID UUID_RX_CHAR = UUID.fromString(DataRxClass.rxChar);
+                    final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
+                    int rx_data_size = 244;
+                    wait_for_gatt_service_discovery();
+                    //battery service and characteristic
+                    BluetoothGattService mService =
+                                            mBleConnect.mBluetoothGatt.getService(UUID_RX_SERVICE);
+                    if (mService != null) {
+                        BluetoothGattCharacteristic mreadChar =
+                                                        mService.getCharacteristic(UUID_RX_CHAR);
+                        if (mreadChar != null) {
+                            if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                                Log.d(TAG, "Found Characteristic: " +
+                                    mreadChar.getUuid().toString());
+                            }
+                            //enable cccd to send notification
+                            mBleConnect.mBluetoothGatt.setCharacteristicNotification(
+                                                                    mreadChar, true);
+                            BluetoothGattDescriptor descriptor =
+                                                            mreadChar.getDescriptor(UUID_CCCD);
+                            if (descriptor != null) {
+                                //start of writing
+                                descriptor.setValue(
+                                            BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                                mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                                synchronized (write_mutex) {
+                                    // Wait for write response
+                                    if(!write_wait_signalled){
+                                        try {
+                                            write_mutex.wait();
+                                        } catch (InterruptedException e) {
+                                            Log.d(TAG, "Interrupted while waiting");
+                                        }
+                                    }
+                                    write_wait_signalled = false;
+                                }
+                            } else {
+                                Log.e(TAG, "Descriptor not found");
+                            }
+                            /* write notifications time to the characteristic */
+                            mreadChar.setValue(
+                                    (int)DataRxClass.NotificationsTime,
+                                    BluetoothGattCharacteristic.FORMAT_UINT32,0);
+                            mBleConnect.mBluetoothGatt.writeCharacteristic(mreadChar);
+                            synchronized (write_mutex) {
+                                // Wait for write response
+                                if(!write_wait_signalled) {
+                                    try {
+                                        write_mutex.wait();
+                                    } catch (InterruptedException e) {
+                                        Log.d(TAG, "Interrupted while waiting");
+                                    }
+                                }
+                                write_wait_signalled = false;
+                            }
+                            /* wait for DataRxClass.NotificationsTime seconds
+                               before disabling notifications */
+                            try {
+                                if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                                    Log.d(TAG, "Sleep for :"+DataRxClass.NotificationsTime+
+                                        " in sec");
+                                }
+                                Thread.sleep((DataRxClass.NotificationsTime)*1000);
+                            }
+                            catch(InterruptedException e){
+                                Log.e(TAG, "error in thread sleep");
+                            }
+
+                            //disable cccd
+                            mBleConnect.mBluetoothGatt.setCharacteristicNotification(
+                                                    mreadChar, false);
+                            descriptor.setValue(
+                                       BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+                            mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                            synchronized (write_mutex) {
+                            //Wait for write response
+                                if(!write_wait_signalled){
+                                    try {
+                                        write_mutex.wait();
+                                    }
+                                    catch (InterruptedException e) {
+                                        Log.d(TAG, "Interrupted while waiting");
+                                    }
+                                }
+                                write_wait_signalled = false;
+                            }
+                            if(ThroughputStateMachine.LOG_LEVEL >= 2) {
+                                Log.d(TAG, "start time"+rx_start_time_stamp+"end time:"+
+                                rx_end_time_stamp+"num of notifications:"+num_of_notifications);
+                            }
+
+                            float rxTput = (((float) num_of_notifications * rx_data_size *8*1000)
+                                        /((float) (rx_end_time_stamp - rx_start_time_stamp)));
+                            float rxTputk = rxTput / 1000;
+                            float rxTputm = rxTputk / 1000;
+                            Log.i(TAG, "Rx tput in kbps: " + rxTputk + " in mbps: " + rxTputm);
+                            rx_start_time_stamp = 0;
+                            rx_end_time_stamp = 0;
+                            num_of_notifications = 0;
+                            /* Signal SM that RX Test is done*/
+                          Message msg = mStateMachine.obtainMessage(
+                          mStateMachine.MSG_TA_SM_RX_TEST_DONE,Float.toString(rxTputk));
+                            mStateMachine.sendMessage(msg);
+                        } else {
+                            Log.d(TAG, "Characteristic is null!");
+                        }
+                    } else {
+                        Log.d(TAG, "Service with uuid is not found");
+                    }
+                }
+            }
+        }
+
+        private class TALatencyMeasurement extends State {
+            private static final String TAG = "TALatencyMeasurement";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                /* start latency thread */
+                LatencyTestthread lt = new LatencyTestthread();
+                Thread t = new Thread(lt);
+                if(!t.isAlive()) {
+                    t.start();
+          PrintStr.setLength(0);
+            PrintStr.append("Latency Measurement Started");
+          SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Thread is already running");
+                }
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                        transitionTo(mTADisconnect);
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_LAT_TEST_DONE:
+                        PrintStr.setLength(0);
+                        String latency = (String) message.obj;
+                        PrintStr.append("Latency in ms:");
+                        PrintStr.append(latency);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Latency test done, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+            class LatencyTestthread implements Runnable {
+
+                public void run() {
+                    final UUID UUID_LAT_SERVICE = UUID.fromString(LatencyTestClass.latService);
+                    final UUID UUID_LAT_CHAR = UUID.fromString(LatencyTestClass.latChar);
+                    Log.i(TAG, "Latency test start");
+                    wait_for_gatt_service_discovery();
+                    String str = "LatencyTest";
+                    BluetoothGattService mService =
+                                        mBleConnect.mBluetoothGatt.getService(UUID_LAT_SERVICE);
+                    if (mService != null) {
+                        BluetoothGattCharacteristic mCharacteristic =
+                                                    mService.getCharacteristic(UUID_LAT_CHAR);
+                        if (mCharacteristic != null) {
+                            mCharacteristic.setWriteType(
+                                                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                            mCharacteristic.setValue(str);
+                            long latency_start_time_stamp = SystemClock.elapsedRealtime();
+                            mBleConnect.mBluetoothGatt.writeCharacteristic(mCharacteristic);
+                            synchronized (write_mutex) {
+                                // Wait for write response
+                                if(!write_wait_signalled) {
+                                    try {
+                                        write_mutex.wait();
+                                    } catch (InterruptedException e) {
+                                        Log.d(TAG, "Interrupted while waiting");
+                                    }
+                                }
+                                write_wait_signalled = false;
+                            }
+                            long latency_end_time_stamp = SystemClock.elapsedRealtime();
+                            float latency = (float) (latency_end_time_stamp -
+                                                        latency_start_time_stamp);
+                            Log.i(TAG, "Latency in msec " + latency);
+                            Message msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_LAT_TEST_DONE,Float.toString(latency));
+                            mStateMachine.sendMessage(msg);
+                        } else {
+                            Log.e(TAG, "Characteristic is null!");
+                        }
+                    } else {
+                        Log.d(TAG, "Service with UUID not found ");
+                    }
+                }
+            }
+        }
+
+        private class TADisconnect extends State {
+            private static final String TAG = "TADisconnect";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                disconnect();
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            private void disconnect() {
+                mBleConnect.mBluetoothGatt.disconnect();
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
+                    case MSG_TA_SM_DEV_DISCONNECTED:
+                        transitionTo(mTAIdle);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Device disconnected");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+        }
+    }
+
+    protected void finalize() {
+
+    }
+}

@@ -36,4 +36,3 @@ public class DataTx {
     public String txService;
     public String txChar;
 }
-

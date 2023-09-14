@@ -103,7 +103,8 @@ public class AdvertiserService extends Service {
 
     public int startAdvertising(Adv adv_info){
         boolean status = false;
-        int index = advertisements.size();//since array index starts a 0, size is used for next index
+        int index = advertisements.size();
+        //since array index starts a 0, size is used for next index
         if(index >= MAX_ADVERTISEMENTS){
             Log.e(TAG,"Max advertisements limit reached, abort");
             return MAX_ADVERTISEMENTS;

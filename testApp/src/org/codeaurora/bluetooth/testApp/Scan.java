@@ -48,6 +48,4 @@ public class Scan {
     int MatchMode;
     int ReportDelay;
     boolean legacy;
-    int ScanTO;
 }
-
