@@ -30,8 +30,8 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class PhyUpdate {
-	   public int txPhy;
-	   public int rxPhy;
-	   public int phyOpt;
-    }
+    public int txPhy;
+    public int rxPhy;
+    public int phyOpt;
+}
 

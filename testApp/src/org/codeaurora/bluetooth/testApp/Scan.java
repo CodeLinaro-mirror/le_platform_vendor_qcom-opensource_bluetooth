@@ -37,7 +37,7 @@ public class Scan {
     String SvcMaskUuid;
     String ManufacturerId;
     String ManufacturerData;
-    String ManuMaskData;
+    String ManufacturerMaskData;
     String ServiceDataUuid;
     String ServiceData;
     String SvcDataMask;
@@ -47,6 +47,7 @@ public class Scan {
     int NumOfAdvMatches;
     int MatchMode;
     int ReportDelay;
+    boolean legacy;
     int ScanTO;
 }
 

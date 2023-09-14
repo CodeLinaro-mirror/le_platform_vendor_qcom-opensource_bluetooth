@@ -131,7 +131,7 @@ public class ScannerService extends Service {
         mScanFilters = filters;
         mScanSettings = settings;
         if (mScanFilters != null) {
-            Log.d(TAG, "Start Scan device name");
+            Log.d(TAG, "Start Scan with filters");
         }
         Log.d(TAG, "Start Scan ");
         Message msg = mScannerHandler.obtainMessage(MSG_START_BLE_SCAN, null);
@@ -172,7 +172,7 @@ public class ScannerService extends Service {
             final int i = result.getRssi();
             final ScanResult r = result;
             byte[] bytes = result.getScanRecord().getBytes();
-            Log.d(TAG, "Device found, devName: ");
+            Log.d(TAG, "Device found, devName: "+devName);
             if(!mScanstatus)
                 return;
 

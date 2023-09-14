@@ -35,12 +35,14 @@ public class Adv {
     int TxPower;
     boolean Legacy;
     boolean Periodic;
+    int PerAdvInterval;
     boolean Connectable;
     boolean Scannable;
     boolean Anonymous;
     boolean IncludePower;
     int PrimaryPhy;
     int SecondaryPhy;
+    int MaxAdvEvents;
     int Interval;
     int TimeOutLegacy;
     int AdvertiseMode;
