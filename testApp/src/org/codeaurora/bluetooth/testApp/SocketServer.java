@@ -52,7 +52,6 @@ public class SocketServer {
     int bytesRead;
     private static boolean socketOpen = false;
     private static boolean closeReceived = false;
-    String toSendString;
     InputStream input;
     private static OutputStream output;
     LocalServerSocket server;
@@ -60,6 +59,7 @@ public class SocketServer {
     localServerSocket localServer;
     communicationHandler commHandler;
     static InputParse parse;
+    StringBuilder sendStr = new StringBuilder();
 
     static final int MAIN_MENU = 1;
     static final int THROUGHPUT_MENU = 2;
@@ -207,7 +207,7 @@ public class SocketServer {
         }
 
         private String processOutput() {
-            StringBuilder sendStr = new StringBuilder();
+            sendStr.setLength(0);
 
             switch (processOutputState) {
                 case MAIN_MENU:
@@ -216,6 +216,8 @@ public class SocketServer {
                     sendStr.append("                     Scanner\n");
                     sendStr.append("                     Throughput\n");
                     sendStr.append("                     GattClient\n");
+                    sendStr.append("                     HoldWakeLock\n");
+                    sendStr.append("                     ReleaseWakeLock\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -323,6 +325,24 @@ public class SocketServer {
                     } else if (inputString.equals("GattClient")) {
                         mainMenuState = GATT_CLIENT_MENU;
                         processOutputState = GATT_CLIENT_MENU;
+                    } else if (inputString.equals("HoldWakeLock")) {
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = NONE;
+                        MainActivity.wl.acquire();
+                        MainActivity.wl_acquired = true;
+                        Log.d(TAG,"Wakelock acquired");
+                        sendStr.setLength(0);
+                        sendStr.append("Wakelock acquired");
+                        SocketServer.sendSocketData(sendStr.toString());
+                    } else if (inputString.equals("ReleaseWakeLock")) {
+                        mainMenuState = MAIN_MENU;
+                        processOutputState = NONE;
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        Log.d(TAG,"Wakelock released");
+                        sendStr.setLength(0);
+                        sendStr.append("Wakelock released");
+                        SocketServer.sendSocketData(sendStr.toString());
                     } else if (inputString.equals("Close")) {
                         closeReceived = true;
                         mainMenuState = MAIN_MENU;
