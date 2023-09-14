@@ -101,8 +101,8 @@ public class MainActivity extends Activity {
     public static MainActivityMessageHandler msghandler;
 
     private Context mAppContext;
-    public static ScanList scanList;
-    public static List<ScanList> mScanList;
+    public static ScanList scanList;
+    public static List<ScanList> mScanList;
 
     /* Location permissions */
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
@@ -200,7 +200,7 @@ public class MainActivity extends Activity {
                                 PERMISSION_REQUEST_FINE_LOCATION);
         }
 
-        socServer = SocketServer.getInstance();
+        socServer = SocketServer.getInstance();
 
         // Bind to the "SCANNER" service
         Log.d("CREATION", "BINDING TO SCANNER ");
@@ -229,10 +229,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static class ScanList {
-        String devName;
-        String devAddr;
-    }
+    public static class ScanList {
+        String devName;
+        String devAddr;
+    }
 
     /* function to check if bluetooth is turned on */
     private boolean initAdapter() {
@@ -260,14 +260,14 @@ public class MainActivity extends Activity {
                             BluetoothDevice.ERROR);
                 if (bondState == BluetoothDevice.BOND_BONDED) {
                    Log.i(TAG, "Device paired");
-            if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
-                Message msg = mgattclient.mGattClientHandler.obtainMessage(
-                                mgattclient.MSG_GC_REM_DEV_PAIRED, null);
+            if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
+                Message msg = mgattclient.mGattClientHandler.obtainMessage(
+                                mgattclient.MSG_GC_REM_DEV_PAIRED, null);
                         mgattclient.mGattClientHandler.sendMessage(msg);
-            } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
-                throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
+            } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
+                throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
                             .MSG_TA_SM_REM_DEV_PAIRED);
-           }
+            }
                 }
             }
         }
@@ -277,25 +277,25 @@ public class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
 
-        IntentFilter Pairingfilter = new IntentFilter();
+        IntentFilter Pairingfilter = new IntentFilter();
         Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         registerReceiver(mPairingReceiver, Pairingfilter);
         mReceiverRegistered = true;
 
-        HandlerThread thread = new HandlerThread("MainActivityMessageHandler");
+        HandlerThread thread = new HandlerThread("MainActivityMessageHandler");
         thread.start();
 
         Looper looper = thread.getLooper();
-        /* start main activity message handler */
-        msghandler = new MainActivityMessageHandler(mAppContext, looper);
+        /* start main activity message handler */
+        msghandler = new MainActivityMessageHandler(mAppContext, looper);
 
-       /* start throughput state machine */
-       start_testapp_tput_state_machine();
+        /* start throughput state machine */
+        start_testapp_tput_state_machine();
 
-       /* start gatt client */
-       mgattclient = new GattClient(mAppContext);
+        /* start gatt client */
+        mgattclient = new GattClient(mAppContext);
 
-       mScanList = new ArrayList<ScanList>();
+        mScanList = new ArrayList<ScanList>();
     }
 
     @Override
@@ -317,14 +317,14 @@ public class MainActivity extends Activity {
         }
 
         /* Unregistering Paring Receiver */
-        try{
+        try{
             if(mReceiverRegistered) {
                 unregisterReceiver(mPairingReceiver);
                 mReceiverRegistered = false;
             }
-        }catch(Exception E) {
-             Log.d(TAG, "not able to unregister");
-        }
+        }catch(Exception E) {
+            Log.d(TAG, "not able to unregister");
+        }
     }
 
     /* function to start testapp throughput state machine */
@@ -390,11 +390,11 @@ public class MainActivity extends Activity {
         private static final String TAG = "MainActivityMessageHandler";
 
         int operation_request;
-        Message msg;
-        StringBuilder PrintStr = new StringBuilder();
+        Message msg;
+        StringBuilder PrintStr = new StringBuilder();
 
         public MainActivityMessageHandler(Context contxt, Looper looper) {
-        super(looper);
+        super(looper);
         mMsgContext = contxt;
         if(MainActivity.LOG_LEVEL >= 2)
             Log.d(TAG, "MainActivityMessageHandler");
@@ -405,98 +405,98 @@ public class MainActivity extends Activity {
             if (MainActivity.LOG_LEVEL >= 2)
                 Log.d(TAG, "Handler(): msg = " + message.what);
             int status;
-            ReadWriteOp RdWrClass;
-            Scan scnObj;
-            PhyUpdate phyUpdateObj;
-            ConnUpdate ConnUpdateObj;
+            ReadWriteOp RdWrClass;
+            Scan scnObj;
+            PhyUpdate phyUpdateObj;
+            ConnUpdate ConnUpdateObj;
 
             switch (message.what) {
                 case MSG_MA_START_BLE_ADV:
-                    Adv adv = (Adv)message.obj;
+                    Adv adv = (Adv)message.obj;
                     mAdvertiseService.startAdvertising(adv);
                     break;
                 case MSG_MA_START_BLE_SCAN:
                     scnObj = (Scan)message.obj;
-                    scan_called = SCAN_CALLED_FROM_MAIN_ACTIVITY;
+                    scan_called = SCAN_CALLED_FROM_MAIN_ACTIVITY;
                     mScannerService.set_scan_parameters(scnObj);
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scanning started!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Scanning started!!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     break;
                 case MSG_MA_STOP_BLE_ADV:
-                    int advId = (int)message.obj;
+                    int advId = (int)message.obj;
                     mAdvertiseService.stopAdvertising(advId);
                     break;
                 case MSG_MA_STOP_BLE_SCAN:
-                    scan_called = 0;
-                    Log.d(TAG, "scan stop(main activity)");
+                    scan_called = 0;
+                    Log.d(TAG, "scan stop(main activity)");
                     mScannerService.stopScan();
-                    PrintStr.setLength(0);
-                    PrintStr.append("Scanning stopped!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Scanning stopped!!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     break;
-                case MSG_MA_SCAN_DEV_FOUND:
-                    Log.d(TAG, "scan dev found(main activity)");
-                    BluetoothDevice device = (BluetoothDevice) message.obj;
-                    processScanCb(device);
-                    break;
-                case MSG_MA_ADV_STARTED:
-                    PrintStr.setLength(0);
-                    String enableId = (String) message.obj;
-                    PrintStr.append("Advertising started! Instance Id:");
-                    PrintStr.append(enableId);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_MA_ADV_STOPPED:
-                    PrintStr.setLength(0);
-                    String disableId = (String) message.obj;
-                    PrintStr.append("Advertising stopped for instance Id:");
-                    PrintStr.append(disableId);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
+                case MSG_MA_SCAN_DEV_FOUND:
+                    Log.d(TAG, "scan dev found(main activity)");
+                    BluetoothDevice device = (BluetoothDevice) message.obj;
+                    processScanCb(device);
+                    break;
+                case MSG_MA_ADV_STARTED:
+                    PrintStr.setLength(0);
+                    String enableId = (String) message.obj;
+                    PrintStr.append("Advertising started! Instance Id:");
+                    PrintStr.append(enableId);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
+                case MSG_MA_ADV_STOPPED:
+                    PrintStr.setLength(0);
+                    String disableId = (String) message.obj;
+                    PrintStr.append("Advertising stopped for instance Id:");
+                    PrintStr.append(disableId);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    break;
                 case MSG_GC_START_BLE_CONNECT:
                     scnObj = (Scan) message.obj;
-                    scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
+                    scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_CONNECT, scnObj);
+                              mgattclient.MSG_START_BLE_CONNECT, scnObj);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_CONN_UPDATE:
                     ConnUpdateObj = (ConnUpdate) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_CONN_UPDATE, ConnUpdateObj);
+                              mgattclient.MSG_START_BLE_CONN_UPDATE, ConnUpdateObj);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_PHY_UPDATE:
                     phyUpdateObj = (PhyUpdate) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_PHY_UPDATE, phyUpdateObj);
+                              mgattclient.MSG_START_BLE_PHY_UPDATE, phyUpdateObj);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE:
                     int Mtu_Size = (int) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE, Mtu_Size);
+                          mgattclient.MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE, Mtu_Size);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_READ_PHY:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_READ_PHY, null);
+                              mgattclient.MSG_START_BLE_READ_PHY, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_PAIR:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_PAIR_DEV, null);
+                              mgattclient.MSG_START_BLE_PAIR_DEV, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_UNPAIR:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_UNPAIR_DEV, null);
+                              mgattclient.MSG_START_BLE_UNPAIR_DEV, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_DISCOVER:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_GATT_DISC, null);
+                              mgattclient.MSG_START_BLE_GATT_DISC, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_REFRESH_SERVICES:
@@ -517,93 +517,93 @@ public class MainActivity extends Activity {
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS:
-                    RdWrClass = (ReadWriteOp) message.obj;
+                    RdWrClass = (ReadWriteOp) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_REGISTER_BLE_GATT_NOTIFICATIONS, RdWrClass);
+                          mgattclient.MSG_REGISTER_BLE_GATT_NOTIFICATIONS, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
-                case MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS:
-                    RdWrClass = (ReadWriteOp) message.obj;
+                case MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS:
+                    RdWrClass = (ReadWriteOp) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS, RdWrClass);
+                          mgattclient.MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_RELIABLE_WRITE:
-                    RdWrClass = (ReadWriteOp) message.obj;
+                    RdWrClass = (ReadWriteOp) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_GATT_RELIABLE_WRITE, RdWrClass);
+                          mgattclient.MSG_START_BLE_GATT_RELIABLE_WRITE, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
-                case MSG_GC_START_BLE_GATT_EXECUTE_WRITE:
-                    msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_GATT_EXECUTE_WRITE, null);
+                case MSG_GC_START_BLE_GATT_EXECUTE_WRITE:
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_GATT_EXECUTE_WRITE, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
+                          mgattclient.MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_DISC:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
+                          mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_CONNECT:
-                    scnObj = (Scan) message.obj;
-                    scan_called = SCAN_CALLED_FROM_THROUGHPUT_SM;
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                          throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT, scnObj);
-                    throughputSMClass.mStateMachine.sendMessage(msg);
-                    break;
-                case MSG_SM_START_BLE_CONN_UPDATE:
-                    ConnUpdateObj = (ConnUpdate) message.obj;
+                case MSG_SM_START_BLE_CONNECT:
+                    scnObj = (Scan) message.obj;
+                    scan_called = SCAN_CALLED_FROM_THROUGHPUT_SM;
                     msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_CONN_UPDATE, ConnUpdateObj);
+                          throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT, scnObj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_PHY_UPDATE:
-                    phyUpdateObj = (PhyUpdate) message.obj;
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_PHY_UPDATE, phyUpdateObj);
+                case MSG_SM_START_BLE_CONN_UPDATE:
+                    ConnUpdateObj = (ConnUpdate) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_CONN_UPDATE, ConnUpdateObj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_READ_PHY:
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_READ_PHY, null);
+                case MSG_SM_START_BLE_PHY_UPDATE:
+                    phyUpdateObj = (PhyUpdate) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_PHY_UPDATE, phyUpdateObj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_PAIR:
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_PAIR_DEV, null);
+                case MSG_SM_START_BLE_READ_PHY:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_READ_PHY, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_UNPAIR:
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_UNPAIR_DEV, null);
+                case MSG_SM_START_BLE_PAIR:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_PAIR_DEV, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_DATA_TX_TEST:
-                    DataTx DataTxClass = (DataTx) message.obj;
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_DATA_TX_TEST, DataTxClass);
+                case MSG_SM_START_BLE_UNPAIR:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_UNPAIR_DEV, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_DATA_RX_TEST:
-                    DataRx DataRxClass = (DataRx) message.obj;
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_DATA_RX_TEST, DataRxClass);
+                case MSG_SM_START_BLE_DATA_TX_TEST:
+                    DataTx DataTxClass = (DataTx) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_DATA_TX_TEST, DataTxClass);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_LATENCY_TEST:
-                    LatencyTest LatencyTestClass = (LatencyTest) message.obj;
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_LATENCY_TEST, LatencyTestClass);
+                case MSG_SM_START_BLE_DATA_RX_TEST:
+                    DataRx DataRxClass = (DataRx) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_DATA_RX_TEST, DataRxClass);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
-                case MSG_SM_START_BLE_GATT_DISC:
-                    msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
+                case MSG_SM_START_BLE_LATENCY_TEST:
+                    LatencyTest LatencyTestClass = (LatencyTest) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_LATENCY_TEST, LatencyTestClass);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_SM_START_BLE_GATT_DISC:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 default:
@@ -611,35 +611,35 @@ public class MainActivity extends Activity {
                     break;
             }
         }
-    private void processScanCb(BluetoothDevice device) {
-      Log.d(TAG, "processScanCb(main activity)"+scan_called+batch_scan);
-      if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
-            msg = mgattclient.mGattClientHandler.obtainMessage(
-                        mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
+    private void processScanCb(BluetoothDevice device) {
+        Log.d(TAG, "processScanCb(main activity)"+scan_called+batch_scan);
+        if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
+            msg = mgattclient.mGattClientHandler.obtainMessage(
+                        mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
             mgattclient.mGattClientHandler.sendMessage(msg);
-        } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
-             msg = throughputSMClass.mStateMachine.obtainMessage(
-                        throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
-             throughputSMClass.mStateMachine.sendMessage(msg);
-        } else {
-        if(!batch_scan){
-                /* Display scannner queue */
-            for(int i=0; i<mScanList.size(); i++){
-                Log.d(TAG, "start of loop, processScanCb(main activity)"
-                            +mScanList.size());
-                ScanList scanRec = mScanList.get(i);
-                PrintStr.setLength(0);
-                PrintStr.append("Scan Results: Device Name - ");
-                PrintStr.append(scanRec.devName);
-                PrintStr.append("\t Device Address - ");
-                PrintStr.append(scanRec.devAddr);
-                SocketServer.sendSocketData(PrintStr.toString());
-            }
-            Log.d(TAG, "End of scan results");
-        } else {
-            Log.d(TAG, "End of Batch scan results");
-        }
-      }
-    }
-  }
+        } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
+            msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
+            throughputSMClass.mStateMachine.sendMessage(msg);
+        } else {
+            if(!batch_scan){
+                /* Display scannner queue */
+                for(int i=0; i<mScanList.size(); i++){
+                    Log.d(TAG, "start of loop, processScanCb(main activity)"
+                                +mScanList.size());
+                    ScanList scanRec = mScanList.get(i);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Scan Results: Device Name - ");
+                    PrintStr.append(scanRec.devName);
+                    PrintStr.append("\t Device Address - ");
+                    PrintStr.append(scanRec.devAddr);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+                Log.d(TAG, "End of scan results");
+            } else {
+                Log.d(TAG, "End of Batch scan results");
+            }
+        }
+    }
+    }
 }

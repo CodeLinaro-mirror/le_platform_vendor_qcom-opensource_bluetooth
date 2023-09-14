@@ -80,83 +80,79 @@ public class AdvertiserEntity {
     public int adv_id;
     public int adv_status;
 
-
     class AdvSetCallback extends AdvertisingSetCallback {
-        Message msg;
-            @Override
-            public void onAdvertisingSetStarted(AdvertisingSet advertisingSet,
-                                                int txPower, int status) {
+        Message msg;
+        @Override
+        public void onAdvertisingSetStarted(AdvertisingSet advertisingSet,
+                                            int txPower, int status) {
             super.onAdvertisingSetStarted(advertisingSet, txPower, status);
             Log.d(TAG,"onAdvertisingSetStarted status : "+status);
-            switch (status){
-                case ADVERTISE_SUCCESS:
-                    adv_status = ADV_STARTED;
-                    msg = MainActivity.msghandler.obtainMessage(
-                          MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
-                    MainActivity.msghandler.sendMessage(msg);
-                    break;
-                case ADVERTISE_FAILED_ALREADY_STARTED:
-                    break;
-                case ADVERTISE_FAILED_FEATURE_UNSUPPORTED:
-                    break;
-                case ADVERTISE_FAILED_DATA_TOO_LARGE:
-                    break;
-                case ADVERTISE_FAILED_TOO_MANY_ADVERTISERS:
-                    break;
-                case ADVERTISE_FAILED_INTERNAL_ERROR:
-                    break;
+            
+            if (status == ADVERTISE_SUCCESS){
+                adv_status = ADV_STARTED;
+                msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+                MainActivity.msghandler.sendMessage(msg);
+            } else {
+                StringBuilder PrintStr = new StringBuilder();
+
+                PrintStr.setLength(0);
+                PrintStr.append("Failed to start advertising with error: ");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
-            @Override
-            public void onAdvertisingSetStopped(AdvertisingSet advertisingSet) {
+        @Override
+        public void onAdvertisingSetStopped(AdvertisingSet advertisingSet) {
             //super.onAdvertisingSetStopped(advertisingSet);
             Log.d(TAG,"onAdvertisingSetStopped");
             adv_status = ADV_STOPPED;
-            msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
+            msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
             MainActivity.msghandler.sendMessage(msg);
         }
 
-            @Override
-            public void onAdvertisingEnabled(AdvertisingSet advertisingSet,
-                                             boolean enable, int status) {
+        @Override
+        public void onAdvertisingEnabled(AdvertisingSet advertisingSet,
+                                         boolean enable, int status) {
             //super.onAdvertisingEnabled(advertisingSet, enable, status);
             Log.d(TAG,"onAdvertisingEnabled");
         }
 
-            @Override
-            public void onAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
+        @Override
+        public void onAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
             //super.onAdvertisingDataSet(advertisingSet, status);
-                Log.d(TAG,"onAdvertisingDataSet");
+            Log.d(TAG,"onAdvertisingDataSet");
         }
 
-            @Override
-            public void onScanResponseDataSet(AdvertisingSet advertisingSet, int status) {
+        @Override
+        public void onScanResponseDataSet(AdvertisingSet advertisingSet, int status) {
             //super.onScanResponseDataSet(advertisingSet, status);
             Log.d(TAG,"onScanResponseDataSet");
         }
 
-            @Override
-            public void onAdvertisingParametersUpdated(AdvertisingSet advertisingSet, int txPower, int status) {
+        @Override
+        public void onAdvertisingParametersUpdated(AdvertisingSet advertisingSet, int txPower,
+                            int status) {
             //super.onAdvertisingParametersUpdated(advertisingSet, txPower, status);
             Log.d(TAG,"onAdvertisingParametersUpdated");
         }
 
-            @Override
-            public void onPeriodicAdvertisingParametersUpdated(AdvertisingSet advertisingSet,
+        @Override
+        public void onPeriodicAdvertisingParametersUpdated(AdvertisingSet advertisingSet,
                                                                int status) {
             //super.onPeriodicAdvertisingParametersUpdated(advertisingSet, status);
             Log.d(TAG,"onPeriodicAdvertisingParametersUpdated");
         }
 
-            @Override
-            public void onPeriodicAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
+        @Override
+        public void onPeriodicAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
             //super.onPeriodicAdvertisingDataSet(advertisingSet, status);
         }
 
-            @Override
-            public void onPeriodicAdvertisingEnabled(AdvertisingSet advertisingSet,
+        @Override
+        public void onPeriodicAdvertisingEnabled(AdvertisingSet advertisingSet,
                                                      boolean enable, int status) {
             //super.onPeriodicAdvertisingEnabled(advertisingSet, enable, status);
             Log.d(TAG,"onPeriodicAdvertisingEnabled");
@@ -168,9 +164,9 @@ public class AdvertiserEntity {
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
             Log.d(TAG, "Advertisemnt sent");
             adv_status = ADV_STARTED;
-            Message msg;
-            msg = MainActivity.msghandler.obtainMessage(
-                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
+            Message msg;
+            msg = MainActivity.msghandler.obtainMessage(
+                      MainActivity.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
             MainActivity.msghandler.sendMessage(msg);
             super.onStartSuccess(settingsInEffect);
         }
@@ -180,6 +176,13 @@ public class AdvertiserEntity {
             Log.e(TAG, "Advertisement failed, errorcode -> "+errorCode);
             adv_status = ADV_FAILED;
             super.onStartFailure(errorCode);
+
+            StringBuilder PrintStr = new StringBuilder();
+
+            PrintStr.setLength(0);
+            PrintStr.append("Failed to start advertising with error: ");
+            PrintStr.append(errorCode);
+            SocketServer.sendSocketData(PrintStr.toString());
         }
     };
 
@@ -321,7 +324,7 @@ public class AdvertiserEntity {
                 mAdvData = legacyData.build();
                 Log.d(TAG,"BuildAdvertisementData done");
                 return true;
-             } else {
+            } else {
                 AdvertiseData.Builder dataBuilder = new AdvertiseData.Builder();
                 dataBuilder.setIncludeDeviceName(true);
                 dataBuilder.setIncludeTxPowerLevel(adv_info.IncludePower);
