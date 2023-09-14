@@ -769,18 +769,18 @@ public class GattClient {
             Log.i(TAG, "Starting Pairing");
             mgattClient.pair();
         }
-  
+
         private void processExecuteWriteReq() {
              /*execute write*/
             if(reliable_write) {
                 if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
-                    Log.i(TAG, "Execute Write Successful!");
+                    Log.i(TAG, "Execute Write Successful!");
                 } else {
-                    Log.e(TAG, "Execute Write Failed!");
+                    Log.e(TAG, "Execute Write Failed!");
                 }
                 reliable_write = false;
                 length_offset = 0;
-           }
+            }
         }
 
         private void processStartUnpair(){

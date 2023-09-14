@@ -60,6 +60,8 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
 
 import android.util.Log;
 
@@ -118,22 +120,25 @@ public class MainActivity extends Activity {
     public static AdvertiserService mAdvertiseService = null;
     public static ScannerService mScannerService = null;
 
-    public static SocketServer socServer;
+    public static SocketServer socServer;
 
-    /* Variable to keep track of calling source of scan
-     (MainActivity or Gatt Client or Throughput SM) */
-    private static int scan_called = 0;
-    private static final int SCAN_CALLED_FROM_MAIN_ACTIVITY = 1;
-    private static final int SCAN_CALLED_FROM_GATT_CLIENT = 2;
-    private static final int SCAN_CALLED_FROM_THROUGHPUT_SM = 3;
+    /* Variable to keep track of calling source of scan
+     (MainActivity or Gatt Client or Throughput SM) */
+    private static int scan_called = 0;
+    private static final int SCAN_CALLED_FROM_MAIN_ACTIVITY = 1;
+    private static final int SCAN_CALLED_FROM_GATT_CLIENT = 2;
+    private static final int SCAN_CALLED_FROM_THROUGHPUT_SM = 3;
 
-    public static boolean batch_scan=false;
+    public static boolean batch_scan=false;
 
-    /* Variable to keep track of calling source of pair request
-     (MainActivity or Gatt Client or Throughput SM) */
-    public static int pairing_called = 0;
-    public static final int PAIRING_REQ_FROM_THROUGHPUT_SM = 1;
-    public static final int PAIRING_REQ_FROM_GATT_CLIENT = 2;
+    public static WakeLock wl;
+    public static boolean wl_acquired=false;
+
+    /* Variable to keep track of calling source of pair request
+     (MainActivity or Gatt Client or Throughput SM) */
+    public static int pairing_called = 0;
+    public static final int PAIRING_REQ_FROM_THROUGHPUT_SM = 1;
+    public static final int PAIRING_REQ_FROM_GATT_CLIENT = 2;
 
     /* Main Activity Actions */
     public static final int MSG_MA_START_BLE_ADV = 0;
@@ -182,37 +187,49 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         mAppContext = getApplicationContext();
 
-        mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-        if (mBluetoothManager == null) {
-            Log.e(TAG, "mBluetoothManager is null");
-            return;
+        if (savedInstanceState != null) {
+            // Restore value of members from saved state
+            wl_acquired = savedInstanceState.getBoolean("wl_acquired");
+            Log.d(TAG, "on create savedInstance not null");
+        } else {
+            //moveTaskToBack(true);
+            Log.d(TAG, "on create savedInstance null");
+            PowerManager pm = (PowerManager)mAppContext.getSystemService(
+                                              Context.POWER_SERVICE);
+            wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WakeLock");
+
+            mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+            if (mBluetoothManager == null) {
+                Log.e(TAG, "mBluetoothManager is null");
+                return;
+            }
+            /* Check and prompt to user if bluetooth in not turned on */
+            if (!initAdapter()) {
+                Log.e(TAG, "Bluetooth is not turned on");
+                showMessage("Bluetooth is not turned ON");
+                return;
+            }
+
+            /* Request for location access */
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                    PERMISSION_REQUEST_FINE_LOCATION);
+            }
+
+            socServer = SocketServer.getInstance();
+
+            // Bind to the "SCANNER" service
+            Log.d("CREATION", "BINDING TO SCANNER ");
+            Intent intent = new Intent(this, ScannerService.class);
+            startService(intent);
+            bindService(intent, mscannerConnection, Context.BIND_AUTO_CREATE);
+
+            // Bind to the "ADVERTISER" service
+            Log.d("CREATION", "BINDING TO ADVERTISER");
+            Intent adv_intent = new Intent(this, AdvertiserService.class);
+            startService(adv_intent);
+            bindService(adv_intent, madvertiserConnection, Context.BIND_AUTO_CREATE);
         }
-        /* Check and prompt to user if bluetooth in not turned on */
-        if (!initAdapter()) {
-            Log.e(TAG, "Bluetooth is not turned on");
-            showMessage("Bluetooth is not turned ON");
-            return;
-        }
-
-        /* Request for location access */
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                PERMISSION_REQUEST_FINE_LOCATION);
-        }
-
-        socServer = SocketServer.getInstance();
-
-        // Bind to the "SCANNER" service
-        Log.d("CREATION", "BINDING TO SCANNER ");
-        Intent intent = new Intent(this, ScannerService.class);
-        startService(intent);
-        bindService(intent, mscannerConnection, Context.BIND_AUTO_CREATE);
-
-        // Bind to the "ADVERTISER" service
-        Log.d("CREATION", "BINDING TO ADVERTISER");
-        Intent adv_intent = new Intent(this, AdvertiserService.class);
-        startService(adv_intent);
-        bindService(adv_intent, madvertiserConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
@@ -251,7 +268,7 @@ public class MainActivity extends Activity {
         return true;
     }
 
-  public final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
+    public final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -292,38 +309,77 @@ public class MainActivity extends Activity {
         /* start throughput state machine */
         start_testapp_tput_state_machine();
 
-        /* start gatt client */
-        mgattclient = new GattClient(mAppContext);
+         /* start gatt client */
+         mgattclient = new GattClient(mAppContext);
 
-        mScanList = new ArrayList<ScanList>();
+         mScanList = new ArrayList<ScanList>();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d(TAG, "onPause");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume");
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "onDestroy");
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle savedInstanceState) {
+        Log.d(TAG, "onSaveInstanceState");
+        if(wl_acquired) {
+            savedInstanceState.putBoolean("wl_acquired", true);
+            Log.d(TAG, "onSaveInstanceState:wl acquired -true");
+        }
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        Log.d(TAG, "onRestoreInstanceState called");
+        wl_acquired = savedInstanceState.getBoolean("wl_acquired");
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        /* Unbind from the "ADVERTISER" service */
-        if (boundA) {
-            unbindService(madvertiserConnection);
-            boundA = false;
-        }
-        /* Unbind from the "SCANNER" service */
-        if (boundS) {
-            unbindService(mscannerConnection);
-            boundS = false;
-        }
-        /* Stopping throughput state machine */
-        if (throughputSMClass.mStateMachine != null) {
-            throughputSMClass.mStateMachine.doQuit();
-        }
-
-        /* Unregistering Paring Receiver */
-        try{
-            if(mReceiverRegistered) {
-                unregisterReceiver(mPairingReceiver);
-                mReceiverRegistered = false;
+        /* if wakelock is acquired data tx/rx is going on,
+           so don't stop SM */
+        if(!wl_acquired) {
+            /* Unbind from the "ADVERTISER" service */
+            if (boundA) {
+                unbindService(madvertiserConnection);
+                boundA = false;
             }
-        }catch(Exception E) {
-            Log.d(TAG, "not able to unregister");
+            /* Unbind from the "SCANNER" service */
+            if (boundS) {
+                unbindService(mscannerConnection);
+                boundS = false;
+            }
+            /* Stopping throughput state machine */
+            if (throughputSMClass.mStateMachine != null) {
+                throughputSMClass.mStateMachine.doQuit();
+            }
+
+            /* Unregistering Paring Receiver */
+            try{
+                if(mReceiverRegistered) {
+                    unregisterReceiver(mPairingReceiver);
+                    mReceiverRegistered = false;
+                }
+            }catch(Exception E) {
+                Log.d(TAG, "not able to unregister");
+            }
         }
     }
 
