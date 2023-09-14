@@ -34,6 +34,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.widget.Toast;
 import android.Manifest;
 import android.util.Log;
@@ -100,9 +101,11 @@ public class MainActivity extends Activity {
 
     public static ThroughputStateMachine throughputSMClass;
     public static GattClient mgattclient;
+    public static GattServer mgattserver;
     public static MainActivityMessageHandler msghandler;
 
     private Context mAppContext;
+    public static boolean isActivityRunning = false;
 
     /* Location permissions */
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
@@ -118,7 +121,7 @@ public class MainActivity extends Activity {
     public static AdvertiserService mAdvertiseService = null;
     public static ScannerService mScannerService = null;
 
-    public static SocketServer socServer;
+    public static SocketServer socServer = null;
 
     /* Variable to keep track of calling source of scan
      (MainActivity or Gatt Client or Throughput SM) */
@@ -129,6 +132,7 @@ public class MainActivity extends Activity {
 
     public static WakeLock wl;
     public static boolean wl_acquired=false;
+    public Looper mlooper;
 
     /* Variable to keep track of calling source of pair request
      (MainActivity or Gatt Client or Throughput SM) */
@@ -141,41 +145,55 @@ public class MainActivity extends Activity {
     public static final int MSG_MA_STOP_BLE_ADV = 1;
     public static final int MSG_MA_START_BLE_SCAN = 2;
     public static final int MSG_MA_STOP_BLE_SCAN = 3;
-    public static final int MSG_MA_SCAN_DEV_FOUND = 20;
-    public static final int MSG_MA_ADV_STARTED = 31;
-    public static final int MSG_MA_ADV_STOPPED = 32;
+    public static final int MSG_MA_SCAN_DEV_FOUND = 4;
+    public static final int MSG_MA_ADV_STARTED = 5;
+    public static final int MSG_MA_ADV_STOPPED = 6;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_ADV_STOPPED;
 
     /* Gatt Client Actions */
-    public static final int MSG_GC_START_BLE_CONNECT = 4;
-    public static final int MSG_GC_START_BLE_CONN_UPDATE = 5;
-    public static final int MSG_GC_START_BLE_PHY_UPDATE = 6;
-    public static final int MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE = 7;
-    public static final int MSG_GC_START_BLE_READ_PHY = 8;
-    public static final int MSG_GC_START_BLE_PAIR = 9;
-    public static final int MSG_GC_START_BLE_UNPAIR = 10;
-    public static final int MSG_GC_START_BLE_GATT_DISCOVER = 11;
-    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = 12;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = 13;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = 14;
-    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = 15;
-    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = 16;
-    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = 17;
-    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = 18;
-    public static final int MSG_GC_START_BLE_GATT_DISC = 19;
-    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = 34;
+    public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
+    public static final int MSG_GC_START_BLE_CONN_UPDATE = MSG_MA_MAX_ACTION_VALUE + 2;
+    public static final int MSG_GC_START_BLE_PHY_UPDATE = MSG_MA_MAX_ACTION_VALUE + 3;
+    public static final int MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE = MSG_MA_MAX_ACTION_VALUE + 4;
+    public static final int MSG_GC_START_BLE_READ_PHY = MSG_MA_MAX_ACTION_VALUE + 5;
+    public static final int MSG_GC_START_BLE_PAIR = MSG_MA_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GC_START_BLE_UNPAIR = MSG_MA_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GC_START_BLE_GATT_DISCOVER = MSG_MA_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = MSG_MA_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = MSG_MA_MAX_ACTION_VALUE + 10;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = MSG_MA_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 12;
+    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 13;
+    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 14;
+    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 15;
+    public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 16;
+    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 17;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_GATT_CANCEL_CONNECT;
 
     /* State Machine Actions */
-    public static final int MSG_SM_START_BLE_CONNECT = 21;
-    public static final int MSG_SM_START_BLE_CONN_UPDATE = 22;
-    public static final int MSG_SM_START_BLE_PHY_UPDATE = 23;
-    public static final int MSG_SM_START_BLE_READ_PHY = 24;
-    public static final int MSG_SM_START_BLE_PAIR = 25;
-    public static final int MSG_SM_START_BLE_UNPAIR = 26;
-    public static final int MSG_SM_START_BLE_DATA_TX_TEST = 27;
-    public static final int MSG_SM_START_BLE_DATA_RX_TEST = 28;
-    public static final int MSG_SM_START_BLE_LATENCY_TEST = 29;
-    public static final int MSG_SM_START_BLE_GATT_DISC = 30;
+    public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
+    public static final int MSG_SM_START_BLE_CONN_UPDATE = MSG_GC_MAX_ACTION_VALUE + 2;
+    public static final int MSG_SM_START_BLE_PHY_UPDATE = MSG_GC_MAX_ACTION_VALUE + 3;
+    public static final int MSG_SM_START_BLE_READ_PHY = MSG_GC_MAX_ACTION_VALUE + 4;
+    public static final int MSG_SM_START_BLE_PAIR = MSG_GC_MAX_ACTION_VALUE + 5;
+    public static final int MSG_SM_START_BLE_UNPAIR = MSG_GC_MAX_ACTION_VALUE + 6;
+    public static final int MSG_SM_START_BLE_DATA_TX_TEST = MSG_GC_MAX_ACTION_VALUE + 7;
+    public static final int MSG_SM_START_BLE_DATA_RX_TEST = MSG_GC_MAX_ACTION_VALUE + 8;
+    public static final int MSG_SM_START_BLE_LATENCY_TEST = MSG_GC_MAX_ACTION_VALUE + 9;
+    public static final int MSG_SM_START_BLE_GATT_DISC = MSG_GC_MAX_ACTION_VALUE + 10;
+    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_DISC;
 
+    /* GATT Server Actions */
+    public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
+    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = MSG_SM_MAX_ACTION_VALUE + 2;
+    public static final int MSG_GS_START_BLE_SET_PHY = MSG_SM_MAX_ACTION_VALUE + 3;
+    public static final int MSG_GS_START_BLE_READ_PHY = MSG_SM_MAX_ACTION_VALUE + 4;
+    public static final int MSG_GS_START_BLE_GET_SERVICES = MSG_SM_MAX_ACTION_VALUE + 5;
+    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = MSG_SM_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GS_START_BLE_CONNECT = MSG_SM_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = MSG_SM_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_GET_CONNECTED_DEVICES;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -188,7 +206,6 @@ public class MainActivity extends Activity {
             wl_acquired = savedInstanceState.getBoolean("wl_acquired");
             Log.d(TAG, "on create savedInstance not null");
         } else {
-            //moveTaskToBack(true);
             Log.d(TAG, "on create savedInstance null");
             PowerManager pm = (PowerManager)mAppContext.getSystemService(
                                               Context.POWER_SERVICE);
@@ -212,7 +229,7 @@ public class MainActivity extends Activity {
                                     PERMISSION_REQUEST_FINE_LOCATION);
             }
 
-            socServer = SocketServer.getInstance();
+            socServer = SocketServer.getInstance(mAppContext);
 
             // Bind to the "SCANNER" service
             Log.d("CREATION", "BINDING TO SCANNER ");
@@ -225,6 +242,27 @@ public class MainActivity extends Activity {
             Intent adv_intent = new Intent(this, AdvertiserService.class);
             startService(adv_intent);
             bindService(adv_intent, madvertiserConnection, Context.BIND_AUTO_CREATE);
+
+            IntentFilter Pairingfilter = new IntentFilter();
+            Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+            registerReceiver(mPairingReceiver, Pairingfilter);
+            mReceiverRegistered = true;
+
+            HandlerThread Thread = new HandlerThread("MainActivityMessageHandler");
+            Thread.start();
+
+            mlooper = Thread.getLooper();
+            /* start main activity message handler */
+            msghandler = new MainActivityMessageHandler(mAppContext, mlooper);
+
+            /* start throughput state machine */
+            start_testapp_tput_state_machine();
+
+            /* start gatt client */
+            mgattclient = new GattClient(mAppContext);
+
+            /*start gatt server*/
+            mgattserver = new GattServer(mAppContext);
         }
     }
 
@@ -259,6 +297,17 @@ public class MainActivity extends Activity {
         return true;
     }
 
+    private boolean isMyServiceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service :
+            manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -267,15 +316,15 @@ public class MainActivity extends Activity {
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                             BluetoothDevice.ERROR);
                 if (bondState == BluetoothDevice.BOND_BONDED) {
-                   Log.i(TAG, "Device paired");
-            if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
-                Message msg = mgattclient.mGattClientHandler.obtainMessage(
-                                mgattclient.MSG_GC_REM_DEV_PAIRED, null);
+                    Log.i(TAG, "Device paired");
+                    if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
+                        Message msg = mgattclient.mGattClientHandler.obtainMessage(
+                                 mgattclient.MSG_GC_REM_DEV_PAIRED, null);
                         mgattclient.mGattClientHandler.sendMessage(msg);
-            } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
-                throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
-                            .MSG_TA_SM_REM_DEV_PAIRED);
-            }
+                    } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
+                        throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
+                             .MSG_TA_SM_REM_DEV_PAIRED);
+                    }
                 }
             }
         }
@@ -284,24 +333,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
-
-        IntentFilter Pairingfilter = new IntentFilter();
-        Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        registerReceiver(mPairingReceiver, Pairingfilter);
-        mReceiverRegistered = true;
-
-        HandlerThread thread = new HandlerThread("MainActivityMessageHandler");
-        thread.start();
-
-        Looper looper = thread.getLooper();
-        /* start main activity message handler */
-        msghandler = new MainActivityMessageHandler(mAppContext, looper);
-
-        /* start throughput state machine */
-        start_testapp_tput_state_machine();
-
-         /* start gatt client */
-         mgattclient = new GattClient(mAppContext);
+        isActivityRunning = true;
+        Log.d(TAG, "onStart");
     }
 
     @Override
@@ -319,8 +352,56 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        isActivityRunning = false;
         Log.d(TAG, "onDestroy");
+        /* if wakelock is acquired data tx/rx is going on,
+           so don't stop SM */
+        if(!wl_acquired) {
+            Log.d(TAG, "onDestroy - wakelock");
+            /* Unbind from the "ADVERTISER" service */
+            if (boundA) {
+                unbindService(madvertiserConnection);
+                boundA = false;
+            }
+            if(isMyServiceRunning(ScannerService.class)) {
+                stopService(new Intent(this, ScannerService.class));
+            }
+            /* Unbind from the "SCANNER" service */
+            if (boundS) {
+                unbindService(mscannerConnection);
+                boundS = false;
+            }
+            if(isMyServiceRunning(AdvertiserService.class)) {
+                stopService(new Intent(this, AdvertiserService.class));
+            }
+            /* Stopping throughput state machine */
+            if (throughputSMClass.mStateMachine != null) {
+                throughputSMClass.mStateMachine.doQuit();
+            }
+
+            /* Unregistering Paring Receiver */
+            try{
+                if(mReceiverRegistered) {
+                    unregisterReceiver(mPairingReceiver);
+                    mReceiverRegistered = false;
+                }
+            }catch(Exception E) {
+                Log.d(TAG, "not able to unregister");
+            }
+
+            /* Stop SocketServer */
+            SocketServer.sendSocketData("Application is Closed... Please restart");
+            socServer.closeSocketServer();
+
+            /* stop Gatt Client handler */
+            mgattclient.cleanup();
+
+            /* stop Ble App Service msg hdlr looper*/
+            mlooper.quitSafely();
+
+        }
     }
+
 
     @Override
     protected void onSaveInstanceState(Bundle savedInstanceState) {
@@ -342,34 +423,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
-        /* if wakelock is acquired data tx/rx is going on,
-           so don't stop SM */
-        if(!wl_acquired) {
-            /* Unbind from the "ADVERTISER" service */
-            if (boundA) {
-                unbindService(madvertiserConnection);
-                boundA = false;
-            }
-            /* Unbind from the "SCANNER" service */
-            if (boundS) {
-                unbindService(mscannerConnection);
-                boundS = false;
-            }
-            /* Stopping throughput state machine */
-            if (throughputSMClass.mStateMachine != null) {
-                throughputSMClass.mStateMachine.doQuit();
-            }
-
-            /* Unregistering Paring Receiver */
-            try{
-                if(mReceiverRegistered) {
-                    unregisterReceiver(mPairingReceiver);
-                    mReceiverRegistered = false;
-                }
-            }catch(Exception E) {
-                Log.d(TAG, "not able to unregister");
-            }
-        }
+        Log.d(TAG, "onStop");
     }
 
     /* function to start testapp throughput state machine */
@@ -439,10 +493,10 @@ public class MainActivity extends Activity {
         StringBuilder PrintStr = new StringBuilder();
 
         public MainActivityMessageHandler(Context contxt, Looper looper) {
-        super(looper);
-        mMsgContext = contxt;
-        if(MainActivity.LOG_LEVEL >= 2)
-            Log.d(TAG, "MainActivityMessageHandler");
+            super(looper);
+            mMsgContext = contxt;
+            if(MainActivity.LOG_LEVEL >= 2)
+                Log.d(TAG, "MainActivityMessageHandler");
         }
 
         @Override
@@ -452,6 +506,7 @@ public class MainActivity extends Activity {
             int status;
             ReadWriteOp RdWrClass;
             Scan scnObj;
+            AddServices AddServ;
             PhyUpdate phyUpdateObj;
             ConnUpdate ConnUpdateObj;
 
@@ -651,24 +706,63 @@ public class MainActivity extends Activity {
                     throughputSMClass.mStateMachine.MSG_TA_SM_DISCONNECT, null);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
+                case MSG_GS_START_BLE_ADD_SERVICE:
+                    AddServ = (AddServices) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_ADD_SERVICE, AddServ);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_REMOVE_SERVICE:
+                    String uuid=(String)message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_REMOVE_SERVICE, uuid);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_CLEAR_SERVICES:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_CLEAR_SERVICES, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_GET_SERVICES:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_GET_SERVICES, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_PHY_UPDATE:
+                    phyUpdateObj = (PhyUpdate) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                             mgattserver.MSG_START_BLE_PHY_UPDATE, phyUpdateObj);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_READ_PHY:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                              mgattserver.MSG_START_BLE_READ_PHY, null);
+                     mgattserver.mGattServerHandler.sendMessage(msg);
+                     break;
+                case MSG_GS_START_GET_CONNECTED_DEVICES:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                             mgattserver.MSG_START_GET_CONNECTED_DEVICES, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
             }
         }
-    private void processScanCb(BluetoothDevice device) {
-        Log.d(TAG, "processScanCb(main activity)"+scan_called);
-        if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
-            msg = mgattclient.mGattClientHandler.obtainMessage(
-                        mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
-            mgattclient.mGattClientHandler.sendMessage(msg);
-        } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
-            msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
-            throughputSMClass.mStateMachine.sendMessage(msg);
-        } else {
-           /* do nothing */
+
+        private void processScanCb(BluetoothDevice device) {
+            Log.d(TAG, "processScanCb(main activity)"+scan_called);
+            if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
+                msg = mgattclient.mGattClientHandler.obtainMessage(
+                            mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
+                mgattclient.mGattClientHandler.sendMessage(msg);
+            } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
+                msg = throughputSMClass.mStateMachine.obtainMessage(
+                        throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
+                throughputSMClass.mStateMachine.sendMessage(msg);
+            } else {
+               /* do nothing */
+            }
         }
-    }
     }
 }

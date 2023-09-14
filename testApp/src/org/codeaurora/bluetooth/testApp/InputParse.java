@@ -30,6 +30,12 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.util.Log;
+import java.util.stream.*;
+
+import java.util.Arrays;
+import java.util.*;
+import java.util.stream.*;
+import java.util.function.*;
 
 public class InputParse {
     private static final String TAG = "InputParse";
@@ -337,17 +343,62 @@ public class InputParse {
                     readWriteOpParam.Value = tmp2[1];
                 } else if (tmp2[0].equals("WriteType")) {
                     readWriteOpParam.Write_type = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("FormatType")) {
+                    readWriteOpParam.Format_type = Integer.parseInt(tmp2[1]);
                 } else {
                     break;
                 }
-            }else{
+            } else {
                 break;
             }
         }
 
-        if(i == tmp.length){
+        if(i == tmp.length) {
             return readWriteOpParam;
-        }else{
+        } else {
+            return null;
+        }
+    }
+
+    public AddServices AddServicesParse(String input){
+        String[] tmp2;
+        Log.d(TAG, "AddServicesParse()");
+        AddServices AddServicesParam = new AddServices();
+        String tmp[] = input.split(";");
+        int i=0;
+        for(i=0; i<tmp.length; i++) {
+           tmp2 = tmp[i].split(":",2);
+           if(tmp2.length == 2) {
+                 if (tmp2[0].equals("ServiceUuid")) {
+                      AddServicesParam.lserviceUUID = UUID.fromString(tmp2[1]);
+                 } else if (tmp2[0].equals("CharUuid")) {
+                      String tmp3[] = tmp2[1].split(" ");
+                      for (int index=0; index<tmp3.length; index++){
+                        AddServicesParam.lcharUUIDs=new ArrayList<>();
+                        AddServicesParam.lcharUUIDs.add(UUID.fromString(tmp3[index]));
+                      }
+                 } else if (tmp2[0].equals("Properties")) {
+                      String tmp3[] = tmp2[1].split(" ");
+                      List<String> list = Arrays.asList(tmp3);
+                      AddServicesParam.lProps = list.stream().map(Integer::decode)
+                            .collect(Collectors.toList());
+                 } else if (tmp2[0].equals("Permissions")) {
+                      String tmp3[] = tmp2[1].split(" ");
+                      List<String> list = Arrays.asList(tmp3);
+                      AddServicesParam.lPerms = list.stream().map(Integer::decode)
+                            .collect(Collectors.toList());
+                 } else if (tmp2[0].equals("Value")) {
+                      AddServicesParam.lvalue = tmp2[1].getBytes();
+                 } else {
+                     break;
+                 }
+           } else {
+                 break;
+           }
+        }
+        if(i == tmp.length){
+            return AddServicesParam ;
+        } else {
             return null;
         }
     }

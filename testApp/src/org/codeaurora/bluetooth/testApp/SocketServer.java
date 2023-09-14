@@ -34,16 +34,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.Semaphore;
 
+import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 public class SocketServer {
-    private static SocketServer INSTANCE = new SocketServer();
+    private static SocketServer INSTANCE = null;
     private static Semaphore mutex = new Semaphore(1);
 
+    private Context mContext;
     private static final String TAG = "SocketServer";
     final String SOCKET_ADDRESS = "BtTestAppSocket";
     static int socSendBufferSize = 4096;
@@ -54,8 +57,8 @@ public class SocketServer {
     private static boolean closeReceived = false;
     InputStream input;
     private static OutputStream output;
-    LocalServerSocket server;
-    LocalSocket client;
+    LocalServerSocket server = null;
+    LocalSocket client = null;
     localServerSocket localServer;
     communicationHandler commHandler;
     static InputParse parse;
@@ -69,12 +72,14 @@ public class SocketServer {
     static final int INVALID_INPUT = 6;
     static final int SOC_CLOSE_ACK = 7;
     static final int NONE = 8;
+    static final int GATT_SERVER_MENU = 9;
 
     static int mainMenuState = MAIN_MENU;
     static int processOutputState = MAIN_MENU;
 
-    private SocketServer() {
+    private SocketServer(Context mAppContext) {
         Log.d(TAG, "SocketServer()");
+        mContext = mAppContext;
         socRcvBuffer = new byte[socRcvBufferSize];
 
         parse = new InputParse();
@@ -82,8 +87,11 @@ public class SocketServer {
         localServer.start();
     }
 
-    public static SocketServer getInstance() {
-        return (INSTANCE);
+    public static synchronized SocketServer getInstance(Context mAppContext) {
+        if(INSTANCE == null) {
+            INSTANCE = new SocketServer(mAppContext);
+        }
+        return INSTANCE;
     }
 
     private class localServerSocket extends Thread {
@@ -156,11 +164,16 @@ public class SocketServer {
             while (true) {
                 try {
                     bytesRead = input.read(socRcvBuffer, 0, socRcvBufferSize);
-                    Log.i(TAG, "Received data from socket, bytesRead = " + bytesRead);
                 } catch (IOException e) {
                     Log.e(TAG, "There is an exception when reading socket");
                     e.printStackTrace();
+                    closeSocketServer();
+                    INSTANCE.showMessage("Socket closed, restart app");
                     break;
+                }
+
+                if(!socketOpen) {
+                    break; // If socket is closed, stop the thread
                 }
 
                 if (bytesRead >= 0) {
@@ -169,8 +182,8 @@ public class SocketServer {
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    processOutputState = NONE;
-                    closeReceived = true;
+                    closeSocketServer();
+                    break;
                 }
 
                 if (processOutputState != NONE) {
@@ -178,27 +191,7 @@ public class SocketServer {
                 }
 
                 if (closeReceived) {
-                    socketOpen = false;
-                    closeReceived = false;
-                    if (client != null) {
-                        try {
-                            client.close();
-                            Log.i(TAG, "client socket closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "client socket close failed");
-                            e.printStackTrace();
-                        }
-                    }
-
-                    if (server != null) {
-                        try {
-                            server.close();
-                            Log.i(TAG, "server closed");
-                        } catch (IOException e) {
-                            Log.e(TAG, "server close failed");
-                            e.printStackTrace();
-                        }
-                    }
+                    closeSocketServer();
                     break;
                 }
             }
@@ -218,6 +211,7 @@ public class SocketServer {
                     sendStr.append("                     GattClient\n");
                     sendStr.append("                     HoldWakeLock\n");
                     sendStr.append("                     ReleaseWakeLock\n");
+                    sendStr.append("                     GattServer\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -280,7 +274,7 @@ public class SocketServer {
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
-                    sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2)\n");
+                    sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
                     sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;)\n");
                     sendStr.append("                     RegNotifications               (Ex: RegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
@@ -288,6 +282,18 @@ public class SocketServer {
                     sendStr.append("                     AbortReliableWrite\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");
+                    sendStr.append("**********************************************************\n");
+                    break;
+                case GATT_SERVER_MENU:
+                    sendStr.append("\n******************** Gatt Server Menu ********************\n");
+                    sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10;Permissions:0x01;Value:0x12)\n");
+                    sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                       ClearServices\n");
+                    sendStr.append("                       GetServices\n");
+                    sendStr.append("                       SetPhy                       (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
+                    sendStr.append("                       ReadPhy\n");
+                    sendStr.append("                       GetConnectedDevices\n");
+                    sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
 
@@ -343,6 +349,9 @@ public class SocketServer {
                         sendStr.setLength(0);
                         sendStr.append("Wakelock released");
                         SocketServer.sendSocketData(sendStr.toString());
+                    } else if (inputString.equals("GattServer")) {
+                        mainMenuState = GATT_SERVER_MENU;
+                        processOutputState = GATT_SERVER_MENU;
                     } else if (inputString.equals("Close")) {
                         closeReceived = true;
                         mainMenuState = MAIN_MENU;
@@ -662,8 +671,106 @@ public class SocketServer {
                         processOutputState = INVALID_INPUT;
                     }
                     break;
+                case GATT_SERVER_MENU:
+                    tmp = inputString.split(" ", 2);
+                    if(tmp.length == 2) {
+                        if (tmp[0].equals("AddService")) {
+                            AddServices AddServiceParam = parse.AddServicesParse(tmp[1]);
+                            if ( AddServiceParam != null) {
+                                processOutputState = NONE;
+                                msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_ADD_SERVICE,AddServiceParam);
+                                MainActivity.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if(tmp[0].equals("RemoveService")) {
+                            String [] tmp2 = tmp[1].split(":");
+                            processOutputState = NONE;
+                            msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
+                            MainActivity.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("SetPhy")) {
+                            PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
+                            if (phyUpdateParam != null) {
+                              processOutputState = NONE;
+                              msg = MainActivity.msghandler.obtainMessage(
+                                     MainActivity.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
+                              MainActivity.msghandler.sendMessage(msg);
+                            } else {
+                              processOutputState = INVALID_INPUT;
+                            }
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+                    } else if(tmp.length == 1) {
+                        if (tmp[0].equals("Back")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = MAIN_MENU;
+                        } else if(tmp[0].equals("ClearServices")) {
+                             processOutputState = NONE;
+                             msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_CLEAR_SERVICES, null);
+                             MainActivity.msghandler.sendMessage(msg);
+                        } else if(tmp[0].equals("GetServices")) {
+                             processOutputState = NONE;
+                             msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_GET_SERVICES, null);
+                             MainActivity.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("ReadPhy")) {
+                             processOutputState = NONE;
+                             msg = MainActivity.msghandler.obtainMessage(
+                                     MainActivity.MSG_GS_START_BLE_READ_PHY, null);
+                             MainActivity.msghandler.sendMessage(msg);
+                        } else if(tmp[0].equals("GetConnectedDevices")) {
+                            processOutputState = NONE;
+                            msg = MainActivity.msghandler.obtainMessage(
+                                     MainActivity.MSG_GS_START_GET_CONNECTED_DEVICES, null);
+                            MainActivity.msghandler.sendMessage(msg);
+                        } else {
+                            processOutputState = INVALID_INPUT;
+                        }
+                    } else {
+                     processOutputState = INVALID_INPUT;
+                    }
+                    break;
             }
         }
+    }
+
+    public void closeSocketServer() {
+        Log.i(TAG, "closeSocketServer()");
+        closeReceived = false;
+        socketOpen = false;
+        mainMenuState = MAIN_MENU;
+        processOutputState = MAIN_MENU;
+
+        if (client != null) {
+            try {
+                client.close();
+                Log.i(TAG, "client socket closed");
+            } catch (IOException e) {
+                Log.e(TAG, "client socket close failed");
+                e.printStackTrace();
+            }
+            client = null;
+        }
+
+        if (server != null) {
+            try {
+                server.close();
+                Log.i(TAG, "server closed");
+            } catch (IOException e) {
+                Log.e(TAG, "server close failed");
+                e.printStackTrace();
+            }
+            server = null;
+        }
+        INSTANCE = null;
+    }
+
+    private void showMessage(String msg) {
+        Toast.makeText(mContext, msg, Toast.LENGTH_SHORT).show();
     }
 
     public static void sendSocketData(String data) {
@@ -674,7 +781,6 @@ public class SocketServer {
                     try {
                         if (data.getBytes().length <= socSendBufferSize) {
                             data = data + '\n';
-                            Log.i(TAG, "bytesToSend: " + data.getBytes().length);
                             output.write(data.getBytes(), 0, data.getBytes().length);
                             output.flush();
                             Log.i(TAG, "Sent: " + data);
@@ -684,6 +790,8 @@ public class SocketServer {
                     } catch (IOException e) {
                         Log.e(TAG, "There is an exception when writing to socket");
                         e.printStackTrace();
+                        INSTANCE.closeSocketServer();
+                        INSTANCE.showMessage("Socket closed, restart app");
                     }
                 } finally {
                     mutex.release();

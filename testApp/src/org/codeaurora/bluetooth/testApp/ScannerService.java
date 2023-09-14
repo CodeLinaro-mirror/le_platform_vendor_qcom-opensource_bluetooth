@@ -31,6 +31,7 @@ package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothUuid;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -57,6 +58,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
 import java.util.Vector;
+import java.util.Arrays;
 
 public class ScannerService extends Service {
     //Log Details
@@ -204,7 +206,7 @@ public class ScannerService extends Service {
               return;
             }
             final String devName = scanRecord.getDeviceName();
-            final int i = result.getRssi();
+            final int rssi = result.getRssi();
             final ScanResult r = result;
             byte[] bytes = result.getScanRecord().getBytes();
             Log.d(TAG, "Device found, devName: "+devName);
@@ -223,10 +225,37 @@ public class ScannerService extends Service {
             if(MainActivity.scan_called == MainActivity.SCAN_CALLED_FROM_MAIN_ACTIVITY){
                 /* Display scannner queue */
                 PrintStr.setLength(0);
-                PrintStr.append("Scan Results: Device Name - ");
+                PrintStr.append("==================================================\n");
+                PrintStr.append("Scan Results: \nDevice Name : ");
                 PrintStr.append(devName);
-                PrintStr.append("\t Device Address - ");
+                PrintStr.append("\t Device Address : ");
                 PrintStr.append(bluetoothDevice.getAddress());
+                PrintStr.append("\tRSSI : ");
+                PrintStr.append(rssi);
+                if(mScanSettings.getScanResultType() == ScanSettings.SCAN_RESULT_TYPE_FULL) {
+                    if (scanRecord.getManufacturerSpecificData().size() > 0) {
+                        for (int i = 0; i < scanRecord.getManufacturerSpecificData().size(); i++) {
+                            int manufacturerId = scanRecord.getManufacturerSpecificData().keyAt(i);
+                            Log.d(TAG, "Manu data ");
+                            byte[] manufacturerData =
+                                    scanRecord.getManufacturerSpecificData().get(manufacturerId);
+                            PrintStr.append("\tMaufactureSpecificData : ");
+                            PrintStr.append(Integer.toHexString(manufacturerId));
+                            PrintStr.append(Arrays.toString(manufacturerData));
+                        }
+                    }
+                    if (!scanRecord.getServiceData().isEmpty()) {
+                        for (ParcelUuid parcelUuid : scanRecord.getServiceData().keySet()) {
+                            byte[] serviceData = scanRecord.getServiceData().get(parcelUuid);
+                            Log.d(TAG, "service data ");
+                            PrintStr.append("\tServiceData : ");
+                            PrintStr.append(parcelUuid.toString());
+                            PrintStr.append(Arrays.toString(serviceData));
+                        }
+                    }
+                }
+                PrintStr.append("\tScanTimeStamp(ns) : ");
+                PrintStr.append(result.getTimestampNanos());
                 SocketServer.sendSocketData(PrintStr.toString());
             }
 
@@ -247,12 +276,49 @@ public class ScannerService extends Service {
 
                 if (!results.isEmpty()) {
                     for(int i=0; i<results.size(); i++){
-                        ScanResult scanRec = results.get(i);
+                        ScanResult scanRes = results.get(i);
+                        ScanRecord scanRecord = scanRes.getScanRecord();
+                        String deviceName = scanRecord.getDeviceName();
+                        if(scanRecord == null) {
+                          Log.d(TAG,"scan record null");
+                          return;
+                        }
                         PrintStr.setLength(0);
-                        PrintStr.append("Scan Results: Device Name - ");
-                        PrintStr.append(scanRec.getScanRecord().getDeviceName());
-                        PrintStr.append("Device Address - ");
-                        PrintStr.append(scanRec.getDevice().getAddress());
+                        PrintStr.append("==================================================\n");
+                        PrintStr.append("Scan Results: \nDevice Name : ");
+                        PrintStr.append(deviceName);
+                        PrintStr.append("\tDevice Address : ");
+                        PrintStr.append(scanRes.getDevice().getAddress());
+                        PrintStr.append("\tRSSI : ");
+                        PrintStr.append(scanRes.getRssi());
+                        if(mScanSettings.getScanResultType() ==
+                                                            ScanSettings.SCAN_RESULT_TYPE_FULL) {
+                            if (scanRecord.getManufacturerSpecificData().size() > 0) {
+                                for (int j = 0; j < scanRecord.getManufacturerSpecificData().size();
+                                                j++) {
+                                    int manufacturerId =
+                                            scanRecord.getManufacturerSpecificData().keyAt(j);
+                                    Log.d(TAG, "batch Manu data ");
+                                    byte[] manufacturerData =
+                                        scanRecord.getManufacturerSpecificData().get(manufacturerId);
+                                    PrintStr.append("\tMaufactureSpecificData : ");
+                                    PrintStr.append(Integer.toHexString(manufacturerId));
+                                    PrintStr.append(Arrays.toString(manufacturerData));
+                                }
+                            }
+                            if (!scanRecord.getServiceData().isEmpty()) {
+                                for (ParcelUuid parcelUuid : scanRecord.getServiceData().keySet()) {
+                                    byte[] serviceData =
+                                            scanRecord.getServiceData().get(parcelUuid);
+                                    Log.d(TAG, "batch service data ");
+                                    PrintStr.append("\tServiceData : ");
+                                    PrintStr.append(parcelUuid.toString());
+                                    PrintStr.append(Arrays.toString(serviceData));
+                                }
+                            }
+                        }
+                        PrintStr.append("\tScanTimeStamp(ns) : ");
+                        PrintStr.append(scanRes.getTimestampNanos());
                         SocketServer.sendSocketData(PrintStr.toString());
                     }
                     Message msg = MainActivity.msghandler.obtainMessage(
