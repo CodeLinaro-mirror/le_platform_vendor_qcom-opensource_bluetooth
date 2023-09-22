@@ -781,6 +781,7 @@ public class AppControlService extends Service {
                     pktMissingIdx = incompPkt.indexOf("$",0);
                     if(pktMissingIdx == 0){
                         incomingMsg = incompPkt + incomingMsg;
+                        numBytes += incompPkt.length();
                         incompPkt="";
                     }
                     while(pktStartIdx != -1){
