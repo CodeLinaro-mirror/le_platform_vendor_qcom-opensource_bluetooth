@@ -28,43 +28,19 @@
  */
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-
-import android.widget.Toast;
-import android.Manifest;
 import android.util.Log;
-import android.util.*;
 
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
 
-import android.os.Bundle;
-import android.os.Build;
-import android.os.IBinder;
-import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Message;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
-import android.os.ParcelUuid;
-import android.os.RemoteException;
-import android.content.Context;
 import java.util.*;
 import java.util.List;
 import java.util.UUID;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.*;
-import java.util.concurrent.locks.*;
-import java.util.Scanner;
 import java.lang.*;
-import java.util.concurrent.TimeUnit;
-import java.io.*;
 
 import libcore.io.IoUtils;
 
@@ -72,29 +48,13 @@ import com.android.internal.util.IState;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.BroadcastReceiver;
-
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothProfile;
 
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattServer;
-import android.bluetooth.BluetoothManager;
-
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
 
 public class GattServer{
     /* Variable to update phy */
