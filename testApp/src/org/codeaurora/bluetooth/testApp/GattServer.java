@@ -65,7 +65,6 @@ public class GattServer{
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
-    private BluetoothDevice mdevice = null;
     private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
@@ -84,10 +83,7 @@ public class GattServer{
 
     public static int LOG_LEVEL = 3;
     public static final int GATT_SERVER = 8;
-    public static final int BLE_STATE_CONNECTED = 10;
-    public static final int BLE_STATE_DISCONNECTED = 11;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
-    private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     StringBuilder PrintStr = new StringBuilder();
 
@@ -96,6 +92,7 @@ public class GattServer{
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
         mgattServer.startServer();
+        connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -140,22 +137,21 @@ public class GattServer{
 
              @Override
              public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
-                 mdevice = device;
                  Log.d(TAG, "onConnectionStateChange() got connection event");
                  if(newState == BluetoothProfile.STATE_CONNECTED &&
-                                                    mConnectionStatus == BLE_STATE_DISCONNECTED ) {
-                    mGattServerHandler.processConnectReq();
+                                                   !connectedDevices.contains(device)  ) {
+                    mGattServerHandler.processConnectReq(device);
                     PrintStr.setLength(0);
                     PrintStr.append("Device Connected : ");
                     PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
-                    mConnectionStatus = BLE_STATE_CONNECTED;
+                    connectedDevices.add(device);
                } else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                     PrintStr.setLength(0);
                     PrintStr.append("Device Disonnected : ");
-                    PrintStr.append(mdevice.getAddress());
+                    PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
-                    mConnectionStatus = BLE_STATE_DISCONNECTED;
+                    connectedDevices.remove(device);
                }
 
              }
@@ -351,8 +347,13 @@ public class GattServer{
             txPhyReq = phyUpdate.txPhy;
             rxPhyReq = phyUpdate.rxPhy;
             Log.i(TAG, "Phy Update");
-            mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,phyUpdate.txPhy,
-                                        phyUpdate.rxPhy, phyUpdate.phyOpt);
+            BluetoothDevice mdevice;
+            if (connectedDevices.size() > 0) {
+                /*Update it for the first connection till option modified*/
+                mdevice = connectedDevices.get(0);
+                mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,
+                     phyUpdate.txPhy, phyUpdate.rxPhy, phyUpdate.phyOpt);
+            }
         }
 
         private void processGattClearServiceReq() {
@@ -360,8 +361,6 @@ public class GattServer{
             mgattServer.mBluetoothGattserver.clearServices();
             Service_List.clear();
         }
-
-
 
         private void processGattGetServiceReq() {
             Log.d(TAG, "Listing all the services");
@@ -378,11 +377,15 @@ public class GattServer{
 
         private void processReadPhyReq() {
             Log.i(TAG, "Read Phy");
-            mgattServer.mBluetoothGattserver.readPhy(mdevice);
+            BluetoothDevice mdevice;
+            if (connectedDevices.size() > 0) {
+                /*Update it for the first connection till option modified*/
+                mdevice = connectedDevices.get(0);
+                mgattServer.mBluetoothGattserver.readPhy(mdevice);
+            }
         }
 
         private void processGetConnectedDevices() {
-             connectedDevices=MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
              PrintStr.setLength(0);
              PrintStr.append("Connected Device:");
              for (int i = 0; i < connectedDevices.size(); i++)  {
@@ -393,7 +396,7 @@ public class GattServer{
              SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processConnectReq() {
+        private void processConnectReq(BluetoothDevice mdevice) {
             mgattServer.mBluetoothGattserver.connect(mdevice,false);
         }
 
