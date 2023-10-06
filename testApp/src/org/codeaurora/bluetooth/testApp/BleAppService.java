@@ -103,14 +103,14 @@ public class BleAppService extends Service {
     private static final String TAG = "BleAppService";
     public static int LOG_LEVEL = 6;
 
-    public static BluetoothAdapter bleAdapter;
+    public static BluetoothAdapter bleAdapter = null;
 
-    public static ThroughputStateMachine throughputSMClass;
-    public static GattClient mgattclient;
-    public static GattServer mgattserver;
+    public static ThroughputStateMachine throughputSMClass = null;
+    public static GattClient mgattclient = null;
+    public static GattServer mgattserver = null;
     public static BleAppServiceMessageHandler msghandler = null;
 
-    public Context mAppContext;
+    public Context mAppContext = null;
     public Looper mlooper;
 
     public static boolean stateMachinestarted = false;
@@ -119,7 +119,7 @@ public class BleAppService extends Service {
     public static boolean boundA = false;
     public static  boolean boundS = false;
 
-    public static boolean mReceiverRegistered;
+    public static boolean mReceiverRegistered = false;
     public static boolean isServiceRunning = false;
 
     public static AdvertiserService mAdvertiseService = null;
@@ -372,7 +372,7 @@ public class BleAppService extends Service {
 
     /* function to start testapp throughput state machine */
     private void start_testapp_tput_state_machine() {
-        if(/*(boundA == true || boundS == true) &&*/ stateMachinestarted == false){
+        if(stateMachinestarted == false){
             throughputSMClass = new ThroughputStateMachine(mAppContext);
             Log.i("TestAppThroughputStateMachine", "make");
             throughputSMClass.mStateMachine.start();

@@ -101,20 +101,18 @@ public class GattClient {
 
     /* MTU size required for MTU exchange */
     public static final int MTU_SIZE_MIN = 23;
-    public static final int MTU_SIZE_MAX = 512;
     public static final int TRANSPORT_LE = 2;
 
     public int mtu_size = MTU_SIZE_MIN;
 
     /* Variable to update phy */
-    public static int txPhyReq;
-    public static int rxPhyReq;
+    public static int txPhyReq = 1;
+    public static int rxPhyReq = 1;
 
-    public static BluetoothAdapter bleAdapter;
     public Looper glooper;
 
-    public BleGattClient mgattClient;
-    private Context mcontext;
+    public BleGattClient mgattClient = null;
+    private Context mcontext = null;
     private BluetoothDevice mDevice = null;
 
     //Actions
@@ -160,8 +158,6 @@ public class GattClient {
 
     private static final int GATT_WRITE = 1;
     private static final int GATT_READ = 2;
-    private static final int GATT_OPTYPE_UUID = 1;
-    private static final int GATT_OPTYPE_INSID = 2;
     private static final int GATT_FORMAT_STRING = 1;
     private static final int GATT_FORMAT_INT = 2;
 
@@ -172,8 +168,7 @@ public class GattClient {
     public static final int BLE_STATE_DISCONNECTED = 4;
 
     private static int length_offset = 0;
-    private static String written_value;
-    private static String offset_value;
+    private static String offset_value = null;
     private boolean reliable_write = false;
     private static int total_length = 0;
     private boolean reliable_write_no_more_data = false;
@@ -220,11 +215,6 @@ public class GattClient {
         glooper.quitSafely();
     }
 
-    /* function to print the message on display */
-    private void showMessage(String msg) {
-        Toast.makeText(mcontext, msg, Toast.LENGTH_SHORT).show();
-    }
-
     /* Connection Class */
     public class BleGattClient {
         private static final String TAG = "BleGattClient";
@@ -232,9 +222,7 @@ public class GattClient {
         private BluetoothGatt mBluetoothGatt;
         private BluetoothGattService mService;
         private BluetoothGattCharacteristic mCharacteristic;
-        private BluetoothGattCharacteristic mreadChar;
         private Context context;
-        private int mState;
         private int GATT_SUCCESS = 0x00;
         Message msg;
         StringBuilder PrintStr = new StringBuilder();
@@ -252,10 +240,9 @@ public class GattClient {
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 Log.i(TAG, "onConnectionStateChange device :" + gatt.getDevice() +
                       " status :" + status + " newState :" + newState);
-                mState = newState;
                 if (gatt.getDevice() == null || status != GATT_SUCCESS) {
                     if(GattClient.LOG_LEVEL >= 1) {
-                        Log.e(TAG, "onConnectionStateChange:Unexpected error! mstate: " +  mState);
+                        Log.e(TAG, "onConnectionStateChange:Unexpected error! state: " +  newState);
                     }
                     mConnectionStatus = BLE_STATE_DISCONNECTED;
                     /*Send Message to Message Handler */
@@ -584,25 +571,11 @@ public class GattClient {
             BleAppService.pairing_called = 0;
             }
         }
-
-        /*public BluetoothGattCharacteristic getCharacteristicById(BluetoothDevice device,
-             int instanceId) {
-            for (BluetoothGattService svc : mBluetoothGatt.mServices) {
-                for (BluetoothGattCharacteristic charac : svc.getCharacteristics()) {
-                    if (charac.getInstanceId() == instanceId) {
-                        return charac;
-                    }
-                }
-            }
-            return null;
-        }*/
     }
 
     public class GattClientMessageHandler extends Handler {
         Context mMsgContext;
         private static final String TAG = "GattClientMessageHandler";
-
-        int operation_request;
 
         public GattClientMessageHandler(Context contxt, Looper looper) {
             super(looper);
@@ -1009,7 +982,6 @@ public class GattClient {
                 }
                 if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
                      mCharacteristic.setValue((RdWrClass.Value).getBytes());
-                     written_value = String.valueOf(RdWrClass.Value);
                      mgattClient.mBluetoothGatt.writeCharacteristic(
                              mCharacteristic);
                 }
@@ -1236,9 +1208,5 @@ public class GattClient {
                 SocketServer.sendSocketData(PrintStr.toString());
             }
         }
-    }
-
-    protected void finalize() {
-
     }
 }

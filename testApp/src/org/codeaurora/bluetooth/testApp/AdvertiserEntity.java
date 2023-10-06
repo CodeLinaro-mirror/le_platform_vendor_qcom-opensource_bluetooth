@@ -54,7 +54,6 @@ public class AdvertiserEntity {
     public static final int ADV_STARTED = 0x00;
     public static final int ADV_STOPPED = 0x01;
     public static final int ADV_FAILED = 0x02;
-    private String invalidParam = "XX";
 
     private byte[] manuData;
     private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
@@ -66,19 +65,17 @@ public class AdvertiserEntity {
     //legacy
     private AdvertiseCallback mAdvCallback;
     private AdvertiseSettings mAdvSettings;
-    private AdvertiseData mAdvData;
+    private AdvertiseData mAdvData = null;
 
     //non-legacy
     private AdvertisingSetParameters mAdvParams;
     private AdvertisingSetCallback mAdvSetCallback;
     private PeriodicAdvertisingParameters mPeriodicAdvParams;
-    private AdvertisingSet mAdvertisingSet;
-    private AdvertiseData mScanResponseData;
-    private AdvertiseData mPeriodicData;
+    private AdvertiseData mScanResponseData = null;
+    private AdvertiseData mPeriodicData = null;
 
-    private boolean inuse;
-    public int adv_id;
-    public int adv_status;
+    public int adv_id = 0;
+    public int adv_status = ADV_STOPPED;
 
     class AdvSetCallback extends AdvertisingSetCallback {
         Message msg;
@@ -105,7 +102,6 @@ public class AdvertiserEntity {
 
         @Override
         public void onAdvertisingSetStopped(AdvertisingSet advertisingSet) {
-            //super.onAdvertisingSetStopped(advertisingSet);
             Log.d(TAG,"onAdvertisingSetStopped");
             adv_status = ADV_STOPPED;
             msg = BleAppService.msghandler.obtainMessage(
@@ -116,45 +112,38 @@ public class AdvertiserEntity {
         @Override
         public void onAdvertisingEnabled(AdvertisingSet advertisingSet,
                                          boolean enable, int status) {
-            //super.onAdvertisingEnabled(advertisingSet, enable, status);
             Log.d(TAG,"onAdvertisingEnabled");
         }
 
         @Override
         public void onAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
-            //super.onAdvertisingDataSet(advertisingSet, status);
             Log.d(TAG,"onAdvertisingDataSet");
         }
 
         @Override
         public void onScanResponseDataSet(AdvertisingSet advertisingSet, int status) {
-            //super.onScanResponseDataSet(advertisingSet, status);
             Log.d(TAG,"onScanResponseDataSet");
         }
 
         @Override
         public void onAdvertisingParametersUpdated(AdvertisingSet advertisingSet, int txPower,
                             int status) {
-            //super.onAdvertisingParametersUpdated(advertisingSet, txPower, status);
             Log.d(TAG,"onAdvertisingParametersUpdated");
         }
 
         @Override
         public void onPeriodicAdvertisingParametersUpdated(AdvertisingSet advertisingSet,
                                                                int status) {
-            //super.onPeriodicAdvertisingParametersUpdated(advertisingSet, status);
             Log.d(TAG,"onPeriodicAdvertisingParametersUpdated");
         }
 
         @Override
         public void onPeriodicAdvertisingDataSet(AdvertisingSet advertisingSet, int status) {
-            //super.onPeriodicAdvertisingDataSet(advertisingSet, status);
         }
 
         @Override
         public void onPeriodicAdvertisingEnabled(AdvertisingSet advertisingSet,
                                                      boolean enable, int status) {
-            //super.onPeriodicAdvertisingEnabled(advertisingSet, enable, status);
             Log.d(TAG,"onPeriodicAdvertisingEnabled");
         }
     };
@@ -246,14 +235,6 @@ public class AdvertiserEntity {
 
     public void setmAdvParams(AdvertisingSetParameters mAdvParams) {
         this.mAdvParams = mAdvParams;
-    }
-
-    public boolean isInuse() {
-        return inuse;
-    }
-
-    public void setInuse(boolean inuse) {
-        this.inuse = inuse;
     }
 
     public int getAdv_status() {
@@ -401,7 +382,7 @@ public class AdvertiserEntity {
         boolean status = false;
 
         if(mAdvertiser == null) {
-            Log.e(TAG,"Advertise is null, adv_id : "+ adv_id);
+            Log.e(TAG,"Advertiser is null, adv_id : "+ adv_id);
             return status;
         }
 

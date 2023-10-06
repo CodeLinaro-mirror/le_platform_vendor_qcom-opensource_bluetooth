@@ -66,24 +66,19 @@ public class ScannerService extends Service {
     public static int LOG_LEVEL = 6;
 
     //States of the service
-    public static boolean START_STATE = false; //Tracks if the service is started
     public static boolean mScanstatus = false; //Tracks if scan is in progress
-    private Context mContext;
+    private Context mContext = null;
 
     //Actions
-    public static final String START_SCAN = "START SCAN";
     public ScannerServiceMessageHandler mScannerHandler = null;
     private static final int MSG_START_BLE_SCAN = 0;
     private static final int MSG_STOP_BLE_SCAN = 1;
     private static final int MSG_SCAN_RESULT = 3;
-    private static int count = 0;
 
     //Variables
     private ScanSettings mScanSettings;
     private ArrayList<ScanFilter> mScanFilters;
     private List<BluetoothDevice> mDeviceList;
-    public List<ScanResult> mScanResult;
-    private List<Integer> mRssiList;
     private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
     private BluetoothLeScanner mBleScanner;
 
@@ -115,8 +110,6 @@ public class ScannerService extends Service {
         mScanFilters = null;
         mBleScanner = mBTAdapter.getBluetoothLeScanner();
         mDeviceList = new ArrayList<BluetoothDevice>();
-        mScanResult = new ArrayList<ScanResult>();
-        mRssiList = new ArrayList<Integer>();
         HandlerThread thread = new HandlerThread("ScannerServiceHandler");
         thread.start();
         Looper looper = thread.getLooper();
@@ -187,11 +180,10 @@ public class ScannerService extends Service {
 
     @Override
     public void onDestroy() {
-        START_STATE = false;
 
         if(mScanstatus) {
             if(mBTAdapter.isEnabled())
-                mBTAdapter.getBluetoothLeScanner().stopScan(mScanCallback);
+                mBleScanner.stopScan(mScanCallback);
             mScanstatus = false;
         }
     }
@@ -219,7 +211,6 @@ public class ScannerService extends Service {
             }
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
             mDeviceList.add(bluetoothDevice);
-            mScanResult.add(r);
 
             StringBuilder PrintStr = new StringBuilder();
             if(BleAppService.scan_called == BleAppService.SCAN_CALLED_FROM_MAIN_ACTIVITY){
@@ -379,17 +370,17 @@ public class ScannerService extends Service {
             if(action && !mScanstatus){
                 if(mScanFilters != null && mScanSettings !=null ){
                     Log.d(TAG, "set Scan with Settings and filters1");
-                    mBTAdapter.getBluetoothLeScanner().startScan(mScanFilters,
+                    mBleScanner.startScan(mScanFilters,
                       mScanSettings, mScanCallback);
                 }
                 else if (mScanFilters != null){
                     Log.d(TAG, "set Scan with Settings and filters");
-                    mBTAdapter.getBluetoothLeScanner().startScan(mScanFilters,
+                    mBleScanner.startScan(mScanFilters,
                       new ScanSettings.Builder().build(),  mScanCallback);
                 }
                 else { //do a regular scan
                     Log.d(TAG, "Do a regular scan");
-                    mBTAdapter.getBluetoothLeScanner().startScan(mScanCallback);
+                    mBleScanner.startScan(mScanCallback);
                 }
                 mScanstatus = true;
 
@@ -398,11 +389,10 @@ public class ScannerService extends Service {
             }
             else if(!action && mScanstatus){
                 if(mBTAdapter.isEnabled()) {
-                    mBTAdapter.getBluetoothLeScanner().stopScan(mScanCallback);
+                    mBleScanner.stopScan(mScanCallback);
                     mBleScanner.flushPendingScanResults(mScanCallback);
                 }
                 mDeviceList.clear();
-                mScanResult.clear();
                 mScanstatus = false;
                 if(ScannerService.LOG_LEVEL >= 3)
                     Log.d(TAG, "scan stopped");
