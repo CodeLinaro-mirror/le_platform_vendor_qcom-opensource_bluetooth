@@ -704,10 +704,14 @@ public class SocketServer {
                             }
                         } else if(tmp[0].equals("RemoveService")) {
                             String [] tmp2 = tmp[1].split(":");
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
+                            if(tmp2.length == 2) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
-                            BleAppService.msghandler.sendMessage(msg);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
                         } else if (tmp[0].equals("ReadPhy")) {
                             if (BleAppService.bleAdapter.
                                   checkBluetoothAddress(tmp[1].toUpperCase())) {
@@ -719,7 +723,7 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                       } else if (tmp[0].equals("SetPhy")) {
+                        } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null ) {
                               processOutputState = NONE;
