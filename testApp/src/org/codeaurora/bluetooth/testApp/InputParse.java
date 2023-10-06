@@ -203,7 +203,9 @@ public class InputParse {
         for(i=0; i<tmp.length; i++){
             tmp2 = tmp[i].split(":",2);
             if(tmp2.length == 2) {
-                if (tmp2[0].equals("Tx_Phy")) {
+                if (tmp2[0].equals("DeviceAddress")) {
+                    phyUpdateParam.remoteAddress = tmp2[1].toUpperCase();
+                } else if (tmp2[0].equals("Tx_Phy")) {
                     phyUpdateParam.txPhy = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("Rx_Phy")) {
                     phyUpdateParam.rxPhy = Integer.parseInt(tmp2[1]);

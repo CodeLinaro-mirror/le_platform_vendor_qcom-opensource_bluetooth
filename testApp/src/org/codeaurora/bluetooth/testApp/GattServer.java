@@ -343,16 +343,28 @@ public class GattServer{
          }
 
         private void processPhyUpdateReq(PhyUpdate phyUpdate) {
-
+            Log.i(TAG, "Phy Update");
             txPhyReq = phyUpdate.txPhy;
             rxPhyReq = phyUpdate.rxPhy;
-            Log.i(TAG, "Phy Update");
-            BluetoothDevice mdevice;
-            if (connectedDevices.size() > 0) {
-                /*Update it for the first connection till option modified*/
-                mdevice = connectedDevices.get(0);
-                mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,
-                     phyUpdate.txPhy, phyUpdate.rxPhy, phyUpdate.phyOpt);
+            String bdAddr = phyUpdate.remoteAddress.toUpperCase();
+            if (BleAppService.bleAdapter.checkBluetoothAddress(bdAddr)) {
+                BluetoothDevice mdevice = getRemoteDevice(bdAddr);
+                if (mdevice != null) {
+                    mgattServer.mBluetoothGattserver.setPreferredPhy(mdevice,
+                          phyUpdate.txPhy, phyUpdate.rxPhy, phyUpdate.phyOpt);
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device not in connected list");
+                    PrintStr.append(bdAddr);
+                    PrintStr.append("  ");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Improper Device Address for set phy:");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
@@ -400,6 +412,18 @@ public class GattServer{
             mgattServer.mBluetoothGattserver.connect(mdevice,false);
         }
 
-
+        private BluetoothDevice getRemoteDevice(String address) {
+            BluetoothDevice mdevice = null;
+            Log.i(TAG,"address: " + address);
+            for (int i = 0; i < connectedDevices.size(); i++)  {
+                 Log.i(TAG,connectedDevices.get(i).getAddress());
+                 if (connectedDevices.get(i).getAddress().equals(address)) {
+                     Log.i(TAG, "Found match");
+                     mdevice = connectedDevices.get(i);
+                     break;
+                 }
+            }
+            return mdevice;
+        }
     }
 }
