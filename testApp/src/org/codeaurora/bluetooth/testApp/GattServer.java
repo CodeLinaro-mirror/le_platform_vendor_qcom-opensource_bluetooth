@@ -55,6 +55,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
+import android.bluetooth.BluetoothProfile;
 
 public class GattServer{
     /* Variable to update phy */
@@ -141,13 +142,21 @@ public class GattServer{
              public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
                  mdevice = device;
                  Log.d(TAG, "onConnectionStateChange() got connection event");
-                 if(mConnectionStatus == BLE_STATE_DISCONNECTED) {
+                 if(newState == BluetoothProfile.STATE_CONNECTED &&
+                                                    mConnectionStatus == BLE_STATE_DISCONNECTED ) {
                     mGattServerHandler.processConnectReq();
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device Connected : ");
+                    PrintStr.append(device.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
                     mConnectionStatus = BLE_STATE_CONNECTED;
-                 }
-                 else {
+               } else if(newState == BluetoothProfile.STATE_DISCONNECTED){
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device Disonnected : ");
+                    PrintStr.append(mdevice.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
                     mConnectionStatus = BLE_STATE_DISCONNECTED;
-                 }
+               }
 
              }
 
