@@ -50,11 +50,13 @@ import android.os.HandlerThread;
 import android.os.Looper;
 
 import java.lang.*;
+import java.util.List;
 
 import libcore.io.IoUtils;
 import android.app.Service;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
 
 import androidx.core.app.NotificationCompat;
 import android.app.Notification;
@@ -102,7 +104,8 @@ public class BleAppService extends Service {
     public static final int MSG_MA_SCAN_DEV_FOUND = 4;
     public static final int MSG_MA_ADV_STARTED = 5;
     public static final int MSG_MA_ADV_STOPPED = 6;
-    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_ADV_STOPPED;
+    public static final int MSG_MA_GET_CONNECTED_DEVICES = 7;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_GET_CONNECTED_DEVICES;
 
     /* Gatt Client Actions */
     public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
@@ -148,9 +151,8 @@ public class BleAppService extends Service {
     public static final int MSG_GS_START_BLE_CLEAR_SERVICES = MSG_SM_MAX_ACTION_VALUE + 6;
     public static final int MSG_GS_START_BLE_CONNECT = MSG_SM_MAX_ACTION_VALUE + 7;
     public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
-    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = MSG_SM_MAX_ACTION_VALUE + 9;
-    public static final int MSG_GS_START_BLE_PAIR = MSG_SM_MAX_ACTION_VALUE + 10;
-    public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GS_START_BLE_PAIR = MSG_SM_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 10;
     public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_DISCONNECT;
 
     @Override
@@ -493,6 +495,9 @@ public class BleAppService extends Service {
                     PrintStr.append(disableId);
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
+                case MSG_MA_GET_CONNECTED_DEVICES:
+                    processGetConnectedDevices();
+                    break;
                 case MSG_GC_START_BLE_CONNECT:
                     scnObj = (Scan) message.obj;
                     scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
@@ -691,11 +696,6 @@ public class BleAppService extends Service {
                               mgattserver.MSG_START_BLE_READ_PHY, bdAddr);
                      mgattserver.mGattServerHandler.sendMessage(msg);
                      break;
-                case MSG_GS_START_GET_CONNECTED_DEVICES:
-                    msg = mgattserver.mGattServerHandler.obtainMessage(
-                             mgattserver.MSG_START_GET_CONNECTED_DEVICES, null);
-                    mgattserver.mGattServerHandler.sendMessage(msg);
-                    break;
                 case MSG_GS_START_BLE_PAIR:
                     bdAddr = (String) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
@@ -727,6 +727,24 @@ public class BleAppService extends Service {
             } else {
                /* do nothing */
             }
+        }
+
+        private void processGetConnectedDevices() {
+             /* All connections from client are also done with server */
+             List<BluetoothDevice> connDevices =
+                            MainActivity.mBluetoothManager.getConnectedDevices(
+                            BluetoothProfile.GATT_SERVER);
+             PrintStr.setLength(0);
+             if (connDevices.size() != 0) {
+                 PrintStr.append("Connected Device:");
+                 for (int i = 0; i < connDevices.size(); i++)  {
+                     PrintStr.append(connDevices.get(i).getAddress());
+                     PrintStr.append("  ");
+                 }
+             } else {
+                 PrintStr.append("No Connected Device");
+             }
+             SocketServer.sendSocketData(PrintStr.toString());
         }
     }
 }
