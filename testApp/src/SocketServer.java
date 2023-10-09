@@ -213,6 +213,7 @@ public class SocketServer {
                     sendStr.append("                     ReleaseWakeLock\n");
                     sendStr.append("                     GattServer\n");
                     sendStr.append("                     GetConnectedDevices\n");
+                    sendStr.append("                     Pair   (Ex: Pair 11:22:33:44:55:66)\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -273,7 +274,6 @@ public class SocketServer {
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
-                    sendStr.append("                     Pair\n");
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
@@ -295,7 +295,6 @@ public class SocketServer {
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
-                    sendStr.append("                       Pair                         (Ex: Pair 11:22:33:44:55:66)\n");
                     sendStr.append("                       Disconnect                   (Ex: Disconnect 11:22:33:44:55:66)\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
@@ -323,51 +322,72 @@ public class SocketServer {
 
             switch (mainMenuState) {
                 case MAIN_MENU:
-                    if (inputString.equals("Advertiser")) {
-                        mainMenuState = ADV_MENU;
-                        processOutputState = ADV_MENU;
-                    } else if (inputString.equals("Scanner")) {
-                        mainMenuState = SCAN_MENU;
-                        processOutputState = SCAN_MENU;
-                    } else if (inputString.equals("Throughput")) {
-                        mainMenuState = THROUGHPUT_MENU;
-                        processOutputState = THROUGHPUT_MENU;
-                    } else if (inputString.equals("GattClient")) {
-                        mainMenuState = GATT_CLIENT_MENU;
-                        processOutputState = GATT_CLIENT_MENU;
-                    } else if (inputString.equals("HoldWakeLock")) {
+                    tmp = inputString.split(" ", 2);
+                    if (tmp.length == 1) {
+                        if (inputString.equals("Advertiser")) {
+                            mainMenuState = ADV_MENU;
+                            processOutputState = ADV_MENU;
+                        } else if (inputString.equals("Scanner")) {
+                            mainMenuState = SCAN_MENU;
+                            processOutputState = SCAN_MENU;
+                        } else if (inputString.equals("Throughput")) {
+                            mainMenuState = THROUGHPUT_MENU;
+                            processOutputState = THROUGHPUT_MENU;
+                        } else if (inputString.equals("GattClient")) {
+                            mainMenuState = GATT_CLIENT_MENU;
+                            processOutputState = GATT_CLIENT_MENU;
+                        } else if (inputString.equals("HoldWakeLock")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = NONE;
+                            MainActivity.wl.acquire();
+                            MainActivity.wl_acquired = true;
+                            Log.d(TAG,"Wakelock acquired");
+                            sendStr.setLength(0);
+                            sendStr.append("Wakelock acquired");
+                            SocketServer.sendSocketData(sendStr.toString());
+                        } else if (inputString.equals("ReleaseWakeLock")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = NONE;
+                            MainActivity.wl.release();
+                            MainActivity.wl_acquired = false;
+                            Log.d(TAG,"Wakelock released");
+                            sendStr.setLength(0);
+                            sendStr.append("Wakelock released");
+                            SocketServer.sendSocketData(sendStr.toString());
+                        } else if (inputString.equals("GattServer")) {
+                            mainMenuState = GATT_SERVER_MENU;
+                            processOutputState = GATT_SERVER_MENU;
+                        } else if (inputString.equals("GetConnectedDevices")) {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                         BleAppService.MSG_MA_GET_CONNECTED_DEVICES, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (inputString.equals("Close")) {
+                            closeReceived = true;
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = SOC_CLOSE_ACK;
+                        } else {
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = INVALID_INPUT;
+                        }
+                    } else if (tmp.length == 2) {
+                        if (tmp[0].equals("Pair")) {
+                            if (BleAppService.bleAdapter.
+                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_START_BLE_PAIR,
+                                        tmp[1].toUpperCase());
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else {
                         mainMenuState = MAIN_MENU;
-                        processOutputState = NONE;
-                        MainActivity.wl.acquire();
-                        MainActivity.wl_acquired = true;
-                        Log.d(TAG,"Wakelock acquired");
-                        sendStr.setLength(0);
-                        sendStr.append("Wakelock acquired");
-                        SocketServer.sendSocketData(sendStr.toString());
-                    } else if (inputString.equals("ReleaseWakeLock")) {
-                        mainMenuState = MAIN_MENU;
-                        processOutputState = NONE;
-                        MainActivity.wl.release();
-                        MainActivity.wl_acquired = false;
-                        Log.d(TAG,"Wakelock released");
-                        sendStr.setLength(0);
-                        sendStr.append("Wakelock released");
-                        SocketServer.sendSocketData(sendStr.toString());
-                    } else if (inputString.equals("GattServer")) {
-                        mainMenuState = GATT_SERVER_MENU;
-                        processOutputState = GATT_SERVER_MENU;
-                    } else if (inputString.equals("GetConnectedDevices")) {
-                        mainMenuState = MAIN_MENU;
-                        processOutputState = NONE;
-                        msg = BleAppService.msghandler.obtainMessage(
-                                     BleAppService.MSG_MA_GET_CONNECTED_DEVICES, null);
-                        BleAppService.msghandler.sendMessage(msg);
-                    } else if (inputString.equals("Close")) {
-                        closeReceived = true;
-                        mainMenuState = MAIN_MENU;
-                        processOutputState = SOC_CLOSE_ACK;
+                        processOutputState = INVALID_INPUT;
+                        }
                     } else {
-                        mainMenuState = MAIN_MENU;
                         processOutputState = INVALID_INPUT;
                     }
                     break;
@@ -649,11 +669,6 @@ public class SocketServer {
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_READ_PHY, null);
                             BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("Pair")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GC_START_BLE_PAIR, null);
-                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("UnPair")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
@@ -738,18 +753,7 @@ public class SocketServer {
                             } else {
                               processOutputState = INVALID_INPUT;
                             }
-                        } else if (tmp[0].equals("Pair")) {
-                            if (BleAppService.bleAdapter.
-                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
-                                processOutputState = NONE;
-                                msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_GS_START_BLE_PAIR,
-                                        tmp[1].toUpperCase());
-                                BleAppService.msghandler.sendMessage(msg);
-                            } else {
-                                processOutputState = INVALID_INPUT;
-                            }
-                        }  else if (tmp[0].equals("Disconnect")) {
+                        } else if (tmp[0].equals("Disconnect")) {
                             if (BleAppService.bleAdapter.
                                     checkBluetoothAddress(tmp[1].toUpperCase())) {
                                 processOutputState = NONE;
