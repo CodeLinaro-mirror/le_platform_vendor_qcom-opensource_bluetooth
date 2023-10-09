@@ -214,6 +214,7 @@ public class SocketServer {
                     sendStr.append("                     GattServer\n");
                     sendStr.append("                     GetConnectedDevices\n");
                     sendStr.append("                     Pair   (Ex: Pair 11:22:33:44:55:66)\n");
+                    sendStr.append("                     UnPair   (Ex: UnPair 11:22:33:44:55:66)\n");
                     sendStr.append("                     GetBondedDevices\n");
                     sendStr.append("                     Close\n");
                     sendStr.append("*****************************************************\n");
@@ -275,7 +276,6 @@ public class SocketServer {
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
-                    sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
                     sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
@@ -385,6 +385,17 @@ public class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_MA_START_BLE_PAIR,
+                                        tmp[1].toUpperCase());
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("UnPair")) {
+                            if (BleAppService.bleAdapter.
+                                    checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_MA_START_BLE_UNPAIR,
                                         tmp[1].toUpperCase());
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
@@ -675,11 +686,6 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_READ_PHY, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("UnPair")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GC_START_BLE_UNPAIR, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("DiscoverServices")) {
                             processOutputState = NONE;
