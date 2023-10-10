@@ -820,9 +820,30 @@ public class ThroughputStateMachine {
                                                 new BufferedReader(
                                                     new InputStreamReader(proc.getInputStream()));
                                 String readLine = reader.readLine();
-                                /* If system property is set to false,
+                                if(readLine.equals("true")) {
+                                    /* If Property is set to true, send one packet from app,
+                                       rest of the packets from bta */
+                                     Log.d(TAG, "system property is true");
+                                    mCharacteristic.setWriteType(
+                                              BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
+                                    mCharacteristic.setValue(String.valueOf(str));
+                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                    mCharacteristic);
+                                    synchronized (write_mutex) {
+                                        // Wait for write response
+                                        if(!write_wait_signalled){
+                                            try {
+                                                write_mutex.wait();
+                                            } catch (InterruptedException e) {
+                                                Log.d(TAG, "Interrupted while waiting");
+                                            }
+                                        }
+                                        write_wait_signalled = false;
+                                    }
+                                }
+                                /* If system property is set to false or is not set,
                                    continue with sending the data from the app */
-                                if(readLine.equals("false")) {
+                                else {
                                     Log.d(TAG, "system property is false");
                                     long tx_start_time_stamp = SystemClock.elapsedRealtime();
                                     mCharacteristic.setWriteType(
@@ -891,26 +912,6 @@ public class ThroughputStateMachine {
                                     float txTputmr = txTputkr / 1000;
                                     Log.i(TAG, "Intr Tx tput in kbps: "+txTputkr+
                                                 " in mbps: "+txTputmr);
-                                } else {
-                                    /* If Property is set to true, send one packet from app,
-                                       rest of the packets from bta */
-                                     Log.d(TAG, "system property is true");
-                                    mCharacteristic.setWriteType(
-                                              BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
-                                    mCharacteristic.setValue(String.valueOf(str));
-                                    mBleConnect.mBluetoothGatt.writeCharacteristic(
-                                                                    mCharacteristic);
-                                    synchronized (write_mutex) {
-                                        // Wait for write response
-                                        if(!write_wait_signalled){
-                                            try {
-                                                write_mutex.wait();
-                                            } catch (InterruptedException e) {
-                                                Log.d(TAG, "Interrupted while waiting");
-                                            }
-                                        }
-                                        write_wait_signalled = false;
-                                    }
                                 }
                                 /* Signal SM that TX Test is done*/
                                 Message msg = mStateMachine.obtainMessage(
