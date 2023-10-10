@@ -158,7 +158,8 @@ public class BleAppService extends Service {
     public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
     public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 9;
     public static final int MSG_GS_START_BLE_REGISTER = MSG_SM_MAX_ACTION_VALUE + 10;
-    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_REGISTER;
+    public static final int MSG_GS_START_BLE_DEREGISTER = MSG_SM_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_DEREGISTER;
 
     @Override
     public void onCreate() {
@@ -730,6 +731,11 @@ public class BleAppService extends Service {
                 case MSG_GS_START_BLE_REGISTER:
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                             mgattserver.MSG_START_BLE_REGISTER, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_DEREGISTER:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_DEREGISTER, null);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 case MSG_GS_START_BLE_DISCONNECT:
