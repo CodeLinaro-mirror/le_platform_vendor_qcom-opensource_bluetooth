@@ -658,12 +658,8 @@ public class GattClient {
         }
 
         private void processCheckAndStartBleScan(Scan scn) {
-            Log.i(TAG, "scanflag set,service bound: " + BleAppService.boundS);
+            Log.i(TAG, "starting scanning");
             BleAppService.mScannerService.set_scan_parameters(scn);
-
-            PrintStr.setLength(0);
-            PrintStr.append("Scanning Started!");
-            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         private void processConnectToBdaddr(String bdAddr) {

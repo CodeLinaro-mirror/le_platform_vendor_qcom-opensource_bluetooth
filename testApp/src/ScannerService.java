@@ -76,7 +76,7 @@ public class ScannerService extends Service {
     private List<BluetoothDevice> mDeviceList;
     private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
     private BluetoothLeScanner mBleScanner;
-
+    StringBuilder PrintStr = new StringBuilder();
 
     public class LocalBinder extends Binder {
         ScannerService getService() {
@@ -138,17 +138,26 @@ public class ScannerService extends Service {
                                             scn.ServiceData, scn.SvcDataMask,
                                             scn.ScanMode, scn.CallbackType, scn.ResultType,
                                             scn.NumOfAdvMatches, scn.MatchMode,
-                                            scn.ReportDelay, scn.legacy/*, scn.phy*/);
+                                            scn.ReportDelay, scn.ScanPhy, scn.legacy);
         if(ScannerService.LOG_LEVEL >= 2) {
             Log.d(TAG, "cbtpe:" + scn.CallbackType + "scan mode:" + scn.ScanMode +
                 "noOfadvmatches:" + scn.NumOfAdvMatches + "match mode:" + scn.MatchMode +
                 "result type:" + scn.ResultType + "report delay:" + scn.ReportDelay +
              "manu id:"+scn.ManufacturerId + "mandu data:"+scn.ManufacturerData +
-             "manu data mask:" + scn.ManufacturerMaskData);
+             "manu data mask:" + scn.ManufacturerMaskData + "scan phy:" + scn.ScanPhy);
         }
         if(params == null) {
             Log.i(TAG, "params NULL");
         }
+
+        if(scn.ScanPhy != BluetoothDevice.PHY_LE_1M && scn.legacy) {
+            Log.e(TAG, "invalid combination, can't set LE Coded Phy for legacy scan");
+            PrintStr.setLength(0);
+            PrintStr.append("Invalid combination, can't set LE Coded Phy for legacy scan");
+            SocketServer.sendSocketData(PrintStr.toString());
+            return;
+        }
+
         mfilter = params.parseScanFilter();
         if(mfilter == null) {
             Log.i(TAG, "mfilter NULL");
@@ -207,7 +216,6 @@ public class ScannerService extends Service {
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
             mDeviceList.add(bluetoothDevice);
 
-            StringBuilder PrintStr = new StringBuilder();
             if(BleAppService.scan_called == BleAppService.SCAN_CALLED_FROM_MAIN_ACTIVITY){
                 /* Display scannner queue */
                 PrintStr.setLength(0);
@@ -218,6 +226,10 @@ public class ScannerService extends Service {
                 PrintStr.append(bluetoothDevice.getAddress());
                 PrintStr.append("\tRSSI : ");
                 PrintStr.append(rssi);
+                PrintStr.append("\tPrimary Phy :");
+                PrintStr.append(r.getPrimaryPhy());
+                PrintStr.append("\tSecondary Phy :");
+                PrintStr.append(r.getSecondaryPhy());
                 if(mScanSettings.getScanResultType() == ScanSettings.SCAN_RESULT_TYPE_FULL) {
                     if (scanRecord.getManufacturerSpecificData().size() > 0) {
                         for (int i = 0; i < scanRecord.getManufacturerSpecificData().size(); i++) {
@@ -367,13 +379,11 @@ public class ScannerService extends Service {
                     Log.d(TAG, "set Scan with Settings and filters1");
                     mBleScanner.startScan(mScanFilters,
                       mScanSettings, mScanCallback);
-                }
-                else if (mScanFilters != null){
+                } else if (mScanFilters != null){
                     Log.d(TAG, "set Scan with Settings and filters");
                     mBleScanner.startScan(mScanFilters,
                       new ScanSettings.Builder().build(),  mScanCallback);
-                }
-                else { //do a regular scan
+                } else { //do a regular scan
                     Log.d(TAG, "Do a regular scan");
                     mBleScanner.startScan(mScanCallback);
                 }
@@ -381,8 +391,10 @@ public class ScannerService extends Service {
 
                 if(ScannerService.LOG_LEVEL >= 3)
                     Log.d(TAG, "scan started");
-            }
-            else if(!action && mScanstatus){
+                PrintStr.setLength(0);
+                PrintStr.append("Scanning started!!");
+                SocketServer.sendSocketData(PrintStr.toString());
+            } else if(!action && mScanstatus){
                 if(mBTAdapter.isEnabled()) {
                     mBleScanner.stopScan(mScanCallback);
                     mBleScanner.flushPendingScanResults(mScanCallback);
@@ -391,6 +403,14 @@ public class ScannerService extends Service {
                 mScanstatus = false;
                 if(ScannerService.LOG_LEVEL >= 3)
                     Log.d(TAG, "scan stopped");
+                PrintStr.setLength(0);
+                PrintStr.append("Scanning stopped!!");
+                SocketServer.sendSocketData(PrintStr.toString());
+            } else if (action && mScanstatus) {
+                Log.d(TAG, "Scan in progress");
+                PrintStr.setLength(0);
+                PrintStr.append("Not Staring scan , Scan in progress!!!");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
             return true;
         }

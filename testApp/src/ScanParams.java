@@ -56,6 +56,7 @@ public final class ScanParams {
     public int NumOfAdvMatches;
     public int MatchMode;
     public int ReportDelay;
+    public int ScanPhy;
     public boolean Legacy;
 
     private String mDeviceName;
@@ -74,7 +75,7 @@ public final class ScanParams {
     public ScanParams(String devName, String DevAddress, String ServUUID, String srvcMaskUUID,
             String ManuId, String ManuData, String ManufacturerMaskData, String SrvcDataUUID,
             String SrvcData, String srvcDataMask, int scanMode, int cbType, int resultType,
-            int NumAdvMatches, int matchMode, int reportDelay, boolean legacy) {
+            int NumAdvMatches, int matchMode, int reportDelay, int scanPhy, boolean legacy) {
         DeviceName = devName;
         DeviceAddress = DevAddress;
         ServiceUuid = ServUUID;
@@ -91,6 +92,7 @@ public final class ScanParams {
         NumOfAdvMatches = NumAdvMatches;
         MatchMode = matchMode;
         ReportDelay = reportDelay;
+        ScanPhy = scanPhy;
         Legacy = legacy;
     }
 
@@ -309,6 +311,7 @@ public final class ScanParams {
                     .setMatchMode(this.MatchMode)
                     .setScanResultType(this.ResultType)
                     .setLegacy(this.Legacy)
+                    .setPhy(this.ScanPhy)
                     .build();
             return mscanSettings;
         }catch (Exception e) {
