@@ -36,6 +36,8 @@ package org.codeaurora.bluetooth.wearos_ble_testapp;
 import android.util.Log;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 
 import android.os.Build;
 import android.os.SystemProperties;
@@ -58,6 +60,7 @@ import com.android.internal.util.StateMachine;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
+import android.content.BroadcastReceiver;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -71,21 +74,19 @@ class GattClient {
     private static final String TAG = "GattClient";
     public static int LOG_LEVEL = 6;
 
+    public static final byte[] ENABLE_NOTIFICATION_INDICATION_VALUE = {0x03, 0x00};
+
     /* MTU size required for MTU exchange */
     public static final int MTU_SIZE_MIN = 23;
     public static final int TRANSPORT_LE = 2;
 
     public int mtu_size = MTU_SIZE_MIN;
 
-    /* Variable to update phy */
-    public static int txPhyReq = 1;
-    public static int rxPhyReq = 1;
-
     public Looper glooper;
 
     public BleGattClient mgattClient = null;
     private Context mcontext = null;
-    private BluetoothDevice mDevice = null;
+    public BluetoothDevice mDevice = null;
 
     //Actions
     public GattClientMessageHandler mGattClientHandler = null;
@@ -99,38 +100,31 @@ class GattClient {
     public static final int MSG_START_BLE_GATT_WRITE_READ_DESC = 7;
     public static final int MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE = 8;
     public static final int MSG_START_BLE_GATT_REFRESH_SERVICES = 9;
-    public static final int MSG_START_BLE_PAIR_DEV = 10;
-    public static final int MSG_START_BLE_UNPAIR_DEV = 11;
-    public static final int MSG_START_BLE_GATT_DISCONNECT = 12;
-    public static final int MSG_REGISTER_BLE_GATT_NOTIFICATIONS = 13;
-    public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 14;
-    public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 15;
-    public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 16;
-    public static final int MSG_START_CANCEL_CONNECT = 17;
-    public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 18;
-    public static final int MSG_START_BLE_CONNECT_TO_BDADDR = 19;
-    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_CONNECT_TO_BDADDR;
+    public static final int MSG_START_BLE_GATT_DISCONNECT = 10;
+    public static final int MSG_REGISTER_BLE_GATT_NOTIFICATIONS = 11;
+    public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 12;
+    public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 13;
+    public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 14;
+    public static final int MSG_START_CANCEL_CONNECT = 15;
+    public static final int MSG_BLE_GATT_REQ_CONN_PRIORITY = 16;
+    public static final int MSG_START_BLE_CONNECT_TO_BDADDR = 17;
+    public static final int MSG_START_BREDR_DISC = 18;
+    public static final int MSG_READ_REMOTE_RSSI = 19;
+    public static final int MSG_READ_CHAR_UUID = 20;
+    public static final int MSG_DISC_SRVC_UUID = 21;
+    public static final int MSG_START_BLE_GATT_UNREG = 22;
+    public static final int MSG_START_BLE_GATT_EXECUTE_WRITE = 23;
+    public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_GATT_EXECUTE_WRITE;
 
-    public static final int MSG_REM_DEV_FAILED_TO_CONNECT = MSG_GC_ACTION_MAX_VALUE + 1;
-    public static final int MSG_REFRESH_SERV_DONE = MSG_GC_ACTION_MAX_VALUE + 2;
-    public static final int MSG_REM_DEV_DISCONNECTED = MSG_GC_ACTION_MAX_VALUE + 3;
-    public static final int MSG_REM_DEV_CONNECTED = MSG_GC_ACTION_MAX_VALUE + 4;
-    public static final int MSG_SERVC_DISC_DONE = MSG_GC_ACTION_MAX_VALUE + 5;
-    public static final int MSG_CONN_UPDATE_DONE = MSG_GC_ACTION_MAX_VALUE + 6;
-    public static final int MSG_PHY_UPDATE_DONE = MSG_GC_ACTION_MAX_VALUE + 7;
-    public static final int MSG_CHAR_READ_DONE = MSG_GC_ACTION_MAX_VALUE + 8;
-    public static final int MSG_CHAR_WRITE_DONE = MSG_GC_ACTION_MAX_VALUE + 9;
-    public static final int MSG_DESC_READ_DONE = MSG_GC_ACTION_MAX_VALUE + 10;
-    public static final int MSG_DESC_WRITE_DONE = MSG_GC_ACTION_MAX_VALUE + 11;
-    public static final int MSG_PHY_READ_DONE = MSG_GC_ACTION_MAX_VALUE + 12;
-    public static final int MSG_MTU_EXCHANGE_DONE = MSG_GC_ACTION_MAX_VALUE + 13;
-    public static final int MSG_CHAR_CHANGED = MSG_GC_ACTION_MAX_VALUE + 14;
-    public static final int MSG_GC_ACTION_DONE_MAX_VALUE = MSG_CHAR_CHANGED;
 
     private static final int GATT_WRITE = 1;
     private static final int GATT_READ = 2;
     private static final int GATT_FORMAT_STRING = 1;
     private static final int GATT_FORMAT_INT = 2;
+
+    private static final int OP_NOTIFICATIONS = 1;
+    private static final int OP_INDICATIONS = 2;
+    private static final int OP_NOTIFICATIONS_INDICATIONS = 3;
 
     // Connection States
     public static final int BLE_STATE_CONNECTING = 1;
@@ -146,6 +140,7 @@ class GattClient {
     private boolean is_op_in_progress = false;
     private ReadWriteOp RdWrReliableClass = null;
     private ReadWriteOp RdWrClass = null;
+	private static BluetoothAdapter bluetoothAdapter = BleAppService.bleAdapter;
     private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
 
     private List<UUID> mServiceUUID;
@@ -155,7 +150,6 @@ class GattClient {
     private List<BluetoothGattCharacteristic> mCharacteristics;
     private List<BluetoothGattDescriptor> mDescriptors;
 
-    StringBuilder PrintStr = new StringBuilder();
 
     public GattClient(Context mcontext) {
         this.mcontext = mcontext;
@@ -175,7 +169,44 @@ class GattClient {
         mServiceUUID = new ArrayList<UUID>();
         mCharUUID = new ArrayList<UUID>();
         mDescUUID = new ArrayList<UUID>();
+
+        IntentFilter intentFilter = new IntentFilter();
+         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+         intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
+         mcontext.registerReceiver(eventReceiver, intentFilter);
     }
+
+    private BroadcastReceiver eventReceiver = new BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        Log.d(TAG,"Inside onReceive");
+        StringBuilder PrintStr = new StringBuilder();
+        String action = intent.getAction();
+         // When discovery finds a device
+         if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+             // Get the BluetoothDevice object from the Intent
+             BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+             PrintStr.setLength(0);
+             PrintStr.append("==================================================\n");
+             PrintStr.append("device type : ");
+             PrintStr.append(device.getType());
+             if(device.getType() != BluetoothDevice.DEVICE_TYPE_CLASSIC) {
+                PrintStr.append("\nDiscovery Results: \nDevice Name : ");
+                PrintStr.append(device.getName());
+                PrintStr.append("\t Device Address : ");
+                PrintStr.append(device.getAddress());
+                SocketServer.sendSocketData(PrintStr.toString());
+             }
+         // When discovery is finished, change the Activity title
+         } else if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
+            SocketServer.sendSocketData("Discovery Started");
+        } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED
+                .equals(action)) {
+            SocketServer.sendSocketData("Discovery Ended");
+        }
+    }
+};
 
     public void cleanup() {
         Log.i(TAG, "cleanup");
@@ -214,14 +245,15 @@ class GattClient {
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 Log.i(TAG, "onConnectionStateChange device :" + gatt.getDevice() +
                       " status :" + status + " newState :" + newState);
-                if (gatt.getDevice() == null || status != GATT_SUCCESS) {
+                if ((gatt.getDevice() == null || status != GATT_SUCCESS) &&
+                                               (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                     if(GattClient.LOG_LEVEL >= 1) {
                         Log.e(TAG, "onConnectionStateChange:Unexpected error! state: " + newState);
                     }
                     mConnectionStatus = BLE_STATE_DISCONNECTED;
-                    /*Send Message to Message Handler */
-                    msg = mGattClientHandler.obtainMessage(MSG_REM_DEV_FAILED_TO_CONNECT, null);
-                    mGattClientHandler.sendMessage(msg);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Failed to connect, please try again!!");
+                    SocketServer.sendSocketData(PrintStr.toString());
                     return;
                 }
 
@@ -231,15 +263,18 @@ class GattClient {
                     Log.i(TAG, "onConnectionStateChange:DISCONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
                     mConnectionStatus = BLE_STATE_DISCONNECTED;
-                    msg = mGattClientHandler.obtainMessage(MSG_REM_DEV_DISCONNECTED, null);
-                    mGattClientHandler.sendMessage(msg);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Disconnected with remote device: ");
+                    PrintStr.append(gatt.getDevice().getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                     Log.i(TAG, "onConnectionStateChange:CONNECTED "
                             + " remoteDevice: " + gatt.getDevice().getAddress());
                     mConnectionStatus = BLE_STATE_CONNECTED;
-                    msg = mGattClientHandler.obtainMessage(
-                               MSG_REM_DEV_CONNECTED, gatt.getDevice().getName());
-                    mGattClientHandler.sendMessage(msg);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Connected to remote device: ");
+                    PrintStr.append(gatt.getDevice().getName());
+                    SocketServer.sendSocketData(PrintStr.toString());
                     if (bondState == BluetoothDevice.BOND_BONDED) {
                        Log.i(TAG, "Device paired");
                     }
@@ -282,16 +317,17 @@ class GattClient {
                              }
                          }
                     }
+                    PrintStr.append("\nGatt Service discovery done!!");
                     SocketServer.sendSocketData(PrintStr.toString());
-                    msg = mGattClientHandler.obtainMessage(MSG_SERVC_DISC_DONE, null);
-                    mGattClientHandler.sendMessage(msg);
                 } else {
                     Log.d(TAG, "onServicesDiscovered received: " + status);
                     PrintStr.setLength(0);
                     PrintStr.append("Service Discovery failed with status: "+ status);
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
+                is_op_in_progress = false;
             }
+
 
             @Override
             public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy,
@@ -299,15 +335,12 @@ class GattClient {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
-                    if(txPhyReq == txPhy || rxPhyReq == rxPhy) {
-                        PhyUpdate tmp_phy = new PhyUpdate();
-                        tmp_phy.txPhy = txPhy;
-                        tmp_phy.rxPhy = rxPhy;
-                        msg = mGattClientHandler.obtainMessage(
-                                         MSG_PHY_UPDATE_DONE, tmp_phy);
-                        mGattClientHandler.sendMessage(msg);
-                        txPhyReq = rxPhyReq = 0;
-                    }
+                    PrintStr.setLength(0);
+                    PrintStr.append("Phy Update done, Tx Phy :");
+                    PrintStr.append(txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(rxPhy);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "phy update failed");
                     PrintStr.setLength(0);
@@ -322,9 +355,21 @@ class GattClient {
                                                 int status){
                 if ((status == GATT_SUCCESS)) {
                     /* get value based on format type */
-                    String value = fetchFormatValue(characteristic);
-                    msg = mGattClientHandler.obtainMessage(MSG_CHAR_READ_DONE, value);
-                    mGattClientHandler.sendMessage(msg);
+                    String value = fetchFormatValue(characteristic, GATT_FORMAT_STRING);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Char Value(string) is :");
+                    PrintStr.append(value);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    String strvalue = fetchFormatValue(characteristic, GATT_FORMAT_INT);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Char Value(int) is :");
+                    PrintStr.append(strvalue);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                    String hexvalue = fetchFormatValue(characteristic, 0);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Char Value(hex) is :");
+                    PrintStr.append(hexvalue);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "Char read failed");
                     PrintStr.setLength(0);
@@ -340,9 +385,23 @@ class GattClient {
                                                 int status) {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "onCharacteristicWrite: " + status);
-                    msg = mGattClientHandler.obtainMessage(MSG_CHAR_WRITE_DONE,
-                            new String(characteristic.getValue()));
-                    mGattClientHandler.sendMessage(msg);
+                    if(!reliable_write){
+                        String strvalue = fetchFormatValue(characteristic, GATT_FORMAT_STRING);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Characteristic Value (string) Written to ");
+                        PrintStr.append(strvalue);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        String Value = fetchFormatValue(characteristic, GATT_FORMAT_INT);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Characteristic Value (int) Written to ");
+                        PrintStr.append(Value);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        String hexvalue = fetchFormatValue(characteristic, 0);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Characteristic Value (hex) Written to ");
+                        PrintStr.append(hexvalue);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    }
                     if(reliable_write) {
                         String value = new String(characteristic.getValue());
                         /* check the value written is correct or not */
@@ -387,24 +446,6 @@ class GattClient {
                                     mgattClient.mBluetoothGatt.writeCharacteristic(
                                                 characteristic);
                                 }
-                            } else {
-                                    /*execute write*/
-                                    if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
-                                        Log.i(TAG, "Execute Write Successful!");
-                                        length_offset = 0;
-                                        reliable_write = false;
-                                        reliable_write_no_more_data = false;
-                                        offset_value = null;
-                                    } else {
-                                        Log.e(TAG, "Execute Write Failed!");
-                                        PrintStr.setLength(0);
-                                        PrintStr.append("Execute Write failed!");
-                                        SocketServer.sendSocketData(PrintStr.toString());
-                                        length_offset = 0;
-                                        reliable_write = false;
-                                        reliable_write_no_more_data = false;
-                                        offset_value = null;
-                                    }
                             }
                         } else {
                             /* abort reliable write if the value written doesn't match*/
@@ -434,11 +475,16 @@ class GattClient {
             public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor,
                                 int status) {
                 if ((status == GATT_SUCCESS)) {
-                    String value = new String(descriptor.getValue());
-                    Log.i(TAG, "onDescriptorRead: " + value);
-                    msg = mGattClientHandler.obtainMessage(MSG_DESC_READ_DONE,
-                                  value);
-                    mGattClientHandler.sendMessage(msg);
+                    byte[] value = descriptor.getValue();
+                    StringBuilder result = new StringBuilder();
+                    for (byte temp : value) {
+                        result.append(String.format("%d ", temp));
+                    }
+                    Log.i(TAG, "Descriptor value is "+ result.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Descriptor Value Read is :");
+                    PrintStr.append(result.toString());
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "read descriptor failed");
                     PrintStr.setLength(0);
@@ -453,10 +499,16 @@ class GattClient {
                                             BluetoothGattDescriptor desc, int status) {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "onDescriptorWrite: " + status);
-                    String value = new String(desc.getValue());
-                    msg = mGattClientHandler.obtainMessage(MSG_DESC_WRITE_DONE,
-                                  value);
-                    mGattClientHandler.sendMessage(msg);
+                    byte[] value = desc.getValue();
+                    StringBuilder result = new StringBuilder();
+                    for (byte temp : value) {
+                        result.append(String.format("%d ", temp));
+                    }
+                    Log.i(TAG, "Descriptor value is "+ result.toString());
+                    PrintStr.setLength(0);
+                    PrintStr.append("Descriptor Value Written to ");
+                    PrintStr.append(result.toString());
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "write descriptor failed");
                     PrintStr.setLength(0);
@@ -467,14 +519,30 @@ class GattClient {
             }
 
             @Override
+            public void onReliableWriteCompleted(BluetoothGatt gatt, int status) {
+                if (status == GATT_SUCCESS) {
+                    Log.i(TAG, "onReliableWriteCompleted: " + status);
+                    PrintStr.setLength(0);
+                    PrintStr.append("onReliableWriteCompleted completed with success");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "onReliableWriteCompleted failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("reliable write failed with status: "+ status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
+
+            @Override
             public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
                 if(status == GATT_SUCCESS){
-                    Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
-                    PhyUpdate tmp_phy = new PhyUpdate();
-                    tmp_phy.txPhy = txPhy;
-                    tmp_phy.rxPhy = rxPhy;
-                    msg = mGattClientHandler.obtainMessage(MSG_PHY_READ_DONE, tmp_phy);
-                    mGattClientHandler.sendMessage(msg);
+                    Log.i(TAG, "Read Phy: Tx Phy: "+txPhy+"Rx Phy: "+rxPhy);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Current Phy: Tx Phy :");
+                    PrintStr.append(txPhy);
+                    PrintStr.append(" Rx Phy :");
+                    PrintStr.append(rxPhy);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else{
                     Log.i(TAG, "Read Phy failed");
                     PrintStr.setLength(0);
@@ -488,9 +556,10 @@ class GattClient {
                                                 BluetoothGattCharacteristic characteristic) {
                 Log.i(TAG, "onCharacteristicChanged");
                 String value = new String(characteristic.getValue());
-                msg = mGattClientHandler.obtainMessage(MSG_CHAR_CHANGED,
-                                value);
-                mGattClientHandler.sendMessage(msg);
+                PrintStr.setLength(0);
+                PrintStr.append("Characteristic value changed to ");
+                PrintStr.append(value);
+                SocketServer.sendSocketData(PrintStr.toString());
             }
 
             @Override
@@ -498,9 +567,10 @@ class GattClient {
                if (status == GATT_SUCCESS) {
                     Log.i(TAG, "Gatt updated MTU" + mtu);
                     mtu_size = mtu;
-                    msg = mGattClientHandler.obtainMessage(MSG_MTU_EXCHANGE_DONE,
-                              Integer.toString(mtu));
-                    mGattClientHandler.sendMessage(msg);
+                    PrintStr.setLength(0);
+                    PrintStr.append("MTU updated to :");
+                    PrintStr.append(mtu);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.i(TAG, "Failed to change Mtu size");
                     PrintStr.setLength(0);
@@ -508,26 +578,50 @@ class GattClient {
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
+
+            @Override
+            public void onReadRemoteRssi (BluetoothGatt gatt, int rssi, int status) {
+               if (status == GATT_SUCCESS) {
+                    Log.i(TAG, "Rssi:" + rssi);
+                    PrintStr.setLength(0);
+                    PrintStr.append("RSSI :");
+                    PrintStr.append(rssi);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Failed to read rssi");
+                    PrintStr.setLength(0);
+                    PrintStr.append("RSSI read with status: ");
+                    PrintStr.append(status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
+
+            @Override
+            public void onServiceChanged (BluetoothGatt gatt) {
+               Log.i(TAG, "OnServiceChanged");
+               PrintStr.setLength(0);
+               PrintStr.append("One of the Services is changed!!\n");
+               PrintStr.append("Please re-discover services as gatt db is out of sync");
+               SocketServer.sendSocketData(PrintStr.toString());
+            }
         };
 
-        public void connect(BluetoothDevice device){
+        public void connect(BluetoothDevice device, int initPhy, boolean autoConnect){
             if((BleAppService.bleAdapter!=null) && (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
+                int deviceType = mDevice.getType();
+                Log.i(TAG, "deviceType: " + deviceType);
+                PrintStr.setLength(0);
+                PrintStr.append("Remote deviceType: ");
+                PrintStr.append(deviceType);
+                PrintStr.append("\ninit phy: ");
+                PrintStr.append(initPhy);
+                PrintStr.append("\nauto connect: ");
+                PrintStr.append(autoConnect);
+                SocketServer.sendSocketData(PrintStr.toString());
                 mConnectionStatus = BLE_STATE_CONNECTING;
-                mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
-            }
-        }
-
-        public void pair(){
-            if(mDevice.getBondState() != BluetoothDevice.BOND_BONDED){
-                Log.i(TAG, "Pairing!");
-                if(!mDevice.createBond(TRANSPORT_LE)) {
-                    Log.i(TAG, "couldn't start pairing");
-                    PrintStr.setLength(0);
-                    PrintStr.append("Pairing failed!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
+                mBluetoothGatt = mDevice.connectGatt(mcontext, autoConnect, mGattCallbacks,TRANSPORT_LE, initPhy);
             }
         }
 
@@ -535,27 +629,15 @@ class GattClient {
             mgattClient.mBluetoothGatt.disconnect();
         }
 
-        public void unpair(){
-            if(mDevice.getBondState() == BluetoothDevice.BOND_BONDED){
-                Log.i(TAG, "Unpairing!");
-                if(!mDevice.removeBond()) {
-                    Log.i(TAG, "couldn't start unpairing");
-                    PrintStr.setLength(0);
-                    PrintStr.append("Unpairing failed!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-            }
-        }
-
-        public String fetchFormatValue(BluetoothGattCharacteristic characteristic) {
+        public String fetchFormatValue(BluetoothGattCharacteristic characteristic, int format_type) {
             /* String format */
-            if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
+            if(format_type == GATT_FORMAT_STRING) {
                 String value = characteristic.getStringValue(0);
                 Log.i(TAG, "Characteristic value(string) is "+ value);
                 return value;
             }
             /* Int format */
-            else if(RdWrClass.Format_type == GATT_FORMAT_INT){
+            else if(format_type == GATT_FORMAT_INT){
                 byte[] value = characteristic.getValue();
                 StringBuilder result = new StringBuilder();
                 for (byte temp : value) {
@@ -593,7 +675,6 @@ class GattClient {
         public void handleMessage(Message msg) {
             if (GattClient.LOG_LEVEL >= 2)
                 Log.d(TAG, "Handler(): msg = " + msg.what);
-            int status;
 
             switch (msg.what) {
                 case MSG_START_BLE_CONNECT:
@@ -608,8 +689,8 @@ class GattClient {
                     }
                     break;
               case MSG_START_BLE_CONNECT_TO_BDADDR:
-                    String bdAddr = (String) msg.obj;
-                    processConnectToBdaddr(bdAddr);
+                    Scan init = (Scan) msg.obj;
+                    processConnectToBdaddr(init);
                     break;
                 case MSG_START_CANCEL_CONNECT:
                     processCancelConnect();
@@ -630,20 +711,29 @@ class GattClient {
                     int conn_priority = (int) msg.obj;
                     processConnPriorityReq(conn_priority);
                     break;
-                case MSG_START_BLE_PAIR_DEV:
-                    processStartPair();
-                    break;
-                case MSG_START_BLE_UNPAIR_DEV:
-                    processStartUnpair();
-                    break;
-                case MSG_START_BLE_READ_PHY:
+               case MSG_START_BLE_READ_PHY:
                     processReadPhyReq();
                     break;
                 case MSG_START_BLE_GATT_DISC:
                     processGattDiscovery();
                     break;
+                case MSG_START_BREDR_DISC:
+                    processBREDRDiscovery();
+                    break;
+                case MSG_READ_REMOTE_RSSI:
+                    mgattClient.mBluetoothGatt.readRemoteRssi();
+                    break;
+                case MSG_READ_CHAR_UUID:
+                    Log.i(TAG, "Not Supported!!");
+                    break;
+                case MSG_DISC_SRVC_UUID:
+                    Log.i(TAG, "Not Supported!!");
+                    break;
                 case MSG_START_BLE_GATT_DISCONNECT:
                     processDisconnectReq();
+                    break;
+                case MSG_START_BLE_GATT_UNREG:
+                    processCloseReq();
                     break;
                 case MSG_START_BLE_GATT_WRITE_READ_CHAR:
                     RdWrClass = (ReadWriteOp) msg.obj;
@@ -668,99 +758,8 @@ class GattClient {
                 case MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE:
                     processGattAbortReliableWrite();
                     break;
-                case MSG_REM_DEV_FAILED_TO_CONNECT:
-                    PrintStr.setLength(0);
-                    PrintStr.append("Failed to connect, please try again!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_REFRESH_SERV_DONE:
-                    PrintStr.setLength(0);
-                    PrintStr.append("Gatt Service refresh done!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_REM_DEV_DISCONNECTED:
-                    PrintStr.setLength(0);
-                    PrintStr.append("Disconnected with remote device!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_REM_DEV_CONNECTED:
-                    PrintStr.setLength(0);
-                    String name = (String) msg.obj;
-                    PrintStr.append("Connected to remote device:");
-                    PrintStr.append(name);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_SERVC_DISC_DONE:
-                    PrintStr.setLength(0);
-                    PrintStr.append("Gatt Service discovery done!!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_CHAR_CHANGED:
-                    PrintStr.setLength(0);
-                    String value = (String) msg.obj;
-                    PrintStr.append("Characteristic value changed to ");
-                    PrintStr.append(value);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_CONN_UPDATE_DONE:
-                    PrintStr.setLength(0);
-                    String interal = (String) msg.obj;
-                    PrintStr.append("Connection Updated to :");
-                    PrintStr.append(interal);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_PHY_UPDATE_DONE:
-                    PrintStr.setLength(0);
-                    phyUpdate = (PhyUpdate) msg.obj;
-                    PrintStr.append("Phy Update done, Tx Phy :");
-                    PrintStr.append(phyUpdate.txPhy);
-                    PrintStr.append(" Rx Phy :");
-                    PrintStr.append(phyUpdate.rxPhy);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_CHAR_READ_DONE:
-                    PrintStr.setLength(0);
-                    String read_char = (String) msg.obj;
-                    PrintStr.append("Char Value is :");
-                    PrintStr.append(read_char);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_CHAR_WRITE_DONE:
-                    PrintStr.setLength(0);
-                    String write_char = (String) msg.obj;
-                    PrintStr.append("Characteristic Value Written Successfully to ");
-                    PrintStr.append(write_char);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_DESC_READ_DONE:
-                    PrintStr.setLength(0);
-                    String read_desc = (String) msg.obj;
-                    PrintStr.append("Descriptor Value is :");
-                    PrintStr.append(read_desc);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_DESC_WRITE_DONE:
-                    PrintStr.setLength(0);
-                    String write_desc = (String) msg.obj;
-                    PrintStr.append("Descriptor Value Written Successfully to ");
-                    PrintStr.append(write_desc);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_PHY_READ_DONE:
-                    PrintStr.setLength(0);
-                    phyUpdate = (PhyUpdate) msg.obj;
-                    PrintStr.append("Current Phy: Tx Phy :");
-                    PrintStr.append(phyUpdate.txPhy);
-                    PrintStr.append(" Rx Phy :");
-                    PrintStr.append(phyUpdate.rxPhy);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_MTU_EXCHANGE_DONE:
-                    PrintStr.setLength(0);
-                    String mtu = (String) msg.obj;
-                    PrintStr.append("MTU updated to :");
-                    PrintStr.append(mtu);
-                    SocketServer.sendSocketData(PrintStr.toString());
+                case MSG_START_BLE_GATT_EXECUTE_WRITE:
+                    processGattExecuteWrite();
                     break;
                 default:
                     Log.e(TAG, "Unknown Operation");
@@ -769,19 +768,15 @@ class GattClient {
         }
 
         private void processCheckAndStartBleScan(Scan scn) {
-            Log.i(TAG, "scanflag set,service bound: " + BleAppService.boundS);
+            Log.i(TAG, "starting scanning");
             BleAppService.mScannerService.set_scan_parameters(scn);
-
-            PrintStr.setLength(0);
-            PrintStr.append("Scanning Started!");
-            SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processConnectToBdaddr(String bdAddr) {
+        private void processConnectToBdaddr(Scan init) {
             if(BleAppService.bleAdapter != null) {
-                Log.i(TAG, "Connect to Address: " + bdAddr);
-                BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(bdAddr);
-                mgattClient.connect(remoteDevice);
+                Log.i(TAG, "Connect to Address: " + init.DeviceAddress);
+                BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(init.DeviceAddress);
+                mgattClient.connect(remoteDevice, init.initPhy, init.autoConnect);
             }
         }
 
@@ -807,25 +802,13 @@ class GattClient {
             if(BleAppService.mScannerService.mScanstatus) {
                 BleAppService.mScannerService.stopScan();
             }
-            mgattClient.connect(device);
+            mgattClient.connect(device, BluetoothDevice.PHY_LE_1M, false);
         }
+
 
         private void processReadPhyReq(){
             Log.i(TAG, "Read Phy");
             mgattClient.mBluetoothGatt.readPhy();
-        }
-
-        private void processStartPair(){
-            Log.i(TAG, "Starting Pairing");
-            mgattClient.pair();
-        }
-
-        private void processStartUnpair(){
-            Log.i(TAG, "Starting Unpair");
-            mgattClient.unpair();
-            PrintStr.setLength(0);
-            PrintStr.append("Device unpaired");
-            SocketServer.sendSocketData(PrintStr.toString());
         }
 
         private void processDisconnectReq() {
@@ -835,13 +818,14 @@ class GattClient {
         }
 
         private void processCloseReq() {
-            Log.i(TAG, "Close!");
+            Log.i(TAG, "Unregistering!");
+            PrintStr.setLength(0);
+            PrintStr.append("Unregistering!");
+            SocketServer.sendSocketData(PrintStr.toString());
             mgattClient.mBluetoothGatt.close();
         }
 
         private void processPhyUpdateReq(PhyUpdate phyUpdate){
-            txPhyReq = phyUpdate.txPhy;
-            rxPhyReq = phyUpdate.rxPhy;
             Log.i(TAG, "Phy Update");
             mgattClient.mBluetoothGatt.setPreferredPhy(phyUpdate.txPhy,
                                         phyUpdate.rxPhy, phyUpdate.phyOpt);
@@ -860,6 +844,11 @@ class GattClient {
         private void processGattDiscovery() {
             Log.i(TAG, "Gatt Service Discovery");
             mgattClient.mBluetoothGatt.discoverServices();
+        }
+
+        private void processBREDRDiscovery() {
+            Log.i(TAG, "BREDR Discovery");
+            BleAppService.bleAdapter.startDiscovery();
         }
 
         private void processGattReadWriteCharReq(ReadWriteOp RdWrClass) {
@@ -904,15 +893,14 @@ class GattClient {
 
             if(RdWrClass.operation == GATT_READ) {
                 status = mgattClient.mBluetoothGatt.readCharacteristic(mCharacteristic);
-                if(status != true)
+                if(status != true) {
                     Log.e(TAG, "Read Char failed");
                     PrintStr.setLength(0);
                     PrintStr.append("Read Char failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                     is_op_in_progress = false;
-                return;
+                }
             }
-
             else if(RdWrClass.operation == GATT_WRITE) {
                 /* Check for write type */
                 if(RdWrClass.Write_type != 0) {
@@ -932,7 +920,7 @@ class GattClient {
                     }
                     else if ((RdWrClass.Value.length() >= (mtu_size - 3)) &&
                             (RdWrClass.Write_type !=
-                                    BluetoothGattCharacteristic.WRITE_TYPE_SIGNED)) {
+                                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)) {
                         Log.e(TAG, "Write failed: Length cannot be more than" +
                                 "ATT_MTU-3 for write");
                         PrintStr.setLength(0);
@@ -956,18 +944,8 @@ class GattClient {
                         return;
                     }
                 }
-                if(RdWrClass.Format_type == GATT_FORMAT_STRING) {
-                    mCharacteristic.setValue((RdWrClass.Value).getBytes());
-                }
-                else if(RdWrClass.Format_type == GATT_FORMAT_INT){
-                    mCharacteristic.setValue(
-                          Integer.parseInt(RdWrClass.Value),
-                            BluetoothGattCharacteristic.FORMAT_UINT32,0);
-                }
-                else{
-                    Log.e(TAG, "using default format");
-                    mCharacteristic.setValue((RdWrClass.Value).getBytes());
-                }
+                Log.e(TAG, "using default format");
+                mCharacteristic.setValue((RdWrClass.Value).getBytes());
                 mgattClient.mBluetoothGatt.writeCharacteristic(
                              mCharacteristic);
             } else {
@@ -1017,7 +995,13 @@ class GattClient {
             }
 
             mgattClient.mBluetoothGatt.setCharacteristicNotification(mCharacteristic, true);
-            mDescriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            if(RdWrClass.operation == OP_NOTIFICATIONS) {
+                mDescriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            } else if(RdWrClass.operation == OP_INDICATIONS) {
+                mDescriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+            } else {
+                mDescriptor.setValue(ENABLE_NOTIFICATION_INDICATION_VALUE);
+            }
             mgattClient.mBluetoothGatt.writeDescriptor(mDescriptor);
             Log.d(TAG, "Registering notifications");
         }
@@ -1158,6 +1142,29 @@ class GattClient {
             reliable_write_no_more_data = false;
             length_offset = 0;
             is_op_in_progress = false;
+        }
+        
+        private void processGattExecuteWrite(){
+            /*execute write*/
+            if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
+                Log.i(TAG, "Execute Write Successful!");
+                PrintStr.setLength(0);
+                PrintStr.append("Execute Write Successful!");
+                SocketServer.sendSocketData(PrintStr.toString());
+                length_offset = 0;
+                reliable_write = false;
+                reliable_write_no_more_data = false;
+                offset_value = null;
+            } else {
+                Log.e(TAG, "Execute Write Failed!");
+                PrintStr.setLength(0);
+                PrintStr.append("Execute Write failed!");
+                SocketServer.sendSocketData(PrintStr.toString());
+                length_offset = 0;
+                reliable_write = false;
+                reliable_write_no_more_data = false;
+                offset_value = null;
+            }
         }
 
         private void processGattReadWriteDescReq(ReadWriteOp RdWrClass) {

@@ -242,7 +242,7 @@ public class SocketServer {
                     sendStr.append("                     SetPeriodicAdvData  (Ex: SetPeriodicAdvData AdvId:0;PeriodicData:abcdabcd)\n");
                     sendStr.append("                     EnablePeriodicAdvSet  (Ex: EnablePeriodicAdvSet AdvId:0;Enableset:true)\n");
                     sendStr.append("                     GetOwnAddrSet  (Ex: GetOwnAddrSet 0)\n");
-                    sendStr.append("                     AdvStop       (Ex: AdvStop 1)\n");
+                    sendStr.append("                     AdvStop       (Ex: AdvStop 0)\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*****************************************************\n");
                     break;
@@ -264,16 +264,20 @@ public class SocketServer {
                     sendStr.append("                                                 SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                 ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                 ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
-                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
+                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr DeviceAddress:11:22:33:44:55:66;initPhy:1(1->1M, 2->2M, 4->LE Coded Phy);\n");
+                    sendStr.append("                                                    autoConnect:false(true->initiates background connection , false->doesn't initiate background connection);\n");
+                    sendStr.append("                                                    transport:2(0 -> auto, 1 -> BREDR, 2 -> LE));\n");
+                    sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     CancelConnect\n");
                     sendStr.append("                     ConnUpdate     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     Pair\n");
                     sendStr.append("                     UnPair\n");
-                    sendStr.append("                     Tx             (Ex: Tx Mtu_Size:512;Packet_Size:244;Num_Packets:50;\n");
+                    sendStr.append("                     Tx             (Ex: Tx Packet_Size:244;Num_Packets:50;\n");
                     sendStr.append("                                            TxService:0000FF01-0000-1000-8000-00805F9B34FB;TxChar:0000FF04-0000-1000-8000-00805F9B34FB)\n");
-                    sendStr.append("                     Rx             (Ex: Rx Mtu_Size:512;NotificationsTimeInSec:2;NotificationsTimeInMin:5;RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                     Rx             (Ex: Rx NotificationsTimeInSec:2;NotificationsTimeInMin:5;RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                     TxRx        (Ex: TxRx Num_Packets:5000)\n");
                     sendStr.append("                     Latency        (Ex: Latency LatencyService:0000FF01-0000-1000-8000-00805F9B34FB;LatencyChar:0000FF02-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");
@@ -282,26 +286,33 @@ public class SocketServer {
 
                 case GATT_CLIENT_MENU:
                     sendStr.append("\n******************** Gatt Client Menu ********************\n");
+                    sendStr.append("                     StartBREDRDiscovery            \n");
                     sendStr.append("                     Connect        (Ex:    Connect DeviceName:Minato;DeviceAddress:73:B5:C0:E6:62:A4;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;\n");
                     sendStr.append("                                                    SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                    ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;ScanPhy:255;Legacy:false)\n");
-                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
+                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr DeviceAddress:11:22:33:44:55:66;initPhy:1(1->1M, 2->2M, 4->LE Coded Phy);\n");
+                    sendStr.append("                                                    transport:2(0 -> auto, 1 -> BREDR, 2 -> LE));\n");
+                    sendStr.append("                                                    autoConnect:false(true->initiates background connection , false->doesn't initiate background connection));\n");
+                    sendStr.append("                     ReadRemoteRssi                (Ex: ReadRemoteRssi)\n");
+                    sendStr.append("                     DiscoverServiceUuid              (Ex: DiscoverServiceUuid ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb)\n");
+                    sendStr.append("                     ReadCharUUid                  (Ex: ReadCharUUid ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;CharUuid:00002a01-0000-1000-8000-00805f9b34fb;StartHdl:0;EndHdl:12)\n");
                     sendStr.append("                     CancelConnect\n");
                     sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
-                    sendStr.append("                     ReadPhy\n");
+                    sendStr.append("                     ReadPhy                        (Ex: ReadPhy)\n");
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
                     sendStr.append("                     DiscoverServices\n");
                     sendStr.append("                     RefreshServices\n");
                     sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
-                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;Value:10)\n");
-                    sendStr.append("                     RegNotifications               (Ex: RegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;Value:01)\n");
+                    sendStr.append("                     RegNotifications               (Ex: RegNotifications Operation:1(1->Notifications, 2->Indications, 3-> both);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
-                    sendStr.append("                     AbortReliableWrite\n");
+                    sendStr.append("                     ExecAbortReliableWrite         (Ex: ExecAbortReliableWrite Operation:1(1-> execute, 0 -> abort))\n");
                     sendStr.append("                     Disconnect\n");
+                    sendStr.append("                     Unregister\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -594,15 +605,22 @@ public class SocketServer {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if (tmp[0].equals("ConnectToBdaddr")) {
-                            if (BleAppService.bleAdapter.checkBluetoothAddress(tmp[1].toUpperCase())) {
+                            Scan initParam = parse.ScanParse(tmp[1]);
+                            if (initParam != null) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_SM_BLE_CONNECT_TO_BDADDR,
-                                        tmp[1].toUpperCase());
+                                        initParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if (tmp[0].equals("ConfigureMTU")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE,
+                                    Integer.parseInt(tmp[1]));
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("ConnUpdate")) {
                             ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
                             if (connUpdateParam != null) {
@@ -639,6 +657,16 @@ public class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_SM_START_BLE_DATA_RX_TEST, dataRxParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("TxRx")) {
+                            DataTx dataTxParam = parse.DataTxParse(tmp[1]);
+                            if (dataTxParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_SM_START_BLE_TX_RX_TEST, dataTxParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
@@ -707,11 +735,32 @@ public class SocketServer {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if (tmp[0].equals("ConnectToBdaddr")) {
-                            if (BleAppService.bleAdapter.checkBluetoothAddress(tmp[1].toUpperCase())) {
+                            Scan initParam = parse.ScanParse(tmp[1]);
+                            if (initParam != null) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GC_START_BLE_CONNECT_TO_BDADDR,
-                                        tmp[1].toUpperCase());
+                                        initParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ReadCharUUid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_READ_CHAR_UUID, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("DiscoverServiceUuid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_DISC_SRVC_UUID, readWriteCharOpParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
@@ -798,6 +847,11 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if (tmp[0].equals("ExecAbortReliableWrite")) {
+                            ReadWriteOp execWrite = parse.ReadWriteOpParse(tmp[1]);
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_EXECUTE_ABORT_RELIABLE_WRITE, execWrite.operation);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
@@ -812,15 +866,20 @@ public class SocketServer {
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_GATT_DISCOVER, null);
                             BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("StartBREDRDiscovery")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BREDR_DISC, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("ReadRemoteRssi")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_READ_REMOTE_RSSI, null);
+                            BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("RefreshServices")) {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_GATT_REFRESH_SERVICES, null);
-                            BleAppService.msghandler.sendMessage(msg);
-                        } else if (tmp[0].equals("AbortReliableWrite")) {
-                            processOutputState = NONE;
-                            msg = BleAppService.msghandler.obtainMessage(
-                                    BleAppService.MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("CancelConnect")) {
                             processOutputState = NONE;
@@ -831,6 +890,11 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_GATT_DISC, null);
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("Unregister")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_START_BLE_GATT_UNREG, null);
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;

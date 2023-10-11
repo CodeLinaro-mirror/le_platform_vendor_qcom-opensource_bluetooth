@@ -308,7 +308,7 @@ public class InputParse {
                 if (tmp2[0].equals("DeviceName")) {
                     scanParam.DeviceName = tmp2[1];
                 } else if (tmp2[0].equals("DeviceAddress")) {
-                    scanParam.DeviceAddress = tmp2[1];
+                    scanParam.DeviceAddress = tmp2[1].toUpperCase();
                 } else if (tmp2[0].equals("ServiceUuid")) {
                     scanParam.ServiceUuid = tmp2[1];
                 } else if (tmp2[0].equals("SvcMaskUuid")) {
@@ -341,7 +341,13 @@ public class InputParse {
                     scanParam.ScanPhy = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("Legacy")) {
                     scanParam.legacy = Boolean.parseBoolean(tmp2[1]);
-                } else {
+                } else if (tmp2[0].equals("initPhy")) {
+                    scanParam.initPhy = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("autoConnect")) {
+                    scanParam.autoConnect = Boolean.parseBoolean(tmp2[1]);
+                } else if (tmp2[0].equals("transport")) {
+                    scanParam.transport = Integer.parseInt(tmp2[1]);
+                 } else {
                     break;
                 }
             }else{
@@ -535,6 +541,10 @@ public class InputParse {
                     readWriteOpParam.Desc_uuid = tmp2[1];
                 } else if (tmp2[0].equals("Value")) {
                     readWriteOpParam.Value = tmp2[1];
+                } else if (tmp2[0].equals("StartHdl")) {
+                    readWriteOpParam.start_hdl = Integer.parseInt(tmp2[1]);
+                } else if (tmp2[0].equals("EndHdl")) {
+                    readWriteOpParam.end_hdl = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("WriteType")) {
                     readWriteOpParam.Write_type = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("FormatType")) {

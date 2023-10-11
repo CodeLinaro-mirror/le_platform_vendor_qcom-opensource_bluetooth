@@ -35,6 +35,8 @@ public class ReadWriteOp {
     String Char_uuid = null;
     String Desc_uuid = null;
     String Value = null;
+    int start_hdl = 0x0000;
+    int end_hdl = 0xFFFF;
     int Write_type = 2;
     int Format_type = 0;
 }

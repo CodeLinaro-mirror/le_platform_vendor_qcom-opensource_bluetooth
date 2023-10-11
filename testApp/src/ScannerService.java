@@ -231,7 +231,7 @@ public class ScannerService extends Service {
                 PrintStr.append("\tSecondary Phy :");
                 PrintStr.append(r.getSecondaryPhy());
                 if(mScanSettings.getScanResultType() == ScanSettings.SCAN_RESULT_TYPE_FULL) {
-                    if (scanRecord.getManufacturerSpecificData().size() > 0) {
+                    if ((scanRecord.getManufacturerSpecificData() != null) && (scanRecord.getManufacturerSpecificData().size() > 0)) {
                         for (int i = 0; i < scanRecord.getManufacturerSpecificData().size(); i++) {
                             int manufacturerId = scanRecord.getManufacturerSpecificData().keyAt(i);
                             Log.d(TAG, "Manu data ");
@@ -242,7 +242,7 @@ public class ScannerService extends Service {
                             PrintStr.append(Arrays.toString(manufacturerData));
                         }
                     }
-                    if (!scanRecord.getServiceData().isEmpty()) {
+                    if ((scanRecord.getServiceData() != null) && !scanRecord.getServiceData().isEmpty()) {
                         for (ParcelUuid parcelUuid : scanRecord.getServiceData().keySet()) {
                             byte[] serviceData = scanRecord.getServiceData().get(parcelUuid);
                             Log.d(TAG, "service data ");

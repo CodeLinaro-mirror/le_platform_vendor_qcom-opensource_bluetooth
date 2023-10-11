@@ -71,19 +71,26 @@ public class ThroughputStateMachine {
     /* Mutex required for writing characteristics and descriptors */
     private final Object write_mutex = new Object();
     private final Object service_discovery_mutex = new Object();
+    private final Object notification_mutex = new Object();
 
     public boolean gatt_discovery_done = false;
     public static boolean write_wait_signalled = false;
+    public static boolean notify_wait_signalled = false;
 
     /* Variable required for calculating DataRx Tput*/
     public static int num_of_notifications = 0;
     public static long rx_start_time_stamp = 0x0;
     public static long rx_end_time_stamp = 0x0;
+    public static long rx_end_time_stamp1 = 0x0;
+    public static long rx_end_time_stamp2 = 0x0;
+    public static long pkt_cnt = 0x0;
 
     /* MTU size required for MTU exchange */
     public static final int MTU_SIZE_MIN = 23;
     public static final int MTU_SIZE_MAX = 512;
     public int mtu_size = MTU_SIZE_MIN;
+    private int tx_rx_mtu_intr_size = 244;
+    private char[] tx_rx_str = new char[tx_rx_mtu_intr_size];
 
     public static final int TRANSPORT_LE = 2;
 
@@ -99,6 +106,7 @@ public class ThroughputStateMachine {
     public static int ALL_PHY = 7;
 
     private static DataTx DataTxClass;
+    private static DataTx DataTxRxClass;
     private static DataRx DataRxClass;
     private static LatencyTest LatencyTestClass;
 
@@ -303,17 +311,33 @@ public class ThroughputStateMachine {
                                                 BluetoothGattCharacteristic characteristic) {
                 num_of_notifications ++;
                 String charValue = characteristic.getStringValue(0);
+                Log.i(TAG, "onCharacteristicChanged, value: " ); //+ charValue);
+                // PrintStr.setLength(0);
+                // PrintStr.append("\nonCharacteristicChanged, Value:  ");
+                // PrintStr.append(charValue);
+                // SocketServer.sendSocketData(PrintStr.toString());
                 /* Read the start time once we receive notification with "start" in it */
                 if (charValue.contains("start")) {
                     rx_start_time_stamp = SystemClock.elapsedRealtime();
                     if(ThroughputStateMachine.LOG_LEVEL >= 2) {
                         Log.d(TAG, "rx_start_time_stamp:"+rx_start_time_stamp);
                     }
+                } else if (Arrays.equals(tx_rx_str, charValue.toCharArray())) {
+                   Log.i(TAG, "onCharacteristicChanged releasing mutex");
+                  /* Release write mutex */
+                   synchronized (notification_mutex) {
+                       notify_wait_signalled = true;
+                       notification_mutex.notifyAll();
+                   }
                 } else {
                     /* Keep reading the end time until we receive last notification */
+                    rx_end_time_stamp1 = rx_end_time_stamp;
                     rx_end_time_stamp = SystemClock.elapsedRealtime();
+                    rx_end_time_stamp2 = (rx_end_time_stamp - rx_end_time_stamp1);
+                    pkt_cnt++;
+                    Log.d(TAG, "rx time : " + rx_end_time_stamp2 + " packet number : " +pkt_cnt);
                     if(ThroughputStateMachine.LOG_LEVEL >= 2) {
-                        Log.d(TAG, "rx_end_time_stamp:"+rx_end_time_stamp);
+                 //       Log.d(TAG, "rx_end_time_stamp:"+rx_end_time_stamp);
                     }
                 }
             }
@@ -323,9 +347,10 @@ public class ThroughputStateMachine {
                 if (status == GATT_SUCCESS) {
                     Log.i(TAG, "Gatt updated MTU" + mtu);
                     mtu_size = mtu;
-                    /* Send Message to SM */
-                    mStateMachine.sendMessage(
-                        TestAppThroughputStateMachine.MSG_TA_SM_MTU_EXCHANGE_DONE);
+                    PrintStr.setLength(0);
+                    PrintStr.append("Mtu Update done, Mtu:");
+                    PrintStr.append(mtu_size);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 } else {
                     Log.d(TAG, "onMtuChanged failed " + status);
                     PrintStr.setLength(0);
@@ -335,11 +360,12 @@ public class ThroughputStateMachine {
             }
         };
 
-        public void connect(BluetoothDevice device){
+        public void connect(BluetoothDevice device, int initPhy, boolean autoConnect){
             if(BleAppService.bleAdapter!=null) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
-                mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
+                mBluetoothGatt = mDevice.connectGatt(mcontext,
+                                autoConnect, mGattCallbacks,TRANSPORT_LE, initPhy);
             }
         }
 
@@ -413,7 +439,6 @@ public class ThroughputStateMachine {
         public static final int MSG_TA_SM_CONNECTION_UPDATED = 10;
         public static final int MSG_TA_SM_PHY_UPDATED = 11;
         public static final int MSG_TA_SM_PHY_READ_DONE = 12;
-        public static final int MSG_TA_SM_MTU_EXCHANGE_DONE = 13;
         public static final int MSG_TA_SM_CONN_UPDATE = 14;
         public static final int MSG_TA_SM_UNPAIR_DEV = 15;
         public static final int MSG_TA_SM_PHY_UPDATE = 16;
@@ -425,12 +450,17 @@ public class ThroughputStateMachine {
         public static final int MSG_TA_SM_CONNECT_TO_BDADDR = 22;
         public static final int MSG_TA_SM_CANCEL_CONNECT = 23;
 
+        public static final int MSG_TA_SM_DATA_TX_RX_TEST = 24;
+        public static final int MSG_TA_SM_TX_RX_TEST_DONE = 25;
+        public static final int MSG_TA_SM_CONFIGURE_MTU = 26;
+
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
         private TAConnectPending mTAConnectPending;
         private TAConnected mTAConnected;
         private TADataTx mTADataTx;
         private TADataRx mTADataRx;
+        private TADataTxRx mTADataTxRx;
         private TALatencyMeasurement mTALatencyMeasurement;
         private TADisconnect mTADisconnect;
         private Context mContext;
@@ -447,6 +477,7 @@ public class ThroughputStateMachine {
             mTAConnected = new TAConnected();
             mTADataTx = new TADataTx();
             mTADataRx = new TADataRx();
+            mTADataTxRx = new TADataTxRx();
             mTALatencyMeasurement = new TALatencyMeasurement();
             mTADisconnect = new TADisconnect();
 
@@ -455,6 +486,7 @@ public class ThroughputStateMachine {
             addState(mTAConnected);
             addState(mTADataTx);
             addState(mTADataRx);
+            addState(mTADataTxRx);
             addState(mTALatencyMeasurement);
             addState(mTADisconnect);
 
@@ -504,8 +536,8 @@ public class ThroughputStateMachine {
                         }
                         break;
                     case MSG_TA_SM_CONNECT_TO_BDADDR:
-                        String bdAddr = (String) message.obj;
-                        processConnectToBdaddr(bdAddr);
+                        Scan init = (Scan) message.obj;
+                        processConnectToBdaddr(init);
                         break;
                     case MSG_TA_SM_CANCEL_CONNECT:
                         processCancelConnect();
@@ -521,12 +553,13 @@ public class ThroughputStateMachine {
                 return retValue;
             }
 
-            private void processConnectToBdaddr(String bdAddr) {
+            private void processConnectToBdaddr(Scan init) {
                 if(BleAppService.bleAdapter != null) {
-                    Log.i(TAG, "Connect to Address: " + bdAddr);
+                    Log.i(TAG, "Connect to Address: " + init.DeviceAddress);
                     BluetoothDevice remoteDevice =
-                            BleAppService.bleAdapter.getRemoteDevice(bdAddr);
-                    mBleConnect.connect(remoteDevice);
+                                    BleAppService.bleAdapter.getRemoteDevice(init.DeviceAddress);
+                    mBleConnect.connect(remoteDevice, init.initPhy, init.autoConnect);
+                    Log.i(TAG, "processConnectToBdaddr connect pending state");
                     transitionTo(mTAConnectPending);
                 }
             }
@@ -536,7 +569,7 @@ public class ThroughputStateMachine {
                 if(BleAppService.mScannerService.mScanstatus) {
                     BleAppService.mScannerService.stopScan();
                 }
-                mBleConnect.connect(device);
+                mBleConnect.connect(device, BluetoothDevice.PHY_LE_1M, false);
                 transitionTo(mTAConnectPending);
             }
 
@@ -655,6 +688,12 @@ public class ThroughputStateMachine {
                             Log.d(TAG,"PhyUpdateflag");
                         processPhyUpdateReq(phyUpdateObj);
                         break;
+                    case MSG_TA_SM_CONFIGURE_MTU:
+                        int Mtu_Size = (int) message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"MTUUpdateflag");
+                        processMtuUpdateReq(Mtu_Size);
+                        break;
                     case MSG_TA_SM_READ_PHY:
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG,"ReadPhyflag");
@@ -672,6 +711,12 @@ public class ThroughputStateMachine {
                             Log.d(TAG,"DataRxflag");
                         transitionTo(mTADataRx);
                         break;
+                    case MSG_TA_SM_DATA_TX_RX_TEST:
+                        DataTxRxClass = (DataTx)message.obj;
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG,"DataTxRxflag");
+                        transitionTo(mTADataTxRx);
+                        break;
                     case MSG_TA_SM_LATENCY_TEST:
                         LatencyTestClass = (LatencyTest)message.obj;
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
@@ -684,9 +729,13 @@ public class ThroughputStateMachine {
                             Log.d(TAG,"Disconnectflag");
                         transitionTo(mTADisconnect);
                         break;
+                    case MSG_TA_SM_DEV_DISCONNECTED:
+                        PrintStr.setLength(0);
+                        PrintStr.append("Remote disconnected");
+                        SocketServer.sendSocketData(PrintStr.toString());
                     case MSG_TA_SM_BT_ADAPTER_OFF:
                         transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                        Log.i(TAG, "BT Adapter is off/ disconnected");
                         break;
                     case MSG_TA_SM_CONNECTION_UPDATED:
                         Log.d(TAG, "CONNECTION PARAM UPDATED");
@@ -751,6 +800,11 @@ public class ThroughputStateMachine {
                 mBleConnect.mBluetoothGatt.readPhy();
             }
 
+            private void processMtuUpdateReq(int Mtu_size) {
+                Log.i(TAG, "MTU Update");
+                mBleConnect.mBluetoothGatt.requestMtu(Mtu_size);
+            }
+
             private void processPhyUpdateReq(PhyUpdate phyUpdate){
                 Log.i(TAG, "Phy Update");
                 txPhyReq = phyUpdate.txPhy;
@@ -770,9 +824,19 @@ public class ThroughputStateMachine {
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                /* MTU Exchange */
-                if(mBleConnect.mBluetoothGatt.requestMtu(DataTxClass.Mtu_Size)) {
-                    Log.i(TAG, "MTU size requested to max size");
+                 /* Start tx thread */
+                DataTxthread tt = new DataTxthread();
+                Thread t = new Thread(tt);
+                if(!t.isAlive()) {
+                    t.start();
+                    MainActivity.wl.acquire();
+                    MainActivity.wl_acquired = true;
+                    Log.d(TAG,"acquire wakelock");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Data Tx Thread Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Thread is already running");
                 }
             }
 
@@ -809,24 +873,6 @@ public class ThroughputStateMachine {
                             Log.d(TAG, "Data Tx done, state change to connected");
                         transitionTo(mTAConnected);
                         break;
-                    case MSG_TA_SM_MTU_EXCHANGE_DONE:
-                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
-                            Log.d(TAG,"MTU size exchanged");
-                            /* Start tx thread */
-                            DataTxthread tt = new DataTxthread();
-                            Thread t = new Thread(tt);
-                            if(!t.isAlive()) {
-                                t.start();
-                                MainActivity.wl.acquire();
-                                MainActivity.wl_acquired = true;
-                                Log.d(TAG,"acquire wakelock");
-                                PrintStr.setLength(0);
-                                PrintStr.append("Data Tx Thread Started");
-                                SocketServer.sendSocketData(PrintStr.toString());
-                            } else {
-                                Log.i(TAG, "Thread is already running");
-                            }
-                        break;
                     default:
                         return NOT_HANDLED;
                 }
@@ -852,8 +898,8 @@ public class ThroughputStateMachine {
 
                     int mtu_intr_size = DataTxClass.Packet_Size;
                     /* Set the packet size to maximum possible if it exceeds mtu size */
-                    if(mtu_intr_size > (DataTxClass.Mtu_Size - 3)) {
-                        mtu_intr_size = DataTxClass.Mtu_Size - 3;
+                    if(mtu_intr_size > (mtu_size - 3)) {
+                        mtu_intr_size = mtu_size - 3;
                     }
                     char[] str = new char[mtu_intr_size];
                     long length = mtu_intr_size * (DataTxClass.Num_Packets);
@@ -984,15 +1030,25 @@ public class ThroughputStateMachine {
             }
         }
 
-        private class TADataRx extends State {
-            private static final String TAG = "TADataRx";
+        private class TADataTxRx extends State {
+            private static final String TAG = "TADataTxRx";
 
             @Override
             public void enter() {
                 Log.i(TAG, "Enter: " + getCurrentMessage().what);
-                /* MTU Exchange */
-                if(mBleConnect.mBluetoothGatt.requestMtu(DataRxClass.Mtu_Size)) {
-                    Log.i(TAG, "MTU size requested to max size");
+                /* Start tx-rx thread */
+                DataTxRxthread tt = new DataTxRxthread();
+                Thread t = new Thread(tt);
+                if(!t.isAlive()) {
+                    t.start();
+                    MainActivity.wl.acquire();
+                    MainActivity.wl_acquired = true;
+                    Log.d(TAG,"acquire wakelock");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Data Tx Rx Thread Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Thread is already running");
                 }
             }
 
@@ -1016,23 +1072,153 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_UNPAIR_DEV:
                         mBleConnect.unpair();
                         break;
-                    case MSG_TA_SM_MTU_EXCHANGE_DONE:
-                        Log.d(TAG,"MTU size exchanged");
-                        /* start rx thread */
-                        DataRxthread rt = new DataRxthread();
-                        Thread t = new Thread(rt);
-                        if(!t.isAlive()) {
-                            t.start();
-                            MainActivity.wl.acquire();
-                            MainActivity.wl_acquired = true;
-                            Log.d(TAG,"acquire wakelock");
-                            PrintStr.setLength(0);
-                            PrintStr.append("Data Rx Thread Started");
-                            SocketServer.sendSocketData(PrintStr.toString());
+                    case MSG_TA_SM_TX_RX_TEST_DONE:
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        Log.d(TAG,"Release wakelock");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Data Tx Rx done");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Data Tx Rx done, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
+                    default:
+                        return NOT_HANDLED;
+                }
+                return retValue;
+            }
+
+            public class DataTxRxthread implements Runnable {
+
+                @Override
+                public void run() {
+                    Log.i(TAG, "data tx rx thread start");
+                    final UUID UUID_TX_SERVICE = UUID.fromString("0000FF01-0000-1000-8000-00805F9B34FB");
+                    final UUID UUID_TX_CHAR = UUID.fromString("0000FF05-0000-1000-8000-00805F9B34FB");
+                    final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
+
+                    //wait_for_gatt_service_discovery();
+                    /* wait for 500ms for DLE event to be received */
+                   /*  try {
+                        Thread.sleep(500);
+                    } catch(InterruptedException e){
+                        Log.e(TAG, "error in thread sleep");
+                    } */
+
+                    int mtu_intr_size = 244;
+                    char[] str = new char[mtu_size];
+                    BluetoothGattService mService =
+                                            mBleConnect.mBluetoothGatt.getService(UUID_TX_SERVICE);
+                    if (mService != null) {
+                        BluetoothGattCharacteristic mCharacteristic =
+                                                        mService.getCharacteristic(UUID_TX_CHAR);
+                        if (mCharacteristic != null) {
+                            mCharacteristic.setWriteType(
+                                            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                            //enable cccd to send notification
+                            mBleConnect.mBluetoothGatt.setCharacteristicNotification(
+                                                                    mCharacteristic, true);
+                            BluetoothGattDescriptor descriptor =
+                                                            mCharacteristic.getDescriptor(UUID_CCCD);
+
+                            if (descriptor != null) {
+                                descriptor.setValue(
+                                            BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                                mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                                synchronized (write_mutex) {
+                                    // Wait for write response
+                                    if(!write_wait_signalled){
+                                        try {
+                                            write_mutex.wait();
+                                        } catch (InterruptedException e) {
+                                            Log.d(TAG, "Interrupted while waiting");
+                                        }
+                                    }
+                                    write_wait_signalled = false;
+                                }
+                            } else {
+                                Log.e(TAG, "Descriptor not found");
+                            }
+
+                             /* Filling the array with data */
+                            Arrays.fill(tx_rx_str,0, tx_rx_mtu_intr_size-1,(char)'a');
+
+                            for (long i = 1; i <= (DataTxRxClass.Num_Packets) ; i++) {
+                                /*Max packet size that can be sent using
+                                 write without response is MTU-3 Bytes*/
+                                mCharacteristic.setValue(String.valueOf(str));
+                                mBleConnect.mBluetoothGatt.writeCharacteristic(
+                                                                    mCharacteristic);
+                                synchronized (write_mutex) {
+                                    // Wait for write response
+                                    if(!write_wait_signalled) {
+                                        try {
+                                            write_mutex.wait();
+                                        } catch (InterruptedException e) {
+                                            Log.d(TAG, "Interrupted while waiting");
+                                        }
+                                    }
+                                    write_wait_signalled = false;
+                                }
+                            }
+
+                            /* Signal SM that TX Test is done*/
+                            Message msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_TX_RX_TEST_DONE,null);
+                            mStateMachine.sendMessage(msg);
                         } else {
-                            Log.i(TAG, "Thread is already running");
+                            Log.e(TAG, "Characteristic is null!");
                         }
-                       break;
+                    } else {
+                        Log.d(TAG, "Service with UUID not found");
+                    }
+                }
+            }
+        }
+
+        private class TADataRx extends State {
+            private static final String TAG = "TADataRx";
+
+            @Override
+            public void enter() {
+                Log.i(TAG, "Enter: " + getCurrentMessage().what);
+                /* start rx thread */
+                DataRxthread rt = new DataRxthread();
+                Thread t = new Thread(rt);
+                if(!t.isAlive()) {
+                    t.start();
+                    MainActivity.wl.acquire();
+                    MainActivity.wl_acquired = true;
+                    Log.d(TAG,"acquire wakelock");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Data Rx Thread Started");
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    Log.i(TAG, "Thread is already running");
+                }
+            }
+
+            @Override
+            public void exit() {
+                Log.i(TAG, "Exit: " + getCurrentMessage().what);
+            }
+
+            @Override
+            public boolean processMessage(Message message) {
+                Log.i(TAG, "processMessage: " + message.what);
+                boolean retValue = HANDLED;
+                switch (message.what) {
+                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                        transitionTo(mTAIdle);
+                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                    case MSG_TA_SM_DISCONNECT:
+                        transitionTo(mTADisconnect);
+                        break;
+                    case MSG_TA_SM_UNPAIR_DEV:
+                        mBleConnect.unpair();
+                        break;
                     case MSG_TA_SM_RX_TEST_DONE:
                         MainActivity.wl.release();
                         MainActivity.wl_acquired = false;
@@ -1060,8 +1246,8 @@ public class ThroughputStateMachine {
                     final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
                     int rx_data_size = 244;
                     /* Set the packet size to maximum possible if it exceeds mtu size */
-                    if(rx_data_size > (DataRxClass.Mtu_Size - 3)) {
-                        rx_data_size = DataRxClass.Mtu_Size - 3;
+                    if(rx_data_size > (mtu_size - 3)) {
+                        rx_data_size = mtu_size - 3;
                     }
                     wait_for_gatt_service_discovery();
                     //battery service and characteristic
@@ -1169,6 +1355,7 @@ public class ThroughputStateMachine {
                             rx_start_time_stamp = 0;
                             rx_end_time_stamp = 0;
                             num_of_notifications = 0;
+                            pkt_cnt = 0;
                             /* Signal SM that RX Test is done*/
                             Message msg = mStateMachine.obtainMessage(
                             mStateMachine.MSG_TA_SM_RX_TEST_DONE,Float.toString(rxTputk));

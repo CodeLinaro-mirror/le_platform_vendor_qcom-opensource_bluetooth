@@ -84,6 +84,7 @@ public class GattServer{
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
+    public static int mtu_size = 23;
     StringBuilder PrintStr = new StringBuilder();
 
     public GattServer(Context mcontext) {
@@ -206,8 +207,23 @@ public class GattServer{
             public void onCharacteristicReadRequest(BluetoothDevice device, int requestId,
                                        int offset, BluetoothGattCharacteristic characteristic) {
                 Log.d(TAG, "sendResponse() - device: " + device.getAddress());
-                mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
-                                                                 0, characteristic.getValue());
+                if(offset + mtu_size < characteristic.getValue().length) {
+                   Log.d(TAG, "offset index" + offset);
+                   Log.d(TAG,"data length = " +
+                              new String(Arrays.copyOfRange(
+                              characteristic.getValue(),offset,offset+mtu_size-1)).length());
+                   Log.d(TAG,"data values is = " +
+                              new String(Arrays.copyOfRange(
+                                       characteristic.getValue(),offset,offset+mtu_size-1)));
+                   mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                      0, Arrays.copyOfRange(characteristic.getValue(),offset,offset+mtu_size-1));
+                }
+                else {
+                    Log.d(TAG, "offset val in else" + offset);
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                    0, Arrays.copyOfRange(characteristic.getValue(),offset,
+                    characteristic.getValue().length));
+                }
             }
 
             @Override
@@ -322,6 +338,7 @@ public class GattServer{
                         BluetoothGattDescriptor descriptor,boolean preparedWrite,
                         boolean responseNeeded, int offset, byte[] value) {
                Log.d(TAG, "onDescriptorWriteRequest" + device.getAddress());
+               descriptor.setValue(value);
                if(responseNeeded) {
                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
                                                                 GATT_SUCCESS, 0, value);
@@ -363,6 +380,49 @@ public class GattServer{
                            }
                        }
                    }
+                }
+            }
+
+            @Override
+            public void onMtuChanged(BluetoothDevice device, int mtu) {
+                Log.d(TAG, "onMtuChanged" + device.getAddress());
+                mtu_size = mtu;
+                PrintStr.setLength(0);
+                PrintStr.append("MTU updated to :");
+                PrintStr.append(mtu);
+                PrintStr.append(" BDAddress:");
+                PrintStr.append(device.getAddress());
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+
+            @Override
+            public void onConnectionUpdated(BluetoothDevice device, int interval, int latency,
+            int timeout,int status) {
+                if(status == GATT_SUCCESS) {
+                    Log.d(TAG, "onConnectionUpdated" + device.getAddress());
+                    PrintStr.setLength(0);
+                    PrintStr.append("ConnectionUpdated for BDAddress:");
+                    PrintStr.append(device.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("Connection update failed with status: " + status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
+
+            @Override
+            public void onNotificationSent(BluetoothDevice device, int status) {
+                if(status == GATT_SUCCESS) {
+                    Log.d(TAG, "Notificationsent" + device.getAddress());
+                    PrintStr.setLength(0);
+                    PrintStr.append("NotificationSent for BDAddress:");
+                    PrintStr.append(device.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("Notificationsent failed with status: " + status);
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
         };

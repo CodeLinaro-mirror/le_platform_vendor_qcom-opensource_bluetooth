@@ -178,6 +178,11 @@ public class AdvertiserEntity {
                 msg = BleAppService.msghandler.obtainMessage(
                         BleAppService.MSG_MA_BLE_PERIODIC_ADV_PARAM_UPDATED_EVENT, Integer.toString(getAdv_id()));
                 BleAppService.msghandler.sendMessage(msg);
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("onPeriodicAdvertisingParametersUpdated Success");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
             }else {
                 StringBuilder PrintStr = new StringBuilder();
                 PrintStr.setLength(0);
@@ -213,6 +218,11 @@ public class AdvertiserEntity {
                 msg = BleAppService.msghandler.obtainMessage(
                         BleAppService.MSG_MA_BLE_PERIODIC_ADV_ENABLED_EVENT, Integer.toString(getAdv_id()));
                 BleAppService.msghandler.sendMessage(msg);
+                StringBuilder PrintStr = new StringBuilder();
+                PrintStr.setLength(0);
+                PrintStr.append("onPeriodicAdvertisingEnabled Success");
+                PrintStr.append(status);
+                SocketServer.sendSocketData(PrintStr.toString());
             }else {
                 StringBuilder PrintStr = new StringBuilder();
                 PrintStr.setLength(0);
@@ -470,9 +480,6 @@ public class AdvertiserEntity {
            Log.e(TAG,"SetScanResponseData failed, adv_id : "+ adv_id);
            return status;
         }
-        mAdvData = null;
-        mScanResponseData = null;
-        mPeriodicData = null;
         try {
             if(adv_info.Legacy){
                 mAdvertiser.startAdvertising(mAdvSettings,mAdvData,mAdvCallback);

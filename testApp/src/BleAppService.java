@@ -146,12 +146,17 @@ public class BleAppService extends Service {
     public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 10;
     public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 11;
     public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 12;
-    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 13;
+    public static final int MSG_GC_START_BLE_GATT_EXECUTE_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 13;
     public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 14;
     public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 15;
     public static final int MSG_GC_BLE_GATT_REQ_CONN_PRIORITY = MSG_MA_MAX_ACTION_VALUE + 16;
     public static final int MSG_GC_START_BLE_CONNECT_TO_BDADDR = MSG_MA_MAX_ACTION_VALUE + 17;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_CONNECT_TO_BDADDR;
+    public static final int MSG_GC_START_BREDR_DISC = MSG_MA_MAX_ACTION_VALUE + 18;
+    public static final int MSG_GC_READ_REMOTE_RSSI = MSG_MA_MAX_ACTION_VALUE + 19;
+    public static final int MSG_GC_READ_CHAR_UUID = MSG_MA_MAX_ACTION_VALUE + 20;
+    public static final int MSG_GC_DISC_SRVC_UUID = MSG_MA_MAX_ACTION_VALUE + 21;
+    public static final int MSG_GC_START_BLE_GATT_UNREG = MSG_MA_MAX_ACTION_VALUE + 22;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_GATT_UNREG;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -166,7 +171,10 @@ public class BleAppService extends Service {
     public static final int MSG_SM_START_BLE_GATT_DISC = MSG_GC_MAX_ACTION_VALUE + 10;
     public static final int MSG_SM_BLE_CONNECT_TO_BDADDR = MSG_GC_MAX_ACTION_VALUE + 11;
     public static final int MSG_SM_BLE_GATT_CANCEL_CONNECT = MSG_GC_MAX_ACTION_VALUE + 12;
-    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_BLE_GATT_CANCEL_CONNECT;
+    public static final int MSG_SM_START_REQ_CONN_PRIORITY = MSG_GC_MAX_ACTION_VALUE + 13;
+    public static final int MSG_SM_START_BLE_TX_RX_TEST = MSG_GC_MAX_ACTION_VALUE + 14;
+    public static final int MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE = MSG_GC_MAX_ACTION_VALUE + 15;
+    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE;
 
     /* GATT Server Actions */
     public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
@@ -489,6 +497,8 @@ public class BleAppService extends Service {
             int status;
             ReadWriteOp RdWrClass;
             Scan scnObj;
+            Scan initObj;
+            int Mtu_Size;
             AddServices AddServ;
             PhyUpdate phyUpdateObj;
             ConnUpdate ConnUpdateObj;
@@ -647,9 +657,32 @@ public class BleAppService extends Service {
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_CONNECT_TO_BDADDR:
+                    initObj = (Scan) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_CONNECT_TO_BDADDR, initObj);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_START_BREDR_DISC:
                     bdAddr = (String) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_CONNECT_TO_BDADDR, bdAddr);
+                              mgattclient.MSG_START_BREDR_DISC, bdAddr);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_READ_REMOTE_RSSI:
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_READ_REMOTE_RSSI, null);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_READ_CHAR_UUID:
+                    RdWrClass = (ReadWriteOp) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_READ_CHAR_UUID, RdWrClass);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_DISC_SRVC_UUID:
+                    RdWrClass = (ReadWriteOp) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_DISC_SRVC_UUID, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_CANCEL_CONNECT:
@@ -670,7 +703,7 @@ public class BleAppService extends Service {
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE:
-                    int Mtu_Size = (int) message.obj;
+                    Mtu_Size = (int) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                           mgattclient.MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE, Mtu_Size);
                     mgattclient.mGattClientHandler.sendMessage(msg);
@@ -698,12 +731,14 @@ public class BleAppService extends Service {
                     break;
                 case MSG_GC_START_BLE_GATT_WRITE_READ_CHAR:
                     RdWrClass = (ReadWriteOp) message.obj;
+                    Log.d(TAG, "MSG_GC_START_BLE_GATT_WRITE_READ_CHAR value = " + RdWrClass.Value);
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                                         mgattclient.MSG_START_BLE_GATT_WRITE_READ_CHAR, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_WRITE_READ_DESC:
                     RdWrClass = (ReadWriteOp) message.obj;
+                    Log.d(TAG, "MSG_GC_START_BLE_GATT_WRITE_READ_DESC value = " + RdWrClass.Value);
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                                         mgattclient.MSG_START_BLE_GATT_WRITE_READ_DESC, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
@@ -726,11 +761,29 @@ public class BleAppService extends Service {
                           mgattclient.MSG_START_BLE_GATT_RELIABLE_WRITE, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
-                case MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE:
+                case MSG_GC_START_BLE_GATT_EXECUTE_ABORT_RELIABLE_WRITE:
+                    int operation = (int) message.obj;
+                    if(operation == 1) {
+                        msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_GATT_EXECUTE_WRITE, null);
+                        mgattclient.mGattClientHandler.sendMessage(msg);
+                    } else {
+                        msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
+                        mgattclient.mGattClientHandler.sendMessage(msg);
+                    }
+                    break;
+                case MSG_GC_START_BLE_GATT_DISC:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE, null);
+                          mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
+                case MSG_GC_START_BLE_GATT_UNREG:
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_GATT_UNREG, null);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                
                 case MSG_GC_START_BLE_GATT_DISC:
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                           mgattclient.MSG_START_BLE_GATT_DISCONNECT, null);
@@ -744,9 +797,9 @@ public class BleAppService extends Service {
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 case MSG_SM_BLE_CONNECT_TO_BDADDR:
-                    bdAddr = (String) message.obj;
+                    initObj = (Scan) message.obj;
                     msg = throughputSMClass.mStateMachine.obtainMessage(
-                              throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT_TO_BDADDR, bdAddr);
+                              throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT_TO_BDADDR, initObj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 case MSG_SM_BLE_GATT_CANCEL_CONNECT:
@@ -760,10 +813,26 @@ public class BleAppService extends Service {
                     throughputSMClass.mStateMachine.MSG_TA_SM_CONN_UPDATE, ConnUpdateObj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
+                case MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_CONFIGURE_MTU, message.obj);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
                 case MSG_SM_START_BLE_PHY_UPDATE:
                     phyUpdateObj = (PhyUpdate) message.obj;
                     msg = throughputSMClass.mStateMachine.obtainMessage(
                     throughputSMClass.mStateMachine.MSG_TA_SM_PHY_UPDATE, phyUpdateObj);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_SM_START_BLE_TX_RX_TEST:
+                    DataTx DataTxRxClass = (DataTx) message.obj;
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                          throughputSMClass.mStateMachine.MSG_TA_SM_DATA_TX_RX_TEST, DataTxRxClass);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_SM_START_REQ_CONN_PRIORITY:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                    throughputSMClass.mStateMachine.MSG_TA_SM_CONN_UPDATE, message.obj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 case MSG_SM_START_BLE_READ_PHY:
