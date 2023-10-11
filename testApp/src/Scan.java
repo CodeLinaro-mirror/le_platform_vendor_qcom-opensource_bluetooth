@@ -48,4 +48,7 @@ public class Scan {
     int ReportDelay = 0;
     int ScanPhy = 1;
     boolean legacy = true;
+    int initPhy = 1;
+    boolean autoConnect = false;
+    int transport = 2;
 }

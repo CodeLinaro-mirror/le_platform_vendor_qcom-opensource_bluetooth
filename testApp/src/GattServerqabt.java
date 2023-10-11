@@ -67,8 +67,11 @@ class GattServer{
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
+    public Map<BluetoothGattCharacteristic,String> mMap_char;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_indicate;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_notify;
+    public List<BluetoothGattService> services;
+    public BluetoothDevice PrepWriteDevice;
     private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
@@ -77,25 +80,26 @@ class GattServer{
     public static final int MSG_START_BLE_GET_SERVICES = 3;
     public static final int MSG_START_BLE_PHY_UPDATE = 4;
     public static final int MSG_START_BLE_READ_PHY = 5;
-    public static final int MSG_START_GET_CONNECTED_DEVICES = 6;
-    public static final int MSG_START_BLE_PAIR = 7;
-    public static final int MSG_START_BLE_DISCONNECT = 8;
-    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DISCONNECT;
+    public static final int MSG_START_BLE_DISCONNECT = 6;
+    public static final int MSG_START_BLE_REGISTER = 7;
+    public static final int MSG_START_BLE_DEREGISTER = 8;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DEREGISTER;
 
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
+    public static int mtu_size = 23;
     StringBuilder PrintStr = new StringBuilder();
 
     public GattServer(Context mcontext) {
         this.mcontext = mcontext;
         /* Initialize classes */
         mgattServer = new BleGattServer(mcontext);
-        mgattServer.startServer();
         connectedDevices = MainActivity.mBluetoothManager.getConnectedDevices(
                             BluetoothProfile.GATT_SERVER);
         mMap_indicate = new HashMap<>();
         mMap_notify = new HashMap<>();
+        mMap_char = new HashMap<>();
         /* Start Message handler */
         HandlerThread thread = new HandlerThread("GattServerHandler");
         thread.start();
@@ -107,9 +111,10 @@ class GattServer{
     /* Connection Class */
     public class BleGattServer {
         private static final String TAG = "BleGattServer";
-        private BluetoothGattServer mBluetoothGattserver;
+        private BluetoothGattServer mBluetoothGattserver = null;
         private Context context;
         private int GATT_SUCCESS = 0x00;
+        private int GATT_FAILURE = 0x101;
         Message msg;
 
         public BleGattServer(Context context) {
@@ -124,7 +129,7 @@ class GattServer{
                     Log.d(TAG, "onServiceAdded() - handle=" + service.getInstanceId()
                                       + " uuid=" + service.getUuid() + " status=" + status);
                     PrintStr.setLength(0);
-                    PrintStr.append("service added with UUID :");
+                    PrintStr.append("service Added/Modified with UUID :");
                     PrintStr.append(service.getUuid().toString());
                     SocketServer.sendSocketData(PrintStr.toString());
                 } else {
@@ -206,8 +211,23 @@ class GattServer{
             public void onCharacteristicReadRequest(BluetoothDevice device, int requestId,
                                        int offset, BluetoothGattCharacteristic characteristic) {
                 Log.d(TAG, "sendResponse() - device: " + device.getAddress());
-                mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
-                                                                 0, characteristic.getValue());
+                if(offset + mtu_size < characteristic.getValue().length) {
+                   Log.d(TAG, "offset index" + offset);
+                   Log.d(TAG,"data length = " +
+                              new String(Arrays.copyOfRange(
+                              characteristic.getValue(),offset,offset+mtu_size-1)).length());
+                   Log.d(TAG,"data values is = " +
+                              new String(Arrays.copyOfRange(
+                                       characteristic.getValue(),offset,offset+mtu_size-1)));
+                   mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                      0, Arrays.copyOfRange(characteristic.getValue(),offset,offset+mtu_size-1));
+                }
+                else {
+                    Log.d(TAG, "offset val in else" + offset);
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                    0, Arrays.copyOfRange(characteristic.getValue(),offset,
+                    characteristic.getValue().length));
+                }
             }
 
             @Override
@@ -215,6 +235,27 @@ class GattServer{
                          BluetoothGattCharacteristic characteristic, boolean preparedWrite,
                          boolean responseNeeded, int offset, byte[] value) {
                 Log.d(TAG, "onCharacteristicWriteRequest from device " + device.getName());
+                if (preparedWrite) {
+                    if (PrepWriteDevice == null ||
+                        device.getAddress().equalsIgnoreCase(PrepWriteDevice.getAddress())) {
+                        if (responseNeeded)
+                            mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                 GATT_SUCCESS, 0, value);
+                        PrepWriteDevice = device;
+                        if (mMap_char.containsKey(characteristic)){
+                            String new_value = (String)mMap_char.get(
+                                 characteristic)+ new String(value);
+                            mMap_char.replace(characteristic,new_value);
+                        } else {
+                            mMap_char.put(characteristic , new String(value));
+                        }
+                    } else {
+                          if (responseNeeded)
+                            mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                 GATT_FAILURE, 0, value);
+                    }
+                    return;
+                }
                 characteristic.setValue(value);
                 if (responseNeeded) {
                     mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
@@ -245,6 +286,50 @@ class GattServer{
             }
 
             @Override
+            public void onExecuteWrite(BluetoothDevice device, int requestId, boolean execute) {
+                Log.d(TAG, "onExecuteWrite from device " + device.getAddress());
+                if ( device.getAddress().equalsIgnoreCase(PrepWriteDevice.getAddress())) {
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
+                                                                        GATT_SUCCESS,0,null);
+                    for (BluetoothGattCharacteristic characteristic : mMap_char.keySet()) {
+                        characteristic.setValue(((String)mMap_char.get(
+                                 characteristic)).getBytes());
+                        if ((characteristic.getProperties() &
+                                        BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+                            for(BluetoothDevice devs:mMap_notify.keySet()) {
+                                List<BluetoothGattCharacteristic> lList_notify =
+                                                                     mMap_notify.get(devs);
+                                if(lList_notify.contains(characteristic)) {
+                                    Log.d(TAG, "notify_sendresponse " + devs.getAddress());
+                                    mgattServer.mBluetoothGattserver.
+                                    notifyCharacteristicChanged(
+                                    devs, characteristic, false);
+                                }
+                            }
+                        }
+                        if ((characteristic.getProperties() &
+                                         BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0) {
+                            for(BluetoothDevice devs:mMap_indicate.keySet()) {
+                                List<BluetoothGattCharacteristic> lList_indicate =
+                                                                      mMap_indicate.get(devs);
+                                if(lList_indicate.contains(characteristic)) {
+                                    Log.d(TAG, "indicate_sendresponse " + devs.getAddress());
+                                    mgattServer.mBluetoothGattserver.
+                                    notifyCharacteristicChanged(
+                                    devs, characteristic, true);
+                                }
+                            }
+                        }
+                    }
+                    PrepWriteDevice = null;
+                    mMap_char.clear();
+                } else {
+                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_FAILURE,
+                                                                      0,null);
+                }
+            }
+
+            @Override
             public void onDescriptorReadRequest(BluetoothDevice device, int requestId,
                                                 int offset, BluetoothGattDescriptor descriptor) {
                 Log.d(TAG, "onDescriptorReadRequest from device " + device.getAddress());
@@ -257,6 +342,7 @@ class GattServer{
                         BluetoothGattDescriptor descriptor,boolean preparedWrite,
                         boolean responseNeeded, int offset, byte[] value) {
                Log.d(TAG, "onDescriptorWriteRequest" + device.getAddress());
+               descriptor.setValue(value);
                if(responseNeeded) {
                    mgattServer.mBluetoothGattserver.sendResponse(device, requestId,
                                                                 GATT_SUCCESS, 0, value);
@@ -300,12 +386,34 @@ class GattServer{
                    }
                 }
             }
-        };
 
-        public void startServer() {
-            mBluetoothGattserver = MainActivity.mBluetoothManager.openGattServer(mcontext,
-                    mGattServerCallbacks);
-        }
+            @Override
+            public void onMtuChanged(BluetoothDevice device, int mtu) {
+                Log.d(TAG, "onMtuChanged" + device.getAddress());
+                mtu_size = mtu;
+                PrintStr.setLength(0);
+                PrintStr.append("MTU updated to :");
+                PrintStr.append(mtu);
+                PrintStr.append(" BDAddress:");
+                PrintStr.append(device.getAddress());
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+
+            @Override
+            public void onNotificationSent(BluetoothDevice device, int status) {
+                if(status == GATT_SUCCESS) {
+                    Log.d(TAG, "Notificationsent" + device.getAddress());
+                    PrintStr.setLength(0);
+                    PrintStr.append("NotificationSent for BDAddress:");
+                    PrintStr.append(device.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
+                } else {
+                    PrintStr.setLength(0);
+                    PrintStr.append("Notificationsent failed with status: " + status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
+        };
     }
 
     public class GattServerMessageHandler extends Handler {
@@ -352,12 +460,13 @@ class GattServer{
                     String mdeviceAddr = (String) msg.obj;
                     processReadPhyReq(mdeviceAddr);
                     break;
-                case MSG_START_GET_CONNECTED_DEVICES:
-                    processGetConnectedDevices();
+                case MSG_START_BLE_REGISTER:
+                    startServer();
+                    SocketServer.sendSocketData("Server registered!");
                     break;
-                case MSG_START_BLE_PAIR:
-                    String remoteDevice = (String) msg.obj;
-                    processStartPair(remoteDevice);
+                case MSG_START_BLE_DEREGISTER:
+                    stopServer();
+                    SocketServer.sendSocketData("Server deregistered!");
                     break;
                 case MSG_START_BLE_DISCONNECT:
                     String bdAddr = (String) msg.obj;
@@ -417,14 +526,13 @@ class GattServer{
                     Log.d(TAG, AddServ.lserviceUUID.toString());
                     Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
                     mgattServer.mBluetoothGattserver.addService(lService);
-              } else {
-                    PrintStr.setLength(0);
-                    String interal = AddServ.lserviceUUID.toString();
-                    PrintStr.append("service modified with uuid:");
-                    PrintStr.append(interal);
-                    SocketServer.sendSocketData(PrintStr.toString());
-              }
-          } else {
+                } else {
+                    mgattServer.mBluetoothGattserver.removeService(lService);
+                    Service_List.remove(AddServ.lserviceUUID.toString().toUpperCase());
+                    mgattServer.mBluetoothGattserver.addService(lService);
+                    Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
+                }
+            } else {
                 PrintStr.setLength(0);
                 PrintStr.append("service was not Added/Modified");
                 SocketServer.sendSocketData(PrintStr.toString());
@@ -479,10 +587,12 @@ class GattServer{
             PrintStr.append("Services UUIDS :");
             SocketServer.sendSocketData(PrintStr.toString());
             PrintStr.setLength(0);
-            for ( String key : Service_List.keySet() ) {
-                    PrintStr.append(key);
-                    PrintStr.append("  ");
-             }
+            services = mgattServer.mBluetoothGattserver.getServices();
+            for (int i = 0; i < services.size(); i++) {
+                Log.d(TAG, services.get(i).getUuid().toString());
+                PrintStr.append(services.get(i).getUuid().toString());
+                PrintStr.append("  ");
+            }
             SocketServer.sendSocketData(PrintStr.toString());
         }
 
@@ -491,40 +601,6 @@ class GattServer{
             BluetoothDevice mdevice = getRemoteDevice(bdAddr);
             if (mdevice != null) {
                 mgattServer.mBluetoothGattserver.readPhy(mdevice);
-            } else {
-                PrintStr.setLength(0);
-                PrintStr.append("Device not in connected list");
-                PrintStr.append(bdAddr);
-                PrintStr.append("  ");
-                SocketServer.sendSocketData(PrintStr.toString());
-            }
-        }
-
-        private void processGetConnectedDevices() {
-             PrintStr.setLength(0);
-             PrintStr.append("Connected Device:");
-             for (int i = 0; i < connectedDevices.size(); i++)  {
-                 Log.i(TAG,connectedDevices.get(i).getAddress());
-                 PrintStr.append(connectedDevices.get(i).getAddress());
-                 PrintStr.append("  ");
-             }
-             SocketServer.sendSocketData(PrintStr.toString());
-        }
-
-        private void processStartPair(String bdAddr) {
-            BluetoothDevice mdevice = getRemoteDevice(bdAddr);
-            if (mdevice != null) {
-                if(mdevice.getBondState() != BluetoothDevice.BOND_BONDED){
-                    Log.i(TAG, "Pairing!");
-                    if(!mdevice.createBond(BluetoothDevice.TRANSPORT_LE)) {
-                        Log.i(TAG, "Couldn't start pairing");
-                        PrintStr.setLength(0);
-                        PrintStr.append("Pairing failed!");
-                        SocketServer.sendSocketData(PrintStr.toString());
-                    }
-                } else {
-                    Log.i(TAG, "Device already bonded");
-                }
             } else {
                 PrintStr.setLength(0);
                 PrintStr.append("Device not in connected list");
@@ -544,6 +620,18 @@ class GattServer{
                 if (remoteDevice != null) {
                     mgattServer.mBluetoothGattserver.cancelConnection(remoteDevice);
                 }
+            }
+        }
+
+        public void startServer() {
+            mgattServer.mBluetoothGattserver  = MainActivity.mBluetoothManager.openGattServer(mcontext,
+                    mgattServer.mGattServerCallbacks);
+        }
+
+        public void stopServer() {
+            if (mgattServer.mBluetoothGattserver != null) {
+                mgattServer.mBluetoothGattserver.close();
+                mgattServer.mBluetoothGattserver = null;
             }
         }
 
