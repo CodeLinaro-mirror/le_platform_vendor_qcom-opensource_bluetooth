@@ -18,18 +18,22 @@
  * limitations under the License.
  */
 
-#include <hardware/hardware.h>
+#include "hardware/hardware.h"
 
-#include <cutils/properties.h>
+#include "osi/include/properties.h"
 
 #include <dlfcn.h>
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
 #include <limits.h>
+#include <unistd.h>
+#include <cstdio>
+#include "include/log.h"
+//#include "properties.h"
 
 #define LOG_TAG "HAL"
-#include <utils/Log.h>
+//#include "osi/include/log.h"
 /** Base path of the hal modules */
 #if defined(__LP64__)
 #ifdef LINUX_ENABLED
@@ -179,21 +183,21 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
 
     /* First try a property specific to the class and possibly instance */
     snprintf(prop_name, sizeof(prop_name), "ro.hardware.%s", name);
-    if (property_get(prop_name, prop, NULL) > 0) {
+    /*if (property_get(prop_name, prop, NULL) > 0) {
         if (hw_module_exists(path, sizeof(path), name, prop) == 0) {
             goto found;
         }
-    }
+    }*/
 
     /* Loop through the configuration variants looking for a module */
-    for (i=0 ; i<HAL_VARIANT_KEYS_COUNT; i++) {
+    /*for (i=0 ; i<HAL_VARIANT_KEYS_COUNT; i++) {
         if (property_get(variant_keys[i], prop, NULL) == 0) {
             continue;
         }
         if (hw_module_exists(path, sizeof(path), name, prop) == 0) {
             goto found;
         }
-    }
+    }*/
 
     /* Nothing found, try the default */
     if (hw_module_exists(path, sizeof(path), name, "default") == 0) {
