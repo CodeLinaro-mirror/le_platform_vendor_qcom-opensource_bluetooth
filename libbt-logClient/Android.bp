@@ -4,7 +4,7 @@ cc_library_shared {
 
     srcs: ["src/bt_vendor_logc.c"],
 
-    include_dirs: ["vendor/qcom/opensource/commonsys/system/bt/include"],
+    header_libs: ["opensource_commonsys_system_bt_all_inc",],
 
     shared_libs: [
         "libcutils",
