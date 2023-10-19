@@ -1,0 +1,26 @@
+android_app {
+    enabled: true,
+    name: "BTProfileTestApp",
+
+    srcs: [
+        "src/**/*.java",
+    ],
+
+    exclude_srcs: [
+        "src/org/codeaurora/bluetooth/btprofiletestapp/services/IMapServiceCallback.java",
+    ],
+
+    static_libs: [
+        "com.android.vcard",
+        "androidx.legacy_legacy-support-v4",
+    ],
+
+    certificate: "platform",
+
+    owner: "qti",
+
+    optimize: {
+        enabled: false,
+    },
+    platform_apis: true,
+}
