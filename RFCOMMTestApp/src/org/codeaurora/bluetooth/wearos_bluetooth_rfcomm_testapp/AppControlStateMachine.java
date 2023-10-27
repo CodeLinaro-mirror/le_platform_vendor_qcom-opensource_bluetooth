@@ -69,6 +69,7 @@ public class AppControlStateMachine extends StateMachine {
     private DisconnectedState mDisconnectedState;
     private GapTestState mGapTestState;
     private ReadyToAcceptConnection mReadyToAcceptConnection;
+    private SppTestState mSppTestState;
 
     public AppControlStateMachine(AppControlService service) {
         super("AppControlStateMachine");
@@ -85,6 +86,7 @@ public class AppControlStateMachine extends StateMachine {
         mDisconnectedState = new DisconnectedState();
         mGapTestState = new GapTestState();
         mReadyToAcceptConnection = new ReadyToAcceptConnection();
+        mSppTestState = new SppTestState();
 
         // Adding States
         addState(mInitState);
@@ -96,6 +98,7 @@ public class AppControlStateMachine extends StateMachine {
         addState(mDisconnectedState);
         addState(mGapTestState);
         addState(mReadyToAcceptConnection);
+        addState(mSppTestState);
 
         // set initial state to Paired state
         Log.d(TAG, "setting initial state as Init state");
@@ -240,6 +243,37 @@ public class AppControlStateMachine extends StateMachine {
                 // SocketServer.mainMenuState = SocketServer.INIT_MENU;
                 // SocketServer.processOutputState = SocketServer.INIT_MENU;
                 // SocketServer.updateSocketClient();
+                break;
+            case Utils.StateMachineMessageConstants.STATE_SPP_CONNECTED:
+                SocketServer.sendSocketData("Spp Connection Successful");
+                Log.d(TAG, "Going to SPP Test state");
+                transitionTo(mSppTestState);
+                String bt_addr_uuid_direction_spp = (String) message.obj;
+                Log.d(TAG, "Going to Connected state :: "+bt_addr_uuid_direction_spp);
+                Rx rx1 = new Rx();
+                rx1.bt_addr_uuid = bt_addr_uuid_direction_spp;
+                rx1.socket = Utils.btAddrUUIDToBTSocketMap.get(bt_addr_uuid_direction_spp);
+                mAppControlService.startRxOperation(rx1);
+                String[] tmp1 = bt_addr_uuid_direction_spp.split(" ",3);
+                if(tmp1 != null){
+                    BluetoothDevice connectedDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(tmp1[0].toUpperCase());
+                    if (connectedDevice != null) {
+                        if (!connectedDevice.getName().isEmpty()) {
+                            SocketServer.sendSocketData("Device "
+                                    + connectedDevice.getName()
+                                    + " is Connected with UUID :: "
+                                    + tmp1[1]);
+                        } else {
+                            SocketServer.sendSocketData("Device "
+                                    + connectedDevice.getAddress()
+                                    + " is Connected with UUID :: "
+                                    + tmp1[1]);
+                        }
+                    } else {
+                        SocketServer.sendSocketData("Device is Connected");
+                    }
+                }
+                Log.d(TAG, "Going to SPP Test state");
                 break;
             }
             return retvalue;
@@ -557,6 +591,35 @@ public class AppControlStateMachine extends StateMachine {
                 break;
             case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
                 break;
+            case Utils.StateMachineMessageConstants.STATE_SPP_CONNECTED:
+                SocketServer.sendSocketData("Spp Connection Successful");
+                Log.d(TAG, "Going to SPP Test state");
+                transitionTo(mSppTestState);
+                String bt_addr_uuid_direction_spp = (String) message.obj;
+                Log.d(TAG, "Going to Connected state :: "+bt_addr_uuid_direction_spp);
+                Rx rx1 = new Rx();
+                rx1.bt_addr_uuid = bt_addr_uuid_direction_spp;
+                rx1.socket = Utils.btAddrUUIDToBTSocketMap.get(bt_addr_uuid_direction_spp);
+                mAppControlService.startRxOperation(rx1);
+                String[] tmp1 = bt_addr_uuid_direction_spp.split(" ",3);
+                if(tmp1 != null){
+                    BluetoothDevice connectedDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(tmp1[0].toUpperCase());
+                    if (connectedDevice != null) {
+                        if (!connectedDevice.getName().isEmpty()) {
+                            SocketServer.sendSocketData("Device "
+                                    + connectedDevice.getName()
+                                    + " is Connected with UUID :: "
+                                    + tmp1[1]);
+                        } else {
+                            SocketServer.sendSocketData("Device "
+                                    + connectedDevice.getAddress()
+                                    + " is Connected with UUID :: "
+                                    + tmp1[1]);
+                        }
+                    } else {
+                        SocketServer.sendSocketData("Device is Connected");
+                    }
+                }
 
             }
 
@@ -564,4 +627,69 @@ public class AppControlStateMachine extends StateMachine {
         }
     }
 
+    private class SppTestState extends State {
+        private static final String TAG = "BluetoothTxRxApp SppTestState";
+
+        @Override
+        public void enter() {
+            Log.d(TAG, "enter()");
+            SocketServer.mainMenuState = SocketServer.BLUETOOTH_SPP_MENU;
+            SocketServer.processOutputState = SocketServer.BLUETOOTH_SPP_MENU;
+            SocketServer.updateSocketClient();
+            Utils.isSppFileTransferOngoing = true;
+        }
+
+        @Override
+        public void exit() {
+            Log.d(TAG, "exit()");
+        }
+
+        @Override
+        public boolean processMessage(Message message) {
+            boolean retvalue = HANDLED;
+            switch (message.what) {
+                case Utils.StateMachineMessageConstants.STATE_START_SEND_FILE:
+                    Utils.isSppFileTransferOngoing=true;
+                    Utils.TxForSpp txParam = (Utils.TxForSpp) message.obj;
+                    mAppControlService.startSendingFile(txParam);
+                    break;
+                case Utils.StateMachineMessageConstants.STATE_END_SEND_FILE:
+                    SocketServer.processOutputState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.mainMenuState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
+                    case Utils.StateMachineMessageConstants.STATE_START_RECEIVE_FILE:
+                    Utils.isSppFileTransferOngoing=true;
+                    SocketServer.sendSocketData("File Receive Started");
+                    break;
+                    case Utils.StateMachineMessageConstants.STATE_END_RECEIVE_FILE:
+                    Rx bt_addr_uuid_direction = (Rx) message.obj;
+                    SocketServer.processOutputState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.mainMenuState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
+                case Utils.StateMachineMessageConstants.STATE_DISCONNECTED:
+                    String disconnectedHandle = (String) message.obj;
+                    Log.d(TAG, "disconnectedHandle " +disconnectedHandle);
+                    mAppControlService.closeConnection(disconnectedHandle);
+                    break; 
+                case Utils.StateMachineMessageConstants.STATE_START_DATA_TX:
+                    Tx txParam1 = (Tx) message.obj;
+                    SocketServer.sendSocketData("Tx Operation Started with chunkSize :" + txParam1.chunkSize);
+                    mAppControlService.startTxOperation(txParam1);
+                    SocketServer.mainMenuState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.processOutputState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
+                case Utils.StateMachineMessageConstants.STATE_START_DATA_RX:
+                    Rx rxParam1 = (Rx) message.obj;
+                    SocketServer.sendSocketData("Rx Operation Started");
+                    SocketServer.mainMenuState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.processOutputState = SocketServer.DEVICE_SELECTION_MENU;
+                    SocketServer.updateSocketClient();
+                    break;
+            }
+            return retvalue;
+        }
+    }
 }
