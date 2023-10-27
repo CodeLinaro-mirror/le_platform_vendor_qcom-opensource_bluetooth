@@ -90,6 +90,11 @@ public class SocketServer {
     //static final int BLUETOOTH_HID_TESTING_MENU = 10;
     static final int CONNECTION_TEST_MENU = 999;
 
+     // SPP
+    static final int BLUETOOTH_SPP_CONNECT_MENU = 15;
+    static final int BLUETOOTH_SPP_TESTING_MENU = 16;
+    static final int BLUETOOTH_SPP_MENU=17;
+
     static int mainMenuState = INIT_MENU;
     static int processOutputState = INIT_MENU;
 
@@ -235,6 +240,7 @@ public class SocketServer {
         case INIT_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     Throughput_Testing\n");
+            sendStr.append("                     Spp_Testing\n");
             sendStr.append("                     GAP\n");
             sendStr.append("                     Close\n");
             sendStr.append("**************************************************************\n");
@@ -250,6 +256,33 @@ public class SocketServer {
             sendStr.append("                     Back\n");
             sendStr.append("**************************************************************\n");
             break;
+
+        case BLUETOOTH_SPP_CONNECT_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Connect (Ex: Connect bdAddress:AA:BB:CC:DD:EE:FF)\n");
+            sendStr.append("                     Incoming_Connection<space><uuid>:<value> (Ex: Incoming_Connection uuid:aaaa:bbbbbb:cccc\n");
+            if(Utils.btAddrUUIDToBTSocketMap.size() != 0)
+                sendStr.append("                     Previous_Connections\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+        break;
+
+        case BLUETOOTH_SPP_TESTING_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Send_File file_name\n");
+            sendStr.append("                     Receive_File\n");
+            sendStr.append("                     Disconnect (Ex: Disconnect)\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+        break;
+
+        case BLUETOOTH_SPP_MENU:
+            sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
+            sendStr.append("                     Spp\n");
+            sendStr.append("                     Back\n");
+            sendStr.append("**************************************************************\n");
+        break;
+
         case CONNECTION_TEST_MENU:
             sendStr.append("\n******************** Bt RFCOMM Test App ********************\n");
             sendStr.append("                     OFF_ON (Ex: OFF_ON count:10)\n");
@@ -328,17 +361,24 @@ public class SocketServer {
         case INIT_MENU:
             try {
                 if (inputString.equals("Throughput_Testing")) {
+                    Utils.isSppFileTransferOngoing = false;
                     Log.d(TAG, "Throughput Menu");
                     mainMenuState = THROUGHPUT_TESTING_MENU;
                     processOutputState = THROUGHPUT_TESTING_MENU;
                     Utils.isThroughputStateMachineUnderProcessing = true;
+                } else if(inputString.equals("Spp_Testing")){
+                    mainMenuState = BLUETOOTH_SPP_CONNECT_MENU;
+                    processOutputState = BLUETOOTH_SPP_CONNECT_MENU;
+                    Utils.isSppConnection = true;
                 } else if (inputString.equals("Close")) {
                     closeReceived = true;
                     mainMenuState = INIT_MENU;
                     processOutputState = SOC_CLOSE_ACK;
                     Utils.isThroughputStateMachineUnderProcessing = false;
+                    Utils.isSppFileTransferOngoing = false;
                 } else if (inputString.equals("GAP")) {
                     Log.d(TAG, "Gap Menu");
+                    Utils.isSppFileTransferOngoing = false;
                     Utils.mAppControlService.startStateMachineForGAP();
                     mainMenuState = CONNECTION_TEST_MENU;
                     processOutputState = CONNECTION_TEST_MENU;
@@ -420,6 +460,7 @@ public class SocketServer {
             {
                 mainMenuState = INIT_MENU;
                 processOutputState = INIT_MENU;
+                Utils.isSppConnection = false;
                 Utils.isThroughputStateMachineUnderProcessing = false;
             }else if(inputString.equals("Previous_Connections")){
                 mainMenuState = DEVICE_SELECTION_MENU;
@@ -427,6 +468,161 @@ public class SocketServer {
             }
             else
             {
+                processOutputState = INVALID_INPUT;
+            }
+            break;
+        case BLUETOOTH_SPP_CONNECT_MENU:
+        tmp = inputString.split(" ", 2);
+        if (tmp.length == 2) {
+            if (tmp[0].equals("Connect"))
+            {
+                Connect connectParam = parser.connectParse(tmp[1],"uuid:00001101-0000-1000-8000-00805f9b34fb");
+                if(connectParam.bdAddress != null)
+                    {
+                        processOutputState = NONE;
+                        if(Utils.mAppControlService != null)
+                        {
+                            Log.d(TAG, "BT Address and UUID Combo is not connected, start Connection");
+                            Utils.mAppControlService.initializeOutgoingConnection(connectParam);
+                        }
+                    }
+                    else
+                    {
+                        processOutputState = INVALID_INPUT;
+                        mainMenuState = INIT_MENU;
+                    }
+            }
+            else if(tmp[0].equals("Incoming_Connection"))
+            {
+                IncomingConnection incomingConnection = parser.incomingConnectionParse(tmp[1]);
+                if(incomingConnection != null)
+                {
+                    processOutputState = NONE;
+                    if(Utils.mAppControlService != null)
+                    {
+                        Utils.mAppControlService.startReadyToAcceptConnection(incomingConnection);
+                    }
+                }
+            }
+            else if(inputString.equals("Back"))
+            {
+                mainMenuState = INIT_MENU;
+                processOutputState = INIT_MENU;
+            }
+            else
+            {
+                processOutputState = INVALID_INPUT;
+                mainMenuState = INIT_MENU;
+            }
+            }else if(inputString.equals("Previous_Connections")){
+                mainMenuState = DEVICE_SELECTION_MENU;
+                processOutputState = DEVICE_SELECTION_MENU;
+            }
+        else if (inputString.equals("Back")) {
+            Utils.isSppConnection = false;
+            Utils.isSppFileTransferOngoing=false;
+            mainMenuState = INIT_MENU;
+            processOutputState = INIT_MENU;
+            Utils.isThroughputStateMachineUnderProcessing = false;
+        } else {
+            processOutputState = INVALID_INPUT;
+        }
+        break;
+
+        case BLUETOOTH_SPP_MENU:
+            if(inputString.equals("Spp")) {
+               mainMenuState = DEVICE_SELECTION_MENU;
+               processOutputState = DEVICE_SELECTION_MENU;
+            }
+            else if(inputString.equals("Back"))
+            {
+                processOutputState = BLUETOOTH_SPP_CONNECT_MENU;
+                mainMenuState = BLUETOOTH_SPP_CONNECT_MENU;
+            }
+            else
+            {
+                processOutputState = INVALID_INPUT;
+            }
+        break;
+
+        case BLUETOOTH_SPP_TESTING_MENU:
+            tmp = inputString.split(" ", 2);
+            if (tmp.length == 2) {
+                if (tmp[0].equals("Send_File")) {
+                    Log.d(TAG, "Inside Send_File :: tmp[1] is :: "+tmp[1]);
+                    Utils.TxForSpp txParamForSpp = new Utils.TxForSpp();
+                    if(tmp[1] != null){
+                        Message message = Message.obtain();
+                        message.what = Utils.StateMachineMessageConstants.STATE_START_SEND_FILE;
+                        if(Utils.currentConnection.size() == 1){
+                            Log.d(TAG,"Utils.currentConnection.size is 1");
+                            Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                            while(itr.hasNext())
+                            {
+                                Map.Entry<String, BluetoothSocket> entry = itr.next();
+                                Log.d(TAG, "Calling sendMessage");
+                                txParamForSpp.bt_addr_uuid = entry.getKey();
+                                txParamForSpp.socket = entry.getValue();
+                                txParamForSpp.fileName = tmp[1];
+                                message.obj = txParamForSpp;
+                                Utils.btAddrUUIDToStateMachineMap.get(entry.getKey()).sendMessage(message);
+                            }
+                        }
+                        else{
+                            Log.d(TAG,"Disconnect Utils.currentConnection.size is not 1. Something went wrong");
+                            sendSocketData("Something went wrong. Please try again\n");
+                        }
+                    }else{
+                        processOutputState = INVALID_INPUT;
+                    }
+                }
+
+            }else if (tmp.length == 1){
+                if(tmp[0].equals("Receive_File")){
+                    Log.d(TAG, "Inside Receive_File");
+                    processOutputState = NONE;
+                    Rx rxFileParam = new Rx();
+                    Message message = Message.obtain();
+                    message.what = Utils.StateMachineMessageConstants.STATE_START_RECEIVE_FILE;
+                    if(Utils.currentConnection.size() == 1){
+                            Log.d(TAG,"Utils.currentConnection.size is 1");
+                            Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                            while(itr.hasNext())
+                            {
+                                Map.Entry<String, BluetoothSocket> entry = itr.next();
+                                rxFileParam.bt_addr_uuid = entry.getKey();
+                                rxFileParam.socket = entry.getValue();
+                                message.obj = rxFileParam;
+                                Utils.btAddrUUIDToStateMachineMap.get(entry.getKey()).sendMessage(message);
+                            }
+                    }else{
+                        Log.d(TAG,"Disconnect Utils.currentConnection.size is not 1. Something went wrong");
+                        sendSocketData("Something went wrong. Please try again\n");
+                    }
+
+                }else if(tmp[0].equals("Disconnect")){
+                    Utils.isSppFileTransferOngoing=false;
+                    processOutputState = NONE;
+                        if(Utils.currentConnection.size() == 1){
+                            Log.d(TAG,"Utils.currentConnection.size is 1");
+                            Iterator<Map.Entry<String, BluetoothSocket>> itr = Utils.currentConnection.entrySet().iterator();
+                            while(itr.hasNext())
+                            {
+                                Map.Entry<String, BluetoothSocket> entry = itr.next();
+                                Utils.mAppControlService.closeConnection(entry.getKey());
+                            }
+                        }else{
+                            Log.d(TAG,"Disconnect Utils.currentConnection.size is not 1. Something went wrong");
+                            sendSocketData("Something went wrong. Please try again\n");
+                        }
+                }else if (tmp[0].equals("Back")) {
+                    mainMenuState = DEVICE_SELECTION_MENU;
+                    processOutputState = DEVICE_SELECTION_MENU;
+                    Utils.isThroughputStateMachineUnderProcessing = false;
+                } else {
+                    processOutputState = INVALID_INPUT;
+                }
+            } else {
                 processOutputState = INVALID_INPUT;
             }
             break;
@@ -520,8 +716,14 @@ public class SocketServer {
                     int srlNum = Integer.parseInt(inputString);
                     if(Utils.srlNumToConnectionMap.get(srlNum) != null){
                         Utils.currentConnection = Utils.srlNumToConnectionMap.get(srlNum);
+                        if(Utils.isSppConnection == true){
+                            mainMenuState = BLUETOOTH_SPP_TESTING_MENU;
+                            processOutputState = BLUETOOTH_SPP_TESTING_MENU;
+                        }
+                        else {
                         mainMenuState = TX_RX_MENU;
                         processOutputState = TX_RX_MENU;
+                        }
                     }else{
                         processOutputState = INVALID_INPUT;
                     }
@@ -529,8 +731,14 @@ public class SocketServer {
                     processOutputState = INVALID_INPUT;
                     if(inputString.equals("Back"))
                     {
-                        mainMenuState = MAIN_MENU;
-                        processOutputState = MAIN_MENU;
+                        if(Utils.isSppConnection == true){
+                            mainMenuState = BLUETOOTH_SPP_MENU;
+                            processOutputState = BLUETOOTH_SPP_MENU;
+                        }
+                        else{
+                            mainMenuState = MAIN_MENU;
+                            processOutputState = MAIN_MENU;
+                        }
                     }else
                     {
                         processOutputState = INVALID_INPUT;

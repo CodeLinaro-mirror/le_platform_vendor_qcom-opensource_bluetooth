@@ -51,8 +51,11 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Build;
+import android.os.Environment;
 import android.util.Log;
 import android.widget.Toast;
+import android.provider.Settings;
+import android.net.Uri;
 
 public class AppControlActivity extends Activity {
 
@@ -63,6 +66,7 @@ public class AppControlActivity extends Activity {
 
     AppControlService appControlService;
     boolean isBound = false;
+    private static final int REQUEST_EXTERNAL_STORAGE = 100;
     String[] permissions = new String[]{"android.permission.BLUETOOTH_CONNECT"};
     int Build_Version_S = 31;
     int Build_Version_O = 26;
@@ -81,6 +85,7 @@ public class AppControlActivity extends Activity {
         }
         mContext = getApplicationContext();
         setContentView(R.layout.activity_main);
+        requestStoragePermissions();
         IntentFilter filter1 = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
         registerReceiver(on_offBroadcastReceiver, filter1);
         socServer = SocketServer.getInstance();
@@ -90,6 +95,13 @@ public class AppControlActivity extends Activity {
         }else{
             this.startService(intent);
         }
+    }
+
+    private void requestStoragePermissions(){
+        requestPermissions(new String[]{
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.MANAGE_EXTERNAL_STORAGE
+        }, REQUEST_EXTERNAL_STORAGE);
     }
 
     @Override
