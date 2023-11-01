@@ -1148,6 +1148,13 @@ public class AppControlService extends Service {
                             }
                         }
                     }
+                    try {
+                        mmServerSocket.close();
+                        break;
+                    }catch (IOException e) {
+                        Log.e(TAG, "AcceptThread: Socket's close() method failed", e);
+                        break;
+                    }
 
 
                 }
