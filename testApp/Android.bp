@@ -2,7 +2,7 @@ android_app {
     name: "wearos_ble_testapp",
 
     srcs: [
-        "src/**/*.java",
+        ":qc_bt_BleTestApp-src",
     ],
 
     certificate: "platform",
@@ -10,5 +10,54 @@ android_app {
     optimize: {
         enabled: false,
     },
+
+    static_libs: [
+        "androidx.legacy_legacy-support-v13",
+        "androidx.appcompat_appcompat",
+    ],
     platform_apis: true,
  }
+soong_config_module_type {
+    name: "qc_bt_BleTestApp",
+    module_type: "filegroup",
+    config_namespace: "qc_bt_BleTestApp",
+    variables: [
+        "qc_bt_enable_disable_BleTestApp",
+    ],
+    properties: ["exclude_srcs","srcs"],
+}
+
+soong_config_string_variable {
+    name: "qc_bt_enable_disable_BleTestApp",
+    values: ["enabled", "disabled"],
+}
+
+qc_bt_BleTestApp {
+    name: "qc_bt_BleTestApp-src",
+    soong_config_variables: {
+        qc_bt_enable_disable_BleTestApp : {
+            disabled : {
+                srcs: [
+                    "src/*.java",
+                ],
+                exclude_srcs: [
+                    "src/GattClient.java",
+                    "src/ThroughputStateMachine.java",
+                    "src/SocketServer.java",
+                    "src/GattServer.java",
+                ],
+            },
+            enabled : {
+                srcs: [
+                    "src/*.java",
+                ],
+                exclude_srcs: [
+                    "src/ThroughputStateMachineqabt.java",
+                    "src/GattClientqabt.java",
+                    "src/SocketServerqabt.java",
+                    "src/GattServerqabt.java",
+                ],
+            },
+        },
+    },
+}

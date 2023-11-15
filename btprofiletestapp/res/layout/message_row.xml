@@ -1,0 +1,193 @@
+<!-- Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions are
+        met:
+            * Redistributions of source code must retain the above copyright
+               notice, this list of conditions and the following disclaimer.
+            * Redistributions in binary form must reproduce the above
+               copyright notice, this list of conditions and the following
+               disclaimer in the documentation and/or other materials provided
+               with the distribution.
+            * Neither the name of The Linux Foundation nor the names of its
+               contributors may be used to endorse or promote products derived
+               from this software without specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+        WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+        MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
+        ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
+        BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+        CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+        SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+        BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+        WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+        OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+        IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp" >
+    <LinearLayout
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:background="#303030"
+         android:orientation="horizontal"
+         style="@style/someSmallPadding" >
+
+        <!-- sender -->
+        <TextView
+            android:id="@+id/message_row_sender_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="5dp"
+            android:typeface="monospace"
+            android:text="@string/map_message_sender_title"/>
+        <TextView
+            android:id="@+id/message_row_sender"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="20dp"
+            android:typeface="monospace"
+            android:ems="16"/>
+    </LinearLayout>
+
+    <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal" >
+
+        <!-- phone number -->
+        <TextView
+            android:id="@+id/message_row_phone_number_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="5dp"
+            android:typeface="monospace"
+            android:text="@string/map_message_phone_number_title"/>
+        <TextView
+            android:id="@+id/message_row_phone_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ems="16"
+            android:typeface="monospace"
+            android:paddingRight="20dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal" >
+
+        <!-- type -->
+        <TextView
+            android:id="@+id/message_row_type_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="5dp"
+            android:typeface="monospace"
+            android:text="@string/map_message_type_title"/>
+        <TextView
+            android:id="@+id/message_row_type"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ems="16"
+            android:typeface="monospace"
+            android:paddingRight="20dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal" >
+
+        <!-- read status -->
+        <TextView
+            android:id="@+id/message_row_flag_read_status_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingRight="5dp"
+            android:typeface="monospace"
+            android:text="@string/map_message_read_status_title" />
+
+        <TextView
+            android:id="@+id/message_row_flag_read_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="3dp"
+            android:typeface="monospace"
+            android:ems="8" />
+
+     </LinearLayout>
+
+     <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal" >
+
+        <!-- handle -->
+        <TextView
+            android:id="@+id/message_row_handle_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="3dp"
+            android:typeface="monospace"
+            android:text="@string/map_message_handle_title" />
+
+        <TextView
+            android:id="@+id/message_row_handle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="3dp"
+            android:typeface="monospace" />
+
+     </LinearLayout>
+
+     <LinearLayout
+           android:layout_width="wrap_content"
+           android:layout_height="wrap_content"
+           android:orientation="horizontal" >
+
+        <Button
+            android:id="@+id/message_row_btn_read"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="3dp"
+            style="@style/textview_normal"
+            android:textSize="15dp"
+            android:text="@string/map_read"/>
+
+        <Button
+            android:id="@+id/message_row_btn_delete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="3dp"
+            android:layout_marginRight="3dp"
+            style="@style/textview_normal"
+            android:textSize="15dp"
+            android:text="@string/map_delete"/>
+
+     </LinearLayout>
+
+    <TextView
+        android:id="@+id/message_row_body_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:typeface="monospace"
+        android:text="@string/map_message_body_title"
+        android:paddingRight="5dp" />
+    <TextView
+        android:id="@+id/message_row_body"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:typeface="monospace" />
+</LinearLayout>
