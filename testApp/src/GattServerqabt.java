@@ -190,7 +190,7 @@ class GattServer{
             @Override
             public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
                 if (status == GATT_SUCCESS) {
-                    Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
+                    Log.i(TAG, "on Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
                     PrintStr.setLength(0);
                     PrintStr.append("Phy Read, BDAddress:");
                     PrintStr.append(device.getAddress());
@@ -402,7 +402,7 @@ class GattServer{
             @Override
             public void onNotificationSent(BluetoothDevice device, int status) {
                 if(status == GATT_SUCCESS) {
-                    Log.d(TAG, "Notificationsent" + device.getAddress());
+                    Log.d(TAG, "onNotificationsent" + device.getAddress());
                     PrintStr.setLength(0);
                     PrintStr.append("NotificationSent for BDAddress:");
                     PrintStr.append(device.getAddress());
