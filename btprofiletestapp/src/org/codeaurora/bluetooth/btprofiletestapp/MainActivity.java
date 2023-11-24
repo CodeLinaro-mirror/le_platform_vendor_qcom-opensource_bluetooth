@@ -163,8 +163,6 @@ public class MainActivity extends MonkeyActivity {
                 mServicesFragment.persistServices();
 
                 if (mDiscoveryInProgress) {
-                    Logger.v(TAG, "Searching MAS instances");
-                    mDevice.sdpSearch(BluetoothUuid.MAS);
                 }
 
             } else if (action.equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)){
