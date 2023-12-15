@@ -308,7 +308,7 @@ class ThroughputStateMachine {
                        notify_wait_signalled = true;
                        notification_mutex.notifyAll();
                    }
-                } else {
+                } else if (charValue.contains("77777")) {
                     /* Keep reading the end time until we receive last notification */
                     rx_end_time_stamp1 = rx_end_time_stamp;
                     rx_end_time_stamp = SystemClock.elapsedRealtime();
@@ -318,6 +318,11 @@ class ThroughputStateMachine {
                     if(ThroughputStateMachine.LOG_LEVEL >= 2) {
                  //       Log.d(TAG, "rx_end_time_stamp:"+rx_end_time_stamp);
                     }
+                } else {
+                    Log.i(TAG,"data integrity failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("DataTxRx: data integrity check failed");
+                    SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
 
@@ -1034,7 +1039,7 @@ class ThroughputStateMachine {
                         MainActivity.wl_acquired = false;
                         Log.d(TAG,"Release wakelock");
                         PrintStr.setLength(0);
-                        PrintStr.append("Data Tx Rx done");
+                        PrintStr.append("Data Tx Rx done - Data Integrity check passed");
                         SocketServer.sendSocketData(PrintStr.toString());
                         if(ThroughputStateMachine.LOG_LEVEL >= 2)
                             Log.d(TAG, "Data Tx Rx done, state change to connected");
@@ -1099,25 +1104,42 @@ class ThroughputStateMachine {
                             }
 
                              /* Filling the array with data */
-                            Arrays.fill(tx_rx_str,0, tx_rx_mtu_intr_size-1,(char)'a');
+                            Arrays.fill(tx_rx_str,0, tx_rx_mtu_intr_size-1,(char)'A');
 
                             for (long i = 1; i <= (DataTxRxClass.Num_Packets) ; i++) {
-                                /*Max packet size that can be sent using
-                                 write without response is MTU-3 Bytes*/
-                                mCharacteristic.setValue(String.valueOf(str));
+                                mCharacteristic.setValue(String.valueOf(tx_rx_str));
                                 mBleConnect.mBluetoothGatt.writeCharacteristic(
                                                                     mCharacteristic);
-                                synchronized (write_mutex) {
+                                synchronized (notification_mutex) {
                                     // Wait for write response
-                                    if(!write_wait_signalled) {
+                                    if(!notify_wait_signalled) {
                                         try {
-                                            write_mutex.wait();
+                                            notification_mutex.wait();
                                         } catch (InterruptedException e) {
                                             Log.d(TAG, "Interrupted while waiting");
                                         }
                                     }
-                                    write_wait_signalled = false;
+                                    notify_wait_signalled = false;
                                 }
+                            }
+
+                            //disable cccd
+                            mBleConnect.mBluetoothGatt.setCharacteristicNotification(
+                                                    mCharacteristic, false);
+                            descriptor.setValue(
+                                       BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+                            mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                            synchronized (write_mutex) {
+                            //Wait for write response
+                                if(!write_wait_signalled){
+                                    try {
+                                        write_mutex.wait();
+                                    }
+                                    catch (InterruptedException e) {
+                                        Log.d(TAG, "Interrupted while waiting");
+                                    }
+                                }
+                                write_wait_signalled = false;
                             }
 
                             /* Signal SM that TX Test is done*/
