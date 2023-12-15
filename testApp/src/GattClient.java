@@ -1678,10 +1678,12 @@ public class GattClient {
         }
         private void processGattLeCocListen (boolean SecureFlag) {
             if (SecureFlag && mSecureAcceptThread == null) {
+                Log.d(TAG, "processGattLeCocListen Secure ");
                 mSecureAcceptThread = new AcceptThread(true);
                 mSecureAcceptThread.start();
             }
             if (!SecureFlag && mInsecureAcceptThread == null) {
+                Log.d(TAG, "processGattLeCocListen InSecure ");
                 mInsecureAcceptThread = new AcceptThread(false);
                 mInsecureAcceptThread.start();
             }
