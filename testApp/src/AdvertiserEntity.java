@@ -408,6 +408,7 @@ public class AdvertiserEntity {
                         .setIncludeTxPower(adv_info.IncludePower)
                         .setInterval(adv_info.PerAdvInterval)
                         .build();
+                Log.d(TAG,"Build Periodic AdvertisingParameters done");
                 return true;
             } else {
                 mPeriodicAdvParams = null;
