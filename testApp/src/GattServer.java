@@ -347,7 +347,8 @@ public class GattServer{
                                             equalsIgnoreCase(CLIENT_CHARACTERISTIC_CONFIG)) {
                    List<BluetoothGattCharacteristic> lList_notify = mMap_notify.get(device);
                    List<BluetoothGattCharacteristic> lList_indicate = mMap_indicate.get(device);
-                   if(value[0] == 0x01) {
+                   if((value[0] == 0x01) || (value[0] == 0x03)){
+                        Log.d(TAG, "onDescriptorWriteRequest, adding dev to list" );
                        if (lList_notify != null) {
                            lList_notify.add(descriptor.getCharacteristic());
                        } else {
