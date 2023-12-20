@@ -69,12 +69,14 @@ public class ThroughputStateMachine {
     public BluetoothDevice mDevice = null;
 
     /* Mutex required for writing characteristics and descriptors */
-    private final Object write_mutex = new Object();
+    private final Object write_char_mutex = new Object();
+    private final Object write_desc_mutex = new Object();
     private final Object service_discovery_mutex = new Object();
     private final Object notification_mutex = new Object();
 
     public boolean gatt_discovery_done = false;
-    public static boolean write_wait_signalled = false;
+    public static boolean write_char_wait_signalled = false;
+    public static boolean write_desc_wait_signalled = false;
     public static boolean notify_wait_signalled = false;
 
     /* Variable required for calculating DataRx Tput*/
@@ -260,9 +262,9 @@ public class ThroughputStateMachine {
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
                 /* Release write mutex */
-                synchronized (write_mutex) {
-                    write_wait_signalled = true;
-                    write_mutex.notify();
+                synchronized (write_char_mutex) {
+                    write_char_wait_signalled = true;
+                    write_char_mutex.notify();
                 }
              }
 
@@ -278,9 +280,9 @@ public class ThroughputStateMachine {
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
                 /* Release write mutex */
-                synchronized (write_mutex) {
-                    write_wait_signalled = true;
-                    write_mutex.notifyAll();
+                synchronized (write_desc_mutex) {
+                    write_desc_wait_signalled = true;
+                    write_desc_mutex.notifyAll();
                     Log.d(TAG, "Mutex unlock");
                 }
              }
@@ -868,6 +870,7 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_TX_TEST_DONE:
                         MainActivity.wl.release();
                         MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
                         Log.d(TAG,"Release wakelock");
                         PrintStr.setLength(0);
                         String tput = (String) message.obj;
@@ -934,16 +937,16 @@ public class ThroughputStateMachine {
                                     mCharacteristic.setValue(String.valueOf(str));
                                     mBleConnect.mBluetoothGatt.writeCharacteristic(
                                                                     mCharacteristic);
-                                    synchronized (write_mutex) {
+                                    synchronized (write_char_mutex) {
                                         // Wait for write response
-                                        if(!write_wait_signalled){
+                                        if(!write_char_wait_signalled){
                                             try {
-                                                write_mutex.wait();
+                                                write_char_mutex.wait();
                                             } catch (InterruptedException e) {
                                                 Log.d(TAG, "Interrupted while waiting");
                                             }
                                         }
-                                        write_wait_signalled = false;
+                                        write_char_wait_signalled = false;
                                     }
                                 }
                                 /* If system property is set to false or is not set,
@@ -963,16 +966,16 @@ public class ThroughputStateMachine {
                                         mCharacteristic.setValue(String.valueOf(str));
                                         mBleConnect.mBluetoothGatt.writeCharacteristic(
                                                                             mCharacteristic);
-                                        synchronized (write_mutex) {
+                                        synchronized (write_char_mutex) {
                                             // Wait for write response
-                                            if(!write_wait_signalled) {
+                                            if(!write_char_wait_signalled) {
                                                 try {
-                                                    write_mutex.wait();
+                                                    write_char_mutex.wait();
                                                 } catch (InterruptedException e) {
                                                     Log.d(TAG, "Interrupted while waiting");
                                                 }
                                             }
-                                            write_wait_signalled = false;
+                                            write_char_wait_signalled = false;
                                         }
                                      }
                                      /* Write the last packet with response */
@@ -983,16 +986,16 @@ public class ThroughputStateMachine {
                                                                     mCharacteristic);
                                     long tx_intr_time_stamp = SystemClock.elapsedRealtime();
                                     Log.d(TAG, "Intr time stamp:"+tx_intr_time_stamp);
-                                    synchronized (write_mutex) {
+                                    synchronized (write_char_mutex) {
                                         // Wait for write response
-                                        if(!write_wait_signalled){
+                                        if(!write_char_wait_signalled){
                                             try {
-                                                write_mutex.wait();
+                                                write_char_mutex.wait();
                                             } catch (InterruptedException e) {
                                                 Log.d(TAG, "Interrupted while waiting");
                                             }
                                         }
-                                        write_wait_signalled = false;
+                                        write_char_wait_signalled = false;
                                     }
                                     long tx_end_time_stamp = SystemClock.elapsedRealtime();
                                     if(ThroughputStateMachine.LOG_LEVEL >= 2) {
@@ -1080,6 +1083,8 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_TX_RX_TEST_DONE:
                         MainActivity.wl.release();
                         MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
+                        notify_wait_signalled = false;
                         Log.d(TAG,"Release wakelock");
                         PrintStr.setLength(0);
                         PrintStr.append("Data Tx Rx done - Data Integrity check passed");
@@ -1103,14 +1108,6 @@ public class ThroughputStateMachine {
                     final UUID UUID_TX_CHAR = UUID.fromString("0000FF05-0000-1000-8000-00805F9B34FB");
                     final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
 
-                    //wait_for_gatt_service_discovery();
-                    /* wait for 500ms for DLE event to be received */
-                   /*  try {
-                        Thread.sleep(500);
-                    } catch(InterruptedException e){
-                        Log.e(TAG, "error in thread sleep");
-                    } */
-
                     int mtu_intr_size = 244;
                     char[] str = new char[mtu_size];
                     BluetoothGattService mService =
@@ -1131,16 +1128,16 @@ public class ThroughputStateMachine {
                                 descriptor.setValue(
                                             BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                                 mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
-                                synchronized (write_mutex) {
+                                synchronized (write_desc_mutex) {
                                     // Wait for write response
-                                    if(!write_wait_signalled){
+                                    if(!write_desc_wait_signalled){
                                         try {
-                                            write_mutex.wait();
+                                            write_desc_mutex.wait();
                                         } catch (InterruptedException e) {
                                             Log.d(TAG, "Interrupted while waiting");
                                         }
                                     }
-                                    write_wait_signalled = false;
+                                    write_desc_wait_signalled = false;
                                 }
                             } else {
                                 Log.e(TAG, "Descriptor not found");
@@ -1172,17 +1169,17 @@ public class ThroughputStateMachine {
                             descriptor.setValue(
                                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
                             mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
-                            synchronized (write_mutex) {
+                            synchronized (write_desc_mutex) {
                             //Wait for write response
-                                if(!write_wait_signalled){
+                                if(!write_desc_wait_signalled){
                                     try {
-                                        write_mutex.wait();
+                                        write_desc_mutex.wait();
                                     }
                                     catch (InterruptedException e) {
                                         Log.d(TAG, "Interrupted while waiting");
                                     }
                                 }
-                                write_wait_signalled = false;
+                                write_desc_wait_signalled = false;
                             }
 
                             /* Signal SM that TX Test is done*/
@@ -1244,6 +1241,8 @@ public class ThroughputStateMachine {
                     case MSG_TA_SM_RX_TEST_DONE:
                         MainActivity.wl.release();
                         MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
+                        write_desc_wait_signalled = false;
                         PrintStr.setLength(0);
                         String rxtput = (String) message.obj;
                         PrintStr.append("Data Rx Throughput in kbps:");
@@ -1293,16 +1292,16 @@ public class ThroughputStateMachine {
                                 descriptor.setValue(
                                             BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                                 mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
-                                synchronized (write_mutex) {
+                                synchronized (write_desc_mutex) {
                                     // Wait for write response
-                                    if(!write_wait_signalled){
+                                    if(!write_desc_wait_signalled){
                                         try {
-                                            write_mutex.wait();
+                                            write_desc_mutex.wait();
                                         } catch (InterruptedException e) {
                                             Log.d(TAG, "Interrupted while waiting");
                                         }
                                     }
-                                    write_wait_signalled = false;
+                                    write_desc_wait_signalled = false;
                                 }
                             } else {
                                 Log.e(TAG, "Descriptor not found");
@@ -1314,16 +1313,16 @@ public class ThroughputStateMachine {
                                     (int)NotificationsTime,
                                     BluetoothGattCharacteristic.FORMAT_UINT32,0);
                             mBleConnect.mBluetoothGatt.writeCharacteristic(mreadChar);
-                            synchronized (write_mutex) {
+                            synchronized (write_char_mutex) {
                                 // Wait for write response
-                                if(!write_wait_signalled) {
+                                if(!write_char_wait_signalled) {
                                     try {
-                                        write_mutex.wait();
+                                        write_char_mutex.wait();
                                     } catch (InterruptedException e) {
                                         Log.d(TAG, "Interrupted while waiting");
                                     }
                                 }
-                                write_wait_signalled = false;
+                                write_char_wait_signalled = false;
                             }
                             /* wait for DataRxClass.NotificationsTime seconds
                                before disabling notifications */
@@ -1352,17 +1351,17 @@ public class ThroughputStateMachine {
                             descriptor.setValue(
                                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
                             mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
-                            synchronized (write_mutex) {
+                            synchronized (write_desc_mutex) {
                             //Wait for write response
-                                if(!write_wait_signalled){
+                                if(!write_desc_wait_signalled){
                                     try {
-                                        write_mutex.wait();
+                                        write_desc_mutex.wait();
                                     }
                                     catch (InterruptedException e) {
                                         Log.d(TAG, "Interrupted while waiting");
                                     }
                                 }
-                                write_wait_signalled = false;
+                                write_desc_wait_signalled = false;
                             }
                             if(ThroughputStateMachine.LOG_LEVEL >= 2) {
                                 Log.d(TAG, "start time"+rx_start_time_stamp+"end time:"+
@@ -1465,16 +1464,16 @@ public class ThroughputStateMachine {
                             mCharacteristic.setValue(str);
                             long latency_start_time_stamp = SystemClock.elapsedRealtime();
                             mBleConnect.mBluetoothGatt.writeCharacteristic(mCharacteristic);
-                            synchronized (write_mutex) {
+                            synchronized (write_char_mutex) {
                                 // Wait for write response
-                                if(!write_wait_signalled) {
+                                if(!write_char_wait_signalled) {
                                     try {
-                                        write_mutex.wait();
+                                        write_char_mutex.wait();
                                     } catch (InterruptedException e) {
                                         Log.d(TAG, "Interrupted while waiting");
                                     }
                                 }
-                                write_wait_signalled = false;
+                                write_char_wait_signalled = false;
                             }
                             long latency_end_time_stamp = SystemClock.elapsedRealtime();
                             float latency = (float) (latency_end_time_stamp -
