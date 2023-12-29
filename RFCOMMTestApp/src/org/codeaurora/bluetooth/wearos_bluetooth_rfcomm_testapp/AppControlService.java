@@ -109,7 +109,7 @@ public class AppControlService extends Service {
     public static final int DEFAULT_DATA_PATTERN = 1;
     public static final int BINARY_DATA_PATTERN  = 2;
     public static final int PRBS9_DATA_PATTERN   = 3;
-    public static final int RFCOMM_PACKET_HEADER = 5;
+    public static final int RFCOMM_PACKET_HEADER = 9;
     private FileOutputStream fos = null;
 
     public AppControlService() {
@@ -714,7 +714,7 @@ public class AppControlService extends Service {
                 outputStream.write(start.getBytes());
                 while(i <= chunksize)
                 {
-                    String header = String.format("$%04d", i);
+                    String header = String.format("$%08d", i);
                     header += senttext;
                     outputStream.write(header.getBytes());
                     i++;
@@ -835,7 +835,10 @@ public class AppControlService extends Service {
                                 curSrlNo=0;
                                 pktMissingIdx=0;
                             }
-                            Log.d(TAG, "Incoming msg received in ClientSocket "+incomingMsg);
+                            if(incomingMsg.contains("a"))
+                                Log.d(TAG, "Invalid Incoming msg received in ClientSocket "+incomingMsg);
+                            else
+                                Log.e(TAG, "Incoming msg received in ClientSocket "+incomingMsg);
                             pktStartIdx = 0;
                             pktMissingIdx = incompPkt.indexOf("$",0);
                             if(pktMissingIdx == 0){
@@ -847,9 +850,9 @@ public class AppControlService extends Service {
                                 pktStartIdx = incomingMsg.indexOf("$", pktStartIdx);
                                 if(pktStartIdx >= 0 )
                                 {
-                                    if(numBytes >= pktStartIdx+5 )
+                                    if(numBytes >= pktStartIdx+9 )
                                     {
-                                        curSrlNo = Integer.parseInt(incomingMsg.substring(pktStartIdx+1 ,pktStartIdx+5));
+                                        curSrlNo = Integer.parseInt(incomingMsg.substring(pktStartIdx+1 ,pktStartIdx+9));
                                         if(curSrlNo == prvSrlNo + 1) {
                                             Log.d(TAG, "Received Packet " +curSrlNo);
                                             prvSrlNo = curSrlNo;
