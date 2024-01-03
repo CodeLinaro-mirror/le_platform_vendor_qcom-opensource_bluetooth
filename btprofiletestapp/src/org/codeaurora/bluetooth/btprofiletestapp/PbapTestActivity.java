@@ -1419,9 +1419,11 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
     private void pullPhoneBookSize(String path) {
         Logger.d(TAG, "pullPhoneBookSize path: " + path);
+        mDownloadValueCardType = getVcardFormat();
+        Logger.d(TAG, "vacrdtype " + mDownloadValueCardType);
         // Get phonebook size with MaxListCount = 0
         pullPhoneBook(path, PbapProfile.PBAP_REQUESTED_FIELDS,
-                PbapProfile.VCARD_TYPE_30, 0, 0);
+                mDownloadValueCardType, 0, 0);
     }
 
     private boolean pullVcardListing(String path, byte order, byte searchProp, String searchValue,
