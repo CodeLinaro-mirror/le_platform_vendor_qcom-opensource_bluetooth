@@ -508,6 +508,7 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
 
         unbindService(mPbapServiceConnection);
         BluetoothConnectionReceiver.removeObserver(this);
+        unregisterReceiver(mReceiver);
     }
 
     @Override

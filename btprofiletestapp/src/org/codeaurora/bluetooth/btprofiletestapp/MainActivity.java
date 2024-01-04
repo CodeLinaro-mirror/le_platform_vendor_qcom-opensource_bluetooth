@@ -452,6 +452,7 @@ public class MainActivity extends MonkeyActivity {
         } else if (v.getId() == R.id.discover_services) {
             if (mDevice == null || mDiscoveryInProgress) {
                 Logger.e(TAG, "mDevice " + mDevice + " mDiscoveryInProgress " + mDiscoveryInProgress);
+                mDiscoveryInProgress = mDevice.fetchUuidsWithSdp();
                 return;
             }
 
