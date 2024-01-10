@@ -35,11 +35,11 @@
 #include <sys/poll.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
-#include <utils/Log.h>
+//#include <utils/Log.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <system/audio.h>
-#include <hardware/audio.h>
+#include <audio.h>
 
 #include <hardware/hardware.h>
 #include "bthost_ipc.h"

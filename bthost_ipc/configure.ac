@@ -25,7 +25,8 @@ if (test "x${with_glib}" = "xyes"); then
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 fi
-
+PKG_CHECK_MODULES([AROUTE], [audioroute])
+AC_SUBST([AROUTE_CFLAGS])
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 

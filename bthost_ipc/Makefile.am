@@ -7,11 +7,18 @@ AM_CFLAGS = -Wall \
         -std=c++11 \
         -DHAS_NO_BDROID_BUILDCFG
 
-AM_CPPFLAGS= \
-        -I. \
-        -I$(bdroid_C_INCLUDES)
+AM_CPPFLAGS =  -I. \ 
+               -I${BT_SOURCE}/stack/system/bt/include/hardware \
+               -I${BT_SOURCE}/stack/system/bt/include \
+               -I${BT_SOURCE}/stack/system/bt/ \
+               -I${BT_SOURCE}/stack/system/bt/utils/include \
+               -I${BT_SOURCE}/stack/system/bt/audio_a2dp_hw/include \
+               -I${BT_SOURCE}/stack/system/bt/types \
+               -I$(bdroid_C_INCLUDES)
 
-common_LDFLAGS = -lpthread  -lrt -llog @GLIB_LIBS@
+AM_CPPFLAGS += @AROUTE_CFLAGS@
+AM_CFLAGS += @AROUTE_CFLAGS@
+common_LDFLAGS = -lchrome -lpthread  -lrt @GLIB_LIBS@
 common_CFLAGS =  $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -DUSE_GLIB @GLIB_CFLAGS@
 
 ########BT_HOST_SOURCE_IPC########
