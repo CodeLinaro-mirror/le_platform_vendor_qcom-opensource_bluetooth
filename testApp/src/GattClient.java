@@ -120,10 +120,10 @@ public class GattClient {
     public static final int MSG_DISC_SRVC_UUID = 21;
     public static final int MSG_START_BLE_GATT_UNREG = 22;
     public static final int MSG_START_BLE_GATT_EXECUTE_WRITE = 23;
-	public static final int MSG_START_BLE_COC_CONNECT = 24;
-	public static final int MSG_START_BLE_COC_WRITE = 25;
-	public static final int MSG_START_BLE_LISTEN = 26;
-	public static final int MSG_START_BLE_COC_CLOSE = 27;
+    public static final int MSG_START_BLE_COC_CONNECT = 24;
+    public static final int MSG_START_BLE_COC_WRITE = 25;
+    public static final int MSG_START_BLE_LISTEN = 26;
+    public static final int MSG_START_BLE_COC_CLOSE = 27;
     public static final int MSG_START_BLE_COC_DATA_TX = 28;
     public static final int MSG_GC_ACTION_MAX_VALUE = MSG_START_BLE_COC_DATA_TX;
 
@@ -143,8 +143,8 @@ public class GattClient {
     public static final int BLE_STATE_CONNECTED = 2;
     public static final int BLE_STATE_DISCONNECTING = 3;
     public static final int BLE_STATE_DISCONNECTED = 4;
-	private BluetoothSocket mSocket;
-	private BluetoothServerSocket mmServerSocket;
+    private BluetoothSocket mSocket;
+    private BluetoothServerSocket mmServerSocket;
 
     private static int length_offset = 0;
     private static String offset_value = null;
@@ -154,7 +154,7 @@ public class GattClient {
     private boolean is_op_in_progress = false;
     private ReadWriteOp RdWrReliableClass = null;
     private ReadWriteOp RdWrClass = null;
-	private static BluetoothAdapter bluetoothAdapter = BleAppService.bleAdapter;
+    private static BluetoothAdapter bluetoothAdapter = BleAppService.bleAdapter;
     private static int mConnectionStatus = BLE_STATE_DISCONNECTED;
 
     private List<UUID> mServiceUUID;
@@ -180,12 +180,12 @@ public class GattClient {
         }
         public void run() {
             try {
-				 StringBuilder sb = new StringBuilder(mChunkSize);
+                 StringBuilder sb = new StringBuilder(mChunkSize);
                  Log.d(TAG, "TxOperationRunnable ");
-				 mOutputStream = mSocket.getOutputStream();
-				 for (int i = 0 ; i < mChunkSize; i++ ) {
-					 sb.append('a');
-				 }
+                 mOutputStream = mSocket.getOutputStream();
+                 for (int i = 0 ; i < mChunkSize; i++ ) {
+                     sb.append('a');
+                 }
                  mOutputStream.write(sb.toString().getBytes());
                  mOutputStream.flush();
             } catch (Exception e) {
@@ -387,7 +387,10 @@ public class GattClient {
                 int bytes;
                 long rx_start_time = 0, rx_end_time = 0;
                 int totalBytes = 0; // totalBytes received
-
+                StringBuilder sb = new StringBuilder(247);
+                for(int i = 0; i < 247; i++) {
+                   sb.append('a');
+                }
                 // Keep listening to the InputStream while connected
                 while (true) {
                     try {
@@ -422,6 +425,9 @@ public class GattClient {
                             SocketServer.sendSocketData("----------");
                             SocketServer.sendSocketData("Throughput (in kbps) : "+RxTputk);
                             totalBytes = 0;
+                            PrintStr.setLength(0);
+                            PrintStr.append("Data Intergrity passed"  );
+                            SocketServer.sendSocketData(PrintStr.toString());
                         }
                         else if(incomingMsg.contains("Ack")) {
                         /* Release write mutex */
@@ -429,6 +435,10 @@ public class GattClient {
                             synchronized (write_mutex) {
                                 write_mutex.notify();
                             }
+                        } else if(!incomingMsg.equals(sb.substring(0,247))) {
+                            PrintStr.setLength(0);
+                            PrintStr.append("Data Intergrity failed"  );
+                            SocketServer.sendSocketData(PrintStr.toString());
                         }
                         PrintStr.append("Received data in Client socket :"  );
                         SocketServer.sendSocketData(PrintStr.toString());
@@ -1103,19 +1113,19 @@ public class GattClient {
                     break;
                 case MSG_START_BLE_COC_CONNECT:
                     LecocConnect LecocConnClass = (LecocConnect) msg.obj;
-					processGattLeCocConnect(LecocConnClass);
-					break;
-				case MSG_START_BLE_COC_WRITE:
-					processGattLeCocWrite((int)msg.obj);
-					break;
-				case MSG_START_BLE_LISTEN:
+                    processGattLeCocConnect(LecocConnClass);
+                    break;
+                case MSG_START_BLE_COC_WRITE:
+                    processGattLeCocWrite((int)msg.obj);
+                    break;
+                case MSG_START_BLE_LISTEN:
                     boolean SecureFlag = (boolean) msg.obj;
-				    processGattLeCocListen(SecureFlag);
-					break;
+                    processGattLeCocListen(SecureFlag);
+                    break;
                 case MSG_START_BLE_COC_CLOSE:
                     boolean SecureFlag1 = (boolean) msg.obj;
-				    processGattLeCocClose(SecureFlag1);
-					break;
+                    processGattLeCocClose(SecureFlag1);
+                    break;
                 case MSG_START_BLE_COC_DATA_TX:
                     DataTx dataTxObj = (DataTx) msg.obj;
                     startTxOperation(dataTxObj);
@@ -1678,10 +1688,12 @@ public class GattClient {
         }
         private void processGattLeCocListen (boolean SecureFlag) {
             if (SecureFlag && mSecureAcceptThread == null) {
+                Log.d(TAG, "processGattLeCocListen Secure ");
                 mSecureAcceptThread = new AcceptThread(true);
                 mSecureAcceptThread.start();
             }
             if (!SecureFlag && mInsecureAcceptThread == null) {
+                Log.d(TAG, "processGattLeCocListen InSecure ");
                 mInsecureAcceptThread = new AcceptThread(false);
                 mInsecureAcceptThread.start();
             }

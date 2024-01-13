@@ -186,7 +186,7 @@ public class GattServer{
             @Override
             public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
                 if (status == GATT_SUCCESS) {
-                    Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
+                    Log.i(TAG, "on Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
                     PrintStr.setLength(0);
                     PrintStr.append("Phy Read, BDAddress:");
                     PrintStr.append(device.getAddress());
@@ -347,7 +347,8 @@ public class GattServer{
                                             equalsIgnoreCase(CLIENT_CHARACTERISTIC_CONFIG)) {
                    List<BluetoothGattCharacteristic> lList_notify = mMap_notify.get(device);
                    List<BluetoothGattCharacteristic> lList_indicate = mMap_indicate.get(device);
-                   if(value[0] == 0x01) {
+                   if((value[0] == 0x01) || (value[0] == 0x03)){
+                        Log.d(TAG, "onDescriptorWriteRequest, adding dev to list" );
                        if (lList_notify != null) {
                            lList_notify.add(descriptor.getCharacteristic());
                        } else {
@@ -414,7 +415,7 @@ public class GattServer{
             @Override
             public void onNotificationSent(BluetoothDevice device, int status) {
                 if(status == GATT_SUCCESS) {
-                    Log.d(TAG, "Notificationsent" + device.getAddress());
+                    Log.d(TAG, "OnNotificationsent" + device.getAddress());
                     PrintStr.setLength(0);
                     PrintStr.append("NotificationSent for BDAddress:");
                     PrintStr.append(device.getAddress());

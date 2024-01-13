@@ -178,6 +178,7 @@ public class ScannerService extends Service {
     }
 
     private void resetScanParams() {
+        Log.d(TAG, "resetScanParams ");
         mScanSettings = null;
         mScanFilters = null;
     }
