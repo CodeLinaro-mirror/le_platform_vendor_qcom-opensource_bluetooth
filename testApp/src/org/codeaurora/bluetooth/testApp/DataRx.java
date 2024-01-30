@@ -30,6 +30,7 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class DataRx {
+    public int Mtu_Size;
     public long NotificationsTime;
     public String rxService;
     public String rxChar;

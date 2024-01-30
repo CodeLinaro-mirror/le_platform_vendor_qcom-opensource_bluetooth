@@ -255,7 +255,7 @@ public class SocketServer {
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     Tx             (Ex: Tx Mtu_Size:512;Packet_Size:244;Num_Packets:50;\n");
                     sendStr.append("                                            TxService:0000FF01-0000-1000-8000-00805F9B34FB;TxChar:0000FF04-0000-1000-8000-00805F9B34FB)\n");
-                    sendStr.append("                     Rx             (Ex: Rx RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB;NotificationsTime:2)\n");
+                    sendStr.append("                     Rx             (Ex: Rx RxService:0000FF01-0000-1000-8000-00805F9B34FB;RxChar:0000FF03-0000-1000-8000-00805F9B34FB;NotificationsTime:2;MtuSize:512)\n");
                     sendStr.append("                     Latency        (Ex: Latency LatencyService:0000FF01-0000-1000-8000-00805F9B34FB;LatencyChar:0000FF02-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Back\n");
@@ -347,7 +347,7 @@ public class SocketServer {
                             }
                         } else if (tmp[0].equals("AdvStop")) {
                             processOutputState = NONE;
-                            msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_STOP_BLE_ADV, 
+                            msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_STOP_BLE_ADV,
                                     Integer.parseInt(tmp[1]));
                             MainActivity.msghandler.sendMessage(msg);
                         } else {
@@ -372,7 +372,7 @@ public class SocketServer {
                             Scan scanParam = parse.ScanParse(tmp[1]);
                             if (scanParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_START_BLE_SCAN, 
+                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_MA_START_BLE_SCAN,
                                         scanParam);
                                 MainActivity.msghandler.sendMessage(msg);
                             } else {
@@ -404,7 +404,7 @@ public class SocketServer {
                             Scan scanParam = parse.ScanParse(tmp[1]);
                             if (scanParam != null) {
                                 processOutputState = NONE;
-                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_SM_START_BLE_CONNECT, 
+                                msg = MainActivity.msghandler.obtainMessage(MainActivity.MSG_SM_START_BLE_CONNECT,
                                         scanParam);
                                 MainActivity.msghandler.sendMessage(msg);
                             } else {
@@ -531,7 +531,7 @@ public class SocketServer {
                         } else if (tmp[0].equals("ConfigureMTU")) {
                             processOutputState = NONE;
                             msg = MainActivity.msghandler.obtainMessage(
-                                    MainActivity.MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE, 
+                                    MainActivity.MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE,
                                     Integer.parseInt(tmp[1]));
                             MainActivity.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("RW_Char")) {
