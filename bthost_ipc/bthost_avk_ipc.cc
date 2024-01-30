@@ -74,12 +74,12 @@
 
 #define CASE_RETURN_STR(const) case const: return #const;
 
-#define FNLOG() LOG_VERBOSE("%s", __FUNCTION__);
+#define FNLOG() LOG_VERBOSE(" %s", __FUNCTION__);
 #define DEBUG(fmt, ...) \
-  LOG_VERBOSE(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define INFO(fmt, ...) LOG_INFO(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define WARN(fmt, ...) LOG_WARN(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define ERROR(fmt, ...) LOG_ERROR(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+  LOG_VERBOSE(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define INFO(fmt, ...) LOG_INFO(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define WARN(fmt, ...) LOG_WARN(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define ERROR(fmt, ...) LOG_ERROR(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 
 #define ASSERTC(cond, msg, val) if (!(cond)) {ERROR("### ASSERT : %s line %d %s (%d) ###", __FILE__, __LINE__, msg, val);}
 
