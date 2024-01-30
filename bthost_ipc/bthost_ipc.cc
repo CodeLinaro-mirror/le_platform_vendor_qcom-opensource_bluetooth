@@ -392,6 +392,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
 
         aac_bit_rate |= 0x000000FF & (((uint32_t)byte));
         aac_codec.bitrate = aac_bit_rate;
+        p_cfg += 6;
         aac_codec.bits_per_sample = *(uint32_t *)p_cfg;
         *codec_type = AUDIO_FORMAT_AAC;
         INFO("AAC: Done copying full codec config");
