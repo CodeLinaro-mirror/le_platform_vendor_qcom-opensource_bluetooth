@@ -849,7 +849,7 @@ public class ThroughputStateMachine {
                             try {
                                 Process proc =
                                     Runtime.getRuntime().exec("/system/bin/getprop"+" "
-                                                            +"persist.bluetooth.tx_test.enable");
+                                                            +"tx_test.enable");
                                 BufferedReader reader =
                                                 new BufferedReader(
                                                     new InputStreamReader(proc.getInputStream()));
