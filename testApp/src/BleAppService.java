@@ -341,10 +341,7 @@ public class BleAppService extends Service {
                             return;
                         }
 
-                        if ((variant == BluetoothDevice.PAIRING_VARIANT_PASSKEY_CONFIRMATION)
-                            || (variant == BluetoothDevice.PAIRING_VARIANT_CONSENT)) {
-                            bluetoothDevice.setPairingConfirmation(true);
-                        } else if (variant == BluetoothDevice.PAIRING_VARIANT_PIN) {
+                        if (variant == BluetoothDevice.PAIRING_VARIANT_PIN) {
                             bluetoothDevice.setPin(new byte[]{'1', '2', '3', '4', '5', '6'});
                         }
                     }
