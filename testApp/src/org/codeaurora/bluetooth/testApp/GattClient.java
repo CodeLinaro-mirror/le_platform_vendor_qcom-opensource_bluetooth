@@ -135,7 +135,6 @@ public class GattClient {
     public static final int MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS = 14;
     public static final int MSG_START_BLE_GATT_RELIABLE_WRITE = 15;
     public static final int MSG_START_BLE_GATT_ABORT_RELIABLE_WRITE = 16;
-    public static final int MSG_START_BLE_GATT_EXECUTE_WRITE = 31;
 
     public static final int MSG_REM_DEV_FAILED_TO_CONNECT = 17;
     public static final int MSG_REFRESH_SERV_DONE = 18;
@@ -609,9 +608,6 @@ public class GattClient {
                     break;
                 case MSG_START_BLE_GATT_REFRESH_SERVICES:
                     processRefreshServices();
-                    break;
-                case MSG_START_BLE_GATT_EXECUTE_WRITE:
-                    processExecuteWriteReq();
                     break;
                 case MSG_START_BLE_GATT_DISCONNECT:
                     processDisconnectReq();

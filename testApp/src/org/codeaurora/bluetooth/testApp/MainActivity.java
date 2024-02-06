@@ -166,7 +166,6 @@ public class MainActivity extends Activity {
     public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = 17;
     public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = 18;
     public static final int MSG_GC_START_BLE_GATT_DISC = 19;
-    public static final int MSG_GC_START_BLE_GATT_EXECUTE_WRITE = 33;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = 21;
@@ -588,11 +587,6 @@ public class MainActivity extends Activity {
                     RdWrClass = (ReadWriteOp) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                           mgattclient.MSG_START_BLE_GATT_RELIABLE_WRITE, RdWrClass);
-                    mgattclient.mGattClientHandler.sendMessage(msg);
-                    break;
-                case MSG_GC_START_BLE_GATT_EXECUTE_WRITE:
-                    msg = mgattclient.mGattClientHandler.obtainMessage(
-                              mgattclient.MSG_START_BLE_GATT_EXECUTE_WRITE, null);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE:
