@@ -205,6 +205,9 @@ public class GattServer{
                     PrintStr.append("All services sucessfully cleared");
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
+                case MSG_START_BLE_GET_SERVICES:
+                    processGattGetServiceReq();
+                    break;
                 case MSG_ADD_SERVICE_DONE:
                     PrintStr.setLength(0);
                     String interal = (String) msg.obj;
@@ -213,7 +216,6 @@ public class GattServer{
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
             }
-
         }
 
         private BluetoothGattService createService(UUID srvcUUID, List<UUID> charuuids,
@@ -254,7 +256,6 @@ public class GattServer{
                 return srvc;
             }
             return null;
-
         }
 
         private void processGattAddServiceReq(AddServices AddServ) {
@@ -285,6 +286,20 @@ public class GattServer{
             Log.d(TAG, "Clearing all the services");
             mgattServer.mBluetoothGattserver.clearServices();
             Service_List.clear();
+        }
+
+        private void processGattGetServiceReq() {
+
+            Log.d(TAG, "Listing all the services");
+            PrintStr.setLength(0);
+            PrintStr.append("Services UUIDS :");
+            SocketServer.sendSocketData(PrintStr.toString());
+            PrintStr.setLength(0);
+            for ( String key : Service_List.keySet() ) {
+                    PrintStr.append(key);
+                    PrintStr.append("  ");
+             }
+            SocketServer.sendSocketData(PrintStr.toString());
         }
     }
 }
