@@ -695,6 +695,11 @@ public class MainActivity extends Activity {
                              mgattserver.MSG_START_BLE_PHY_UPDATE, phyUpdateObj);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
+                case MSG_GS_START_BLE_READ_PHY:
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                              mgattserver.MSG_START_BLE_READ_PHY, null);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
                 default:
                     Log.e(TAG, "Unknown Operation");
                     break;
