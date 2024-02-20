@@ -181,7 +181,6 @@ public class ScannerService extends Service {
     private void resetScanParams() {
         mScanSettings = null;
         mScanFilters = null;
-        MainActivity.batch_scan = false;
     }
 
     @Override
@@ -220,10 +219,16 @@ public class ScannerService extends Service {
             mDeviceList.add(bluetoothDevice);
             mScanResult.add(r);
 
-            MainActivity.scanList = new MainActivity.ScanList();
-            MainActivity.scanList.devName = devName;
-            MainActivity.scanList.devAddr = bluetoothDevice.getAddress();
-            MainActivity.mScanList.add(MainActivity.scanList);
+            StringBuilder PrintStr = new StringBuilder();
+            if(MainActivity.scan_called == MainActivity.SCAN_CALLED_FROM_MAIN_ACTIVITY){
+                /* Display scannner queue */
+                PrintStr.setLength(0);
+                PrintStr.append("Scan Results: Device Name - ");
+                PrintStr.append(devName);
+                PrintStr.append("\t Device Address - ");
+                PrintStr.append(bluetoothDevice.getAddress());
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
 
             Message msg = MainActivity.msghandler.obtainMessage(
                       MainActivity.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
@@ -262,7 +267,6 @@ public class ScannerService extends Service {
             if(ScannerService.LOG_LEVEL >= 2) {
                 Log.d(TAG, "Failed to start scan " + errorCode);
             }
-            MainActivity.batch_scan = false;
             StringBuilder PrintStr = new StringBuilder();
 
             PrintStr.setLength(0);
@@ -294,8 +298,6 @@ public class ScannerService extends Service {
                     break;
                 case MSG_STOP_BLE_SCAN:
                     resetScanParams();
-                    /* Clear the list while disabling scan */
-                    MainActivity.mScanList.clear();
                     scanLeDevice(false);
                     break;
                 case MSG_SCAN_RESULT:
