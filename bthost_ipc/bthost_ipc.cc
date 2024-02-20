@@ -35,11 +35,11 @@
 #include <sys/poll.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
-#include <utils/Log.h>
+//#include <utils/Log.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <system/audio.h>
-#include <hardware/audio.h>
+#include <audio.h>
 
 #include <hardware/hardware.h>
 #include "bthost_ipc.h"
@@ -73,12 +73,12 @@ static int bt_split_a2dp_enabled = 0;
 
 #define CASE_RETURN_STR(const) case const: return #const;
 
-#define FNLOG() LOG_VERBOSE("%s", __FUNCTION__);
+#define FNLOG() LOG_VERBOSE(" %s", __FUNCTION__);
 #define DEBUG(fmt, ...) \
-  LOG_VERBOSE(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define INFO(fmt, ...) LOG_INFO(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define WARN(fmt, ...) LOG_WARN(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
-#define ERROR(fmt, ...) LOG_ERROR(LOG_TAG, "%s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+  LOG_VERBOSE(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define INFO(fmt, ...) LOG_INFO(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define WARN(fmt, ...) LOG_WARN(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
+#define ERROR(fmt, ...) LOG_ERROR(" %s: " fmt, __FUNCTION__, ##__VA_ARGS__)
 
 #define ASSERTC(cond, msg, val) if (!(cond)) {ERROR("### ASSERT : %s line %d %s (%d) ###", __FILE__, __LINE__, msg, val);}
 
@@ -392,6 +392,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
 
         aac_bit_rate |= 0x000000FF & (((uint32_t)byte));
         aac_codec.bitrate = aac_bit_rate;
+        p_cfg += 6;
         aac_codec.bits_per_sample = *(uint32_t *)p_cfg;
         *codec_type = AUDIO_FORMAT_AAC;
         INFO("AAC: Done copying full codec config");
