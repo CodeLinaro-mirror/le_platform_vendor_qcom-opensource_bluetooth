@@ -181,7 +181,7 @@ public class MainActivity extends Activity {
     /* GATT Server Actions */
 
     public static final int MSG_GS_START_BLE_ADD_SERVICE = 50;
-    public static final int MSG_GS_START_BLE_REMOVE_SERVICES = 51;
+    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = 51;
     public static final int MSG_GS_START_BLE_SET_PHY = 52;
     public static final int MSG_GS_START_BLE_READ_PHY = 33;
     public static final int MSG_GS_START_BLE_GET_SERVICES = 54;
@@ -671,6 +671,12 @@ public class MainActivity extends Activity {
                     AddServ = (AddServices) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                             mgattserver.MSG_START_BLE_ADD_SERVICE, AddServ);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_START_BLE_REMOVE_SERVICE:
+                    String uuid=(String)message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                            mgattserver.MSG_START_BLE_REMOVE_SERVICE, uuid);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 default:

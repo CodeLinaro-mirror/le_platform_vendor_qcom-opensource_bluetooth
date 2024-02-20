@@ -295,6 +295,7 @@ public class SocketServer {
                 case GATT_SERVER_MENU:
                     sendStr.append("\n******************** Gatt Server Menu ********************\n");
                     sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10;Permissions:0x01;Value:0x12)\n");
+                    sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -673,11 +674,10 @@ public class SocketServer {
                         processOutputState = INVALID_INPUT;
                     }
                     break;
-
                 case GATT_SERVER_MENU:
                     tmp = inputString.split(" ", 2);
                     if(tmp.length == 2) {
-                      if (tmp[0].equals("AddService")) {
+                        if (tmp[0].equals("AddService")) {
                             AddServices AddServiceParam = parse.AddServicesParse(tmp[1]);
                             if ( AddServiceParam != null) {
                                 processOutputState = NONE;
@@ -687,25 +687,25 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if(tmp[0].equals("RemoveService")) {
+                            String [] tmp2 = tmp[1].split(":");
+                            processOutputState = NONE;
+                            msg = MainActivity.msghandler.obtainMessage(
+                                        MainActivity.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
+                            MainActivity.msghandler.sendMessage(msg);
                         } else {
                             processOutputState = INVALID_INPUT;
                         }
-
-                    }
-                    else if(tmp.length == 1) {
-
+                    } else if(tmp.length == 1) {
                          if (tmp[0].equals("Back")) {
                             mainMenuState = MAIN_MENU;
                             processOutputState = MAIN_MENU;
-                        } else {
+                         } else {
                             processOutputState = INVALID_INPUT;
-                        }
-
-
-                   } else {
+                         }
+                    } else {
                      processOutputState = INVALID_INPUT;
                     }
-
                     break;
             }
         }
