@@ -145,52 +145,55 @@ public class MainActivity extends Activity {
     public static final int MSG_MA_STOP_BLE_ADV = 1;
     public static final int MSG_MA_START_BLE_SCAN = 2;
     public static final int MSG_MA_STOP_BLE_SCAN = 3;
-    public static final int MSG_MA_SCAN_DEV_FOUND = 20;
-    public static final int MSG_MA_ADV_STARTED = 31;
-    public static final int MSG_MA_ADV_STOPPED = 32;
+    public static final int MSG_MA_SCAN_DEV_FOUND = 4;
+    public static final int MSG_MA_ADV_STARTED = 5;
+    public static final int MSG_MA_ADV_STOPPED = 6;
+    public static final int MSG_MA_MAX_ACTION_VALUE = MSG_MA_ADV_STOPPED;
 
     /* Gatt Client Actions */
-    public static final int MSG_GC_START_BLE_CONNECT = 4;
-    public static final int MSG_GC_START_BLE_CONN_UPDATE = 5;
-    public static final int MSG_GC_START_BLE_PHY_UPDATE = 6;
-    public static final int MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE = 7;
-    public static final int MSG_GC_START_BLE_READ_PHY = 8;
-    public static final int MSG_GC_START_BLE_PAIR = 9;
-    public static final int MSG_GC_START_BLE_UNPAIR = 10;
-    public static final int MSG_GC_START_BLE_GATT_DISCOVER = 11;
-    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = 12;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = 13;
-    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = 14;
-    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = 15;
-    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = 16;
-    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = 17;
-    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = 18;
-    public static final int MSG_GC_START_BLE_GATT_DISC = 19;
-    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = 34;
+    public static final int MSG_GC_START_BLE_CONNECT = MSG_MA_MAX_ACTION_VALUE + 1;
+    public static final int MSG_GC_START_BLE_CONN_UPDATE = MSG_MA_MAX_ACTION_VALUE + 2;
+    public static final int MSG_GC_START_BLE_PHY_UPDATE = MSG_MA_MAX_ACTION_VALUE + 3;
+    public static final int MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE = MSG_MA_MAX_ACTION_VALUE + 4;
+    public static final int MSG_GC_START_BLE_READ_PHY = MSG_MA_MAX_ACTION_VALUE + 5;
+    public static final int MSG_GC_START_BLE_PAIR = MSG_MA_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GC_START_BLE_UNPAIR = MSG_MA_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GC_START_BLE_GATT_DISCOVER = MSG_MA_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GC_START_BLE_GATT_REFRESH_SERVICES = MSG_MA_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_CHAR = MSG_MA_MAX_ACTION_VALUE + 10;
+    public static final int MSG_GC_START_BLE_GATT_WRITE_READ_DESC = MSG_MA_MAX_ACTION_VALUE + 11;
+    public static final int MSG_GC_REGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 12;
+    public static final int MSG_GC_DEREGISTER_BLE_GATT_NOTIFICATIONS = MSG_MA_MAX_ACTION_VALUE + 13;
+    public static final int MSG_GC_START_BLE_GATT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 14;
+    public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 15;
+    public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 16;
+    public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 17;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_GATT_CANCEL_CONNECT;
 
     /* State Machine Actions */
-    public static final int MSG_SM_START_BLE_CONNECT = 21;
-    public static final int MSG_SM_START_BLE_CONN_UPDATE = 22;
-    public static final int MSG_SM_START_BLE_PHY_UPDATE = 23;
-    public static final int MSG_SM_START_BLE_READ_PHY = 24;
-    public static final int MSG_SM_START_BLE_PAIR = 25;
-    public static final int MSG_SM_START_BLE_UNPAIR = 26;
-    public static final int MSG_SM_START_BLE_DATA_TX_TEST = 27;
-    public static final int MSG_SM_START_BLE_DATA_RX_TEST = 28;
-    public static final int MSG_SM_START_BLE_LATENCY_TEST = 29;
-    public static final int MSG_SM_START_BLE_GATT_DISC = 30;
+    public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
+    public static final int MSG_SM_START_BLE_CONN_UPDATE = MSG_GC_MAX_ACTION_VALUE + 2;
+    public static final int MSG_SM_START_BLE_PHY_UPDATE = MSG_GC_MAX_ACTION_VALUE + 3;
+    public static final int MSG_SM_START_BLE_READ_PHY = MSG_GC_MAX_ACTION_VALUE + 4;
+    public static final int MSG_SM_START_BLE_PAIR = MSG_GC_MAX_ACTION_VALUE + 5;
+    public static final int MSG_SM_START_BLE_UNPAIR = MSG_GC_MAX_ACTION_VALUE + 6;
+    public static final int MSG_SM_START_BLE_DATA_TX_TEST = MSG_GC_MAX_ACTION_VALUE + 7;
+    public static final int MSG_SM_START_BLE_DATA_RX_TEST = MSG_GC_MAX_ACTION_VALUE + 8;
+    public static final int MSG_SM_START_BLE_LATENCY_TEST = MSG_GC_MAX_ACTION_VALUE + 9;
+    public static final int MSG_SM_START_BLE_GATT_DISC = MSG_GC_MAX_ACTION_VALUE + 10;
+    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_DISC;
 
     /* GATT Server Actions */
-
-    public static final int MSG_GS_START_BLE_ADD_SERVICE = 50;
-    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = 51;
-    public static final int MSG_GS_START_BLE_SET_PHY = 52;
-    public static final int MSG_GS_START_BLE_READ_PHY = 33;
-    public static final int MSG_GS_START_BLE_GET_SERVICES = 54;
-    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = 55;
-    public static final int MSG_GS_START_BLE_CONNECT = 56;
-    public static final int MSG_GS_START_BLE_PHY_UPDATE = 57;
-    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = 58;
+    public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
+    public static final int MSG_GS_START_BLE_REMOVE_SERVICE = MSG_SM_MAX_ACTION_VALUE + 2;
+    public static final int MSG_GS_START_BLE_SET_PHY = MSG_SM_MAX_ACTION_VALUE + 3;
+    public static final int MSG_GS_START_BLE_READ_PHY = MSG_SM_MAX_ACTION_VALUE + 4;
+    public static final int MSG_GS_START_BLE_GET_SERVICES = MSG_SM_MAX_ACTION_VALUE + 5;
+    public static final int MSG_GS_START_BLE_CLEAR_SERVICES = MSG_SM_MAX_ACTION_VALUE + 6;
+    public static final int MSG_GS_START_BLE_CONNECT = MSG_SM_MAX_ACTION_VALUE + 7;
+    public static final int MSG_GS_START_BLE_PHY_UPDATE = MSG_SM_MAX_ACTION_VALUE + 8;
+    public static final int MSG_GS_START_GET_CONNECTED_DEVICES = MSG_SM_MAX_ACTION_VALUE + 9;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_GET_CONNECTED_DEVICES;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -203,7 +206,6 @@ public class MainActivity extends Activity {
             wl_acquired = savedInstanceState.getBoolean("wl_acquired");
             Log.d(TAG, "on create savedInstance not null");
         } else {
-            //moveTaskToBack(true);
             Log.d(TAG, "on create savedInstance null");
             PowerManager pm = (PowerManager)mAppContext.getSystemService(
                                               Context.POWER_SERVICE);
@@ -314,15 +316,15 @@ public class MainActivity extends Activity {
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                             BluetoothDevice.ERROR);
                 if (bondState == BluetoothDevice.BOND_BONDED) {
-                   Log.i(TAG, "Device paired");
-            if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
-                Message msg = mgattclient.mGattClientHandler.obtainMessage(
-                                mgattclient.MSG_GC_REM_DEV_PAIRED, null);
+                    Log.i(TAG, "Device paired");
+                    if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
+                        Message msg = mgattclient.mGattClientHandler.obtainMessage(
+                                 mgattclient.MSG_GC_REM_DEV_PAIRED, null);
                         mgattclient.mGattClientHandler.sendMessage(msg);
-            } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
-                throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
-                            .MSG_TA_SM_REM_DEV_PAIRED);
-            }
+                    } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
+                        throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
+                             .MSG_TA_SM_REM_DEV_PAIRED);
+                    }
                 }
             }
         }
@@ -747,19 +749,20 @@ public class MainActivity extends Activity {
                     break;
             }
         }
-    private void processScanCb(BluetoothDevice device) {
-        Log.d(TAG, "processScanCb(main activity)"+scan_called);
-        if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
-            msg = mgattclient.mGattClientHandler.obtainMessage(
-                        mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
-            mgattclient.mGattClientHandler.sendMessage(msg);
-        } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
-            msg = throughputSMClass.mStateMachine.obtainMessage(
-                    throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
-            throughputSMClass.mStateMachine.sendMessage(msg);
-        } else {
-           /* do nothing */
+
+        private void processScanCb(BluetoothDevice device) {
+            Log.d(TAG, "processScanCb(main activity)"+scan_called);
+            if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
+                msg = mgattclient.mGattClientHandler.obtainMessage(
+                            mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
+                mgattclient.mGattClientHandler.sendMessage(msg);
+            } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
+                msg = throughputSMClass.mStateMachine.obtainMessage(
+                        throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
+                throughputSMClass.mStateMachine.sendMessage(msg);
+            } else {
+               /* do nothing */
+            }
         }
-    }
     }
 }
