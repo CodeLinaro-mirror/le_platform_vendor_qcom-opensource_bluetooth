@@ -157,7 +157,6 @@ public class SocketServer {
             while (true) {
                 try {
                     bytesRead = input.read(socRcvBuffer, 0, socRcvBufferSize);
-                    Log.i(TAG, "Received data from socket, bytesRead = " + bytesRead);
                 } catch (IOException e) {
                     Log.e(TAG, "There is an exception when reading socket");
                     e.printStackTrace();
@@ -754,7 +753,6 @@ public class SocketServer {
                     try {
                         if (data.getBytes().length <= socSendBufferSize) {
                             data = data + '\n';
-                            Log.i(TAG, "bytesToSend: " + data.getBytes().length);
                             output.write(data.getBytes(), 0, data.getBytes().length);
                             output.flush();
                             Log.i(TAG, "Sent: " + data);
