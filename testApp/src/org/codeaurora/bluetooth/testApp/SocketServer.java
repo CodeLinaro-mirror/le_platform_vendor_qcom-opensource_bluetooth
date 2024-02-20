@@ -300,6 +300,7 @@ public class SocketServer {
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy\n");
+                    sendStr.append("                       GetConnectedDevices\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
                     break;
@@ -729,11 +730,16 @@ public class SocketServer {
                              msg = MainActivity.msghandler.obtainMessage(
                                      MainActivity.MSG_GS_START_BLE_READ_PHY, null);
                              MainActivity.msghandler.sendMessage(msg);
+                        } else if(tmp[0].equals("GetConnectedDevices")) {
+                            processOutputState = NONE;
+                            msg = MainActivity.msghandler.obtainMessage(
+                                     MainActivity.MSG_GS_START_GET_CONNECTED_DEVICES, null);
+                            MainActivity.msghandler.sendMessage(msg);
                         } else {
-                             processOutputState = INVALID_INPUT;
+                            processOutputState = INVALID_INPUT;
                         }
                     } else {
-                       processOutputState = INVALID_INPUT;
+                     processOutputState = INVALID_INPUT;
                     }
                     break;
             }
