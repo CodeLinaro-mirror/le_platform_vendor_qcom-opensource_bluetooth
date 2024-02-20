@@ -387,6 +387,10 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "not able to unregister");
             }
 
+            /* Stop SocketServer */
+            SocketServer.sendSocketData("Application is Closed... Please restart");
+            socServer.closeSocketServer();
+
             /* stop Gatt Client handler */
             mgattclient.cleanup();
 
