@@ -265,6 +265,7 @@ public class SocketServer {
                     sendStr.append("                                                    SvcMaskUuid:ffffffff-ffff-ffff-ffff-ffffffffffff;ManufacturerId:158;ManufacturerData:1,1,1;ManuMaskData:f,f,f;\n");
                     sendStr.append("                                                    ServiceDataUuid:0000180f-0000-1000-8000-00805f9b34fb;ServiceData:12;SvcDataMask:ff;ScanMode:1;CallbackType:1;\n");
                     sendStr.append("                                                    ResultType:0;NumOfAdvMatches:3;MatchMode:1;ReportDelay:0;Legacy:false)\n");
+                    sendStr.append("                     ConnectToBdaddr                (Ex: ConnectToBdaddr 11:22:33:44:55:66\n");
                     sendStr.append("                     CancelConnect\n");
                     sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     ReadPhy\n");
@@ -535,6 +536,15 @@ public class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                        BleAppService.MSG_GC_START_BLE_CONNECT, scanParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ConnectToBdaddr")) {
+                            if (BleAppService.bleAdapter.checkBluetoothAddress(tmp[1].toUpperCase())) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_CONNECT_TO_BDADDR, tmp[1]);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;

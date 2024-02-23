@@ -167,7 +167,8 @@ public class BleAppService extends Service {
     public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 16;
     public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 17;
     public static final int MSG_GC_BLE_GATT_REQ_CONN_PRIORITY = MSG_MA_MAX_ACTION_VALUE + 18;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_BLE_GATT_REQ_CONN_PRIORITY;
+    public static final int MSG_GC_START_BLE_CONNECT_TO_BDADDR = MSG_MA_MAX_ACTION_VALUE + 19;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_CONNECT_TO_BDADDR;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -502,6 +503,12 @@ public class BleAppService extends Service {
                     scan_called = SCAN_CALLED_FROM_GATT_CLIENT;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                               mgattclient.MSG_START_BLE_CONNECT, scnObj);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_START_BLE_CONNECT_TO_BDADDR:
+                    String bdAddr = (String) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                              mgattclient.MSG_START_BLE_CONNECT_TO_BDADDR, bdAddr);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_GATT_CANCEL_CONNECT:
