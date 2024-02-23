@@ -346,16 +346,17 @@ public class GattClient {
                                                 int status) {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "onCharacteristicWrite: " + status);
-                    PrintStr.setLength(0);
-                    PrintStr.append("Characteristic Value Written to ");
-                    PrintStr.append(new String(characteristic.getValue()));
-                    SocketServer.sendSocketData(PrintStr.toString());
-
+                    if(!reliable_write){
+                        String Value = fetchFormatValue(characteristic);
+                        PrintStr.setLength(0);
+                        PrintStr.append("Characteristic Value Written to ");
+                        PrintStr.append(Value);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    }
                     if(reliable_write) {
                         String value = new String(characteristic.getValue());
                         /* check the value written is correct or not */
                         if(offset_value.equals(value)) {
-                            Log.d(TAG, "Data matched, proceeding!!");
                             if(!reliable_write_no_more_data) {
                                 /*check if the total data is written, if no write*/
                                 if(total_length > length_offset + mtu_size-5) {
