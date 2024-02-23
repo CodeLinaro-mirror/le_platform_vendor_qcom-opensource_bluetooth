@@ -864,15 +864,14 @@ public class GattClient {
 
             if(RdWrClass.operation == GATT_READ) {
                 status = mgattClient.mBluetoothGatt.readCharacteristic(mCharacteristic);
-                if(status != true)
+                if(status != true) {
                     Log.e(TAG, "Read Char failed");
                     PrintStr.setLength(0);
                     PrintStr.append("Read Char failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                     is_op_in_progress = false;
-                return;
+                }
             }
-
             else if(RdWrClass.operation == GATT_WRITE) {
                 /* Check for write type */
                 if(RdWrClass.Write_type != 0) {
