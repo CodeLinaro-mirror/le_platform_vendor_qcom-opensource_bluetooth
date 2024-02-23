@@ -270,6 +270,7 @@ public class SocketServer {
                     sendStr.append("                     ReadPhy\n");
                     sendStr.append("                     SetPhy                         (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
+                    sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
                     sendStr.append("                     Pair\n");
                     sendStr.append("                     UnPair\n");
                     sendStr.append("                     DiscoverServices\n");
@@ -562,6 +563,12 @@ public class SocketServer {
                             processOutputState = NONE;
                             msg = BleAppService.msghandler.obtainMessage(
                                     BleAppService.MSG_GC_START_BLE_GATT_CONFIGURE_MTU_SIZE,
+                                    Integer.parseInt(tmp[1]));
+                            BleAppService.msghandler.sendMessage(msg);
+                        } else if (tmp[0].equals("ReqConnPriority")) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                    BleAppService.MSG_GC_BLE_GATT_REQ_CONN_PRIORITY,
                                     Integer.parseInt(tmp[1]));
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("RW_Char")) {

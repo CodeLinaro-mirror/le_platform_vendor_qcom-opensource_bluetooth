@@ -166,7 +166,8 @@ public class BleAppService extends Service {
     public static final int MSG_GC_START_BLE_GATT_ABORT_RELIABLE_WRITE = MSG_MA_MAX_ACTION_VALUE + 15;
     public static final int MSG_GC_START_BLE_GATT_DISC = MSG_MA_MAX_ACTION_VALUE + 16;
     public static final int MSG_GC_START_BLE_GATT_CANCEL_CONNECT = MSG_MA_MAX_ACTION_VALUE + 17;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_GATT_CANCEL_CONNECT;
+    public static final int MSG_GC_BLE_GATT_REQ_CONN_PRIORITY = MSG_MA_MAX_ACTION_VALUE + 18;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_BLE_GATT_REQ_CONN_PRIORITY;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -524,6 +525,12 @@ public class BleAppService extends Service {
                     int Mtu_Size = (int) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                           mgattclient.MSG_START_BLE_GATT_CONFIGURE_MTU_SIZE, Mtu_Size);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_BLE_GATT_REQ_CONN_PRIORITY:
+                    int conn_priority = (int) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_BLE_GATT_REQ_CONN_PRIORITY, conn_priority);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_READ_PHY:
