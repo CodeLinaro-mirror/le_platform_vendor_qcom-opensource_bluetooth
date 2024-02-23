@@ -288,7 +288,7 @@ public class SocketServer {
                     break;
                 case GATT_SERVER_MENU:
                     sendStr.append("\n******************** Gatt Server Menu ********************\n");
-                    sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10;Permissions:0x01;Value:0x12)\n");
+                    sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10,0x01;Permissions:0x01,0x10;Value:0x12)\n");
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");

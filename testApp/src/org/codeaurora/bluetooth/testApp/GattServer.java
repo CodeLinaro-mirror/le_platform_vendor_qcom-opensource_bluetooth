@@ -280,7 +280,7 @@ public class GattServer{
             }
         }
 
-        private BluetoothGattService createService(UUID srvcUUID, List<UUID> charuuids,
+        private BluetoothGattService createService(UUID srvcUUID, UUID charuuid,
                                  List<Integer> props, List<Integer>perms, byte[] value){
 
             if(LOG_LEVEL >=2)
@@ -297,23 +297,22 @@ public class GattServer{
                 perm_ored = perm_ored | x;
             }
             BluetoothGattCharacteristic charAdd;
-            for(UUID Char_uuid: charuuids){
 
-                charAdd = new BluetoothGattCharacteristic(Char_uuid, prop_ored, perm_ored);
-                if(value != null)
-                    charAdd.setValue(value);
+            charAdd = new BluetoothGattCharacteristic(charuuid, prop_ored, perm_ored);
+            if(value != null)
+                charAdd.setValue(value);
 
-                if((prop_ored & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0){
-                    BluetoothGattDescriptor desc =  new BluetoothGattDescriptor
-                            (UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG),
-                                    perm_ored);
+            if((prop_ored & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0){
+                BluetoothGattDescriptor desc =  new BluetoothGattDescriptor
+                        (UUID.fromString(CLIENT_CHARACTERISTIC_CONFIG),
+                                perm_ored);
 
-                    desc.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-                    charAdd.addDescriptor(desc);
-                }
-
-                srvc.addCharacteristic(charAdd);
+                desc.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+                charAdd.addDescriptor(desc);
             }
+
+            srvc.addCharacteristic(charAdd);
+
             if(srvc != null){
                 return srvc;
             }
@@ -323,7 +322,7 @@ public class GattServer{
         private void processGattAddServiceReq(AddServices AddServ) {
 
             BluetoothGattService lService = createService(AddServ.lserviceUUID,
-                              AddServ.lcharUUIDs, AddServ.lProps,AddServ.lPerms, AddServ.lvalue);
+                              AddServ.lcharUUID, AddServ.lProps,AddServ.lPerms, AddServ.lvalue);
             if(lService != null) {
             Log.d(TAG, AddServ.lserviceUUID.toString());
             Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);

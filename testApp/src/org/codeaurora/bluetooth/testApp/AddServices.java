@@ -33,7 +33,7 @@ import java.util.*;
 public class AddServices {
 
     UUID lserviceUUID;
-    List<UUID> lcharUUIDs;
+    UUID lcharUUID;
     List<Integer> lProps;
     List<Integer> lPerms;
     byte[] lvalue;
