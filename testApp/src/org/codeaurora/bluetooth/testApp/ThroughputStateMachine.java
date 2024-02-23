@@ -98,8 +98,8 @@ public class ThroughputStateMachine {
     private static final String TAG = "ThroughputStateMachine";
     public static int LOG_LEVEL = 6;
 
-    public BleConnectionClass mBleConnect;
-    private Context mcontext;
+    public BleConnectionClass mBleConnect = null;
+    private Context mcontext = null;
     public static TestAppThroughputStateMachine mStateMachine;
     private BluetoothDevice mDevice = null;
 
@@ -107,7 +107,7 @@ public class ThroughputStateMachine {
     private final Object write_mutex = new Object();
     private final Object service_discovery_mutex = new Object();
 
-    public boolean gatt_discovery_done=false;
+    public boolean gatt_discovery_done = false;
     public static boolean write_wait_signalled = false;
 
     /* Variable required for calculating DataRx Tput*/
@@ -128,8 +128,8 @@ public class ThroughputStateMachine {
     public static final int CONN_INTERVAL_MIN_COEX = 16;
 
     /* Macros required for phy update */
-    public static int txPhyReq;
-    public static int rxPhyReq;
+    public static int txPhyReq = 1;
+    public static int rxPhyReq = 1;
     public static int LE_CODED_PHY = 4;
     public static int ALL_PHY = 7;
 

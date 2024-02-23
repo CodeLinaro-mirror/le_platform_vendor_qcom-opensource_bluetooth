@@ -80,9 +80,9 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     public static int LOG_LEVEL = 6;
 
-    private Context mAppContext;
+    private Context mAppContext = null;
     public static WakeLock wl;
-    public static boolean wl_acquired=false;
+    public static boolean wl_acquired = false;
     public static BluetoothManager mBluetoothManager;
 
     /* Flag indicating whether we have called bind on the service. */
@@ -230,9 +230,4 @@ public class MainActivity extends Activity {
             isBound = false;
         }
     };
-
-    /* function to print the message on display */
-    private void showMessage(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
 }

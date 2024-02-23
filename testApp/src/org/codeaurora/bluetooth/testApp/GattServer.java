@@ -98,15 +98,14 @@ import android.bluetooth.le.ScanSettings;
 
 public class GattServer{
     /* Variable to update phy */
-    public static int txPhyReq;
-    public static int rxPhyReq;
+    public static int txPhyReq = 1;
+    public static int rxPhyReq = 1;
     public GattServerMessageHandler mGattServerHandler = null;
     public BleGattServer mgattServer;
     public List<BluetoothDevice> connectedDevices;
     public HashMap<String,BluetoothGattService> Service_List;
-    private BluetoothManager mManager;
-    private BluetoothDevice mdevice;
-    private Context mcontext;
+    private BluetoothDevice mdevice = null;
+    private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
     public static final int MSG_START_BLE_REMOVE_SERVICE = 1;
@@ -234,8 +233,7 @@ public class GattServer{
         };
 
         public void startServer(){
-        mManager = (BluetoothManager) mcontext.getSystemService("bluetooth");
-        mBluetoothGattserver= mManager.openGattServer(mcontext,
+        mBluetoothGattserver= MainActivity.mBluetoothManager.openGattServer(mcontext,
                                       mGattServerCallbacks,BluetoothDevice.TRANSPORT_LE);
         }
     }
@@ -415,7 +413,7 @@ public class GattServer{
         }
 
         private void processGetConnectedDevices() {
-             connectedDevices=mManager.getConnectedDevices(GATT_SERVER);
+             connectedDevices=MainActivity.mBluetoothManager.getConnectedDevices(GATT_SERVER);
              PrintStr.setLength(0);
              PrintStr.append("Connected Device:");
              for (int i = 0; i < connectedDevices.size(); i++)  {

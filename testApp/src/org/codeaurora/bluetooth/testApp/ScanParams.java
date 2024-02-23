@@ -97,7 +97,6 @@ public final class ScanParams {
         NumOfAdvMatches = NumAdvMatches;
         MatchMode = matchMode;
         ReportDelay = reportDelay;
-//       Phy = phy;
         Legacy = legacy;
     }
 
