@@ -38,13 +38,10 @@ import android.bluetooth.le.AdvertisingSetCallback;
 import android.bluetooth.le.AdvertisingSetParameters;
 import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.PeriodicAdvertisingParameters;
-import android.os.Build;
 import android.os.ParcelUuid;
 import android.util.Log;
 import android.os.Message;
 
-
-import java.lang.annotation.Target;
 import java.nio.charset.Charset;
 import java.util.UUID;
 

@@ -39,7 +39,6 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
@@ -51,13 +50,9 @@ import android.os.Message;
 import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.util.Log;
-import android.widget.Toast;
-
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Iterator;
-import java.util.Vector;
 import java.util.Arrays;
 
 public class ScannerService extends Service {

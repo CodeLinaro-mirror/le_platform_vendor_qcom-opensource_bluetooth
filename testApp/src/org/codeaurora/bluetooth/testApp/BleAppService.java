@@ -29,73 +29,34 @@
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-
-import android.app.Activity;
 import android.app.ActivityManager;
 import android.widget.Toast;
-import android.Manifest;
 import android.util.Log;
-import android.util.*;
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.content.ServiceConnection;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.BroadcastReceiver;
 
-import android.os.Bundle;
-import android.os.Build;
 import android.os.SystemProperties;
 import android.os.Handler;
 import android.os.Binder;
 import android.os.IBinder;
-import android.os.ParcelUuid;
 import android.os.Message;
-import android.os.SystemClock;
-import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
-import android.os.RemoteException;
-import android.os.PowerManager;
-import android.os.PowerManager.WakeLock;
 
-import android.util.Log;
-
-import java.util.List;
-import java.util.UUID;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.*;
-import java.util.concurrent.locks.*;
-import java.util.Scanner;
 import java.lang.*;
-import java.util.concurrent.TimeUnit;
-import java.io.*;
 
 import libcore.io.IoUtils;
 import android.app.Service;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothProfile;
-import android.bluetooth.BluetoothManager;
-
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
 
 import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
 import android.app.Notification;
-import android.Manifest;
-import android.app.IntentService;
 import android.app.PendingIntent;
 
 

@@ -34,45 +34,27 @@
 
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-
 import android.app.Activity;
-import android.app.ActivityManager;
-import android.widget.Toast;
 import android.Manifest;
 
 import android.content.ServiceConnection;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.BroadcastReceiver;
-import android.app.IntentService;
 
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Message;
-import android.os.RemoteException;
 
 import android.util.Log;
 
 import java.lang.*;
-import java.io.*;
 
 import libcore.io.IoUtils;
 
-import static android.widget.Toast.makeText;
-
-import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 
-import android.util.Log;
-import android.widget.Toast;
 import android.os.Build;
 import android.bluetooth.BluetoothManager;
 

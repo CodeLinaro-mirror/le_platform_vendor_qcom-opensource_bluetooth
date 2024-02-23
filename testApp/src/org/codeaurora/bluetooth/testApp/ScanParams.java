@@ -31,14 +31,8 @@ package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
-import android.os.Parcel;
 import android.os.ParcelUuid;
-import android.os.Parcelable;
-import android.telecom.Call;
 import android.util.Log;
-import java.lang.annotation.Target;
-import java.nio.charset.Charset;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 
