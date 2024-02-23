@@ -74,9 +74,8 @@ public class GattServer{
     public static final int MSG_START_BLE_GET_SERVICES = 3;
     public static final int MSG_START_BLE_PHY_UPDATE = 4;
     public static final int MSG_START_BLE_READ_PHY = 5;
-    public static final int MSG_START_GET_CONNECTED_DEVICES = 6;
-    public static final int MSG_START_BLE_PAIR = 7;
-    public static final int MSG_START_BLE_DISCONNECT = 8;
+    public static final int MSG_START_BLE_PAIR = 6;
+    public static final int MSG_START_BLE_DISCONNECT = 7;
     public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DISCONNECT;
 
     public static int LOG_LEVEL = 3;
@@ -349,9 +348,6 @@ public class GattServer{
                     String mdeviceAddr = (String) msg.obj;
                     processReadPhyReq(mdeviceAddr);
                     break;
-                case MSG_START_GET_CONNECTED_DEVICES:
-                    processGetConnectedDevices();
-                    break;
                 case MSG_START_BLE_PAIR:
                     String remoteDevice = (String) msg.obj;
                     processStartPair(remoteDevice);
@@ -496,17 +492,6 @@ public class GattServer{
                 PrintStr.append("  ");
                 SocketServer.sendSocketData(PrintStr.toString());
             }
-        }
-
-        private void processGetConnectedDevices() {
-             PrintStr.setLength(0);
-             PrintStr.append("Connected Device:");
-             for (int i = 0; i < connectedDevices.size(); i++)  {
-                 Log.i(TAG,connectedDevices.get(i).getAddress());
-                 PrintStr.append(connectedDevices.get(i).getAddress());
-                 PrintStr.append("  ");
-             }
-             SocketServer.sendSocketData(PrintStr.toString());
         }
 
         private void processStartPair(String bdAddr) {
