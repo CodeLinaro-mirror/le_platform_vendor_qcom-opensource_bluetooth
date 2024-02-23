@@ -124,8 +124,7 @@ public class GattClient {
     public static final int MSG_DESC_WRITE_DONE = MSG_GC_ACTION_MAX_VALUE + 11;
     public static final int MSG_PHY_READ_DONE = MSG_GC_ACTION_MAX_VALUE + 12;
     public static final int MSG_MTU_EXCHANGE_DONE = MSG_GC_ACTION_MAX_VALUE + 13;
-    public static final int MSG_GC_REM_DEV_PAIRED = MSG_GC_ACTION_MAX_VALUE + 14;
-    public static final int MSG_CHAR_CHANGED = MSG_GC_ACTION_MAX_VALUE + 15;
+    public static final int MSG_CHAR_CHANGED = MSG_GC_ACTION_MAX_VALUE + 14;
     public static final int MSG_GC_ACTION_DONE_MAX_VALUE = MSG_CHAR_CHANGED;
 
     private static final int GATT_WRITE = 1;
@@ -524,7 +523,6 @@ public class GattClient {
                     PrintStr.append("Pairing failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
-                BleAppService.pairing_called = BleAppService.PAIRING_REQ_FROM_GATT_CLIENT;
             }
         }
 
@@ -541,7 +539,6 @@ public class GattClient {
                     PrintStr.append("Unpairing failed!");
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
-            BleAppService.pairing_called = 0;
             }
         }
     }
@@ -735,11 +732,6 @@ public class GattClient {
                     String mtu = (String) msg.obj;
                     PrintStr.append("MTU updated to :");
                     PrintStr.append(mtu);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
-                case MSG_GC_REM_DEV_PAIRED:
-                    PrintStr.setLength(0);
-                    PrintStr.append("Device is paired!!");
                     SocketServer.sendSocketData(PrintStr.toString());
                     break;
                 default:

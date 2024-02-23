@@ -30,6 +30,7 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 import android.app.ActivityManager;
+import android.os.Build;
 import android.widget.Toast;
 import android.util.Log;
 
@@ -92,12 +93,6 @@ public class BleAppService extends Service {
     public static final int SCAN_CALLED_FROM_MAIN_ACTIVITY = 1;
     private static final int SCAN_CALLED_FROM_GATT_CLIENT = 2;
     private static final int SCAN_CALLED_FROM_THROUGHPUT_SM = 3;
-
-    /* Variable to keep track of calling source of pair request
-     (MainActivity or Gatt Client or Throughput SM) */
-    public static int pairing_called = 0;
-    public static final int PAIRING_REQ_FROM_THROUGHPUT_SM = 1;
-    public static final int PAIRING_REQ_FROM_GATT_CLIENT = 2;
 
     /* Main Activity Actions */
     public static final int MSG_MA_START_BLE_ADV = 0;
@@ -195,6 +190,7 @@ public class BleAppService extends Service {
 
         IntentFilter Pairingfilter = new IntentFilter();
         Pairingfilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        Pairingfilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
         registerReceiver(mPairingReceiver, Pairingfilter);
         mReceiverRegistered = true;
 
@@ -251,15 +247,51 @@ public class BleAppService extends Service {
                 int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                             BluetoothDevice.ERROR);
                 if (bondState == BluetoothDevice.BOND_BONDED) {
-                    Log.i(TAG, "Device paired");
-                    if(pairing_called == PAIRING_REQ_FROM_GATT_CLIENT){
-                        Message msg = mgattclient.mGattClientHandler.obtainMessage(
-                                 mgattclient.MSG_GC_REM_DEV_PAIRED, null);
-                        mgattclient.mGattClientHandler.sendMessage(msg);
-                    } else if(pairing_called == PAIRING_REQ_FROM_THROUGHPUT_SM) {
-                        throughputSMClass.mStateMachine.sendMessage(throughputSMClass.mStateMachine
-                             .MSG_TA_SM_REM_DEV_PAIRED);
+                    BluetoothDevice bluetoothDevice = intent.getParcelableExtra(
+                                                        BluetoothDevice.EXTRA_DEVICE);
+                    StringBuilder PrintStr = new StringBuilder();
+                    Log.i(TAG, "Device paired!!");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Device is paired ");
+                    PrintStr.append(bluetoothDevice.getAddress());
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            } else if (action.equals(BluetoothDevice.ACTION_PAIRING_REQUEST)) {
+                Log.i(TAG, "Incoming pairing request");
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        int variant = intent.getIntExtra(
+                                        "android.bluetooth.device.extra.PAIRING_VARIANT",
+                                        BluetoothDevice.ERROR);
+                        int index = 0;
+                        Log.i(TAG, "Pairing Variant " + variant);
+                        BluetoothDevice bluetoothDevice = intent.getParcelableExtra(
+                                                              BluetoothDevice.EXTRA_DEVICE);
+
+                        for (index = 0; index < mgattserver.connectedDevices.size(); index++) {
+                            if (mgattserver.connectedDevices.get(index).getAddress().equals(
+                                    bluetoothDevice.getAddress())) {
+                                break;
+                            }
+                        }
+
+                        /* Handle incoming pairing from devices in connectedDevices list only */
+                        if ((mgattserver.connectedDevices.size() > 0)
+                                && (index == mgattserver.connectedDevices.size())) {
+                            Log.i(TAG, "Pairing device not found " + bluetoothDevice.getAddress());
+                            return;
+                        }
+
+                        if ((variant == BluetoothDevice.PAIRING_VARIANT_PASSKEY_CONFIRMATION)
+                            || (variant == BluetoothDevice.PAIRING_VARIANT_CONSENT)) {
+                            bluetoothDevice.setPairingConfirmation(true);
+                        } else if (variant == BluetoothDevice.PAIRING_VARIANT_PIN) {
+                            bluetoothDevice.setPin(new byte[]{'1', '2', '3', '4', '5', '6'});
+                        }
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error occured when trying to auto pair");
+                    e.printStackTrace();
                 }
             }
         }
