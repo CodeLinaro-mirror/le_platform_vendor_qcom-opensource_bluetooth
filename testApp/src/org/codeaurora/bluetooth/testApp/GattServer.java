@@ -74,9 +74,6 @@ public class GattServer{
     public static final int MSG_START_BLE_PAIR = 7;
     public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_PAIR;
 
-    public static final int MSG_ADD_SERVICE_DONE = MSG_GS_ACTION_MAX_VALUE + 1;
-    public static final int MSG_GS_ACTION_DONE_MAX_VALUE = MSG_ADD_SERVICE_DONE;
-
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
@@ -114,17 +111,18 @@ public class GattServer{
              @Override
              public void onServiceAdded(int status, BluetoothGattService service) {
                 if ((status == GATT_SUCCESS)) {
-                 Log.d(TAG, "onServiceAdded() - handle=" + service.getInstanceId()
+                    Log.d(TAG, "onServiceAdded() - handle=" + service.getInstanceId()
                                       + " uuid=" + service.getUuid() + " status=" + status);
-                 msg = mGattServerHandler.obtainMessage(MSG_ADD_SERVICE_DONE,
-                                                               service.getUuid().toString());
-                 mGattServerHandler.sendMessage(msg);
-                } else {
-                     Log.i(TAG, "conn update failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("service added with UUID :");
+                    PrintStr.append(service.getUuid().toString());
+                    SocketServer.sendSocketData(PrintStr.toString());
+              } else {
+                     Log.i(TAG, "AddService failed");
                      PrintStr.setLength(0);
-                     PrintStr.append("Connection Update failed with status: "+ status);
+                     PrintStr.append("AddService failed with status: "+ status);
                      SocketServer.sendSocketData(PrintStr.toString());
-                 }
+              }
              }
 
              @Override
@@ -249,13 +247,6 @@ public class GattServer{
                     String remoteDevice = (String) msg.obj;
                     processStartPair(remoteDevice);
                     break;
-                case MSG_ADD_SERVICE_DONE:
-                    PrintStr.setLength(0);
-                    String interal = (String) msg.obj;
-                    PrintStr.append("service added with UUID :");
-                    PrintStr.append(interal);
-                    SocketServer.sendSocketData(PrintStr.toString());
-                    break;
             }
         }
 
@@ -264,9 +255,11 @@ public class GattServer{
 
             if(LOG_LEVEL >=2)
                 Log.d(TAG, "srvcUUID to be added is:" + srvcUUID);
-            BluetoothGattService srvc = new BluetoothGattService(srvcUUID,
+            BluetoothGattService srvc = mgattServer.mBluetoothGattserver.getService(srvcUUID);
+            if(srvc == null) {
+                srvc = new BluetoothGattService(srvcUUID,
                                                  BluetoothGattService.SERVICE_TYPE_PRIMARY);
-
+            }
             int prop_ored = 0;
             for(int x:props){
                 prop_ored = prop_ored | x;
@@ -303,10 +296,22 @@ public class GattServer{
             BluetoothGattService lService = createService(AddServ.lserviceUUID,
                               AddServ.lcharUUID, AddServ.lProps,AddServ.lPerms, AddServ.lvalue);
             if(lService != null) {
-            Log.d(TAG, AddServ.lserviceUUID.toString());
-            Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
-            mgattServer.mBluetoothGattserver.addService(lService);
-            }
+                if(!Service_List.containsKey(AddServ.lserviceUUID.toString().toUpperCase())){
+                    Log.d(TAG, AddServ.lserviceUUID.toString());
+                    Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
+                    mgattServer.mBluetoothGattserver.addService(lService);
+              } else {
+                    PrintStr.setLength(0);
+                    String interal = AddServ.lserviceUUID.toString();
+                    PrintStr.append("service modified with uuid:");
+                    PrintStr.append(interal);
+                    SocketServer.sendSocketData(PrintStr.toString());
+              }
+          } else {
+                PrintStr.setLength(0);
+                PrintStr.append("service was not Added/Modified");
+                SocketServer.sendSocketData(PrintStr.toString());
+          }
         }
 
         private void processGattRemoveServiceReq(String srvc_uuid) {
