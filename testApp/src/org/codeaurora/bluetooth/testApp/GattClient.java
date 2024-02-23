@@ -421,7 +421,7 @@ public class GattClient {
                                    characteristic.setValue(offset_value.getBytes());
                                    mgattClient.mBluetoothGatt.writeCharacteristic(
                                                 characteristic);
-                                } else if(total_length < length_offset + mtu_size - 5) {
+                                } else if(total_length <= length_offset + mtu_size - 5) {
                                     /* last chunk */
                                     offset_value = RdWrReliableClass.Value.substring(length_offset,
                                           total_length);
@@ -438,11 +438,16 @@ public class GattClient {
                                         length_offset = 0;
                                         reliable_write = false;
                                         reliable_write_no_more_data = false;
+                                        offset_value = null;
                                     } else {
                                         Log.e(TAG, "Execute Write Failed!");
                                         PrintStr.setLength(0);
                                         PrintStr.append("Execute Write failed!");
                                         SocketServer.sendSocketData(PrintStr.toString());
+                                        length_offset = 0;
+                                        reliable_write = false;
+                                        reliable_write_no_more_data = false;
+                                        offset_value = null;
                                     }
                             }
                         } else {
@@ -451,6 +456,9 @@ public class GattClient {
                             /*abort*/
                             mgattClient.mBluetoothGatt.abortReliableWrite();
                             reliable_write = false;
+                            length_offset = 0;
+                            reliable_write_no_more_data = false;
+                            offset_value = null;
                         }
                     }
                 } else {
@@ -458,6 +466,10 @@ public class GattClient {
                     PrintStr.setLength(0);
                     PrintStr.append("Characteristic Write failed with status: "+ status);
                     SocketServer.sendSocketData(PrintStr.toString());
+                    reliable_write = false;
+                    length_offset = 0;
+                    reliable_write_no_more_data = false;
+                    offset_value = null;
                 }
             }
 
@@ -869,22 +881,6 @@ public class GattClient {
             mgattClient.pair();
         }
 
-        private void processExecuteWriteReq() {
-             /*execute write*/
-            if(reliable_write) {
-                if(mgattClient.mBluetoothGatt.executeReliableWrite()) {
-                    Log.i(TAG, "Execute Write Successful!");
-                } else {
-                    Log.e(TAG, "Execute Write Failed!");
-                    PrintStr.setLength(0);
-                    PrintStr.append("Execute Write failed!");
-                    SocketServer.sendSocketData(PrintStr.toString());
-                }
-                reliable_write = false;
-                length_offset = 0;
-            }
-        }
-
         private void processStartUnpair(){
             Log.i(TAG, "Starting Unpair");
             mgattClient.unpair();
@@ -1183,6 +1179,8 @@ public class GattClient {
         private void processGattAbortReliableWrite() {
             mgattClient.mBluetoothGatt.abortReliableWrite();
             reliable_write = false;
+            reliable_write_no_more_data = false;
+            length_offset = 0;
         }
 
         private void processGattReadWriteDescReq(ReadWriteOp RdWrClass) {
