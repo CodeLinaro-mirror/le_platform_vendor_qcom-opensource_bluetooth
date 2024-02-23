@@ -189,6 +189,14 @@ public class GattServer{
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
+
+            @Override
+            public void onCharacteristicReadRequest(BluetoothDevice device, int requestId,
+                                       int offset, BluetoothGattCharacteristic characteristic) {
+                Log.d(TAG, "sendResponse() - device: " + device.getAddress());
+                mgattServer.mBluetoothGattserver.sendResponse(device, requestId, GATT_SUCCESS,
+                                                                 0, characteristic.getValue());
+            }
         };
 
         public void startServer() {
