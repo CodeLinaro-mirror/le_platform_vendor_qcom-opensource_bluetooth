@@ -40,7 +40,6 @@ import android.bluetooth.le.BluetoothLeAdvertiser;
 import android.bluetooth.le.PeriodicAdvertisingParameters;
 import android.os.ParcelUuid;
 import android.util.Log;
-import android.os.Message;
 
 import java.nio.charset.Charset;
 import java.util.UUID;
@@ -75,18 +74,15 @@ public class AdvertiserEntity {
     public int adv_status = ADV_STOPPED;
 
     class AdvSetCallback extends AdvertisingSetCallback {
-        Message msg;
         @Override
         public void onAdvertisingSetStarted(AdvertisingSet advertisingSet,
                                             int txPower, int status) {
-            super.onAdvertisingSetStarted(advertisingSet, txPower, status);
             Log.d(TAG,"onAdvertisingSetStarted status : "+status);
-            
+
             if (status == ADVERTISE_SUCCESS){
                 adv_status = ADV_STARTED;
-                msg = BleAppService.msghandler.obtainMessage(
-                      BleAppService.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
-                BleAppService.msghandler.sendMessage(msg);
+                Log.d(TAG,"onAdvertisingSetStarted, adv_id:" + getAdv_id());
+                mAdvServiceCb.onAdvStarted(getAdv_id());
             } else {
                 StringBuilder PrintStr = new StringBuilder();
 
@@ -101,9 +97,8 @@ public class AdvertiserEntity {
         public void onAdvertisingSetStopped(AdvertisingSet advertisingSet) {
             Log.d(TAG,"onAdvertisingSetStopped");
             adv_status = ADV_STOPPED;
-            msg = BleAppService.msghandler.obtainMessage(
-                      BleAppService.MSG_MA_ADV_STOPPED, Integer.toString(adv_id));
-            BleAppService.msghandler.sendMessage(msg);
+            Log.d(TAG,"onAdvertisingSetStopped, adv_id:" + getAdv_id());
+            mAdvServiceCb.onAdvStopped(getAdv_id());
         }
 
         @Override
@@ -148,12 +143,9 @@ public class AdvertiserEntity {
     class AdvCallback extends AdvertiseCallback {
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-            Log.d(TAG, "Advertisemnt sent");
             adv_status = ADV_STARTED;
-            Message msg;
-            msg = BleAppService.msghandler.obtainMessage(
-                      BleAppService.MSG_MA_ADV_STARTED, Integer.toString(adv_id));
-            BleAppService.msghandler.sendMessage(msg);
+            Log.d(TAG,"onAdvStartSuccess, adv_id:" + getAdv_id());
+            mAdvServiceCb.onAdvStarted(getAdv_id());
             super.onStartSuccess(settingsInEffect);
         }
 
@@ -175,8 +167,8 @@ public class AdvertiserEntity {
 
     public AdvertiserEntity(Adv adv_info, int adv_id,
                             AdvertiserService.AdvServiceCallback mAdvServiceCb) {
-        this.adv_info = adv_info;
-        this.adv_id = adv_id;
+        setAdv_info(adv_info);
+        setAdv_id(adv_id);
         this.mAdvServiceCb = mAdvServiceCb;
         // Advertiser
         mAdvertiser = mBTAdapter.getBluetoothLeAdvertiser();
@@ -186,56 +178,24 @@ public class AdvertiserEntity {
         mAdvSetCallback = new AdvSetCallback();
     }
 
+    public void setAdv_id(int adv_id) {
+        this.adv_id = adv_id;
+    }
+
+    public int getAdv_id() {
+        return this.adv_id;
+    }
+
     public Adv getAdv_info() {
-        return adv_info;
+        return this.adv_info;
     }
 
     public void setAdv_info(Adv adv_info) {
         this.adv_info = adv_info;
     }
 
-    public AdvertiseCallback getmAdvCallback() {
-        return mAdvCallback;
-    }
-
-    public void setmAdvCallback(AdvertiseCallback mAdvCallback) {
-        this.mAdvCallback = mAdvCallback;
-    }
-
-    public AdvertiseSettings getmAdvSettings() {
-        return mAdvSettings;
-    }
-
-    public void setmAdvSettings(AdvertiseSettings mAdvSettings) {
-        this.mAdvSettings = mAdvSettings;
-    }
-
-    public AdvertiseData getmAdvData() {
-        return mAdvData;
-    }
-
-    public void setmAdvData(AdvertiseData mAdvData) {
-        this.mAdvData = mAdvData;
-    }
-
-    public BluetoothLeAdvertiser getmAdvertiser() {
-        return mAdvertiser;
-    }
-
-    public void setmAdvertiser(BluetoothLeAdvertiser mAdvertiser) {
-        this.mAdvertiser = mAdvertiser;
-    }
-
-    public AdvertisingSetParameters getmAdvParams() {
-        return mAdvParams;
-    }
-
-    public void setmAdvParams(AdvertisingSetParameters mAdvParams) {
-        this.mAdvParams = mAdvParams;
-    }
-
     public int getAdv_status() {
-        return adv_status;
+        return this.adv_status;
     }
 
     public boolean BuildAdvertisementParameters(){
@@ -434,6 +394,9 @@ public class AdvertiserEntity {
         try {
             if(adv_info.Legacy){
                 mAdvertiser.stopAdvertising(mAdvCallback);
+                adv_status = ADV_STOPPED;
+                Log.d(TAG,"StopAdvertisement, adv_id:" + getAdv_id());
+                mAdvServiceCb.onAdvStopped(getAdv_id());
                 return true;
             } else {
                 mAdvertiser.stopAdvertisingSet(mAdvSetCallback);
