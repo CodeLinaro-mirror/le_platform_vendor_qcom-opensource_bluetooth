@@ -65,6 +65,7 @@ public class GattServer{
     public HashMap<String,BluetoothGattService> Service_List;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_indicate;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_notify;
+    public List<BluetoothGattService> services;
     private Context mcontext = null;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
@@ -120,7 +121,7 @@ public class GattServer{
                     Log.d(TAG, "onServiceAdded() - handle=" + service.getInstanceId()
                                       + " uuid=" + service.getUuid() + " status=" + status);
                     PrintStr.setLength(0);
-                    PrintStr.append("service added with UUID :");
+                    PrintStr.append("service Added/Modified with UUID :");
                     PrintStr.append(service.getUuid().toString());
                     SocketServer.sendSocketData(PrintStr.toString());
                 } else {
@@ -413,14 +414,13 @@ public class GattServer{
                     Log.d(TAG, AddServ.lserviceUUID.toString());
                     Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
                     mgattServer.mBluetoothGattserver.addService(lService);
-              } else {
-                    PrintStr.setLength(0);
-                    String interal = AddServ.lserviceUUID.toString();
-                    PrintStr.append("service modified with uuid:");
-                    PrintStr.append(interal);
-                    SocketServer.sendSocketData(PrintStr.toString());
-              }
-          } else {
+                } else {
+                    mgattServer.mBluetoothGattserver.removeService(lService);
+                    Service_List.remove(AddServ.lserviceUUID.toString().toUpperCase());
+                    mgattServer.mBluetoothGattserver.addService(lService);
+                    Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
+                }
+            } else {
                 PrintStr.setLength(0);
                 PrintStr.append("service was not Added/Modified");
                 SocketServer.sendSocketData(PrintStr.toString());
@@ -475,10 +475,12 @@ public class GattServer{
             PrintStr.append("Services UUIDS :");
             SocketServer.sendSocketData(PrintStr.toString());
             PrintStr.setLength(0);
-            for ( String key : Service_List.keySet() ) {
-                    PrintStr.append(key);
-                    PrintStr.append("  ");
-             }
+            services = mgattServer.mBluetoothGattserver.getServices();
+            for (int i = 0; i < services.size(); i++) {
+                Log.d(TAG, services.get(i).getUuid().toString());
+                PrintStr.append(services.get(i).getUuid().toString());
+                PrintStr.append("  ");
+            }
             SocketServer.sendSocketData(PrintStr.toString());
         }
 
