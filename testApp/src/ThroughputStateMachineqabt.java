@@ -53,6 +53,7 @@ import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
 
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 
 import android.bluetooth.BluetoothGatt;
@@ -74,7 +75,7 @@ class ThroughputStateMachine {
 
     /* Mutex required for writing characteristics and descriptors */
     private final Object write_char_mutex = new Object();
-	private final Object write_desc_mutex = new Object();
+    private final Object write_desc_mutex = new Object();
     private final Object service_discovery_mutex = new Object();
     private final Object notification_mutex = new Object();
 
@@ -412,7 +413,7 @@ class ThroughputStateMachine {
     public class TestAppThroughputStateMachine extends StateMachine {
 
         public static final int MSG_TA_SM_DEV_FOUND = 0;
-        public static final int MSG_TA_SM_BT_ADAPTER_OFF = 1;
+        public static final int MSG_TA_SM_BT_ADAPTER_STATE_CHANGED = 1;
         public static final int MSG_TA_SM_CONNECT = 2;
         public static final int MSG_TA_SM_REM_DEV_CONNECTED = 3;
         public static final int MSG_TA_SM_DEV_FAILED_TO_CONNECT = 4;
@@ -438,6 +439,10 @@ class ThroughputStateMachine {
         public static final int MSG_TA_SM_DATA_TX_RX_TEST = 24;
         public static final int MSG_TA_SM_TX_RX_TEST_DONE = 25;
         public static final int MSG_TA_SM_CONFIGURE_MTU = 26;
+        public static final int MSG_TA_SM_TX_TEST_FAILED = 27;
+        public static final int MSG_TA_SM_RX_TEST_FAILED = 28;
+        public static final int MSG_TA_SM_TX_RX_TEST_FAILED = 29;
+        public static final int MSG_TA_SM_LAT_TEST_FAILED = 30;
 
         /* Test App Connection states.*/
         private TAIdle mTAIdle;
@@ -486,6 +491,21 @@ class ThroughputStateMachine {
             }
         }
 
+        private void showAdapterMessage(int state) {
+            if(state == BluetoothAdapter.STATE_ON) {
+                Log.i(TAG, "BT Adapter is on");
+                PrintStr.setLength(0);
+                PrintStr.append("BT Adapter is turned on");
+                SocketServer.sendSocketData(PrintStr.toString());
+            } else if ((state == BluetoothAdapter.STATE_OFF)) {
+                Log.i(TAG, "BT Adapter is off");
+                PrintStr.setLength(0);
+                PrintStr.append("BT Adapter is turned off");
+                SocketServer.sendSocketData(PrintStr.toString());
+                transitionTo(mTAIdle);
+            }
+         }
+
         private class TAIdle extends State {
             private static final String TAG = "TAIdle";
 
@@ -505,9 +525,9 @@ class ThroughputStateMachine {
 
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_CONNECT:
                         Scan scn = (Scan)message.obj;
@@ -590,9 +610,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_CANCEL_CONNECT:
                         processCancelConnect();
@@ -716,9 +736,15 @@ class ThroughputStateMachine {
                             Log.d(TAG,"Disconnectflag");
                         transitionTo(mTADisconnect);
                         break;
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
+                    case MSG_TA_SM_DEV_DISCONNECTED:
+                        PrintStr.setLength(0);
+                        PrintStr.append("Remote disconnected");
+                        SocketServer.sendSocketData(PrintStr.toString());
                         transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                        break;
+                   case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int) message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_CONNECTION_UPDATED:
                         Log.d(TAG, "CONNECTION PARAM UPDATED");
@@ -814,9 +840,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
@@ -838,6 +864,18 @@ class ThroughputStateMachine {
                             Log.d(TAG, "Data Tx done, state change to connected");
                         transitionTo(mTAConnected);
                         break;
+                    case MSG_TA_SM_TX_TEST_FAILED:
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
+                        Log.d(TAG,"Release wakelock");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Data Tx Test failed, either service or char is null");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Data Tx failed, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
                     default:
                         return NOT_HANDLED;
                 }
@@ -852,6 +890,7 @@ class ThroughputStateMachine {
                     final UUID UUID_TX_SERVICE = UUID.fromString(DataTxClass.txService);
                     final UUID UUID_TX_CHAR = UUID.fromString(DataTxClass.txChar);
                     float txTputkr = 0;
+                    Message msg;
 
                     wait_for_gatt_service_discovery();
                     /* wait for 500ms for DLE event to be received */
@@ -979,17 +1018,26 @@ class ThroughputStateMachine {
                                                 " in mbps: "+txTputmr);
                                 }
                                 /* Signal SM that TX Test is done*/
-                                Message msg = mStateMachine.obtainMessage(
+                                msg = mStateMachine.obtainMessage(
                                 mStateMachine.MSG_TA_SM_TX_TEST_DONE,Float.toString(txTputkr));
                                 mStateMachine.sendMessage(msg);
                             } catch (IOException e) {
-                                Log.e(TAG, "Exception handling");;
+                                Log.e(TAG, "Exception handling");
+                                msg = mStateMachine.obtainMessage(
+                                mStateMachine.MSG_TA_SM_TX_TEST_FAILED,null);
+                                mStateMachine.sendMessage(msg);
                             }
                         } else {
                             Log.e(TAG, "Characteristic is null!");
+                            msg = mStateMachine.obtainMessage(
+                                mStateMachine.MSG_TA_SM_TX_TEST_FAILED,null);
+                                mStateMachine.sendMessage(msg);
                         }
                     } else {
                         Log.d(TAG, "Service with UUID not found");
+                        msg = mStateMachine.obtainMessage(
+                                mStateMachine.MSG_TA_SM_TX_TEST_FAILED,null);
+                                mStateMachine.sendMessage(msg);
                     }
                 }
             }
@@ -1027,9 +1075,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
@@ -1050,6 +1098,18 @@ class ThroughputStateMachine {
                             Log.d(TAG, "Data Tx Rx done, state change to connected");
                         transitionTo(mTAConnected);
                         break;
+                    case MSG_TA_SM_TX_RX_TEST_FAILED:
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
+                        Log.d(TAG,"Release wakelock");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Data Tx Rx Test failed, either service or char is null");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Data Tx Rx failed, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
                     default:
                         return NOT_HANDLED;
                 }
@@ -1064,6 +1124,7 @@ class ThroughputStateMachine {
                     final UUID UUID_TX_SERVICE = UUID.fromString("0000FF01-0000-1000-8000-00805F9B34FB");
                     final UUID UUID_TX_CHAR = UUID.fromString("0000FF05-0000-1000-8000-00805F9B34FB");
                     final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
+                    Message msg;
 
                     int mtu_intr_size = 244;
                     char[] str = new char[mtu_size];
@@ -1140,14 +1201,20 @@ class ThroughputStateMachine {
                             }
 
                             /* Signal SM that TX Test is done*/
-                            Message msg = mStateMachine.obtainMessage(
+                            msg = mStateMachine.obtainMessage(
                             mStateMachine.MSG_TA_SM_TX_RX_TEST_DONE,null);
                             mStateMachine.sendMessage(msg);
                         } else {
                             Log.e(TAG, "Characteristic is null!");
+                            msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_TX_RX_TEST_FAILED,null);
+                            mStateMachine.sendMessage(msg);
                         }
                     } else {
                         Log.d(TAG, "Service with UUID not found");
+                        msg = mStateMachine.obtainMessage(
+                        mStateMachine.MSG_TA_SM_TX_RX_TEST_FAILED,null);
+                        mStateMachine.sendMessage(msg);
                     }
                 }
             }
@@ -1185,9 +1252,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
@@ -1209,6 +1276,18 @@ class ThroughputStateMachine {
                             Log.d(TAG, "Rx Data Done, state change to connected");
                         transitionTo(mTAConnected);
                         break;
+                    case MSG_TA_SM_RX_TEST_FAILED:
+                        MainActivity.wl.release();
+                        MainActivity.wl_acquired = false;
+                        write_char_wait_signalled = false;
+                        Log.d(TAG,"Release wakelock");
+                        PrintStr.setLength(0);
+                        PrintStr.append("Data Rx Test failed, either service or char is null");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Data Rx failed, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
                     default:
                         return NOT_HANDLED;
                 }
@@ -1223,6 +1302,7 @@ class ThroughputStateMachine {
                     final UUID UUID_RX_CHAR = UUID.fromString(DataRxClass.rxChar);
                     final UUID UUID_CCCD = CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR;
                     int rx_data_size = 244;
+                    Message msg;
                     /* Set the packet size to maximum possible if it exceeds mtu size */
                     if(rx_data_size > (mtu_size - 3)) {
                         rx_data_size = mtu_size - 3;
@@ -1335,14 +1415,20 @@ class ThroughputStateMachine {
                             num_of_notifications = 0;
                             pkt_cnt = 0;
                             /* Signal SM that RX Test is done*/
-                            Message msg = mStateMachine.obtainMessage(
+                            msg = mStateMachine.obtainMessage(
                             mStateMachine.MSG_TA_SM_RX_TEST_DONE,Float.toString(rxTputk));
                             mStateMachine.sendMessage(msg);
                         } else {
                             Log.d(TAG, "Characteristic is null!");
+                            msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_RX_TEST_FAILED,null);
+                            mStateMachine.sendMessage(msg);
                         }
                     } else {
                         Log.d(TAG, "Service with uuid is not found");
+                        msg = mStateMachine.obtainMessage(
+                        mStateMachine.MSG_TA_SM_RX_TEST_FAILED,null);
+                        mStateMachine.sendMessage(msg);
                     }
                 }
             }
@@ -1377,9 +1463,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_DISCONNECT:
                         transitionTo(mTADisconnect);
@@ -1397,6 +1483,14 @@ class ThroughputStateMachine {
                             Log.d(TAG, "Latency test done, state change to connected");
                         transitionTo(mTAConnected);
                         break;
+                    case MSG_TA_SM_LAT_TEST_FAILED:
+                        PrintStr.setLength(0);
+                        PrintStr.append("Latency Test failed, either service or char is null");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        if(ThroughputStateMachine.LOG_LEVEL >= 2)
+                            Log.d(TAG, "Latency test failed, state change to connected");
+                        transitionTo(mTAConnected);
+                        break;
                     default:
                         return NOT_HANDLED;
                 }
@@ -1407,6 +1501,7 @@ class ThroughputStateMachine {
                 public void run() {
                     final UUID UUID_LAT_SERVICE = UUID.fromString(LatencyTestClass.latService);
                     final UUID UUID_LAT_CHAR = UUID.fromString(LatencyTestClass.latChar);
+                    Message msg;
                     Log.i(TAG, "Latency test start");
                     wait_for_gatt_service_discovery();
                     String str = "LatencyTest";
@@ -1436,14 +1531,20 @@ class ThroughputStateMachine {
                             float latency = (float) (latency_end_time_stamp -
                                                         latency_start_time_stamp);
                             Log.i(TAG, "Latency in msec " + latency);
-                            Message msg = mStateMachine.obtainMessage(
+                            msg = mStateMachine.obtainMessage(
                             mStateMachine.MSG_TA_SM_LAT_TEST_DONE,Float.toString(latency));
                             mStateMachine.sendMessage(msg);
                         } else {
                             Log.e(TAG, "Characteristic is null!");
+                            msg = mStateMachine.obtainMessage(
+                            mStateMachine.MSG_TA_SM_LAT_TEST_FAILED,null);
+                            mStateMachine.sendMessage(msg);
                         }
                     } else {
                         Log.d(TAG, "Service with UUID not found ");
+                        msg = mStateMachine.obtainMessage(
+                        mStateMachine.MSG_TA_SM_LAT_TEST_FAILED,null);
+                        mStateMachine.sendMessage(msg);
                     }
                 }
             }
@@ -1472,9 +1573,9 @@ class ThroughputStateMachine {
                 Log.i(TAG, "processMessage: " + message.what);
                 boolean retValue = HANDLED;
                 switch (message.what) {
-                    case MSG_TA_SM_BT_ADAPTER_OFF:
-                        transitionTo(mTAIdle);
-                        Log.i(TAG, "BT Adapter is off");
+                    case MSG_TA_SM_BT_ADAPTER_STATE_CHANGED:
+                        int state = (int)message.obj;
+                        showAdapterMessage(state);
                         break;
                     case MSG_TA_SM_UNPAIR_DEV:
                         mBleConnect.unpair();
