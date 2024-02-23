@@ -30,11 +30,11 @@
 package org.codeaurora.bluetooth.wearos_ble_testapp;
 
 public class ReadWriteOp {
-    int operation;
-    String Srvc_uuid;
-    String Char_uuid;
-    String Desc_uuid;
-    String Value;
-    int Write_type;
-    int Format_type;
+    int operation = 2;
+    String Srvc_uuid = null;
+    String Char_uuid = null;
+    String Desc_uuid = null;
+    String Value = null;
+    int Write_type = 2;
+    int Format_type = 0;
 }
