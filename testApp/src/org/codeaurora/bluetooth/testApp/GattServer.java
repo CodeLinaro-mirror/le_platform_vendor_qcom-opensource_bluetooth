@@ -37,6 +37,7 @@ import android.os.Message;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+
 import java.util.*;
 import java.util.List;
 import java.util.UUID;
@@ -72,7 +73,8 @@ public class GattServer{
     public static final int MSG_START_BLE_READ_PHY = 5;
     public static final int MSG_START_GET_CONNECTED_DEVICES = 6;
     public static final int MSG_START_BLE_PAIR = 7;
-    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_PAIR;
+    public static final int MSG_START_BLE_DISCONNECT = 8;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DISCONNECT;
 
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
@@ -108,8 +110,8 @@ public class GattServer{
 
         private final BluetoothGattServerCallback mGattServerCallbacks =
                                                       new BluetoothGattServerCallback() {
-             @Override
-             public void onServiceAdded(int status, BluetoothGattService service) {
+            @Override
+            public void onServiceAdded(int status, BluetoothGattService service) {
                 if ((status == GATT_SUCCESS)) {
                     Log.d(TAG, "onServiceAdded() - handle=" + service.getInstanceId()
                                       + " uuid=" + service.getUuid() + " status=" + status);
@@ -117,38 +119,37 @@ public class GattServer{
                     PrintStr.append("service added with UUID :");
                     PrintStr.append(service.getUuid().toString());
                     SocketServer.sendSocketData(PrintStr.toString());
-              } else {
-                     Log.i(TAG, "AddService failed");
-                     PrintStr.setLength(0);
-                     PrintStr.append("AddService failed with status: "+ status);
-                     SocketServer.sendSocketData(PrintStr.toString());
-              }
-             }
+                } else {
+                    Log.i(TAG, "AddService failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("AddService failed with status: " + status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
+            }
 
-             @Override
-             public void onConnectionStateChange(BluetoothDevice device, int status,int newState) {
-                 Log.d(TAG, "onConnectionStateChange() got connection event");
-                 if(newState == BluetoothProfile.STATE_CONNECTED &&
-                                                   !connectedDevices.contains(device)  ) {
+            @Override
+            public void onConnectionStateChange(BluetoothDevice device, int status, int newState) {
+                Log.d(TAG, "onConnectionStateChange() got connection event");
+                if (newState == BluetoothProfile.STATE_CONNECTED &&
+                        !connectedDevices.contains(device)) {
                     mGattServerHandler.processConnectReq(device);
                     PrintStr.setLength(0);
-                    PrintStr.append("Device Connected : ");
+                    PrintStr.append("GattServer: Device Connected - ");
                     PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
                     connectedDevices.add(device);
-               } else if(newState == BluetoothProfile.STATE_DISCONNECTED){
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED &&
+                        connectedDevices.contains(device)) {
                     PrintStr.setLength(0);
-                    PrintStr.append("Device Disonnected : ");
+                    PrintStr.append("GattServer: Device Disonnected - ");
                     PrintStr.append(device.getAddress());
                     SocketServer.sendSocketData(PrintStr.toString());
                     connectedDevices.remove(device);
-               }
+                }
+            }
 
-             }
-
-             @Override
-             public void onPhyUpdate(BluetoothDevice device, int txPhy, int rxPhy, int status) {
-
+            @Override
+            public void onPhyUpdate(BluetoothDevice device, int txPhy, int rxPhy, int status) {
                 if ((status == GATT_SUCCESS)) {
                     Log.i(TAG, "on Phy updated:"
                          + " tx phy " + txPhy + " rx phy " + rxPhy +" status " + status);
@@ -167,11 +168,11 @@ public class GattServer{
                     PrintStr.append("Phy Update failed with status: "+ status);
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
-             }
+            }
 
             @Override
             public void onPhyRead(BluetoothDevice device, int txPhy, int rxPhy, int status) {
-                if(status == GATT_SUCCESS){
+                if (status == GATT_SUCCESS) {
                     Log.i(TAG, "Read Phy: Tx Phy-"+txPhy+"Rx Phy:"+rxPhy);
                     PrintStr.setLength(0);
                     PrintStr.append("Phy Read, BDAddress:");
@@ -181,18 +182,18 @@ public class GattServer{
                     PrintStr.append(" Rx Phy :");
                     PrintStr.append(rxPhy);
                     SocketServer.sendSocketData(PrintStr.toString());
-                 } else{
-                     Log.i(TAG, "Read Phy failed");
-                     PrintStr.setLength(0);
-                     PrintStr.append("Read Phy failed with status: "+ status);
-                     SocketServer.sendSocketData(PrintStr.toString());
-                 }
+                } else {
+                    Log.i(TAG, "Read Phy failed");
+                    PrintStr.setLength(0);
+                    PrintStr.append("Read Phy failed with status: " + status);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
             }
         };
 
-        public void startServer(){
-        mBluetoothGattserver= MainActivity.mBluetoothManager.openGattServer(mcontext,
-                                      mGattServerCallbacks,BluetoothDevice.TRANSPORT_LE);
+        public void startServer() {
+            mBluetoothGattserver = MainActivity.mBluetoothManager.openGattServer(mcontext,
+                    mGattServerCallbacks, BluetoothDevice.TRANSPORT_LE);
         }
     }
 
@@ -246,6 +247,10 @@ public class GattServer{
                 case MSG_START_BLE_PAIR:
                     String remoteDevice = (String) msg.obj;
                     processStartPair(remoteDevice);
+                    break;
+                case MSG_START_BLE_DISCONNECT:
+                    String bdAddr = (String) msg.obj;
+                    processDisconnectReq(bdAddr);
                     break;
             }
         }
@@ -419,6 +424,15 @@ public class GattServer{
 
         private void processConnectReq(BluetoothDevice mdevice) {
             mgattServer.mBluetoothGattserver.connect(mdevice,false);
+        }
+
+        public void processDisconnectReq(String bdAddr) {
+            if (mgattServer.mBluetoothGattserver != null) {
+                BluetoothDevice remoteDevice = getRemoteDevice(bdAddr);
+                if (remoteDevice != null) {
+                    mgattServer.mBluetoothGattserver.cancelConnection(remoteDevice);
+                }
+            }
         }
 
         private BluetoothDevice getRemoteDevice(String address) {
