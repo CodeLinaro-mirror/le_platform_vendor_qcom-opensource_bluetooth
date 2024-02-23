@@ -185,6 +185,7 @@ public class GattClient {
         }
         /* stop the looper */
         glooper.quitSafely();
+        mGattClientHandler.processCloseReq();
     }
 
     /* Connection Class */
@@ -833,6 +834,11 @@ public class GattClient {
             Log.i(TAG, "Disconnecting!");
             mConnectionStatus = BLE_STATE_DISCONNECTING;
             mgattClient.disconnect();
+        }
+
+        private void processCloseReq() {
+            Log.i(TAG, "Close!");
+            mgattClient.mBluetoothGatt.close();
         }
 
         private void processPhyUpdateReq(PhyUpdate phyUpdate){
