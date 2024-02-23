@@ -292,8 +292,8 @@ public class SocketServer {
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");
-                    sendStr.append("                       SetPhy                       (Ex: SetPhy Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
-                    sendStr.append("                       ReadPhy\n");
+                    sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
+                    sendStr.append("                       ReadPhy                      (Ex: ReadPhy )\n");
                     sendStr.append("                       GetConnectedDevices\n");
                     sendStr.append("                       Back\n");
                     sendStr.append("**********************************************************\n");
@@ -710,10 +710,10 @@ public class SocketServer {
                             BleAppService.msghandler.sendMessage(msg);
                         } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
-                            if (phyUpdateParam != null) {
+                            if (phyUpdateParam != null ) {
                               processOutputState = NONE;
                               msg = BleAppService.msghandler.obtainMessage(
-                                     BleAppService.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
+                                BleAppService.MSG_GS_START_BLE_PHY_UPDATE, phyUpdateParam);
                               BleAppService.msghandler.sendMessage(msg);
                             } else {
                               processOutputState = INVALID_INPUT;
@@ -738,7 +738,7 @@ public class SocketServer {
                         } else if (tmp[0].equals("ReadPhy")) {
                              processOutputState = NONE;
                              msg = BleAppService.msghandler.obtainMessage(
-                                     BleAppService.MSG_GS_START_BLE_READ_PHY, null);
+                                        BleAppService.MSG_GS_START_BLE_READ_PHY, null);
                              BleAppService.msghandler.sendMessage(msg);
                         } else if(tmp[0].equals("GetConnectedDevices")) {
                             processOutputState = NONE;
