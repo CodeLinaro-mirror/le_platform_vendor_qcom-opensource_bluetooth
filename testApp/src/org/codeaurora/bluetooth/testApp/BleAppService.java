@@ -652,10 +652,11 @@ public class BleAppService extends Service {
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 case MSG_GS_START_BLE_READ_PHY:
+                    bdAddr = (String) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
-                              mgattserver.MSG_START_BLE_READ_PHY, null);
-                    mgattserver.mGattServerHandler.sendMessage(msg);
-                    break;
+                              mgattserver.MSG_START_BLE_READ_PHY, bdAddr);
+                     mgattserver.mGattServerHandler.sendMessage(msg);
+                     break;
                 case MSG_GS_START_GET_CONNECTED_DEVICES:
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                              mgattserver.MSG_START_GET_CONNECTED_DEVICES, null);

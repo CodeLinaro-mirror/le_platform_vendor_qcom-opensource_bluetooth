@@ -246,7 +246,8 @@ public class GattServer{
                     processPhyUpdateReq(phyUpdate);
                     break;
                 case MSG_START_BLE_READ_PHY:
-                    processReadPhyReq();
+                    String mdeviceAddr = (String) msg.obj;
+                    processReadPhyReq(mdeviceAddr);
                     break;
                 case MSG_START_GET_CONNECTED_DEVICES:
                     processGetConnectedDevices();
@@ -387,13 +388,17 @@ public class GattServer{
             SocketServer.sendSocketData(PrintStr.toString());
         }
 
-        private void processReadPhyReq() {
+        private void processReadPhyReq(String bdAddr) {
             Log.i(TAG, "Read Phy");
-            BluetoothDevice mdevice;
-            if (connectedDevices.size() > 0) {
-                /*Update it for the first connection till option modified*/
-                mdevice = connectedDevices.get(0);
+            BluetoothDevice mdevice = getRemoteDevice(bdAddr);
+            if (mdevice != null) {
                 mgattServer.mBluetoothGattserver.readPhy(mdevice);
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("Device not in connected list");
+                PrintStr.append(bdAddr);
+                PrintStr.append("  ");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 
