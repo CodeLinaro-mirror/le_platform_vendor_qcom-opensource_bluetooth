@@ -90,6 +90,7 @@ public class BleAppService extends Service {
     public static  boolean boundS = false;
 
     public static boolean mReceiverRegistered = false;
+    public static boolean mAdapterReceiverRegistered = false;
     public static boolean isServiceRunning = false;
 
     public static AdvertiserService mAdvertiseService = null;
@@ -179,7 +180,8 @@ public class BleAppService extends Service {
     public static final int MSG_SM_START_REQ_CONN_PRIORITY = MSG_GC_MAX_ACTION_VALUE + 13;
     public static final int MSG_SM_START_BLE_TX_RX_TEST = MSG_GC_MAX_ACTION_VALUE + 14;
     public static final int MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE = MSG_GC_MAX_ACTION_VALUE + 15;
-    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_START_BLE_GATT_CONFIGURE_MTU_SIZE;
+    public static final int MSG_SM_ADAPTER_STATE_CHANGED = MSG_GC_MAX_ACTION_VALUE + 16;
+    public static final int MSG_SM_MAX_ACTION_VALUE = MSG_SM_ADAPTER_STATE_CHANGED;
 
     /* GATT Server Actions */
     public static final int MSG_GS_START_BLE_ADD_SERVICE = MSG_SM_MAX_ACTION_VALUE + 1;
@@ -238,6 +240,11 @@ public class BleAppService extends Service {
         registerReceiver(mPairingReceiver, Pairingfilter);
         mReceiverRegistered = true;
 
+        IntentFilter Adapterfilter = new IntentFilter();
+        Adapterfilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        registerReceiver(mAdapterReceiver, Adapterfilter);
+        mAdapterReceiverRegistered = true;
+
         HandlerThread Thread = new HandlerThread("BleAppServiceHandler");
         Thread.start();
 
@@ -282,6 +289,23 @@ public class BleAppService extends Service {
         }
         return false;
     }
+
+    public final BroadcastReceiver mAdapterReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(intent.getAction())) {
+                int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1);
+                int newState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
+                Log.d(TAG, "Previous state: " + previousState + " New state: " + newState);
+                if((newState == BluetoothAdapter.STATE_OFF) ||
+                   (newState == BluetoothAdapter.STATE_ON)) {
+                Message msg = BleAppService.msghandler.obtainMessage(
+                                     BleAppService.MSG_SM_ADAPTER_STATE_CHANGED, newState);
+                    BleAppService.msghandler.sendMessage(msg);
+                }
+            }
+        }
+    };
 
     public final BroadcastReceiver mPairingReceiver = new BroadcastReceiver() {
         @Override
@@ -395,6 +419,15 @@ public class BleAppService extends Service {
             }
         }catch(Exception E) {
             Log.d(TAG, "not able to unregister");
+        }
+        /* Unregistering Adapter Receiver */
+        try{
+           if(mAdapterReceiverRegistered) {
+                unregisterReceiver(mAdapterReceiver);
+                mAdapterReceiverRegistered = false;
+            }
+        }catch(Exception E) {
+            Log.d(TAG, "not able to unregister Adapter receiver");
         }
 
         /* stop Gatt Client handler */
@@ -819,6 +852,11 @@ public class BleAppService extends Service {
                     initObj = (Scan) message.obj;
                     msg = throughputSMClass.mStateMachine.obtainMessage(
                               throughputSMClass.mStateMachine.MSG_TA_SM_CONNECT_TO_BDADDR, initObj);
+                    throughputSMClass.mStateMachine.sendMessage(msg);
+                    break;
+                case MSG_SM_ADAPTER_STATE_CHANGED:
+                    msg = throughputSMClass.mStateMachine.obtainMessage(
+                              throughputSMClass.mStateMachine.MSG_TA_SM_BT_ADAPTER_STATE_CHANGED, message.obj);
                     throughputSMClass.mStateMachine.sendMessage(msg);
                     break;
                 case MSG_SM_BLE_GATT_CANCEL_CONNECT:
