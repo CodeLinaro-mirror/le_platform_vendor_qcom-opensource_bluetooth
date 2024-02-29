@@ -855,8 +855,9 @@ class GattClient {
                     processCancelConnect();
                     break;
                 case MSG_BLE_SCAN_DEV_FOUND:
+                    int  primaryphy= (int) msg.arg1;
                     BluetoothDevice device = (BluetoothDevice) msg.obj;
-                    processScanDevFound(device);
+                    processScanDevFound(device, primaryphy);
                     break;
                 case MSG_START_BLE_PHY_UPDATE:
                     PhyUpdate phyUpdate = (PhyUpdate) msg.obj;
@@ -971,12 +972,12 @@ class GattClient {
             }
         }
 
-        private void processScanDevFound(BluetoothDevice device) {
+        private void processScanDevFound(BluetoothDevice device, int primaryphy) {
             Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
             if(BleAppService.mScannerService.mScanstatus) {
                 BleAppService.mScannerService.stopScan();
             }
-            mgattClient.connect(device, BluetoothDevice.PHY_LE_1M, false);
+            mgattClient.connect(device, primaryphy, false);
         }
 
 
