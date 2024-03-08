@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <cstdio>
 #include "include/log.h"
+#include "include/compat.h"
 //#include "properties.h"
 
 #define LOG_TAG "HAL"
@@ -172,7 +173,7 @@ int hw_get_module_by_class(const char *class_id, const char *inst,
     if (inst)
         snprintf(name, PATH_MAX, "%s.%s", class_id, inst);
     else
-        strncpy(name, class_id, PATH_MAX);
+        strlcpy(name, class_id, PATH_MAX);
 
     /*
      * Here we rely on the fact that calling dlopen multiple times on
