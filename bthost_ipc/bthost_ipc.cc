@@ -1160,7 +1160,7 @@ int audio_stream_close()
 
     skt_disconnect(audio_stream.ctrl_fd);
     audio_stream.ctrl_fd = AUDIO_SKT_DISCONNECTED;
-    return 0;
+    return 1;
 }
 int audio_stop_stream()
 {
