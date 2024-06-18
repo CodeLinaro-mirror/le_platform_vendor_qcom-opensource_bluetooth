@@ -202,6 +202,8 @@ public class GattClient {
         private BluetoothSocket socket;
         public AcceptThread(boolean SecureFlag) {
             mSecureFlag = SecureFlag;
+        }
+        public void createserversocket() {
             try {
                 if(mSecureFlag == true)
                 {
@@ -228,6 +230,7 @@ public class GattClient {
 
         }
         public void run() {
+            createserversocket();
             byte[] buffer = new byte[8010];
             int bytes;
             long rx_start_time = 0, rx_end_time = 0;
@@ -363,26 +366,62 @@ public class GattClient {
     }
 
     public class ConnectedThread extends Thread {
-            private final BluetoothSocket mmSocket;
-            private final InputStream mmInStream;
+            private InputStream mmInStream;
             private OutputStream mOutputStream;
+            boolean mSecureFlag;
+            String DeviceAddress;
+            int mpsm;
 
-            public ConnectedThread(BluetoothSocket socket) {
+            public ConnectedThread(LecocConnect LecocConnClass) {
+                DeviceAddress = LecocConnClass.DeviceAddress;
+                mSecureFlag   = LecocConnClass.secure_flag;
+                mpsm   = LecocConnClass.psm;
+            }
+            public void CreateClientSocket() {
                 Log.d(TAG, "create ConnectedThread" );
-                mmSocket = socket;
-                InputStream tmpIn = null;
-
-                // Get the BluetoothSocket input stream
                 try {
-                    tmpIn = socket.getInputStream();
-                    mOutputStream = socket.getOutputStream();
+                    BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(DeviceAddress);
+                    if (mSecureFlag == true)
+                    {
+                        Log.d(TAG, "processGattLeCocConnect - Secure  ");
+                        mSocket = remoteDevice.createL2capChannel(mpsm);
+                    }
+                    else{
+                        Log.d(TAG, "processGattLeCocConnect - In Secure  ");
+                        mSocket = remoteDevice.createInsecureL2capChannel(mpsm);
+                    }
+                    mSocket.connect();
                 } catch (Exception e) {
-                    Log.e(TAG, "temp sockets not created", e);
+                    Log.e(TAG,"got error while executing createL2CapChannel" + e);
+                    // Close the socket
+                    try {
+                        mSocket.close();
+                    } catch (Exception e2) {
+                        Log.e(TAG, "unable to close() socket during connection failure"+ e2);
+                        return;
+                    }
+
                 }
-                mmInStream = tmpIn;
+                if (mSocket != null) {
+                    InputStream tmpIn = null;
+
+                    // Get the BluetoothSocket input stream
+                    try {
+                        tmpIn = mSocket.getInputStream();
+                        mOutputStream = mSocket.getOutputStream();
+                    } catch (Exception e) {
+                        Log.e(TAG, "temp sockets not created", e);
+                        return;
+                    }
+                    mmInStream = tmpIn;
+                    PrintStr.setLength(0);
+                    PrintStr.append("LE COC Connect Successfull" +mpsm);
+                    SocketServer.sendSocketData(PrintStr.toString());
+                }
             }
 
             public void run() {
+                CreateClientSocket();
                 Log.i(TAG, "BEGIN mConnectedThread");
                 int bytes;
                 long rx_start_time = 0, rx_end_time = 0;
@@ -452,7 +491,7 @@ public class GattClient {
 
             public void cancel() {
                 try {
-                    mmSocket.close();
+                    mSocket.close();
                     PrintStr.setLength(0);
                     PrintStr.append(" Client Socket Disconnected");
                     SocketServer.sendSocketData(PrintStr.toString());
@@ -1037,8 +1076,9 @@ public class GattClient {
                     processCancelConnect();
                     break;
                 case MSG_BLE_SCAN_DEV_FOUND:
+                    int  primaryphy= (int) msg.arg1;
                     BluetoothDevice device = (BluetoothDevice) msg.obj;
-                    processScanDevFound(device);
+                    processScanDevFound(device, primaryphy);
                     break;
                 case MSG_START_BLE_CONN_UPDATE:
                     ConnUpdate ConnUpdateClass = (ConnUpdate) msg.obj;
@@ -1166,12 +1206,12 @@ public class GattClient {
             }
         }
 
-        private void processScanDevFound(BluetoothDevice device) {
+        private void processScanDevFound(BluetoothDevice device, int primaryphy) {
             Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
             if(BleAppService.mScannerService.mScanstatus) {
                 BleAppService.mScannerService.stopScan();
             }
-            mgattClient.connect(device, BluetoothDevice.PHY_LE_1M, false, TRANSPORT_LE);
+            mgattClient.connect(device, primaryphy, false, TRANSPORT_LE);
         }
 
         private void processConnUpdateReq(ConnUpdate ConnUpdateClass){
@@ -1622,7 +1662,7 @@ public class GattClient {
             length_offset = 0;
             is_op_in_progress = false;
         }
-
+/*
         private void processGattLeCoCRead(BluetoothSocket socket)
         {
             // Cancel any thread currently running a connection
@@ -1642,37 +1682,23 @@ public class GattClient {
             mConnectedThread = new ConnectedThread(socket);
             mConnectedThread.start();
         }
-
+*/
         private void processGattLeCocConnect(LecocConnect LecocConnClass) {
-            try {
-                BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(LecocConnClass.DeviceAddress);
-                if(LecocConnClass.secure_flag == true)
-                {
-                    Log.d(TAG, "processGattLeCocConnect - Secure  ");
-                    mSocket = remoteDevice.createL2capChannel(LecocConnClass.psm);
-                }
-                else{
-                    Log.d(TAG, "processGattLeCocConnect - In Secure  ");
-                    mSocket = remoteDevice.createInsecureL2capChannel(LecocConnClass.psm);
-                }
-                mSocket.connect();
-            } catch(Exception e) {
-                Log.e(TAG,"got error while executing createL2CapChannel" + e);
-                // Close the socket
-                try {
-                    mSocket.close();
-                } catch (Exception e2) {
-                    Log.e(TAG, "unable to close() socket during connection failure"+ e2);
-                }
+            // Cancel any thread currently running a connection
+            if (mConnectedThread != null) {mConnectedThread.cancel(); mConnectedThread = null;}
 
+            // Cancel the accept thread because we only want to connect to one device
+            if (mSecureAcceptThread != null) {
+                mSecureAcceptThread.cancel();
+                mSecureAcceptThread = null;
             }
-            if(mSocket!=null)
-            {
-                PrintStr.setLength(0);
-                PrintStr.append("LE COC Connect Successfull" +LecocConnClass.psm);
-                SocketServer.sendSocketData(PrintStr.toString());
-                processGattLeCoCRead(mSocket);
+            if (mInsecureAcceptThread != null) {
+                mInsecureAcceptThread.cancel();
+                mInsecureAcceptThread = null;
             }
+            mConnectedThread = new ConnectedThread(LecocConnClass);
+            Thread t1 = new Thread(mConnectedThread);
+            t1.start();
         }
         private void processGattLeCocWrite (int ChunkSize) {
             Log.d(TAG, "processGattLeCocWrite ");

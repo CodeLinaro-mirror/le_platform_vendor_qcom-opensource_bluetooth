@@ -205,6 +205,7 @@ public class ScannerService extends Service {
             final String devName = scanRecord.getDeviceName();
             final int rssi = result.getRssi();
             final ScanResult r = result;
+            final int primaryphy = r.getPrimaryPhy();
             byte[] bytes = result.getScanRecord().getBytes();
             Log.d(TAG, "Device found, devName: "+devName);
             if(!mScanstatus)
@@ -259,7 +260,7 @@ public class ScannerService extends Service {
             }
 
             Message msg = BleAppService.msghandler.obtainMessage(
-                      BleAppService.MSG_MA_SCAN_DEV_FOUND, bluetoothDevice);
+                      BleAppService.MSG_MA_SCAN_DEV_FOUND, primaryphy, 0, bluetoothDevice);
             BleAppService.msghandler.sendMessage(msg);
         }
 

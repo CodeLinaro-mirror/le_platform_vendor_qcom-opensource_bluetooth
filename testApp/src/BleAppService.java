@@ -592,8 +592,9 @@ public class BleAppService extends Service {
                     break;
                 case MSG_MA_SCAN_DEV_FOUND:
                     Log.d(TAG, "scan dev found(main activity)");
+                    int primaryphy = (int)message.arg1;
                     BluetoothDevice device = (BluetoothDevice) message.obj;
-                    processScanCb(device);
+                    processScanCb(device, primaryphy);
                     break;
                 case MSG_MA_ADV_STARTED:
                     PrintStr.setLength(0);
@@ -992,11 +993,15 @@ public class BleAppService extends Service {
             }
         }
 
-        private void processScanCb(BluetoothDevice device) {
-            Log.d(TAG, "processScanCb(main activity)"+scan_called);
+        private void processScanCb(BluetoothDevice device, int primaryphy) {
+            Log.d(TAG, "processScanCb(main activity) primaryphy: "+scan_called +primaryphy);
+            if(primaryphy == BluetoothDevice.PHY_LE_CODED){
+               primaryphy = 4 ; //converstion connect to coded phy value = 4
+               Log.d(TAG, "processScanCb after conversion primary phy: "+primaryphy);
+            }
             if(scan_called == SCAN_CALLED_FROM_GATT_CLIENT){
                 msg = mgattclient.mGattClientHandler.obtainMessage(
-                            mgattclient.MSG_BLE_SCAN_DEV_FOUND, device);
+                            mgattclient.MSG_BLE_SCAN_DEV_FOUND, primaryphy, 0, device);
                 mgattclient.mGattClientHandler.sendMessage(msg);
             } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
                 msg = throughputSMClass.mStateMachine.obtainMessage(
