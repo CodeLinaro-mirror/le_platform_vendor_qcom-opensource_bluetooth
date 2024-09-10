@@ -347,11 +347,11 @@ class ThroughputStateMachine {
             }
         };
 
-        public void connect(BluetoothDevice device){
+        public void connect(BluetoothDevice device, int initPhy){
             if(BleAppService.bleAdapter!=null) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
-                mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE);
+                mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE, initPhy);
             }
         }
 
@@ -541,16 +541,17 @@ class ThroughputStateMachine {
                         }
                         break;
                     case MSG_TA_SM_CONNECT_TO_BDADDR:
-                        String bdAddr = (String) message.obj;
-                        processConnectToBdaddr(bdAddr);
+                        Scan init = (Scan) message.obj;
+                        processConnectToBdaddr(init);
                         break;
                     case MSG_TA_SM_CANCEL_CONNECT:
                         processCancelConnect();
                         transitionTo(mTAIdle);
                         break;
                     case MSG_TA_SM_DEV_FOUND:
+                        int primaryphy = (int) message.arg1;
                         BluetoothDevice device = (BluetoothDevice) message.obj;
-                        processSMDevFoundEvent(device);
+                        processSMDevFoundEvent(device, primaryphy);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -558,22 +559,22 @@ class ThroughputStateMachine {
                 return retValue;
             }
 
-            private void processConnectToBdaddr(String bdAddr) {
+            private void processConnectToBdaddr(Scan init) {
                 if(BleAppService.bleAdapter != null) {
-                    Log.i(TAG, "Connect to Address: " + bdAddr);
+                    Log.i(TAG, "Connect to Address: " + init.DeviceAddress);
                     BluetoothDevice remoteDevice =
-                            BleAppService.bleAdapter.getRemoteDevice(bdAddr);
-                    mBleConnect.connect(remoteDevice);
+                            BleAppService.bleAdapter.getRemoteDevice(init.DeviceAddress);
+                    mBleConnect.connect(remoteDevice, init.initPhy);
                     transitionTo(mTAConnectPending);
                 }
             }
 
-            private void processSMDevFoundEvent(BluetoothDevice device) {
+            private void processSMDevFoundEvent(BluetoothDevice device, int primaryphy) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
                 if(BleAppService.mScannerService.mScanstatus) {
                     BleAppService.mScannerService.stopScan();
                 }
-                mBleConnect.connect(device);
+                mBleConnect.connect(device, primaryphy);
                 transitionTo(mTAConnectPending);
             }
 

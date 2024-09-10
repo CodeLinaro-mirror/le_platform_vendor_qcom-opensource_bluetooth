@@ -1008,7 +1008,7 @@ public class BleAppService extends Service {
                 mgattclient.mGattClientHandler.sendMessage(msg);
             } else if (scan_called == SCAN_CALLED_FROM_THROUGHPUT_SM){
                 msg = throughputSMClass.mStateMachine.obtainMessage(
-                        throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, device);
+                        throughputSMClass.mStateMachine.MSG_TA_SM_DEV_FOUND, primaryphy, 0, device);
                 throughputSMClass.mStateMachine.sendMessage(msg);
             } else {
                /* do nothing */
