@@ -68,4 +68,4 @@ libhidlclient_la_CC = @CC@
 libhidlclient_la_SOURCES = $(cpp_sources)
 libhidlclient_la_CPPFLAGS = $(AM_CPPFLAGS) -std=c++11 $(common_CPPFLAGS) -g -O0 -DFTM
 libhidlclient_la_CFLAGS = $(common_CFLAGS) -DFTM
-libhidlclient_la_LDFLAGS := $(common_LDFLAGS) -shared
+libhidlclient_la_LDFLAGS := $(common_LDFLAGS) -shared -version-number @LT_VERSION_NUMBER@

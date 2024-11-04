@@ -30,7 +30,7 @@ lib_LTLIBRARIES =  libbthost_if.la
 libbthost_if_la_SOURCES = $(ipc_sources)
 libbthost_if_la_CPPFLAGS =$(AM_CPPFLAGS)    $(common_CFLAGS)
 libbthost_if_la_CFLAGS = $(common_CFLAGS)
-libbthost_if_la_LDFLAGS = $(common_LDFLAGS) -avoid-version
+libbthost_if_la_LDFLAGS = $(common_LDFLAGS) -version-number @LT_VERSION_NUMBER@
 
 ########BT_HOST_SINK_IPC########
 ipc_avk_sources = \
@@ -41,4 +41,4 @@ lib_LTLIBRARIES +=  libbthost_if_sink.la
 libbthost_if_sink_la_SOURCES = $(ipc_avk_sources)
 libbthost_if_sink_la_CPPFLAGS =$(AM_CPPFLAGS)    $(common_CFLAGS)
 libbthost_if_sink_la_CFLAGS = $(common_CFLAGS)
-libbthost_if_sink_la_LDFLAGS = $(common_LDFLAGS) -avoid-version
+libbthost_if_sink_la_LDFLAGS = $(common_LDFLAGS) -version-number @LT_VERSION_NUMBER@

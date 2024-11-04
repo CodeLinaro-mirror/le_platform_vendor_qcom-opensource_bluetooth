@@ -8,4 +8,4 @@ libbtvendorhal_la_CPPFLAGS += -I${BT_SOURCE}/stack/system/bt/include
 libbtvendorhal_la_CPPFLAGS += -I${BT_SOURCE}/stack/system/bt
 libbtvendorhal_la_CPPFLAGS += -I${BT_SOURCE}/btapp/bt-app/osi
 libbtvendorhal_la_CPPFLAGS += -I${BT_SOURCE}/bt_audio/hal/include
-libbtvendorhal_la_LDFLAGS = -ldl -D__GLIBC__
+libbtvendorhal_la_LDFLAGS = -ldl -D__GLIBC__  -version-number @LT_VERSION_NUMBER@
