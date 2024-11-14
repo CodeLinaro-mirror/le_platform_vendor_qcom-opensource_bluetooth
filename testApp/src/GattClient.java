@@ -640,6 +640,7 @@ public class GattClient {
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 PrintStr.setLength(0);
                 PrintStr.append("Gatt Service discovery!!");
+                SocketServer.sendSocketData(PrintStr.toString());
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG, "onService discovery success");
                     mServices = gatt.getServices();
@@ -652,6 +653,7 @@ public class GattClient {
                     }
                     for (BluetoothGattService service : mServices) {
                         Log.d(TAG, "Found service: " + service.getUuid());
+                        PrintStr.setLength(0);
                         PrintStr.append("\n------------------------------------------------\n");
                         PrintStr.append("Service UUID:");
                         PrintStr.append(service.getUuid());
@@ -670,8 +672,10 @@ public class GattClient {
                                 PrintStr.append(descriptor.getUuid());
                                 mDescUUID.add(descriptor.getUuid());
                              }
-                         }
+                        }
+                        SocketServer.sendSocketData(PrintStr.toString());
                     }
+                    PrintStr.setLength(0);
                     PrintStr.append("\nGatt Service discovery done!!");
                     SocketServer.sendSocketData(PrintStr.toString());
                 } else {
