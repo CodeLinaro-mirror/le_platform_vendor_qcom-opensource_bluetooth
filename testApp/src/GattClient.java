@@ -1249,6 +1249,7 @@ public class GattClient {
 
         private void processCloseReq() {
             Log.i(TAG, "Unregistering!");
+            mConnectionStatus = BLE_STATE_DISCONNECTED;
             PrintStr.setLength(0);
             PrintStr.append("Unregistering!");
             SocketServer.sendSocketData(PrintStr.toString());
