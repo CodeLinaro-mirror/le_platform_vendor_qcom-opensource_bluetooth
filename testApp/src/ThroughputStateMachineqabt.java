@@ -92,6 +92,9 @@ class ThroughputStateMachine {
     public static long rx_end_time_stamp2 = 0x0;
     public static long pkt_cnt = 0x0;
 
+    private static final int WRITE_DESC_MAX_RETRIES = 5;
+    private static final int WRITE_DESC_TIME_TO_WAIT = 25; // milliseconds
+
     /* MTU size required for MTU exchange */
     public static final int MTU_SIZE_MIN = 23;
     public static final int MTU_SIZE_MAX = 512;
@@ -352,6 +355,20 @@ class ThroughputStateMachine {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
                 mBluetoothGatt = mDevice.connectGatt(mcontext, false, mGattCallbacks,TRANSPORT_LE, initPhy);
+            }
+        }
+
+        public void writeDescriptor(BluetoothGattDescriptor descriptor) {
+            for (int i = 0; i < WRITE_DESC_MAX_RETRIES; i++) {
+                boolean requestStatus = mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                if (requestStatus != false) {
+                    break;
+                }
+                try {
+                    Thread.sleep(WRITE_DESC_TIME_TO_WAIT);
+                } catch (InterruptedException e) {
+                    Log.e(TAG, "", e);
+                }
             }
         }
 
@@ -1146,7 +1163,8 @@ class ThroughputStateMachine {
                             if (descriptor != null) {
                                 descriptor.setValue(
                                             BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+
+                                mBleConnect.writeDescriptor(descriptor);
                                 synchronized (write_desc_mutex) {
                                     // Wait for write response
                                     if(!write_desc_wait_signalled){
@@ -1187,7 +1205,7 @@ class ThroughputStateMachine {
                                                     mCharacteristic, false);
                             descriptor.setValue(
                                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-                            mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                            mBleConnect.writeDescriptor(descriptor);
                             synchronized (write_desc_mutex) {
                             //Wait for write response
                                 if(!write_desc_wait_signalled){
@@ -1329,7 +1347,7 @@ class ThroughputStateMachine {
                                 //start of writing
                                 descriptor.setValue(
                                             BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                                mBleConnect.writeDescriptor(descriptor);
                                 synchronized (write_desc_mutex) {
                                     // Wait for write response
                                     if(!write_desc_wait_signalled){
@@ -1388,7 +1406,7 @@ class ThroughputStateMachine {
                                                     mreadChar, false);
                             descriptor.setValue(
                                        BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-                            mBleConnect.mBluetoothGatt.writeDescriptor(descriptor);
+                            mBleConnect.writeDescriptor(descriptor);
                             synchronized (write_desc_mutex) {
                             //Wait for write response
                                 if(!write_desc_wait_signalled){
