@@ -74,6 +74,7 @@ public class ScannerService extends Service {
     private ScanSettings mScanSettings;
     private ArrayList<ScanFilter> mScanFilters;
     private List<BluetoothDevice> mDeviceList;
+    public List<BluetoothDevice> mDevlistforConnToBdaddr;
     private BluetoothAdapter mBTAdapter = BleAppService.bleAdapter;
     private BluetoothLeScanner mBleScanner;
     StringBuilder PrintStr = new StringBuilder();
@@ -105,6 +106,7 @@ public class ScannerService extends Service {
         mScanFilters = null;
         mBleScanner = mBTAdapter.getBluetoothLeScanner();
         mDeviceList = new ArrayList<BluetoothDevice>();
+        mDevlistforConnToBdaddr = new ArrayList<BluetoothDevice>();
         HandlerThread thread = new HandlerThread("ScannerServiceHandler");
         thread.start();
         Looper looper = thread.getLooper();
@@ -217,6 +219,7 @@ public class ScannerService extends Service {
             }
             Log.d(TAG, "Device found with addr:" + bluetoothDevice.getAddress().toString());
             mDeviceList.add(bluetoothDevice);
+            mDevlistforConnToBdaddr.add(bluetoothDevice);
 
             if(BleAppService.scan_called == BleAppService.SCAN_CALLED_FROM_MAIN_ACTIVITY){
                 /* Display scannner queue */
@@ -258,7 +261,7 @@ public class ScannerService extends Service {
                 PrintStr.append(result.getTimestampNanos());
                 SocketServer.sendSocketData(PrintStr.toString());
             }
-
+            Log.d(TAG, "primaryphy:" +primaryphy);
             Message msg = BleAppService.msghandler.obtainMessage(
                       BleAppService.MSG_MA_SCAN_DEV_FOUND, primaryphy, 0, bluetoothDevice);
             BleAppService.msghandler.sendMessage(msg);
