@@ -5,6 +5,15 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile \
                  ])
 
+
+m4_define([LT_MAJOR], [1])
+m4_define([LT_MINOR], [0])
+m4_define([LT_PATCH], [0])
+
+AC_SUBST([LT_VERSION], LT_MAJOR.LT_MINOR.LT_PATCH)
+AC_SUBST([LT_VERSION_NUMBER], LT_MAJOR:LT_MINOR:LT_PATCH)
+
+
 AC_PROG_CXX
 AC_PROG_CC
 
