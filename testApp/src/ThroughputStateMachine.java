@@ -571,8 +571,9 @@ public class ThroughputStateMachine {
                         transitionTo(mTAIdle);
                         break;
                     case MSG_TA_SM_DEV_FOUND:
+					    int  primaryphy= (int) message.arg1;
                         BluetoothDevice device = (BluetoothDevice) message.obj;
-                        processSMDevFoundEvent(device);
+                        processSMDevFoundEvent(device, primaryphy);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -591,12 +592,12 @@ public class ThroughputStateMachine {
                 }
             }
 
-            private void processSMDevFoundEvent(BluetoothDevice device) {
+            private void processSMDevFoundEvent(BluetoothDevice device, int primaryphy) {
                 Log.i(TAG, "matchFoundEvent Address:" + device.getAddress());
                 if(BleAppService.mScannerService.mScanstatus) {
                     BleAppService.mScannerService.stopScan();
                 }
-                mBleConnect.connect(device, BluetoothDevice.PHY_LE_1M, false);
+                mBleConnect.connect(device, primaryphy, false);
                 transitionTo(mTAConnectPending);
             }
 
