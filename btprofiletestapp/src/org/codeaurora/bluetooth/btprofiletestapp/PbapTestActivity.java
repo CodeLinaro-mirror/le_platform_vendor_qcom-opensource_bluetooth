@@ -1437,6 +1437,9 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
         }
 
         try {
+            if(searchProp == 0) {
+                return mPbap.pullPhoneBook(mDevice, "telecom/pb.vcf", 0, PbapProfile.VCARD_TYPE_30, 65535, 0);
+            }
             return mPbap.pullVcardListing(mDevice, path, order,
                     searchProp, searchValue, maxListCount, listStartOffset);
         } catch (Exception e) {
