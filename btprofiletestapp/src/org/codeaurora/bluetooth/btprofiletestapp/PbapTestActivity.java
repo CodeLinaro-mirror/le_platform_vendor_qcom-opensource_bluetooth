@@ -1430,14 +1430,14 @@ public class PbapTestActivity extends MonkeyActivity implements IBluetoothConnec
     private boolean pullVcardListing(String path, byte order, byte searchProp, String searchValue,
             int maxListCount, int listStartOffset) {
         Logger.d(TAG, "pullVcardListing path: " + path + ", order: " + order +
-            ", searchProp" + searchProp + ", searchValue: " + searchValue +
-            ", maxListCount: " + maxListCount + ", listStartOffset" + listStartOffset);
+            ", searchProp: " + searchProp + ", searchValue: " + searchValue +
+            ", maxListCount: " + maxListCount + ", listStartOffset: " + listStartOffset);
         if (!verifyPbapDevice()) {
             return false;
         }
 
         try {
-            if(searchProp == 0) {
+            if((searchValue == null) || (searchValue.isEmpty())) {
                 return mPbap.pullPhoneBook(mDevice, "telecom/pb.vcf", 0, PbapProfile.VCARD_TYPE_30, 65535, 0);
             }
             return mPbap.pullVcardListing(mDevice, path, order,
