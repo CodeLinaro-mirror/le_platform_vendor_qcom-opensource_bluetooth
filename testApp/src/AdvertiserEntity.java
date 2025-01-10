@@ -346,13 +346,13 @@ public class AdvertiserEntity {
                 AdvertiseData.Builder legacyData = new AdvertiseData.Builder();
                 legacyData.setIncludeDeviceName(true);
                 legacyData.setIncludeTxPowerLevel(adv_info.IncludePower);
-                if(adv_info.ServiceUuid != null) {
-                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
+                if(adv_info.ServiceUuid[0] != null) {
+                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid[0]));
                     legacyData.addServiceUuid(pUuid);
                     Log.d(TAG, "service uuid added");
                 }
-                if(adv_info.ManufacturerData != null) {
-                    String[] manufacturerData = adv_info.ManufacturerData.split(",");
+                if(adv_info.ManufacturerData[0] != null) {
+                    String[] manufacturerData = adv_info.ManufacturerData[0].split(",");
                     if(manufacturerData!= null && (manufacturerData).length>0) {
                         manuData = new byte[manufacturerData.length];
                         for(int i=0; i< manuData.length; i++) {
@@ -364,7 +364,7 @@ public class AdvertiserEntity {
                             Log.d(TAG, "manufacturerData::"+manuData[j]);
                         }
                     }
-                    legacyData.addManufacturerData(adv_info.ManufacturerId,manuData);
+                    legacyData.addManufacturerData(adv_info.ManufacturerId[0],manuData);
                     Log.d(TAG, "manu data added");
                 }
                 mAdvData = legacyData.build();
@@ -375,20 +375,45 @@ public class AdvertiserEntity {
                 dataBuilder.setIncludeDeviceName(true);
                 dataBuilder.setIncludeTxPowerLevel(adv_info.IncludePower);
                 if(adv_info.ServiceUuid != null) {
-                    Log.d(TAG,"Setting Service UUID");
-                    ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid));
-                    dataBuilder.addServiceUuid(pUuid);
-                    if(adv_info.ServiceData != null) {
-                        Log.d(TAG,"Setting Service data");
-                        dataBuilder.addServiceData(pUuid,
-                               adv_info.ServiceData.getBytes(Charset.forName("UTF-8")));
-                     }
+                    Log.d(TAG,"Setting Service UUIDs");
+                    for (int i = 0; i < adv_info.ServiceUuid.length; i++) {
+                        if (adv_info.ServiceUuid[i] != null) {
+                            Log.d(TAG, "Setting Service UUID: " + adv_info.ServiceUuid[i]);
+                            ParcelUuid pUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceUuid[i]));
+                            dataBuilder.addServiceUuid(pUuid);
+                        }
+                        else {
+                            break;
+                        }
+                    }
                 }
-                if((adv_info.ManufacturerId != 0) ||
-                    (adv_info.ManufacturerData != null)) {
-                    Log.d(TAG,"Setting Manufacture data");
-                    dataBuilder.addManufacturerData(adv_info.ManufacturerId,
-                            adv_info.ManufacturerData.getBytes(Charset.forName("UTF-8")));
+
+                if (adv_info.ServiceDataUuid != null && adv_info.ServiceData != null) {
+                    Log.d(TAG, "ServiceDataUuid length " + adv_info.ServiceDataUuid.length);
+                    for (int j = 0; j < adv_info.ServiceDataUuid.length; j++) {
+                        if (adv_info.ServiceDataUuid[j] != null && adv_info.ServiceData[j] != null) {
+                            Log.d(TAG, "Setting Service data UUID: " + adv_info.ServiceDataUuid[j]);
+                            ParcelUuid pServiceDataUuid = new ParcelUuid(UUID.fromString(adv_info.ServiceDataUuid[j]));
+                            Log.d(TAG, "Setting Service data: " + adv_info.ServiceData[j]);
+                            dataBuilder.addServiceData(pServiceDataUuid, adv_info.ServiceData[j].getBytes(Charset.forName("UTF-8")));
+                        }
+                        else {
+                            break;
+                        }
+                    }
+                }
+                if (adv_info.ManufacturerId != null && adv_info.ManufacturerData != null) {
+                    Log.d(TAG, "Setting Manufacturer data");
+                    for (int i = 0; i < adv_info.ManufacturerData.length; i++) {
+                        if (adv_info.ManufacturerId !=null &&adv_info.ManufacturerData[i] != null) {
+                            Log.d(TAG, "Setting Manufacturer data: " + adv_info.ManufacturerData[i]);
+                            dataBuilder.addManufacturerData(adv_info.ManufacturerId[i],
+                            adv_info.ManufacturerData[i].getBytes(Charset.forName("UTF-8")));
+                        }
+                        else {
+                            break;
+                        }
+                    }
                 }
                 mAdvData = dataBuilder.build();
                 Log.d(TAG,"BuildAdvertisementData done");
@@ -536,27 +561,20 @@ public class AdvertiserEntity {
     public boolean SetAdvertData(AdvDataInfo advdata_info) {
         Log.d(TAG,"SetAdvertiseData");
         int adv_id = advdata_info.AdvId;
-        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
         AdvertiseData data = null;
         try {
             if(mAdvSetIdMap.containsKey(adv_id))
             {
                 AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
-                if((adv_info.ServiceUuid == null) && (advdata_info.AdvData != null)){
-                     data = new AdvertiseData.Builder()
-                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), advdata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                Log.d("TAG", "mAdvSet: " + mAdvSet);
+                if(mAdvSet != null){
+                    data = new AdvertiseData.Builder()
+                        .addServiceData(new ParcelUuid(UUID.fromString(advdata_info.ServiceUuid)), advdata_info.AdvData.getBytes(Charset.forName("UTF-8")))
                         .setIncludeTxPowerLevel(true)
                         .build();
-                }else{
-                    if(advdata_info.AdvData != null){
-                        data = new AdvertiseData.Builder()
-                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), advdata_info.AdvData.getBytes(Charset.forName("UTF-8")))
-                            .setIncludeTxPowerLevel(true)
-                            .build();
-                    }
+                    mAdvSet.setAdvertisingData(data);
+                    return true;
                 }
-                mAdvSet.setAdvertisingData(data);
-                  return true;
             }
             return false;
         } catch (Exception e) {
@@ -568,27 +586,20 @@ public class AdvertiserEntity {
     public boolean SetScanRspData(AdvDataInfo scandata_info) {
         Log.d(TAG,"SetScanRspData");
         int adv_id = scandata_info.AdvId;
-        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
         AdvertiseData data = null;
         try {
             if(mAdvSetIdMap.containsKey(adv_id))
             {
                 AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
-                if((adv_info.ServiceUuid == null ) && (scandata_info.AdvData != null)){
+                Log.d("TAG", "mAdvSet: " + mAdvSet);
+                if(mAdvSet != null){
                     data = new AdvertiseData.Builder()
-                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), scandata_info.AdvData.getBytes(Charset.forName("UTF-8")))
+                        .addServiceData(new ParcelUuid(UUID.fromString(scandata_info.ServiceUuid)), scandata_info.AdvData.getBytes(Charset.forName("UTF-8")))
                         .setIncludeTxPowerLevel(true)
                         .build();
-                }else{
-                    if(scandata_info.AdvData != null){
-                        data = new AdvertiseData.Builder()
-                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), scandata_info.AdvData.getBytes(Charset.forName("UTF-8")))
-                            .setIncludeTxPowerLevel(true)
-                            .build();
-                    }
+                    mAdvSet.setScanResponseData(data);
+                    return true;
                 }
-                mAdvSet.setScanResponseData(data);
-            return true;
             }
             return false;
         } catch (Exception e) {
@@ -649,27 +660,20 @@ public class AdvertiserEntity {
     public boolean SetPerioAdvData(SetPerAdvData setperadvdata_info) {
        Log.d(TAG,"SetPerioAdvData");
         int adv_id = setperadvdata_info.AdvId;
-        String ServiceUuid = "0000FF01-0000-1000-8000-00805F9B34FB";
         AdvertiseData data = null;
         try {
             if(mAdvSetIdMap.containsKey(adv_id))
             {
                 AdvertisingSet mAdvSet = mAdvSetIdMap.get(adv_id);
-                if((adv_info.ServiceUuid == null) && (setperadvdata_info.PeriodicData != null)){
-                     data = new AdvertiseData.Builder()
-                        .addServiceData(new ParcelUuid(UUID.fromString(ServiceUuid)), setperadvdata_info.PeriodicData.getBytes(Charset.forName("UTF-8")))
+                Log.d("TAG", "mAdvSet: " + mAdvSet);
+                if(mAdvSet != null){
+                    data = new AdvertiseData.Builder()
+                        .addServiceData(new ParcelUuid(UUID.fromString(setperadvdata_info.ServiceUuid)), setperadvdata_info.PeriodicData.getBytes(Charset.forName("UTF-8")))
                         .setIncludeTxPowerLevel(true)
                         .build();
-                }else{
-                    if(setperadvdata_info.PeriodicData != null){
-                        data = new AdvertiseData.Builder()
-                            .addServiceData(new ParcelUuid(UUID.fromString(adv_info.ServiceUuid)), setperadvdata_info.PeriodicData.getBytes(Charset.forName("UTF-8")))
-                            .setIncludeTxPowerLevel(true)
-                            .build();
-                    }
+                    mAdvSet.setPeriodicAdvertisingData(data);
+                    return true;
                 }
-                mAdvSet.setPeriodicAdvertisingData(data);
-            return true;
             }
             return false;
         } catch (Exception e) {
