@@ -9,5 +9,6 @@ package org.codeaurora.bluetooth.wearos_ble_testapp;
 public class SetPerAdvData {
     int AdvId = 0;
     String PeriodicData = null;
+    String ServiceUuid = null;
 }
 

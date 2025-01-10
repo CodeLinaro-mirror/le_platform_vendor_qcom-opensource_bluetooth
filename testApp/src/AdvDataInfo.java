@@ -9,4 +9,5 @@ package org.codeaurora.bluetooth.wearos_ble_testapp;
 public class AdvDataInfo {
     int AdvId = 0;
     String AdvData = null;
+    String ServiceUuid = null;
 }
