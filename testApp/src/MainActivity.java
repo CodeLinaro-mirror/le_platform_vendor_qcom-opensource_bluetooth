@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
     public static boolean isBound = false;
 
     /* Location permissions */
-    private static final int PERMISSION_REQUEST_FINE_LOCATION = 2;
+    private static final int PERMISSION_REQUEST = 2;
 
     public static SocketServer socServer;
     public static BleAppService appService = null;
@@ -100,8 +100,14 @@ public class MainActivity extends Activity {
 
             /* Request for location access */
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                    PERMISSION_REQUEST_FINE_LOCATION);
+                requestPermissions(new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.BLUETOOTH_ADVERTISE,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH,
+                    },PERMISSION_REQUEST);
             }
 
             socServer = SocketServer.getInstance(mAppContext);
@@ -115,11 +121,11 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String permissions[],
                                             int[] grantResults) {
         switch (requestCode) {
-            case PERMISSION_REQUEST_FINE_LOCATION: {
+                case PERMISSION_REQUEST: {
                 if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.i(TAG, "Permission granted!");
                 } else {
-                    Log.e(TAG, "Needs location permission");
+                    Log.e(TAG, "Needs required permission");
                 }
             }
         }
