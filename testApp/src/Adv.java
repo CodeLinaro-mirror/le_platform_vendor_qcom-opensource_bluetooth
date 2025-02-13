@@ -49,9 +49,9 @@ public class Adv {
     int Interval = 160;
     int TimeOutLegacy = 0;
     int AdvertiseMode = 0;
-    String ServiceUuid = null;
-    int ManufacturerId = 0;
-    String ManufacturerData = null;
-    String ServiceDataUuid = null;
-    String ServiceData = null;
+    String[] ServiceUuid = new String[100];
+    int[] ManufacturerId = new int[100];
+    String[] ManufacturerData = new String[100];
+    String[] ServiceDataUuid = new String[100];
+    String[] ServiceData = new String[100];
 }
