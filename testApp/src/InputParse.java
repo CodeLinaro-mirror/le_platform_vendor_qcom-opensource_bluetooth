@@ -493,6 +493,8 @@ public class InputParse {
                     dataTxParam.txService = tmp2[1];
                 } else if (tmp2[0].equals("TxChar")) {
                     dataTxParam.txChar = tmp2[1];
+                } else if (tmp2[0].equals("pfd")) {
+                    dataTxParam.pfd = Integer.parseInt(tmp2[1]);
                 } else {
                     break;
                 }

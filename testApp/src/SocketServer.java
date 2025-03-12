@@ -288,11 +288,12 @@ public class SocketServer {
                 case LE_COC_MENU:
                     sendStr.append("\n******************** LE COC Menu ********************\n");
                     sendStr.append("                     LeCoC_Connect                  (Ex : LeCoC_Connect DeviceAddress:73:B5:C0:E6:62:A4;psm:1;secure_flag:true\n");
-                    sendStr.append("                     LeCoC_Write                    (Ex : LeCoC_Write Data:500\n");
+                    sendStr.append("                     LeCoC_Write                    (Ex : LeCoC_Write Packet_Size:500;pfd:95\n");
                     sendStr.append("                     LeCoC_listen                   (Ex : LeCoC_listen secure_flag:true\n");
                     sendStr.append("                     ConnUpdate                     (Ex: ConnUpdate ConnIntervalMin:20;ConnIntervalMax:20;ConnSlaveLatency:0;ConnSupTO:180)\n");
                     sendStr.append("                     Tx                             (Ex: Tx Packet_Size:2000;Num_Packets:1000 )\n");
-                    sendStr.append("                     LeCoC_Close                    (Ex : LeCoC_Close secure_flag:true\n");
+                    sendStr.append("                     LeCoC_Disconnect               (Ex : LeCoC_Disconnect pfd:95\n");
+                    sendStr.append("                     LeCoC_Server_Close             (Ex : LeCoC_Server_Close psm:95\n");
                     sendStr.append("                     Back\n");
                     sendStr.append("*********************************************************\n");
                     break;
@@ -769,21 +770,31 @@ public class SocketServer {
                                 processOutputState = INVALID_INPUT;
                             }
                         } else if (tmp[0].equals("LeCoC_Write")) {
-                            String[] val = tmp[1].split(":", 2);
-                            if (val.length == 2) {
+                            DataTx dataTxParam = parse.DataTxParse(tmp[1]);
+                            if (dataTxParam != null ) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_GC_START_BLE_COC_WRITE, Integer.valueOf(val[1]));
+                                        BleAppService.MSG_GC_START_BLE_COC_WRITE, dataTxParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                        } else if (tmp[0].equals("LeCoC_Close")) {
+                        } else if (tmp[0].equals("LeCoC_Disconnect")) {
                             String[] val1 = tmp[1].split(":", 2);
                             if (val1.length == 2) {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
-                                        BleAppService.MSG_GC_START_BLE_COC_CLOSE, Boolean.parseBoolean(val1[1]));
+                                        BleAppService.MSG_GC_START_BLE_COC_CLOSE, Integer.parseInt(val1[1]));
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("LeCoC_Server_Close")) {
+                            String[] val1 = tmp[1].split(":", 2);
+                            if (val1.length == 2) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_COC_SERVER_CLOSE, Integer.parseInt(val1[1]));
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;
