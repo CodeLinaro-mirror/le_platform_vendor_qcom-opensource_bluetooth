@@ -18,6 +18,9 @@ PKG_CHECK_MODULES([SYSTEM_BT], [system_bt])
 AC_SUBST([SYSTEM_BT_CFLAGS])
 AC_SUBST([SYSTEM_BT_LIBS])
 
+PKG_CHECK_MODULES([AROUTE], [audio_route])
+AC_SUBST([AROUTE_CFLAGS])
+
 AC_ARG_WITH([glib],
      AC_HELP_STRING([--with-glib],
         [enable glib, building HLOS systems which use glib]))

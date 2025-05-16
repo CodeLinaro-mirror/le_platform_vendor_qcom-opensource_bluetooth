@@ -34,6 +34,10 @@ AM_CPPFLAGS += @LIBHARDWARE_CFLAGS@ @SYSTEM_BT_CFLAGS@
 #pkgconfig_DATA = bthost_ipc.pc
 #EXTRA_DIST     = $(pkgconfig_DATA)
 
+
+AM_CPPFLAGS += @AROUTE_CFLAGS@
+AM_CFLAGS += @AROUTE_CFLAGS@
+
 common_LDFLAGS = -lpthread  -lrt -llog @GLIB_LIBS@
 common_CFLAGS =  $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -DUSE_GLIB @GLIB_CFLAGS@
 

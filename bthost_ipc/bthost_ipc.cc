@@ -378,20 +378,35 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
             default:
                 ERROR("VBR not supported");
         }
-        aac_bit_rate = 0x7F&byte;
-        //Move it 2nd byte of 32 bit word. leaving the VBR bit
-        aac_bit_rate = aac_bit_rate << 16;
-        byte = *p_cfg++; //Move to 2nd byteof bitrate
+        // Extract 7-bit bitrate value from the first byte and shift to upper 16
+        // bits,
+        // leaving space for the remaining 2 bytes of the 24-bit bitrate
+        aac_bit_rate = (byte & 0x7F) << 16;
+
+        // Move to next byte (second byte of bitrate field)
+        byte = *p_cfg++;
         len--;
 
-        //Move it to 3rd byte of 32bit word
-        aac_bit_rate |= 0x0000FF00 & (((uint32_t)byte)<<8);
-        byte = *p_cfg++; //Move to 3rd byte of bitrate
+        // Shift second byte to middle 8 bits of the 32-bit bitrate field
+        aac_bit_rate |= ((uint32_t)byte) << 8;
+
+        // Move to next byte (third byte of bitrate field)
+        byte = *p_cfg++;
         len--;
 
-        aac_bit_rate |= 0x000000FF & (((uint32_t)byte));
+        // Place third byte into the lowest 8 bits of the bitrate field
+        aac_bit_rate |= (uint32_t)byte;
+
+        // Store final 24-bit AAC bitrate value in the codec struct
         aac_codec.bitrate = aac_bit_rate;
+
+        // Advance p_cfg pointer by 6 bytes to reach bits_per_sample field
+        p_cfg += 6;
+
+        // Read bits_per_sample from the codec configuration buffer
         aac_codec.bits_per_sample = *(uint32_t *)p_cfg;
+
+        // Indicate that the codec type being handled is AAC
         *codec_type = AUDIO_FORMAT_AAC;
         INFO("AAC: Done copying full codec config");
         return ((void *)(&aac_codec));
