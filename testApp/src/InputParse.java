@@ -92,6 +92,8 @@ public class InputParse {
                     DataInfo.AdvId = Integer.parseInt(tmp2[1]);
                 } else if ((tmp2[0].equals("AdvData")) || (tmp2[0].equals("ScanRespData"))) {
                     DataInfo.AdvData = tmp2[1];
+                }else if (tmp2[0].equals("ServiceUuid")) {
+                    DataInfo.ServiceUuid = tmp2[1];
                 } else {
                     break;
                 }
@@ -192,6 +194,8 @@ public class InputParse {
                     DataInfo.AdvId = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("PeriodicData")) {
                     DataInfo.PeriodicData = tmp2[1];
+                }else if (tmp2[0].equals("ServiceUuid")) {
+                    DataInfo.ServiceUuid = tmp2[1];
                 } else {
                     break;
                 }
@@ -240,6 +244,10 @@ public class InputParse {
         String tmp[] = input.split(";");
         String[] tmp2;
         int i=0;
+        int j=0;
+        int Service_Uuid_Index =0;
+        int Manufacturer_Id_index =0;
+        int manufactureDataIndex =0;
         for(i=0; i<tmp.length; i++){
             tmp2 = tmp[i].split(":",2);
             if(tmp2.length == 2) {
@@ -272,15 +280,25 @@ public class InputParse {
                 } else if (tmp2[0].equals("AdvertiseMode")) {
                     advParam.AdvertiseMode = Integer.parseInt(tmp2[1]);
                 } else if (tmp2[0].equals("ServiceUuid")) {
-                    advParam.ServiceUuid = tmp2[1];
+                    advParam.ServiceUuid[Service_Uuid_Index] = tmp2[1];
+                    Log.d(TAG,"setting serviceuuid :" + Service_Uuid_Index +tmp2[1]);
+                    Service_Uuid_Index ++;
                 } else if (tmp2[0].equals("ManufacturerId")) {
-                    advParam.ManufacturerId = Integer.parseInt(tmp2[1]);
+                    advParam.ManufacturerId[Manufacturer_Id_index] = Integer.parseInt(tmp2[1]);
+                    Log.d(TAG,"setting ManufacturerId :" + Manufacturer_Id_index +tmp2[1]);
+                    Manufacturer_Id_index ++;
                 } else if (tmp2[0].equals("ManufacturerData")) {
-                    advParam.ManufacturerData = tmp2[1];
+                    advParam.ManufacturerData[manufactureDataIndex] = tmp2[1];
+                    Log.d(TAG,"setting serviceuuid :" +manufactureDataIndex +tmp2[1]);
+                    manufactureDataIndex ++;
                 } else if (tmp2[0].equals("ServiceDataUuid")) {
-                    advParam.ServiceDataUuid = tmp2[1];
+                    Log.d(TAG, "servicedata uuid" +j);
+                    advParam.ServiceDataUuid[j] = tmp2[1];
+                    Log.d(TAG, "servicedata uuid "+advParam.ServiceDataUuid[j]);
                 } else if (tmp2[0].equals("ServiceData")) {
-                    advParam.ServiceData = tmp2[1];
+                    advParam.ServiceData[j]= tmp2[1];
+                    Log.d(TAG ,"service data"+advParam.ServiceData[j]);
+                    j++;
                 } else {
                     break;
                 }
@@ -475,6 +493,8 @@ public class InputParse {
                     dataTxParam.txService = tmp2[1];
                 } else if (tmp2[0].equals("TxChar")) {
                     dataTxParam.txChar = tmp2[1];
+                } else if (tmp2[0].equals("pfd")) {
+                    dataTxParam.pfd = Integer.parseInt(tmp2[1]);
                 } else {
                     break;
                 }

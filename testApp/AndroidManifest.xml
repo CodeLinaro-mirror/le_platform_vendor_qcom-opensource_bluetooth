@@ -44,10 +44,12 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
 
     <uses-sdk
         android:minSdkVersion="16"
-        android:targetSdkVersion="23" />
+        android:targetSdkVersion="34" />
 
     <application
         android:allowBackup="true"
@@ -56,6 +58,7 @@
   
         <service
             android:name=".BleAppService"
+            android:foregroundServiceType="location"
             android:enabled="true"
             android:exported="false"></service>
         <service
@@ -69,6 +72,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:exported="true"
             android:screenOrientation="landscape" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

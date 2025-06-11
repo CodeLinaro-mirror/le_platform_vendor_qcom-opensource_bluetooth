@@ -67,6 +67,8 @@ import android.bluetooth.BluetoothProfile;
 import androidx.core.app.NotificationCompat;
 import android.app.Notification;
 import android.app.PendingIntent;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 
 
 public class BleAppService extends Service {
@@ -162,7 +164,8 @@ public class BleAppService extends Service {
     public static final int MSG_GC_START_BLE_COC_CONNECT = MSG_MA_MAX_ACTION_VALUE + 25;
     public static final int MSG_GC_START_BLE_COC_CLOSE = MSG_MA_MAX_ACTION_VALUE + 26;
     public static final int MSG_GC_START_BLE_COC_DATA_TX = MSG_MA_MAX_ACTION_VALUE + 27;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_COC_DATA_TX;
+    public static final int MSG_GC_START_BLE_COC_SERVER_CLOSE = MSG_MA_MAX_ACTION_VALUE + 28;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_COC_SERVER_CLOSE;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -202,18 +205,34 @@ public class BleAppService extends Service {
         super.onCreate();
         mAppContext = this;
         isServiceRunning = true;
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+            String NOTIFICATION_CHANNEL_ID = "org.codeaurora.bluetooth.wearos_ble_testapp";
+            String channelName = "Wearos TestApp Service";
+            NotificationChannel chan = new NotificationChannel(NOTIFICATION_CHANNEL_ID, channelName, NotificationManager.IMPORTANCE_NONE);
+            chan.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            manager.createNotificationChannel(chan);
+            Notification.Builder notificationBuilder = new Notification.Builder(this,NOTIFICATION_CHANNEL_ID);
+            Notification notification = notificationBuilder.setOngoing(true)
+                                        .setContentTitle("Wearos BLE Test App")
+                                        .setPriority(NotificationManager.IMPORTANCE_MIN)
+                                        .setCategory(Notification.CATEGORY_SERVICE)
+                                        .build();
+            startForeground(1337, notification);
+         }else{
 
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+            Intent notificationIntent = new Intent(this, MainActivity.class);
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
-                        notificationIntent, 0);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0,
+                            notificationIntent, 0);
 
-        Notification notification = new NotificationCompat.Builder(this)
-                        .setContentTitle("BLE Test App")
-                        .setContentText("Running...!!!")
-                        .setContentIntent(pendingIntent).build();
+            Notification notification = new NotificationCompat.Builder(this)
+                            .setContentTitle("BLE Test App")
+                            .setContentText("Running...!!!")
+                            .setContentIntent(pendingIntent).build();
 
-        startForeground(1337, notification);
+            startForeground(1337, notification);
+         }
 
         /* Check and prompt to user if bluetooth in not turned on */
         if (!initAdapter()) {
@@ -537,6 +556,7 @@ public class BleAppService extends Service {
             AddServices AddServ;
             PhyUpdate phyUpdateObj;
             ConnUpdate ConnUpdateObj;
+            DataTx TxClass;
             String bdAddr;
 
             switch (message.what) {
@@ -826,14 +846,21 @@ public class BleAppService extends Service {
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_COC_CLOSE:
-                    boolean SecureFlag1 = (boolean) message.obj;
+                    int pfd = (int) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_COC_CLOSE, SecureFlag1);
+                          mgattclient.MSG_START_BLE_COC_CLOSE, pfd);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_START_BLE_COC_SERVER_CLOSE:
+                    int psm = (int) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_COC_SERVER_CLOSE, psm);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_COC_WRITE:
-                     msg = mgattclient.mGattClientHandler.obtainMessage(
-                          mgattclient.MSG_START_BLE_COC_WRITE, message.obj);
+                    TxClass = (DataTx) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                          mgattclient.MSG_START_BLE_COC_WRITE, TxClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_COC_CONNECT:
@@ -982,7 +1009,7 @@ public class BleAppService extends Service {
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_COC_DATA_TX:
-                    DataTx TxClass = (DataTx) message.obj;
+                    TxClass = (DataTx) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
                              mgattclient.MSG_START_BLE_COC_DATA_TX, TxClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);

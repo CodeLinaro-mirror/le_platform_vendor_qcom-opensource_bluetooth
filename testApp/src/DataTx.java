@@ -35,4 +35,5 @@ public class DataTx {
     public long Num_Packets;
     public String txService;
     public String txChar;
+    public int pfd;
 }
