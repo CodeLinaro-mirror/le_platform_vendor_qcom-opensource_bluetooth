@@ -136,6 +136,8 @@ typedef struct
     btav_codec_config_t   codec_info;
 } btif_avk_config_req_t;
 
+UINT64 average_delay;
+
 /*****************************************************************************
 **  Static variables
 ******************************************************************************/

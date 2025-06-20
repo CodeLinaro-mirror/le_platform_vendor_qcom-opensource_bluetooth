@@ -30,6 +30,7 @@
 /* AV control block */
 /* structure to keep track of AVDTP_CONNECT_IND and AVDTP_DISCONNECT_IND */
 
+tBTA_AR_AVDTP_CONNECTION_INFO avdtp_connection_info[10];
 
 void bta_ar_ext_init(void)
 {

@@ -53,7 +53,6 @@ typedef enum {
     BTIF_AVK_INIT_REQ_EVT,
 } btif_avk_sm_event_t;
 
-UINT64 average_delay;
 
 /*******************************************************************************
 **  BTIF AV API

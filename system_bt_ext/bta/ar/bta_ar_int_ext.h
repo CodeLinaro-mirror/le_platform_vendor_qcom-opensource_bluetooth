@@ -33,7 +33,6 @@ typedef struct {
     UINT8           sep_type;                     /* Sep Type of remote */
 } tBTA_AR_AVDTP_CONNECTION_INFO;
 
-tBTA_AR_AVDTP_CONNECTION_INFO avdtp_connection_info[10];
 #define BTA_AV_RC_PROFILE_SINK  0x02
 #define BTA_AV_RC_PROFILE_SRC  0x01
 
