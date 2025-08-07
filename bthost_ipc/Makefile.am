@@ -7,13 +7,13 @@ AM_CFLAGS = -Wall \
         -std=c++11 \
         -DHAS_NO_BDROID_BUILDCFG
 
-AM_CPPFLAGS =  -I. \ 
-               -I${BT_SOURCE}/stack/system/bt/include/hardware \
-               -I${BT_SOURCE}/stack/system/bt/include \
-               -I${BT_SOURCE}/stack/system/bt/ \
-               -I${BT_SOURCE}/stack/system/bt/utils/include \
-               -I${BT_SOURCE}/stack/system/bt/audio_a2dp_hw/include \
-               -I${BT_SOURCE}/stack/system/bt/types \
+AM_CPPFLAGS =  -I. \
+               -I${BT_INC_PATH}/include/hardware \
+               -I${BT_INC_PATH}/include \
+               -I${BT_INC_PATH}/ \
+               -I${BT_INC_PATH}/utils/include \
+               -I${BT_INC_PATH}/audio_a2dp_hw/include \
+               -I${BT_INC_PATH}/types \
                -I$(bdroid_C_INCLUDES)
 
 AM_CPPFLAGS += @AROUTE_CFLAGS@
