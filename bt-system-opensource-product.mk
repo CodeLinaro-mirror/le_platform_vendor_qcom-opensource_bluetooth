@@ -7,17 +7,21 @@ PRODUCT_PACKAGES_DEBUG += l2test_ertm
 ifneq ($(TARGET_BOARD_TYPE),auto)
 # Set supported Bluetooth profiles to enabled
 PRODUCT_PRODUCT_PROPERTIES += \
-    bluetooth.profile.a2dp.source.enabled=true \
-    bluetooth.profile.avrcp.target.enabled=true \
+    bluetooth.profile.a2dp.source.enabled=false \
+    bluetooth.profile.avrcp.target.enabled=false \
     bluetooth.profile.avrcp.controller.enabled=true \
-    bluetooth.profile.hfp.ag.enabled=true \
+    bluetooth.profile.hfp.ag.enabled=false \
     bluetooth.profile.gatt.enabled=true \
     bluetooth.profile.hid.host.enabled=true \
     bluetooth.profile.hid.device.enabled=false \
-    bluetooth.profile.map.server.enabled=true \
+    bluetooth.profile.map.server.enabled=false \
     bluetooth.profile.opp.enabled=true \
-    bluetooth.profile.pbap.server.enabled=true \
-    bluetooth.profile.bas.client.enabled=true \
+    bluetooth.profile.pbap.server.enabled=false \
+    bluetooth.profile.bas.client.enabled=false \
+    bluetooth.profile.a2dp.sink.enabled=true \
+    bluetooth.profile.hfp.hf.enabled=true \
+    bluetooth.profile.map.client.enabled=true \
+    bluetooth.profile.pbap.client.enabled=true \
     bluetooth.device_id.vendor_id=0x001D \
 ifneq ($(TARGET_SUPPORTS_WEAR_ANDROID), true)
     bluetooth.profile.pan.nap.enabled=true \
@@ -25,12 +29,12 @@ ifneq ($(TARGET_SUPPORTS_WEAR_ANDROID), true)
 endif #TARGET_SUPPORTS_WEAR_ANDROID
 
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
-    bluetooth.profile.sap.server.enabled=true \
-    bluetooth.profile.pbap.sim.enabled=true \
+    bluetooth.profile.sap.server.enabled=false \
+    bluetooth.profile.pbap.sim.enabled=false \
     bluetooth.hfp.codec_aptx_voice.enabled=true \
     bluetooth.hfp.swb.aptx.power_management.enabled=true \
     ro.bluetooth.leaudio_offload.supported=true \
-    bluetooth.device.class_of_device=90,2,12 \
+    bluetooth.device.class_of_device=26,4,8 \
     persist.bluetooth.leaudio_offload.disabled=false \
     persist.bluetooth.leaudio.bypass_allow_list=true \
     bluetooth.leaudio.dual_bidirection_swb.supported=true \
