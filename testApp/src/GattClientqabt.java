@@ -961,7 +961,7 @@ class GattClient {
             }
         };
 
-        public void connect(BluetoothDevice device, int initPhy, boolean autoConnect, int transport){
+        public void connect(BluetoothDevice device, int initPhy, boolean autoConnect , int transport){
             if((BleAppService.bleAdapter!=null) && (mConnectionStatus == BLE_STATE_DISCONNECTED)) {
                 Log.i(TAG, "Gatt Connect");
                 mDevice = device;
@@ -976,8 +976,7 @@ class GattClient {
                 PrintStr.append(autoConnect);
                 SocketServer.sendSocketData(PrintStr.toString());
                 mConnectionStatus = BLE_STATE_CONNECTING;
-                mBluetoothGatt = mDevice.connectGatt(mcontext,
-                                autoConnect, mGattCallbacks, transport, initPhy);
+                mBluetoothGatt = mDevice.connectGatt(mcontext, autoConnect, mGattCallbacks,transport, initPhy);
             }
         }
 
@@ -1149,22 +1148,10 @@ class GattClient {
         }
 
         private void processConnectToBdaddr(Scan init) {
-            Log.d(TAG, "processConnectToBdaddr address:" + init.DeviceAddress);
             if(BleAppService.bleAdapter != null) {
-                if (BleAppService.mScannerService.mDevlistforConnToBdaddr.isEmpty()) {
-                    Log.d(TAG, "Device list is empty");
-                } else {
-                    Log.d(TAG, "Device list size: " + BleAppService.mScannerService.mDevlistforConnToBdaddr.size());
-                }
-               for (BluetoothDevice dev:BleAppService.mScannerService.mDevlistforConnToBdaddr) {
-                   Log.d(TAG, "mDevlistforConnToBdaddr address:" + dev.getAddress().toString());
-                   if(dev.getAddress().equals(init.DeviceAddress)) {
                 Log.i(TAG, "Connect to Address: " + init.DeviceAddress);
                 BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(init.DeviceAddress);
                 mgattClient.connect(remoteDevice, init.initPhy, init.autoConnect, init.transport);
-                BleAppService.mScannerService.mDevlistforConnToBdaddr.clear();
-                   }
-               }
             }
         }
 
