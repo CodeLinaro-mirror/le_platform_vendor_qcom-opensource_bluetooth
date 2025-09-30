@@ -40,13 +40,18 @@
 #include <fcntl.h>
 #include <system/audio.h>
 #include <hardware/audio.h>
-
+#include <cutils/properties.h>
 #include <hardware/hardware.h>
 #include "bthost_ipc.h"
 #include "osi/include/hash_map_utils.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
 #include "osi/include/socket_utils/sockets.h"
+/* 2DH5 Max (679) = 663 + 12 (AVDTP header) + 4 (L2CAP header) */
+#define MAX_2MBPS_A2DP_STREAM_MTU 663
+/* 3DH5 Max (1021) = 1005 + 12 (AVDTP header) + 4 (L2CAP header) */
+#define MAX_3MBPS_A2DP_STREAM_MTU 1005
+#define MAX_LEVELS 5
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -105,7 +110,7 @@ struct a2dp_stream_common audio_stream;
 
 audio_sbc_encoder_config sbc_codec;
 audio_aptx_default_config aptx_codec;
-audio_aac_encoder_config aac_codec;
+audio_aac_encoder_config_t aac_codec;
 audio_aptx_ad_config aptx_adaptive_codec;
 audio_aptx_dual_mono_config aptx_tws_codec;
 /*****************************************************************************
@@ -302,7 +307,7 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
     {
         uint16_t aac_samp_freq = 0;
         uint32_t aac_bit_rate = 0;
-        memset(&aac_codec,0,sizeof(audio_aac_encoder_config));
+        memset(&aac_codec,0,sizeof(audio_aac_encoder_config_t));
         p_cfg++;//skip dev idx
         len = *p_cfg++;
         p_cfg++;//skip media type
@@ -371,12 +376,44 @@ static void* a2dp_codec_parser(uint8_t *codec_cfg, audio_format_t *codec_type)
         }
         byte = *p_cfg++; //Move to VBR byte
         len--;
+
         switch (byte & A2D_AAC_IE_VBR_MSK)
         {
             case A2D_AAC_IE_VBR:
-                break;
+                ALOGE("%s: AAC: Variable bit rate enabled", __func__);
+                aac_codec.size_control_struct = A2D_AAC_SIZE_CTL_STRUCT;
+                aac_codec.frame_ptr_ctl = (struct aac_frame_size_control_t *)malloc(
+                                           aac_codec.size_control_struct *
+                                           sizeof(struct aac_frame_size_control_t));
+
+                if (aac_codec.frame_ptr_ctl != nullptr) {
+                    aac_codec.frame_ptr_ctl->ctl_type = A2D_AAC_VBR_SUPPORT;
+                    aac_codec.frame_ptr_ctl->ctl_value = A2D_AAC_VBR_ENABLE;
+                    ALOGI("%s: AAC: VBR ctl_type:%d VBR ctl_value:%d", __func__,
+                           aac_codec.frame_ptr_ctl->ctl_type,
+                           aac_codec.frame_ptr_ctl->ctl_value);
+                } else {
+                    ALOGE("%s: Memory allocation failed", __func__);
+                }
+            break;
+
             default:
-                ERROR("VBR not supported");
+                ALOGE("%s: AAC: Variable bit rate disabled", __func__);
+                aac_codec.size_control_struct = A2D_AAC_SIZE_CTL_STRUCT;
+                aac_codec.frame_ptr_ctl = (struct aac_frame_size_control_t *)malloc(
+                                           aac_codec.size_control_struct *
+                                           sizeof(struct aac_frame_size_control_t));
+
+                if (aac_codec.frame_ptr_ctl != nullptr) {
+                    aac_codec.frame_ptr_ctl->ctl_type = A2D_AAC_VBR_SUPPORT;
+                    aac_codec.frame_ptr_ctl->ctl_value = A2D_AAC_VBR_DISABLE;
+                ALOGI("%s: AAC: VBR ctl_type:%d VBR ctl_value:%d", __func__,
+                       aac_codec.frame_ptr_ctl->ctl_type,
+                       aac_codec.frame_ptr_ctl->ctl_value);
+                } else {
+                    ALOGE("%s: Memory allocation failed", __func__);
+                }
+            break;
         }
         // Extract 7-bit bitrate value from the first byte and shift to upper 16
         // bits,

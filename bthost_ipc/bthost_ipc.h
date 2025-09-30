@@ -141,6 +141,16 @@ codec specific definitions
 #define A2D_AAC_IE_VBR_MSK                     0x80
 #define A2D_AAC_IE_VBR                         0x80    /* supported */
 
+#define A2D_AAC_FRAME_PEAK_MTU       0  /* Configure peak MTU */
+#define A2D_AAC_FRAME_PEAK_BITRATE   1  /* Configure peak bitrate */
+#define A2D_AAC_VBR_SUPPORT   2  /* Configure AAC VBR support */
+#define A2D_AAC_SIZE_CTL_STRUCT 1
+#define A2D_AAC_VBR_ENABLE 1
+#define A2D_AAC_VBR_DISABLE 0
+#define A2D_AAC_MIN_BITRATE 32000
+#define A2D_AAC_MAX_BITRATE 165000
+
+
 typedef struct {
     uint8_t  codec_type;
     uint8_t  dev_idx;
@@ -166,6 +176,47 @@ typedef struct {
     uint16_t mtu;
     uint32_t bitrate;
 }tA2DP_APTX_CODEC;
+
+struct bit_rate_level_map_t {
+     uint32_t link_quality_level;
+     uint32_t bitrate;
+ };
+
+ #define MAX_LEVELS 5
+
+ struct quality_level_to_bitrate_info {
+     uint32_t num_levels;
+     struct bit_rate_level_map_t bit_rate_level_map[MAX_LEVELS];
+ };
+/* Structure to control frame size of AAC encoded frames. */
+ struct aac_frame_size_control_t {
+     /* Type of frame size control: MTU_SIZE / PEAK_BIT_RATE */
+     uint32_t ctl_type;
+     /* Control value
+      * MTU_SIZE: MTU size in bytes
+      * PEAK_BIT_RATE: Peak bitrate in bits per second.
+      */
+     uint32_t ctl_value;
+ };
+
+ struct aac_abr_control_t {
+ bool is_abr_enabled;
+ struct quality_level_to_bitrate_info level_to_bitrate_map;
+ };
+
+typedef struct {
+    uint32_t enc_mode; /* LC, SBR, PS */
+    uint16_t format_flag; /* RAW, ADTS */
+    uint16_t channels; /* 1-Mono, 2-Stereo */
+    uint32_t sampling_rate;
+    uint32_t bitrate;
+    uint32_t bits_per_sample;
+    struct aac_frame_size_control_t frame_ctl;
+    uint8_t size_control_struct;
+    struct aac_frame_size_control_t* frame_ptr_ctl;
+    uint8_t abr_size_control_struct;
+    struct aac_abr_control_t* abr_ptr_ctl;
+} audio_aac_encoder_config_t;
 
 typedef struct {
     /** Set to sizeof(bt_host_ipc_interface_t) */
