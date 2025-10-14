@@ -41,4 +41,5 @@ void hidl_client_close();
 #define MODE_BT (0)
 #define MODE_ANT (1)
 #define MODE_FM (2)
+#define MODE_THREAD (3)
 
