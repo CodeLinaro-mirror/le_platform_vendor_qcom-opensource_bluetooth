@@ -1,1 +1,1 @@
-SUBDIRS = hidl_client
+SUBDIRS = hidl_client btconfig

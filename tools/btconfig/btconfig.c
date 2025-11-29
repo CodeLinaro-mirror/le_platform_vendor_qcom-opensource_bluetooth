@@ -24,6 +24,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 
@@ -31,7 +35,12 @@
 #include <config.h>
 #endif
 
+#include <stdint.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <ctype.h>
@@ -54,6 +63,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stdbool.h>
+#include <sys/select.h>
+#include <getopt.h>
+#include <strings.h>
+#include <signal.h>
 
 #ifdef ANDROID
 #include <cutils/properties.h>
@@ -68,6 +81,144 @@
 #include "btconfig.h"
 #include "masterblaster.h"
 
+// Include HIDL client interface
+#include "hidl_client/inc/hidl_client.h"
+
+
+#ifdef ANDROID
+#include <cutils/properties.h>
+#include <cutils/log.h>
+#define LOG_TAG "DirectHIDLShell"
+#define ALOGI(fmt, ...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, fmt, ##__VA_ARGS__)
+#define ALOGE(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, fmt, ##__VA_ARGS__)
+#define ALOGD(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, fmt, ##__VA_ARGS__)
+#else
+#define ALOGI(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
+#define ALOGE(fmt, ...) printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
+#define ALOGD(fmt, ...) printf("[DEBUG] " fmt "\n", ##__VA_ARGS__)
+#endif
+
+
+// Command definitions
+#define MAX_CMD_LEN         256
+#define MAX_RESPONSE_LEN    1024
+#define MAX_ARGS           20
+
+// HCI Command opcodes
+#define HCI_RESET                   0x0C03
+#define HCI_READ_LOCAL_VERSION      0x1001
+#define HCI_READ_BD_ADDR           0x1009
+#define HCI_READ_LOCAL_NAME        0x0C14
+#define HCI_WRITE_LOCAL_NAME       0x0C13
+#define HCI_INQUIRY                0x0401
+#define HCI_INQUIRY_CANCEL         0x0402
+#define HCI_LE_SET_ADV_PARAM       0x2006
+#define HCI_LE_SET_ADV_ENABLE      0x200A
+#define HCI_LE_CREATE_CONNECTION   0x200D
+
+// Packet types
+#define BT_COMMAND_PKT             0x01
+#define BT_ACL_DATA_PKT            0x02
+#define BT_SCO_DATA_PKT            0x03
+#define BT_EVENT_PKT               0x04
+
+// Mode definitions (if not in hidl_client.h)
+#define MODE_BT  (0)
+#define MODE_ANT (1)
+#define MODE_FM  (2)
+
+// Global variables
+static int hidl_fd = -1;
+static bool hidl_initialized = false;
+static bool hidl_interface = false;
+static pthread_t response_thread;
+static bool running = false;
+static bool response_thread_running = false;
+
+// Global variables for HIDL throughput testing
+static bool hidl_tput_running = false;
+static pthread_t hidl_tput_thread;
+static int hidl_connection_handle = -1;
+static uint32_t hidl_packets_sent = 0;
+static uint32_t hidl_packets_completed = 0;
+static struct timeval hidl_start_time, hidl_end_time;
+
+// HIDL-specific packet structure for throughput testing
+typedef struct {
+    uint8_t packet_type;        // 0x02 for ACL data
+    uint16_t connection_handle; // Connection handle + flags
+    uint16_t data_length;       // ACL data length
+    uint16_t l2cap_length;      // L2CAP length
+    uint16_t l2cap_cid;         // L2CAP Channel ID
+    uint8_t payload[1000];      // Payload data
+} __attribute__((packed)) hidl_acl_packet_t;
+
+// Function prototypes
+static void print_usage(const char *prog_name);
+static int initialize_hidl_client(int mode);
+static void cleanup_hidl_client(void);
+static int send_hci_command(uint16_t opcode, uint8_t *params, uint8_t param_len);
+static void *response_handler_thread(void *arg);
+static int parse_hex_string(const char *hex_str, uint8_t *buffer, int max_len);
+static void print_hex_data(const uint8_t *data, int len, const char *prefix);
+static void signal_handler(int sig);
+static int execute_shell_command(const char *cmd_line);
+
+static void stop_response_thread(void);
+static int start_response_thread(void);
+
+static int hidl_create_connection(const char *bd_addr, uint16_t *handle);
+static int hidl_disconnect_connection(uint16_t handle);
+static int hidl_send_acl_data(uint16_t handle, uint8_t *data, uint16_t length);
+static void *hidl_tput_response_handler(void *arg);
+static int hidl_parse_connection_complete(uint8_t *event_data);
+static int hidl_parse_num_completed_packets(uint8_t *event_data);
+
+// Command structure
+typedef struct {
+    const char *name;
+    const char *description;
+    int (*handler)(int argc, char *argv[]);
+} shell_command_t;
+
+// Command handlers
+static int cmd_help(int argc, char *argv[]);
+static int cmd_init(int argc, char *argv[]);
+static int cmd_reset(int argc, char *argv[]);
+static int cmd_version(int argc, char *argv[]);
+static int cmd_bdaddr(int argc, char *argv[]);
+static int cmd_name(int argc, char *argv[]);
+static int cmd_setname(int argc, char *argv[]);
+static int cmd_inquiry(int argc, char *argv[]);
+static int cmd_raw(int argc, char *argv[]);
+static int cmd_exit(int argc, char *argv[]);
+static int cmd_connect(int argc, char *argv[]);
+static int cmd_disconnect(int argc, char *argv[]);
+static int cmd_adv(int argc, char *argv[]);
+static int cmd_le_connect(int argc, char *argv[]);
+static int hidl_cmd_tputr(int argc, char *argv[]);
+static int hidl_cmd_tputs(int argc, char *argv[]);
+
+// Command table
+static shell_command_t commands[] = {
+    {"help",     "Show available commands",                    cmd_help},
+    {"init",     "Initialize HIDL client [bt|ant|fm]",        cmd_init},
+    {"reset",    "Send HCI Reset command",                    cmd_reset},
+    {"version",  "Read local version information",            cmd_version},
+    {"bdaddr",   "Read BD_ADDR",                             cmd_bdaddr},
+    {"name",     "Read local name",                          cmd_name},
+    {"setname",  "Set local name <name>",                    cmd_setname},
+    {"inquiry",  "Start inquiry [duration]",                 cmd_inquiry},
+    {"connect",  "Create ACL connection <bd_addr>",          cmd_connect},
+    {"disconnect","Disconnect ACL connection <handle>",      cmd_disconnect},
+    {"adv",      "Enable/Disable LE Advertising [on|off]",   cmd_adv},
+    {"le_connect", "Create LE connection <bd_addr>",         cmd_le_connect},
+    {"raw",      "Send raw HCI command <opcode> [params]",   cmd_raw},
+    {"exit",     "Exit the shell",                           cmd_exit},
+    {"tput-r",   "Throughput test receiver", hidl_cmd_tputr},
+    {"tput-s",   "Throughput test sender [bd_addr] [threshold] [log] [iter] [size]", hidl_cmd_tputs},
+    {NULL, NULL, NULL}
+};
 
 #define PRONTO_SOC TRUE
 #define QCA_DEBUG TRUE
@@ -230,6 +381,7 @@ static struct option main_options[] = {
     { "help",   0, 0, 'h' },
     { "soc",    1, 0, 's' },
     { "initialize", 0, 0, 'i' },
+    { "hidl", 0, 0, 'x' },
     { 0, 0, 0, 0 }
 };
 
@@ -1012,7 +1164,7 @@ static const char *reset_help =
 "Usage:\n"
 "\n reset\n";
 
-static void cmd_reset(int uart_fd, int argc, char **argv){
+static void legacy_cmd_reset(int uart_fd, int argc, char **argv){
     int Length = 0;
     UCHAR buf[MAX_EVENT_SIZE];
 
@@ -1472,7 +1624,7 @@ static const char *cwrx_help =
 "Usage:\n"
 "\n cwrx <Channel>\n";
 
-static void cmd_cwrx(int uart_fd, int argc, char **argv){
+static void legacy_cmd_cwrx(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR channel;
     BOOL Ok = TRUE;
@@ -1766,7 +1918,7 @@ static const char *cmdline_help =
 
 //add by Austin for automatic manufacture tool
 
-static void cmdline(int uart_fd, int argc, char **argv){
+static void legacy_cmdline(int uart_fd, int argc, char **argv){
     int iRet,address,width,value,mask;
     bdaddr_t bdaddr;
     tBRM_Control_packet MasterBlaster;
@@ -2187,7 +2339,7 @@ static void cmdline(int uart_fd, int argc, char **argv){
 
 static const char *mb_help = "Usage:\n\n mb\n";
 
-static void cmd_mb(int uart_fd, int argc, char **argv){
+static void legacy_cmd_mb(int uart_fd, int argc, char **argv){
     printf("Enter master blaster mode\n");
 
     int FieldNum,iRet,iDataSize, fdmax, k, l, i, j;
@@ -2566,7 +2718,7 @@ static const char *wsm_help =
 "\twsm 2\t(Page scan enabled)\n"
 "\twsm 3\t(Inquiry and Page scan enabled)\n";
 
-static void cmd_wsm(int uart_fd, int argc, char **argv){
+static void legacy_cmd_wsm(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     if(argc < 2){
         printf("\n%s\n",wsm_help);
@@ -2705,7 +2857,7 @@ static const char *mbr_help =
 "\n mbr 0x00004FFC 10 \n"
 "\n mbr 0x00004FFC 0x10 \n";
 
-static void cmd_mbr(int uart_fd, int argc, char **argv){
+static void legacy_cmd_mbr(int uart_fd, int argc, char **argv){
 
     UCHAR buf[MAX_EVENT_SIZE*20];
 
@@ -2739,7 +2891,7 @@ static const char *psr_help =
 "Usage:\n"
 "\n psr \n";
 
-static void cmd_psr(int uart_fd, int argc, char **argv){
+static void legacy_cmd_psr(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     if(argv) UNUSED(argv);
     if(argc > 1){
@@ -2763,7 +2915,7 @@ static const char *rpst_help =
 "\n Example:\n"
 "\n rpst 1 6 \n";
 
-static void cmd_rpst(int uart_fd, int argc, char **argv){
+static void legacy_cmd_rpst(int uart_fd, int argc, char **argv){
     int iRet;
     UCHAR buf[MAX_EVENT_SIZE];
     int tag_id,tag_len,i,j;
@@ -2801,7 +2953,7 @@ static const char *wpst_help =
 "\n Example:\n"
 "\n wpst 1 6 00 03 F4 55 AB 77 \n";
 
-static void cmd_wpst(int uart_fd, int argc, char **argv){
+static void legacy_cmd_wpst(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int tag_id,tag_len,i;
     if(argc < 4){
@@ -2835,7 +2987,7 @@ static const char *setam_help =
 "\naccess mode: 0-Read-only 1-Write-only 2-Read-Write 3- Disabled\n"
 "\nExample:\n"
 "\nsetam 0 3\n";
-static void cmd_setam(int uart_fd, int argc, char **argv){
+static void legacy_cmd_setam(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int medium,mode;
     if(argc !=3){
@@ -2864,7 +3016,7 @@ static const char *setap_help =
 "\nExample:\n"
 "\nsetap 0 1\n";
 
-static void cmd_setap(int uart_fd, int argc, char **argv){
+static void legacy_cmd_setap(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int medium,priority;
     if(argc !=3){
@@ -2890,7 +3042,7 @@ static const char *rpsraw_help =
 "\n rpsraw <offset> <length> \n"
 "\n Example:\n"
 "\n rpsraw 0x012c 10\n";
-static void cmd_rpsraw(int uart_fd, int argc, char **argv){
+static void legacy_cmd_rpsraw(int uart_fd, int argc, char **argv){
     int iRet;
     UCHAR buf[MAX_EVENT_SIZE];
     int offset,len,i,j;
@@ -2931,7 +3083,7 @@ static const char *wpsraw_help =
 "\n Example:\n"
 "\n wpsraw 0x012C 6 00 03 F4 55 AB 77 \n";
 
-static void cmd_wpsraw(int uart_fd, int argc, char **argv){
+static void legacy_cmd_wpsraw(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int offset,len,i;
     if(argc < 4){
@@ -2962,7 +3114,7 @@ static const char *peek_help =
 "\npeek <address> <width>\n"
 "\nExample:\n"
 "\npeek 0x00004FFC 5\n";
-static void cmd_peek(int uart_fd, int argc, char **argv){
+static void legacy_cmd_peek(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int address,width,value;
     if(argc < 2){
@@ -3002,7 +3154,7 @@ static const char *cwtx_help =
 "\ncwtx 40"
 "\n\n";
 
-static void cmd_cwtx(int uart_fd, int argc, char **argv){
+static void legacy_cmd_cwtx(int uart_fd, int argc, char **argv){
     int Length = 0;
     UCHAR buf[MAX_EVENT_SIZE];
     int channel;
@@ -3139,7 +3291,7 @@ static const char *poke_help =
 "\npoke 0x580000 0x22005FF 0xFFFFFFFF 4"
 "\n\n";
 
-static void cmd_poke(int uart_fd, int argc, char **argv){
+static void legacy_cmd_poke(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     int address,width,value,mask;
     if(argc < 2){
@@ -3196,7 +3348,7 @@ static const char *dump_help =
 "\n";
 
 
-static void cmd_dump(int uart_fd, int argc, char **argv){
+static void legacy_cmd_dump(int uart_fd, int argc, char **argv){
 
     if(argc < 2){
         printf("\n%s\n",dump_help);
@@ -3230,7 +3382,7 @@ static const char *rafh_help =
 "\nrafh 0x15"
 "\n\n";
 
-static void cmd_rafh(int uart_fd, int argc, char **argv){
+static void legacy_cmd_rafh(int uart_fd, int argc, char **argv){
     int iRet;
     UCHAR buf[MAX_EVENT_SIZE];
     short int handle;
@@ -3279,7 +3431,7 @@ static const char *safh_help =
 "\nsafh 0x7FFFFFFFFFFFFFFFFFFF"
 "\n\n";
 
-static void cmd_safh(int uart_fd, int argc, char **argv){
+static void legacy_cmd_safh(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
 
     if(argc < 2){
@@ -3320,7 +3472,7 @@ static const char *wotp_help =
 "\nwotp 0x15 0x2020 2"
 "\n\n";
 
-static void cmd_wotp(int uart_fd, int argc, char **argv)
+static void legacy_cmd_wotp(int uart_fd, int argc, char **argv)
 {
     UINT32 address, length;
 
@@ -3367,7 +3519,7 @@ static const char *rotp_help =
 "\nrotp 0x15 2"
 "\n\n";
 
-static void cmd_rotp(int uart_fd, int argc, char **argv)
+static void legacy_cmd_rotp(int uart_fd, int argc, char **argv)
 {
     UINT32 address, length;
     UCHAR buf[MAX_EVENT_SIZE];
@@ -3449,7 +3601,7 @@ static int SU_GetId(int uart_fd, char *pStr, tSU_RevInfo *pRetRevInfo)
   "\n\n";
  */
 
-static void cmd_otp(int uart_fd, int argc, char **argv)
+static void legacy_cmd_otp(int uart_fd, int argc, char **argv)
 {
     UCHAR buf[512], format[16];
     FILE *pF = NULL;
@@ -3749,7 +3901,7 @@ static void cmd_otp(int uart_fd, int argc, char **argv)
 }
 
 
-static void cmd_plb(int uart_fd, int argc, char **argv)
+static void legacy_cmd_plb(int uart_fd, int argc, char **argv)
 {
     int enable;
     UCHAR buf[MAX_EVENT_SIZE];
@@ -3771,7 +3923,7 @@ static void cmd_plb(int uart_fd, int argc, char **argv)
 }
 
 
-static void cmd_psw(int uart_fd, int argc, char **argv)
+static void legacy_cmd_psw(int uart_fd, int argc, char **argv)
 {
     int enable, freq;
     UCHAR buf[MAX_EVENT_SIZE];
@@ -3815,7 +3967,7 @@ static const char *lert_help=
 "\nlert 30 \n"
 "\n\n";
 
-static void cmd_lert(int uart_fd, int argc, char **argv)
+static void legacy_cmd_lert(int uart_fd, int argc, char **argv)
 {
     UCHAR channel;
     if (argc < 2) {
@@ -3856,7 +4008,7 @@ static const char *lett_help=
 "\nlett 30 30 5\n"
 "\n\n";
 
-static void cmd_lett(int uart_fd, int argc, char **argv)
+static void legacy_cmd_lett(int uart_fd, int argc, char **argv)
 {
     UCHAR channel, length, payload;
     if (argc < 4) {
@@ -3908,7 +4060,7 @@ static BOOL SU_LETxTest(int uart_fd, UCHAR channel, UCHAR length, UCHAR payload)
 }
 
 
-static void cmd_lete(int uart_fd, int argc, char **argv)
+static void legacy_cmd_lete(int uart_fd, int argc, char **argv)
 {
     UCHAR buf[MAX_EVENT_SIZE];
 
@@ -4016,7 +4168,7 @@ static void CalculateTput(int uart_fd, UINT16 hci_handle, char *filename, double
 }
 #endif
 
-static void cmd_tputs(int uart_fd, int argc, char **argv)
+static void legacy_cmd_tputs(int uart_fd, int argc, char **argv)
 {
     if(argv) UNUSED(argv);
     UNUSED(argc);
@@ -4186,7 +4338,7 @@ static void cmd_tputs(int uart_fd, int argc, char **argv)
 #endif
 }
 
-static void cmd_tputr(int uart_fd, int argc, char **argv)
+static void legacy_cmd_tputr(int uart_fd, int argc, char **argv)
 {
     ssize_t plen;
     UINT16 hci_handle = 0;
@@ -4312,7 +4464,7 @@ int sock_send(int sockid, unsigned char *buf, int bytes)
     return (bufpos - buf);
 }
 
-static void cmd_btagent(int uart_fd, int argc, char **argv)
+static void legacy_cmd_btagent(int uart_fd, int argc, char **argv)
 {
     int i, j, k, l, iRet, rx_enable, iDataSize;
     uint32_t m_BerTotalBits, m_BerGoodBits;
@@ -4552,7 +4704,7 @@ static const char *hciinq_help =
 "Usage:\n"
 "\n hciinq\n";
 
-static void cmd_hciinq(int uart_fd, int argc, char **argv){
+static void legacy_cmd_hciinq(int uart_fd, int argc, char **argv){
     int iRet, i;
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR resultBuf[MAX_EVENT_SIZE];
@@ -4592,7 +4744,7 @@ static const char *hciinqcnl_help =
 "Usage:\n"
 "\n hciinqcnl\n";
 
-static void cmd_hciinqcnl(int uart_fd, int argc, char **argv){
+static void legacy_cmd_hciinqcnl(int uart_fd, int argc, char **argv){
     UCHAR buf[MAX_EVENT_SIZE];
     if(argv) UNUSED(argv);
     if(argc > 1){
@@ -4615,7 +4767,7 @@ static const char *hcisetevtflt_help =
 "Usage:\n"
 "\n hcisetevtflt\n";
 
-static void cmd_hcisetevtflt(int uart_fd, int argc, char **argv){
+static void legacy_cmd_hcisetevtflt(int uart_fd, int argc, char **argv){
     int i;
     UCHAR buf[MAX_EVENT_SIZE];
 
@@ -4643,7 +4795,7 @@ static const char *pinconntest_help =
 "Usage:\n"
 "\n pinconntest\n";
 
-static void cmd_pinconntest(int uart_fd, int argc, char **argv){
+static void legacy_cmd_pinconntest(int uart_fd, int argc, char **argv){
     int iRet;
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR resultBuf[MAX_EVENT_SIZE];
@@ -4672,7 +4824,7 @@ static const char *conntest_help =
 "Usage:\n"
 "\n conn < bdaddress >\n";
 
-static void cmd_createconnection(int uart_fd, int argc, char **argv){
+static void legacy_cmd_createconnection(int uart_fd, int argc, char **argv){
     int iRet, i,j;
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR resultBuf[MAX_EVENT_SIZE];
@@ -4726,7 +4878,7 @@ static const char *disc_help =
 "Usage:\n"
 "\n disc <handle in 2 octets Hex><reason in hex>";
 
-static void cmd_disc(int uart_fd, int argc, char **argv){
+static void legacy_cmd_disc(int uart_fd, int argc, char **argv){
     int iRet;
     unsigned long val32;
     UCHAR buf[MAX_EVENT_SIZE];
@@ -4759,7 +4911,7 @@ static const char *venspeccmd_help =
 "Usage:\n"
 "\n venspeccmd [3|6]\n";
 
-static void cmd_venspeccmd(int uart_fd, int argc, char **argv){
+static void legacy_cmd_venspeccmd(int uart_fd, int argc, char **argv){
     int iRet,i;
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR resultBuf[MAX_EVENT_SIZE];
@@ -4791,7 +4943,7 @@ static const char *rawcmd_help =
 "Usage:\n"
 "\n rawcmd ogf ocf <bytes> \n";
 
-static void cmd_rawcmd(int uart_fd, int argc, char **argv){
+static void legacy_cmd_rawcmd(int uart_fd, int argc, char **argv){
     int iRet,i,j;
     UCHAR buf[MAX_EVENT_SIZE];
     UCHAR resultBuf[MAX_EVENT_SIZE];
@@ -4841,7 +4993,7 @@ static const char *hciinvcmd1_help =
 "Usage:\n"
 "\n hciinvcmd1\n";
 
-static void cmd_hciinvcmd1(int uart_fd, int argc, char **argv){
+static void legacy_cmd_hciinvcmd1(int uart_fd, int argc, char **argv){
     int iRet;
     UCHAR buf[MAX_EVENT_SIZE];
 
@@ -4882,52 +5034,52 @@ static struct {
     char *cmd_option;
     void (*func)(int uart_fd, int argc, char **argv);
     char *doc;
-} command[] = {
-    { "reset","      ",   cmd_reset,    "Reset Target"                },
+} legacy_command[] = {
+    { "reset","      ",   legacy_cmd_reset,    "Reset Target"                },
     { "rba","       ",  cmd_rba,    "Read BD Address"                },
     { "wba","<bdaddr> ",   cmd_wba,    "Write BD Address"                },
     { "edutm","       ",  cmd_edutm,    "Enter DUT Mode"                },
-    { "wsm","<mode>  ",   cmd_wsm,    "Write Scan Mode"                },
-    { "mb","       ",   cmd_mb,    "Enter Master Blaster Mode"                },
-    { "mbr","<address> <length>  ",   cmd_mbr,    "Block memory read"                },
-    { "peek","<address> <width>  ",   cmd_peek,    "Read Value of an Address"                },
-    { "poke","<address> <value> <mask> <width>  ",   cmd_poke,    "Write Value to an Address"                },
-    { "cwtx","<channel number> ",   cmd_cwtx,    "Enter Continuous wave Tx"                },
-    { "cwrx","<channel number> ",   cmd_cwrx,    "Enter Continuous wave Rx"                },
-    { "rpst","<length> <id>  ",   cmd_rpst,    "Read PS Tag"                },
-    { "wpst","<length> <id> <data> ",   cmd_wpst,    "Write PS Tag"                },
-    { "psr","       ",   cmd_psr,    "PS Reset"                },
-    { "setap","<storage medium> <priority>",   cmd_setap,    "Set Access Priority"                },
-    { "setam","<storage medium> <access mode>",   cmd_setam,    "Set Access Mode"               },
-    { "rpsraw","<offset> <length>  ",   cmd_rpsraw,    "Read Raw PS"                },
-    { "wpsraw","<offset> <length>  <data>",   cmd_wpsraw,    "Write Raw PS"                },
+    { "wsm","<mode>  ",   legacy_cmd_wsm,    "Write Scan Mode"                },
+    { "mb","       ",   legacy_cmd_mb,    "Enter Master Blaster Mode"                },
+    { "mbr","<address> <length>  ",   legacy_cmd_mbr,    "Block memory read"                },
+    { "peek","<address> <width>  ",   legacy_cmd_peek,    "Read Value of an Address"                },
+    { "poke","<address> <value> <mask> <width>  ",   legacy_cmd_poke,    "Write Value to an Address"                },
+    { "cwtx","<channel number> ",   legacy_cmd_cwtx,    "Enter Continuous wave Tx"                },
+    { "cwrx","<channel number> ",   legacy_cmd_cwrx,    "Enter Continuous wave Rx"                },
+    { "rpst","<length> <id>  ",   legacy_cmd_rpst,    "Read PS Tag"                },
+    { "wpst","<length> <id> <data> ",   legacy_cmd_wpst,    "Write PS Tag"                },
+    { "psr","       ",   legacy_cmd_psr,    "PS Reset"                },
+    { "setap","<storage medium> <priority>",   legacy_cmd_setap,    "Set Access Priority"                },
+    { "setam","<storage medium> <access mode>",   legacy_cmd_setam,    "Set Access Mode"               },
+    { "rpsraw","<offset> <length>  ",   legacy_cmd_rpsraw,    "Read Raw PS"                },
+    { "wpsraw","<offset> <length>  <data>",   legacy_cmd_wpsraw,    "Write Raw PS"                },
     { "ssm","<disable|enable>         ", cmd_ssm, "Set Sleep Mode"      },
     { "dtx","         ", cmd_dtx, "Disable TX"      },
-    { "dump","<option>         ", cmd_dump, "Display Host Controller Information"      },
-    { "rafh","<connection handle>         ", cmd_rafh, "Read AFH channel Map"      },
-    { "safh","<channel classification>         ", cmd_safh, "Set AFH Host Channel Classification"      },
-    { "wotp", "<address> <data> [length=1]", cmd_wotp, "Write Length (default 1) bytes of Data to OTP started at Address"      },
-    { "rotp", "<address> [length=1]", cmd_rotp, "Read Length (default 1) bytes of Data to OTP started at Address"},
+    { "dump","<option>         ", legacy_cmd_dump, "Display Host Controller Information"      },
+    { "rafh","<connection handle>         ", legacy_cmd_rafh, "Read AFH channel Map"      },
+    { "safh","<channel classification>         ", legacy_cmd_safh, "Set AFH Host Channel Classification"      },
+    { "wotp", "<address> <data> [length=1]", legacy_cmd_wotp, "Write Length (default 1) bytes of Data to OTP started at Address"      },
+    { "rotp", "<address> [length=1]", legacy_cmd_rotp, "Read Length (default 1) bytes of Data to OTP started at Address"},
     { "otp", "[dump|imp|exp|test|rpid|wpid|rvid|wvid|rba|wba|hid|cpw|pwridx|ledo] [file]; opt wba <BdAddr>",
-        cmd_otp, "Misc OTP operation: dump/import otp content; imp file content into otp; test otp; otp wba <BdAddr>"},
-    { "plb", "[1|0]", cmd_plb, "Enable/disable PCM CODEC loopback"},
-    { "psw", "[1|0] [Frequency]", cmd_psw, "Enable/disable PCM sine wave playback at frequency (0..3700)"},
-    { "lert", "<rx_channel>", cmd_lert, "Put unit in LE RX mode at rx_channel (0..39)"},
-    { "lett", "<tx_channel> <length> <packet_payload>", cmd_lett, "Put unit in LE TX mode at tx_channel (0..39) with packet of given length (0..37) and packet_payload"},
-    { "lete", "        ", cmd_lete, "End LE test"},
-    { "tput-s", "[BD_Addr] [Judgment value] Logfile times data_size", cmd_tputs, "Throughput test - sender side"},
-    { "tput-r", "        ", cmd_tputr, "Throughput test - receiver side"},
-    { "btagent","<port number>", cmd_btagent, "BT Agent for IQFact" },
-    { "pinconntest", "        ", cmd_pinconntest, "Pin Connectivity Test"},
-    { "hciinq", "        ", cmd_hciinq, "Inquiry start"},
-    { "hciinqcnl", "        ", cmd_hciinqcnl, "Inquiry Cancel"},
-    { "hcisetevtflt", "        ", cmd_hcisetevtflt, "Set Event Filter"},
-    { "conn", "        ", cmd_createconnection, "ACL Connection Test" },
-    { "venspeccmd", "  ", cmd_venspeccmd, "Vendor Specific Command"},
-    { "disc", "  ", cmd_disc, "HCI disconnect Command"},
-    { "hciinvcmd1", "        ", cmd_hciinvcmd1, "Invalid HCI Command"},
-    { "rawcmd", "    ", cmd_rawcmd, "RAW HCI Command ex) rawcmd ogf ocf <bytes>"},
-    { "cmdline","<port number>", cmdline, "command line for Enable TX test mode" },
+        legacy_cmd_otp, "Misc OTP operation: dump/import otp content; imp file content into otp; test otp; otp wba <BdAddr>"},
+    { "plb", "[1|0]", legacy_cmd_plb, "Enable/disable PCM CODEC loopback"},
+    { "psw", "[1|0] [Frequency]", legacy_cmd_psw, "Enable/disable PCM sine wave playback at frequency (0..3700)"},
+    { "lert", "<rx_channel>", legacy_cmd_lert, "Put unit in LE RX mode at rx_channel (0..39)"},
+    { "lett", "<tx_channel> <length> <packet_payload>", legacy_cmd_lett, "Put unit in LE TX mode at tx_channel (0..39) with packet of given length (0..37) and packet_payload"},
+    { "lete", "        ", legacy_cmd_lete, "End LE test"},
+    { "tput-s", "[BD_Addr] [Judgment value] Logfile times data_size", legacy_cmd_tputs, "Throughput test - sender side"},
+    { "tput-r", "        ", legacy_cmd_tputr, "Throughput test - receiver side"},
+    { "btagent","<port number>", legacy_cmd_btagent, "BT Agent for IQFact" },
+    { "pinconntest", "        ", legacy_cmd_pinconntest, "Pin Connectivity Test"},
+    { "hciinq", "        ", legacy_cmd_hciinq, "Inquiry start"},
+    { "hciinqcnl", "        ", legacy_cmd_hciinqcnl, "Inquiry Cancel"},
+    { "hcisetevtflt", "        ", legacy_cmd_hcisetevtflt, "Set Event Filter"},
+    { "conn", "        ", legacy_cmd_createconnection, "ACL Connection Test" },
+    { "venspeccmd", "  ", legacy_cmd_venspeccmd, "Vendor Specific Command"},
+    { "disc", "  ", legacy_cmd_disc, "HCI disconnect Command"},
+    { "hciinvcmd1", "        ", legacy_cmd_hciinvcmd1, "Invalid HCI Command"},
+    { "rawcmd", "    ", legacy_cmd_rawcmd, "RAW HCI Command ex) rawcmd ogf ocf <bytes>"},
+    { "cmdline","<port number>", legacy_cmdline, "command line for Enable TX test mode" },
     { NULL, NULL, NULL, NULL }
 };
 /*
@@ -4954,8 +5106,8 @@ static void usage(void)
                 "\t/dev/ttyHS1\n");
     }
     printf("Commands:\n");
-    for (i = 0; command[i].cmd; i++)
-        printf("\t%-8s %-40s\t%s\n", command[i].cmd,command[i].cmd_option,command[i].doc);
+    for (i = 0; legacy_command[i].cmd; i++)
+        printf("\t%-8s %-40s\t%s\n", legacy_command[i].cmd,legacy_command[i].cmd_option,legacy_command[i].doc);
     printf("\n"
             "For more information on the usage of each command use:\n"
             "\tbtconfig <command> --help\n" );
@@ -5423,6 +5575,7 @@ static int set_patch_ram(int dev, char *patch_loc, int len)
 
 #define PATCH_LOC_KEY    "DA:"
 #define PATCH_LOC_STRING_LEN    8
+
 static int ps_patch_download(int fd, FILE *stream)
 {
     char byte[3];
@@ -6816,11 +6969,16 @@ int main(int argc, char *argv[])
 {
     int opt, i, min_para = 2;
     static int fd = -1;
+    char input_line[MAX_CMD_LEN];
+    bool interactive = true;
+    char *command = NULL;
 
     while ((opt=getopt_long(argc, argv, "hs:n", main_options, NULL)) != -1) {
+        printf("++++ main ++++\n ");
         switch (opt) {
             case 'h':
                 usage();
+                print_usage(argv[0]);
                 exit(0);
             case 's':
                 strcpy(soc_type, optarg);
@@ -6828,9 +6986,64 @@ int main(int argc, char *argv[])
             case 'i':
                 nopatch = false;
                 continue;
+            case 'x':
+                ALOGI("Direct HIDL Shell Interface Starting");
+                printf("Direct HIDL Shell Interface Starting\n");
+                hidl_interface = true;
+                continue;
+            case 'c':
+                command = optarg;
+                interactive = false;
+                break;
+         }
+      }
+    if (hidl_interface) {
+      // Setup signal handlers
+      signal(SIGINT, signal_handler);
+      signal(SIGTERM, signal_handler);
+
+      running = true;
+
+      // Execute single command if provided
+      if (!interactive) {
+        printf("Execute single command \n");
+        int result = execute_shell_command(command);
+        cleanup_hidl_client();
+        return result;
+      }
+
+      // Interactive shell mode
+      printf("Direct HIDL Shell Interface\n");
+      printf("Type 'help' for available commands\n");
+      printf("Type 'exit' to quit\n\n");
+
+      while (running) {
+        printf("hidl> ");
+        fflush(stdout);
+
+        if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
+            if (feof(stdin)) {
+                printf("\n");
+                break;
+            }
+            continue;
         }
+
+        // Remove newline
+        input_line[strcspn(input_line, "\n")] = 0;
+
+        // Skip empty lines
+        if (strlen(input_line) == 0) {
+            continue;
+        }
+
+        execute_shell_command(input_line);
     }
 
+    cleanup_hidl_client();
+    ALOGI("Direct HIDL Shell Interface Exiting\n");
+    return 0;
+    }else{
 #ifdef ANDROID
     property_get("ro.qualcomm.bt.hci_transport", prop, NULL);
     property_get("qcom.bluetooth.soc", soc_type, NULL);
@@ -6902,14 +7115,15 @@ int main(int argc, char *argv[])
 
     disable_soc_logging(fd);
 
-    for (i = 0; command[i].cmd; i++) {
-        if (strcmp(command[i].cmd, argv[0]))
+    for (i = 0; legacy_command[i].cmd; i++) {
+        if (strcmp(legacy_command[i].cmd, argv[0]))
             continue;
-        command[i].func(fd, argc, argv);
+        legacy_command[i].func(fd, argc, argv);
         break;
     }
     close(fd);
     return 0;
+   }
 }
 
 
@@ -7533,4 +7747,1234 @@ int ToggleMinMaxOption (int *Value, char *Option, int FieldID, int Min, int Max,
 }
 
 //----------------------------------------------------------------------------
+//****HIDL INTERFACE API'S******
+static void stop_response_thread(void)
+{
+    if (!response_thread_running) return;
+    ALOGI("Stopping response handler thread");
+    response_thread_running = false;
+    pthread_join(response_thread, NULL);
+    ALOGI("Response handler thread stopped");
+}
 
+static int start_response_thread(void)
+{
+    if (response_thread_running) return 0;
+
+    ALOGI("Starting response handler thread");
+    response_thread_running = true;
+    if (pthread_create(&response_thread, NULL, response_handler_thread, NULL) != 0) {
+        ALOGE("Failed to create response thread");
+        response_thread_running = false;
+        return -1;
+    }
+    return 0;
+}
+
+static void print_usage(const char *prog_name)
+{   printf("****HIDL INTERFACE HELP****\n");
+    printf("Usage: %s [options]\n", prog_name);
+    printf("Options:\n");
+    printf("  -c <command>  Execute single command and exit\n");
+    printf("  -h            Show this help\n");
+    printf("\nExamples:\n");
+    printf("  %s                    # Interactive mode\n", prog_name);
+    printf("  %s -c \"init bt\"       # Initialize BT and exit\n", prog_name);
+    printf("  %s -c \"reset\"         # Send reset command\n", prog_name);
+}
+
+static int execute_shell_command(const char *cmd_line)
+{
+    char *cmd_copy = strdup(cmd_line);
+    char *argv[MAX_ARGS];
+    int argc = 0;
+    char *token;
+    char *saveptr;
+    int result = 0;
+    bool found = false;
+
+    if (!cmd_copy) {
+        ALOGE("Memory allocation failed");
+        return -1;
+    }
+
+    // Tokenize command line
+    token = strtok_r(cmd_copy, " \t", &saveptr);
+    while (token && argc < MAX_ARGS - 1) {
+        argv[argc++] = token;
+        token = strtok_r(NULL, " \t", &saveptr);
+    }
+    argv[argc] = NULL;
+
+    if (argc == 0) {
+        free(cmd_copy);
+        return 0;
+    }
+
+    // Find and execute command
+    for (int i = 0; commands[i].name; i++) {
+        if (strcmp(argv[0], commands[i].name) == 0) {
+            result = commands[i].handler(argc, argv);
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        printf("Unknown command: %s\n", argv[0]);
+        printf("Type 'help' for available commands\n");
+        result = -1;
+    }
+
+    free(cmd_copy);
+    return result;
+}
+
+static int initialize_hidl_client(int mode)
+{
+    if (hidl_initialized) {
+        ALOGI("HIDL client already initialized");
+        return 0;
+    }
+
+    ALOGI("Initializing HIDL client with mode %d", mode);
+
+    if (!hidl_client_initialize(mode, &hidl_fd)) {
+        ALOGE("Failed to initialize HIDL client");
+        return -1;
+    }
+
+    if (hidl_fd < 0) {
+        ALOGE("Invalid HIDL file descriptor");
+        return -1;
+    }
+
+    // Create response handler thread
+    if (start_response_thread() != 0) {
+        ALOGE("Failed to create response thread");
+        close(hidl_fd);
+        hidl_fd = -1;
+        return -1;
+    }
+
+    hidl_initialized = true;
+    ALOGI("HIDL client initialized successfully, fd=%d", hidl_fd);
+    return 0;
+}
+
+static void cleanup_hidl_client(void)
+{
+    if (!hidl_initialized) {
+        return;
+    }
+
+    ALOGI("Cleaning up HIDL client");
+    running = false;
+
+    if (hidl_fd >= 0) {
+        close(hidl_fd);
+        hidl_fd = -1;
+    }
+
+    // Wait for response thread to finish
+    pthread_join(response_thread, NULL);
+
+    hidl_client_close();
+    hidl_initialized = false;
+    ALOGI("HIDL client cleanup completed");
+}
+
+
+
+static int send_hci_command(uint16_t opcode, uint8_t *params, uint8_t param_len)
+{
+    uint8_t command[256];
+    int cmd_len = 0;
+
+    if (!hidl_initialized || hidl_fd < 0) {
+        ALOGE("HIDL client not initialized");
+        return -1;
+    }
+
+    // Build HCI command packet
+    command[cmd_len++] = BT_COMMAND_PKT;           // Packet type
+    command[cmd_len++] = opcode & 0xFF;            // Opcode LSB
+    command[cmd_len++] = (opcode >> 8) & 0xFF;     // Opcode MSB
+    command[cmd_len++] = param_len;                // Parameter length
+
+    // Add parameters
+    if (params && param_len > 0) {
+        memcpy(&command[cmd_len], params, param_len);
+        cmd_len += param_len;
+    }
+
+    ALOGD("Sending HCI command: opcode=0x%04X, param_len=%d", opcode, param_len);
+    print_hex_data(command, cmd_len, "CMD");
+
+    // Send command to HIDL client
+    ssize_t bytes_written = write(hidl_fd, command, cmd_len);
+    if (bytes_written != cmd_len) {
+        ALOGE("Failed to write command to HIDL client: %s", strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+
+#define MAX_INQUIRY_RESULTS 20
+
+typedef struct {
+    uint8_t bdaddr[6];
+    uint8_t page_scan_rep_mode;
+    uint8_t class_of_device[3];
+    uint16_t clock_offset;
+    int8_t rssi;
+    char name[249];
+} inquiry_result_t;
+
+static inquiry_result_t inquiry_results[MAX_INQUIRY_RESULTS];
+static int inquiry_result_count = 0;
+
+static const char *get_device_type_from_cod(uint8_t *cod)
+{
+    uint8_t major_device = cod[1] & 0x1F;
+    switch (major_device) {
+        case 0x00: return "Miscellaneous";
+        case 0x01: return "Computer";
+        case 0x02: return "Phone";
+        case 0x03: return "LAN/Access Point";
+        case 0x04: return "Audio/Video";
+        case 0x05: return "Peripheral";
+        case 0x06: return "Imaging";
+        case 0x07: return "Wearable";
+        case 0x08: return "Toy";
+        case 0x09: return "Health";
+        case 0x1F: return "Uncategorized";
+        default:   return "Unknown";
+    }
+}
+
+static void parse_eir_for_name(uint8_t *eir, char *name_buf, int max_len) {
+    int i = 0;
+    name_buf[0] = '\0';
+    while (i < 240) {
+        uint8_t len = eir[i];
+        if (len == 0) break;
+        if (i + 1 + len > 240) break;
+        uint8_t type = eir[i+1];
+        if (type == 0x09 || type == 0x08) { // Complete or Shortened Local Name
+            int copy_len = len - 1;
+            if (copy_len > max_len - 1) copy_len = max_len - 1;
+            memcpy(name_buf, &eir[i+2], copy_len);
+            name_buf[copy_len] = '\0';
+            return;
+        }
+        i += len + 1;
+    }
+}
+
+static void print_inquiry_results(void)
+{
+    printf("\n\n");
+    printf("=========================================================================================================================\n");
+    printf("                                                  Inquiry Results                                                        \n");
+    printf("=========================================================================================================================\n");
+    printf("  # |      BD Address     |    Device Type    |      CoD      | Clock | RSSI | Name \n");
+    printf("-------------------------------------------------------------------------------------------------------------------------\n");
+    for (int i = 0; i < inquiry_result_count; i++) {
+        inquiry_result_t *res = &inquiry_results[i];
+        char rssi_str[10] = "N/A";
+        if (res->rssi != 0) snprintf(rssi_str, sizeof(rssi_str), "%d dBm", res->rssi);
+
+        printf(" %2d | %02X:%02X:%02X:%02X:%02X:%02X | %-17s | 0x%02X%02X%02X  | 0x%04X| %-4s | %s\n",
+               i + 1,
+               res->bdaddr[5], res->bdaddr[4], res->bdaddr[3],
+               res->bdaddr[2], res->bdaddr[1], res->bdaddr[0],
+               get_device_type_from_cod(res->class_of_device),
+               res->class_of_device[2], res->class_of_device[1], res->class_of_device[0],
+               res->clock_offset,
+               rssi_str,
+               res->name[0] ? res->name : "");
+    }
+    printf("=========================================================================================================================\n");
+    printf("\n");
+    inquiry_result_count = 0;
+}
+
+static void *response_handler_thread(void *arg)
+{
+    uint8_t buffer[MAX_RESPONSE_LEN];
+    fd_set readfds;
+    struct timeval timeout;
+    int result;
+
+    ALOGI("Response handler thread started");
+
+    while (running && response_thread_running && hidl_fd >= 0) {
+        FD_ZERO(&readfds);
+        FD_SET(hidl_fd, &readfds);
+
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+
+        result = select(hidl_fd + 1, &readfds, NULL, NULL, &timeout);
+        if (result < 0) {
+            if (errno == EINTR) continue;
+            ALOGE("Select error: %s", strerror(errno));
+            break;
+        }
+
+        if (result == 0) {
+            // Timeout, continue
+            continue;
+        }
+
+        if (FD_ISSET(hidl_fd, &readfds)) {
+            ssize_t bytes_read = read(hidl_fd, buffer, sizeof(buffer));
+            if (bytes_read > 0) {
+                print_hex_data(buffer, bytes_read, "RSP");
+
+                // Parse and display response
+                if (bytes_read >= 3 && buffer[0] == BT_EVENT_PKT) {
+                    uint8_t event_code = buffer[1];
+                    uint8_t param_len = buffer[2];
+                    printf("Event: 0x%02X, Length: %d\n", event_code, param_len);
+
+                    // Handle specific events
+                    switch (event_code) {
+                        case 0x0E:
+                            // Command Complete
+                            if (param_len >= 3) {
+                                uint8_t num_hci_cmd_pkts = buffer[3];
+                                uint16_t opcode = buffer[4] | (buffer[5] << 8);
+                                uint8_t status = buffer[6];
+                                printf("Command Complete: opcode=0x%04X, status=0x%02X\n",
+                                       opcode, status);
+                                if (status == 0x00) {
+                                    switch (opcode) {
+                                        case 0x1009: // Read BD_ADDR
+                                            if (param_len >= 10) { // 1 (Num) + 2 (Op) + 1 (Status) + 6 (Addr) = 10
+                                                printf("BD Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                                                    buffer[12], buffer[11], buffer[10],
+                                                    buffer[9], buffer[8], buffer[7]);
+                                            }
+                                            break;
+                                        case 0x1001: // Read Local Version
+                                            // ... parse version ...
+                                            break;
+                                        case 0x0C14: // Read Local Name
+                                            if (param_len > 1) {
+                                                char name[249];
+                                                int name_len = param_len - 1;
+                                                if (name_len > 248) name_len = 248;
+                                                memcpy(name, &buffer[7], name_len);
+                                                name[name_len] = '\0';
+                                                printf("Local Name: %s\n", name);
+                                            }
+                                            break;
+                                    }
+                                }
+                            }
+                            break;
+                        case 0x0F:
+                            // Command Status
+                            if (param_len >= 3) {
+                                uint8_t status = buffer[3];
+                                uint16_t opcode = buffer[4] | (buffer[5] << 8);
+                                printf("Command Status: opcode=0x%04X, status=0x%02X\n",
+                                       opcode, status);
+                            }
+                            break;
+                        case 0x02: // Inquiry Result
+                            if (param_len > 0) {
+                                uint8_t num_responses = buffer[3];
+                                int offset = 4;
+                                for (int i = 0; i < num_responses && inquiry_result_count < MAX_INQUIRY_RESULTS; i++) {
+                                    if (offset + 14 > 3 + param_len) break;
+                                    inquiry_result_t *res = &inquiry_results[inquiry_result_count];
+                                    memcpy(res->bdaddr, &buffer[offset], 6);
+                                    res->page_scan_rep_mode = buffer[offset + 6];
+                                    memcpy(res->class_of_device, &buffer[offset + 9], 3);
+                                    res->clock_offset = buffer[offset + 12] | (buffer[offset + 13] << 8);
+                                    res->rssi = 0;
+                                    res->name[0] = '\0';
+                                    printf("Found Device: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                                        res->bdaddr[5], res->bdaddr[4], res->bdaddr[3],
+                                        res->bdaddr[2], res->bdaddr[1], res->bdaddr[0]);
+
+                                    inquiry_result_count++;
+                                    offset += 14;
+                                }
+                            }
+                            break;
+                        case 0x2F: // Extended Inquiry Result
+                            if (param_len > 0) {
+                                // Num_Responses (1)
+                                if (inquiry_result_count < MAX_INQUIRY_RESULTS) {
+                                    inquiry_result_t *res = &inquiry_results[inquiry_result_count];
+                                    int offset = 4;
+                                    memcpy(res->bdaddr, &buffer[offset], 6);
+                                    res->page_scan_rep_mode = buffer[offset + 6];
+                                    // Reserved (1)
+                                    memcpy(res->class_of_device, &buffer[offset + 8], 3);
+                                    res->clock_offset = buffer[offset + 11] | (buffer[offset + 12] << 8);
+                                    res->rssi = (int8_t)buffer[offset + 13];
+                                    parse_eir_for_name(&buffer[offset + 14], res->name, sizeof(res->name));
+
+                                    printf("Found Device: %02X:%02X:%02X:%02X:%02X:%02X Name: %s\n",
+                                        res->bdaddr[5], res->bdaddr[4], res->bdaddr[3],
+                                        res->bdaddr[2], res->bdaddr[1], res->bdaddr[0],
+                                        res->name);
+
+                                    inquiry_result_count++;
+                                }
+                            }
+                            break;
+                        case 0x01: // Inquiry Complete
+                            printf("Inquiry Complete. Status: 0x%02X\n", buffer[3]);
+                            print_inquiry_results();
+                            break;
+                        case 0x3E: // LE Meta Event
+                            if (param_len > 0) {
+                                uint8_t subevent = buffer[3];
+                                if (subevent == 0x01) { // LE Connection Complete
+                                    uint8_t status = buffer[4];
+                                    uint16_t handle = buffer[5] | (buffer[6] << 8);
+                                    printf("LE Connection Complete: status=0x%02X, handle=0x%04X\n", status, handle);
+                                } else {
+                                    printf("LE Meta Event: subevent=0x%02X\n", subevent);
+                                }
+                            }
+                            break;
+                        default:
+                            printf("Event data: ");
+                            for (int i = 3; i < bytes_read && i < 3 + param_len; i++) {
+                                printf("%02X ", buffer[i]);
+                            }
+                            printf("\n");
+                            break;
+                    }
+                }
+            } else if (bytes_read == 0) {
+                ALOGI("HIDL client closed connection");
+                break;
+            } else {
+                ALOGE("Read error: %s", strerror(errno));
+                break;
+            }
+        }
+    }
+
+    ALOGI("Response handler thread exiting");
+    return NULL;
+}
+
+static int parse_hex_string(const char *hex_str, uint8_t *buffer, int max_len)
+{
+    int len = 0;
+    const char *ptr = hex_str;
+    while (*ptr && len < max_len) {
+        // Skip whitespace and separators
+        while (*ptr && (*ptr == ' ' || *ptr == '\t' || *ptr == ',' || *ptr == ':')) {
+            ptr++;
+        }
+
+        if (!*ptr) break;
+
+        // Parse hex byte
+        if (sscanf(ptr, "%2hhx", &buffer[len]) == 1) {
+            len++;
+            ptr += 2;
+        } else {
+            ALOGE("Invalid hex string at position %ld", ptr - hex_str);
+            return -1;
+        }
+    }
+    return len;
+}
+
+static void print_hex_data(const uint8_t *data, int len, const char *prefix)
+{
+    printf("%s: ", prefix);
+    for (int i = 0; i < len; i++) {
+        printf("%02X ", data[i]);
+        if ((i + 1) % 16 == 0 && i + 1 < len) {
+            printf("\n     ");
+        }
+    }
+    printf("\n");
+}
+
+static void signal_handler(int sig)
+{
+    ALOGI("Received signal %d, shutting down", sig);
+    running = false;
+}
+
+// Command implementations
+static int cmd_help(int argc, char *argv[])
+{
+    printf("Available commands:\n");
+    for (int i = 0; commands[i].name; i++) {
+        printf("  %-10s - %s\n", commands[i].name, commands[i].description);
+    }
+    return 0;
+}
+
+static int cmd_init(int argc, char *argv[])
+{
+    int mode = MODE_BT; // Default to Bluetooth
+    if (argc > 1) {
+        if (strcmp(argv[1], "bt") == 0) {
+            mode = MODE_BT;
+        } else if (strcmp(argv[1], "ant") == 0) {
+            mode = MODE_ANT;
+        } else if (strcmp(argv[1], "fm") == 0) {
+            mode = MODE_FM;
+        } else {
+            printf("Invalid mode: %s (use bt, ant, or fm)\n", argv[1]);
+            return -1;
+        }
+    }
+    return initialize_hidl_client(mode);
+}
+
+static int cmd_reset(int argc, char *argv[])
+{
+    printf("Sending HCI Reset command...\n");
+    return send_hci_command(HCI_RESET, NULL, 0);
+}
+
+static int cmd_version(int argc, char *argv[])
+{
+    printf("Reading local version information...\n");
+    return send_hci_command(HCI_READ_LOCAL_VERSION, NULL, 0);
+}
+
+static int cmd_bdaddr(int argc, char *argv[])
+{
+    printf("Reading BD_ADDR...\n");
+    return send_hci_command(HCI_READ_BD_ADDR, NULL, 0);
+}
+
+static int cmd_name(int argc, char *argv[])
+{
+    printf("Reading local name...\n");
+    return send_hci_command(HCI_READ_LOCAL_NAME, NULL, 0);
+}
+
+static int cmd_setname(int argc, char *argv[])
+{
+    uint8_t params[248] = {0}; // Max name length
+    if (argc < 2) {
+        printf("Usage: setname <name>\n");
+        return -1;
+    }
+    strlcpy((char*)params, argv[1], sizeof(params));
+    printf("Setting local name to: %s\n", (char *)params);
+    return send_hci_command(HCI_WRITE_LOCAL_NAME, params, strlen((char*)params) + 1);
+}
+
+static int cmd_inquiry(int argc, char *argv[])
+{
+    uint8_t params[5];
+    uint8_t duration = 8; // Default 10.24 seconds
+    if (argc > 1) {
+        duration = atoi(argv[1]);
+        if (duration == 0 || duration > 48) {
+            printf("Invalid duration (1-48): %s\n", argv[1]);
+            return -1;
+        }
+    }
+
+    //(General Inquiry)
+    params[0] = 0x33;
+    params[1] = 0x8B;
+    params[2] = 0x9E;
+    params[3] = duration;
+    params[4] = 0x00;
+
+    printf("Starting inquiry for %d * 1.28 seconds...\n", duration);
+    return send_hci_command(HCI_INQUIRY, params, 5);
+}
+
+static int cmd_raw(int argc, char *argv[])
+{
+    uint16_t opcode;
+    uint8_t params[255];
+    int param_len = 0;
+    if (argc < 2) {
+        printf("Usage: raw <opcode> [param1] [param2] ...\n");
+        printf("Example: raw 0x1001\n");
+        printf("Example: raw 0x0C13 48656C6C6F00\n");
+        return -1;
+    }
+
+    // Parse opcode
+    if (sscanf(argv[1], "0x%hx", &opcode) != 1 && sscanf(argv[1], "%hx", &opcode) != 1) {
+        printf("Invalid opcode: %s\n", argv[1]);
+        return -1;
+    }
+
+    // Parse parameters
+    if (argc > 2) {
+        param_len = parse_hex_string(argv[2], params, sizeof(params));
+        if (param_len < 0) {
+            printf("Invalid parameter string: %s\n", argv[2]);
+            return -1;
+        }
+    }
+    printf("Sending raw HCI command: opcode=0x%04X, param_len=%d\n", opcode, param_len);
+    return send_hci_command(opcode, param_len > 0 ? params : NULL, param_len);
+}
+
+static int cmd_connect(int argc, char *argv[])
+{
+    uint16_t handle;
+    int ret;
+
+    if (argc < 2) {
+        printf("Usage: connect <bd_addr>\n");
+        return -1;
+    }
+
+    // Stop thread to avoid race condition on Connection Complete event
+    stop_response_thread();
+
+    ret = hidl_create_connection(argv[1], &handle);
+
+    // Restart thread
+    start_response_thread();
+
+    if (ret == 0) {
+        printf("Successfully connected to %s, Handle: 0x%04X\n", argv[1], handle);
+        return 0;
+    } else {
+        printf("Failed to connect to %s\n", argv[1]);
+        return -1;
+    }
+}
+
+static int cmd_disconnect(int argc, char *argv[])
+{
+    uint16_t handle;
+
+    if (argc < 2) {
+        printf("Usage: disconnect <handle>\n");
+        printf("Example: disconnect 0x0001\n");
+        return -1;
+    }
+
+    // Parse handle
+    if (sscanf(argv[1], "0x%hx", &handle) != 1 && sscanf(argv[1], "%hx", &handle) != 1) {
+        printf("Invalid handle: %s\n", argv[1]);
+        return -1;
+    }
+
+    printf("Disconnecting handle 0x%04X...\n", handle);
+    return hidl_disconnect_connection(handle);
+}
+
+static int cmd_adv(int argc, char *argv[])
+{
+    if (argc < 2) {
+        printf("Usage: adv <on|off>\n");
+        return -1;
+    }
+
+    if (strcmp(argv[1], "on") == 0) {
+        // Set Advertising Parameters
+        // Min_Interval(2), Max_Interval(2), Type(1), Own_Addr_Type(1),
+        // Peer_Addr_Type(1), Peer_Addr(6), Channel_Map(1), Filter_Policy(1)
+        // Total 15 bytes
+        uint8_t params[15];
+        memset(params, 0, sizeof(params));
+        // Interval: 0x0800 (1.28s)
+        params[0] = 0x00; params[1] = 0x08; // Min
+        params[2] = 0x00; params[3] = 0x08; // Max
+        params[4] = 0x00; // Type: Connectable undirected
+        params[5] = 0x00; // Own Addr: Public
+        params[6] = 0x00; // Peer Addr Type: Public
+        // Peer Addr: 00:00:00:00:00:00 (already 0)
+        params[13] = 0x07; // Channel Map: All
+        params[14] = 0x00; // Filter: Allow all
+
+        printf("Setting advertising parameters...\n");
+        if (send_hci_command(HCI_LE_SET_ADV_PARAM, params, sizeof(params)) < 0) {
+            printf("Failed to set advertising parameters\n");
+            return -1;
+        }
+
+        // Enable Advertising
+        uint8_t enable = 0x01;
+        printf("Enabling advertising...\n");
+        return send_hci_command(HCI_LE_SET_ADV_ENABLE, &enable, 1);
+    } else if (strcmp(argv[1], "off") == 0) {
+        uint8_t enable = 0x00;
+        printf("Disabling advertising...\n");
+        return send_hci_command(HCI_LE_SET_ADV_ENABLE, &enable, 1);
+    } else {
+        printf("Invalid argument: %s\n", argv[1]);
+        return -1;
+    }
+}
+
+static int cmd_le_connect(int argc, char *argv[])
+{
+    uint8_t params[25];
+    uint8_t bd_addr_bytes[6];
+
+    if (argc < 2) {
+        printf("Usage: le_connect <bd_addr>\n");
+        return -1;
+    }
+
+    if (sscanf(argv[1], "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+               &bd_addr_bytes[5], &bd_addr_bytes[4], &bd_addr_bytes[3],
+               &bd_addr_bytes[2], &bd_addr_bytes[1], &bd_addr_bytes[0]) != 6) {
+        printf("Error: Invalid BD address format\n");
+        return -1;
+    }
+
+    // LE Create Connection Parameters
+    // Scan Interval: 0x0060 (60ms)
+    params[0] = 0x60; params[1] = 0x00;
+    // Scan Window: 0x0030 (30ms)
+    params[2] = 0x30; params[3] = 0x00;
+    // Initiator Filter Policy: 0x00 (Use peer address)
+    params[4] = 0x00;
+    // Peer Address Type: 0x00 (Public)
+    params[5] = 0x00;
+    // Peer Address
+    memcpy(&params[6], bd_addr_bytes, 6);
+    // Own Address Type: 0x00 (Public)
+    params[12] = 0x00;
+    // Conn Interval Min: 0x0018 (30ms)
+    params[13] = 0x18; params[14] = 0x00;
+    // Conn Interval Max: 0x0028 (50ms)
+    params[15] = 0x28; params[16] = 0x00;
+    // Conn Latency: 0x0000
+    params[17] = 0x00; params[18] = 0x00;
+    // Supervision Timeout: 0x01F4 (5s)
+    params[19] = 0xF4; params[20] = 0x01;
+    // Min CE Length: 0x0000
+    params[21] = 0x00; params[22] = 0x00;
+    // Max CE Length: 0x0000
+    params[23] = 0x00; params[24] = 0x00;
+
+    printf("Sending LE Create Connection to %s...\n", argv[1]);
+    return send_hci_command(HCI_LE_CREATE_CONNECTION, params, sizeof(params));
+}
+
+static int cmd_exit(int argc, char *argv[])
+{
+    printf("Exiting...\n");
+    running = false;
+    return 0;
+}
+
+
+
+static int hidl_calculate_tput(uint16_t hci_handle, const char *filename,
+                              double threshold, int tx_size_kb)
+{
+    FILE *log_file = NULL;
+    hidl_acl_packet_t acl_packet;
+    uint32_t target_packets;
+    uint32_t acl_credits = 8; // Initial ACL credits
+    fd_set read_fds;
+    struct timeval timeout;
+    int result;
+    double throughput_kbps;
+    uint64_t time_diff_us;
+    uint32_t bytes_sent;
+
+    printf("HIDL Throughput Test: Starting measurement\n");
+    printf("Target: %d KB, Handle: 0x%04X, Threshold: %.2f KB/s\n",
+           tx_size_kb, hci_handle, threshold);
+
+    // Open log file if specified
+    if (filename && strlen(filename) > 0) {
+        log_file = fopen(filename, "a");
+        if (!log_file) {
+            printf("Warning: Could not open log file %s\n", filename);
+        }
+    }
+
+    // Calculate target packets (1000 bytes per packet)
+    target_packets = (tx_size_kb * 1024) / 1000;
+
+    // Initialize packet structure
+    memset(&acl_packet, 0, sizeof(acl_packet));
+    acl_packet.packet_type = 0x02; // HCI_ACLDATA_PKT
+    acl_packet.connection_handle = hci_handle;
+    acl_packet.data_length = 1004; // ACL data length
+    acl_packet.l2cap_length = 1000; // L2CAP length
+    acl_packet.l2cap_cid = 0x0040; // L2CAP CID
+
+    // Reset counters
+    hidl_packets_sent = 0;
+    hidl_packets_completed = 0;
+
+    // Record start time
+    gettimeofday(&hidl_start_time, NULL);
+
+    printf("Sending %u packets...\n", target_packets);
+
+    // Main transmission loop
+    while (hidl_packets_sent < target_packets) {
+        // Send packets while we have credits
+        while (acl_credits > 0 && hidl_packets_sent < target_packets) {
+            // Fill payload with packet sequence number
+            memset(acl_packet.payload, hidl_packets_sent & 0xFF, sizeof(acl_packet.payload));
+
+            // Send ACL packet via HIDL
+            if (hidl_send_acl_data(hci_handle, (uint8_t*)&acl_packet, sizeof(acl_packet)) < 0) {
+                printf("Error: Failed to send ACL packet %u\n", hidl_packets_sent);
+                break;
+            }
+
+            hidl_packets_sent++;
+            acl_credits--;
+
+            // Progress indicator
+            if (hidl_packets_sent % 100 == 0) {
+                printf("Sent: %u/%u packets\r", hidl_packets_sent, target_packets);
+                fflush(stdout);
+            }
+        }
+
+        // Wait for controller response to restore credits
+        FD_ZERO(&read_fds);
+        FD_SET(hidl_fd, &read_fds);
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        result = select(hidl_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (result < 0) {
+            printf("Error: select() failed: %s\n", strerror(errno));
+            break;
+        } else if (result == 0) {
+            printf("Warning: Timeout waiting for controller response\n");
+            continue;
+        }
+
+        if (FD_ISSET(hidl_fd, &read_fds)) {
+            uint8_t event_buffer[256];
+            ssize_t bytes_read = read(hidl_fd, event_buffer, sizeof(event_buffer));
+
+            if (bytes_read > 0) {
+                // Parse Number of Completed Packets event
+                if (event_buffer[0] == 0x04 && event_buffer[1] == 0x13) { // HCI Event + Event Code
+                    int completed = hidl_parse_num_completed_packets(event_buffer);
+                    if (completed > 0) {
+                        acl_credits += completed;
+                        hidl_packets_completed += completed;
+                    }
+                }
+            }
+        }
+
+        // Check for timeout (5 minutes max)
+        struct timeval current_time;
+        gettimeofday(&current_time, NULL);
+        uint64_t elapsed_us = (current_time.tv_sec - hidl_start_time.tv_sec) * 1000000ULL +
+                             (current_time.tv_usec - hidl_start_time.tv_usec);
+        if (elapsed_us > 300000000ULL) { // 5 minutes
+            printf("\nTimeout: Test exceeded 5 minutes\n");
+            break;
+        }
+    }
+
+    // Record end time
+    gettimeofday(&hidl_end_time, NULL);
+
+    // Calculate results
+    time_diff_us = (hidl_end_time.tv_sec - hidl_start_time.tv_sec) * 1000000ULL +
+                   (hidl_end_time.tv_usec - hidl_start_time.tv_usec);
+    bytes_sent = hidl_packets_sent * 1000;
+    throughput_kbps = (double)bytes_sent / ((double)time_diff_us / 1000000.0) / 1024.0;
+
+    // Display results
+    printf("\n\nHIDL Throughput Test Results:\n");
+    printf("Packets Sent: %u\n", hidl_packets_sent);
+    printf("Bytes Sent: %u\n", bytes_sent);
+    printf("Time Elapsed: %.3f seconds\n", (double)time_diff_us / 1000000.0);
+    printf("Throughput: %.2f KB/s\n", throughput_kbps);
+    printf("Result: %s\n", (throughput_kbps >= threshold) ? "PASS" : "FAIL");
+
+    // Log results
+    if (log_file) {
+        time_t now = time(NULL);
+        struct tm *tm_info = localtime(&now);
+        char timestamp[64];
+        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", tm_info);
+
+        fprintf(log_file, "[%s] HIDL Throughput Test\n", timestamp);
+        fprintf(log_file, "Handle: 0x%04X, Packets: %u, Throughput: %.2f KB/s, Result: %s\n",
+                hci_handle, hidl_packets_sent, throughput_kbps,
+                (throughput_kbps >= threshold) ? "PASS" : "FAIL");
+        fclose(log_file);
+    }
+
+    return (throughput_kbps >= threshold) ? 0 : -1;
+}
+
+/**
+ * HIDL version of cmd_tputs - Throughput Test Sender
+ */
+static int hidl_cmd_tputs(int argc, char *argv[])
+{
+    const char *bd_addr;
+    double threshold;
+    const char *log_file = NULL;
+    int iterations = 1;
+    int tx_size_kb = 1;
+    uint16_t connection_handle;
+    int i, result;
+
+    // Parse arguments
+    if (argc < 3) {
+        printf("Usage: tput-s <bd_addr> <threshold_kbps> [log_file] [iterations] [size_kb]\n");
+        printf("Example: tput-s 00:11:22:33:44:55 150 test.log 5 10\n");
+        return -1;
+    }
+
+    bd_addr = argv[1];
+    threshold = atof(argv[2]);
+
+    if (argc > 3) log_file = argv[3];
+    if (argc > 4) iterations = atoi(argv[4]);
+    if (argc > 5) tx_size_kb = atoi(argv[5]);
+
+    // Validate parameters
+    if (threshold <= 0) {
+        printf("Error: Invalid threshold value\n");
+        return -1;
+    }
+
+    if (iterations <= 0) iterations = 1;
+    if (tx_size_kb <= 0) tx_size_kb = 1;
+
+    printf("HIDL Throughput Sender Test\n");
+    printf("Target Device: %s\n", bd_addr);
+    printf("Threshold: %.2f KB/s\n", threshold);
+    printf("Iterations: %d\n", iterations);
+    printf("Data Size: %d KB per test\n", tx_size_kb);
+
+    // Check HIDL initialization
+    if (!hidl_initialized) {
+        printf("Error: HIDL client not initialized. Run 'init bt' first.\n");
+        return -1;
+    }
+
+    // Stop response handler thread to avoid race conditions
+    stop_response_thread();
+
+    // Stop response handler thread to avoid race conditions
+    stop_response_thread();
+
+    // Run test iterations
+    for (i = 0; i < iterations; i++) {
+        printf("\n--- Test Iteration %d/%d ---\n", i + 1, iterations);
+
+        // Create connection
+        printf("Creating connection to %s...\n", bd_addr);
+        if (hidl_create_connection(bd_addr, &connection_handle) < 0) {
+            printf("Error: Failed to create connection\n");
+            continue;
+        }
+
+        printf("Connection established, handle: 0x%04X\n", connection_handle);
+
+        // Run throughput test
+        result = hidl_calculate_tput(connection_handle, log_file, threshold, tx_size_kb);
+
+        // Disconnect
+        printf("Disconnecting...\n");
+        hidl_disconnect_connection(connection_handle);
+
+        // Brief pause between iterations
+        if (i < iterations - 1) {
+            sleep(2);
+        }
+    }
+    // Restart response handler thread
+    start_response_thread();
+
+    printf("\nHIDL Throughput Sender Test Complete\n");
+    return 0;
+}
+
+/**
+ * HIDL version of cmd_tputr - Throughput Test Receiver
+ */
+static int hidl_cmd_tputr(int argc, char *argv[])
+{
+    uint8_t scan_enable = 0x02; // Page scan enabled
+    uint8_t event_buffer[256];
+    fd_set read_fds;
+    struct timeval timeout;
+    int result;
+
+    UNUSED(argc);
+    UNUSED(argv);
+
+    printf("HIDL Throughput Receiver Test\n");
+
+    // Check HIDL initialization
+    if (!hidl_initialized) {
+        printf("Error: HIDL client not initialized. Run 'init bt' first.\n");
+        return -1;
+    }
+
+    // Send HCI Reset
+    printf("Resetting controller...\n");
+    if (send_hci_command(HCI_RESET, NULL, 0) < 0) {
+        printf("Error: Failed to reset controller\n");
+        return -1;
+    }
+
+    sleep(1);
+
+    // Enable page scan
+    printf("Enabling page scan...\n");
+    if (send_hci_command(0x0C1A, &scan_enable, 1) < 0) { // HCI_Write_Scan_Enable
+        printf("Error: Failed to enable page scan\n");
+        return -1;
+    }
+
+    printf("Listening for incoming connections...\n");
+    printf("Press Ctrl+C to stop\n");
+
+    hidl_tput_running = true;
+
+    // Main receiver loop
+    while (hidl_tput_running && running) {
+        FD_ZERO(&read_fds);
+        FD_SET(hidl_fd, &read_fds);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+
+        result = select(hidl_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (result < 0) {
+            if (errno == EINTR) continue;
+            printf("Error: select() failed: %s\n", strerror(errno));
+            break;
+        } else if (result == 0) {
+            continue; // Timeout, check running flag
+        }
+
+        if (FD_ISSET(hidl_fd, &read_fds)) {
+            ssize_t bytes_read = read(hidl_fd, event_buffer, sizeof(event_buffer));
+
+            if (bytes_read > 0) {
+                // Parse HCI events
+                if (event_buffer[0] == 0x04) { // HCI Event packet
+                    uint8_t event_code = event_buffer[1];
+
+                    switch (event_code) {
+                        case 0x04: // Connection Request Event
+                            printf("Incoming connection request received\n");
+                            {
+                                uint8_t accept_params[7];
+                                // Copy BD_ADDR from event (starts at offset 3)
+                                memcpy(accept_params, &event_buffer[3], 6);
+                                // Role: 0x01 (Remain Slave)
+                                accept_params[6] = 0x01;
+
+                                printf("Accepting connection...\n");
+                                // OGF_LINK_CTL(0x01) | OCF_ACCEPT_CONN_REQ(0x0009) = 0x0409
+                                send_hci_command(0x0409, accept_params, sizeof(accept_params));
+                            }
+                            break;
+                        case 0x03: // Connection Complete Event
+                            {
+                                int handle = hidl_parse_connection_complete(event_buffer);
+                                if (handle >= 0) {
+                                    printf("Connection established, handle: 0x%04X\n", handle);
+                                    hidl_connection_handle = handle;
+                                }
+                            }
+                            break;
+                        case 0x05: // Disconnection Complete Event
+                            printf("Connection disconnected\n");
+                            hidl_connection_handle = -1;
+                            break;
+                        default:
+                            // Handle other events as needed
+                            break;
+                    }
+                }
+            } else if (bytes_read == 0) {
+                printf("HIDL service disconnected\n");
+                break;
+            }
+        }
+    }
+
+    hidl_tput_running = false;
+
+    // Restart response handler thread
+    start_response_thread();
+
+    printf("\nHIDL Throughput Receiver Test Stopped\n");
+    return 0;
+}
+
+/**
+ * Helper function to create ACL connection via HIDL
+ */
+static int hidl_create_connection(const char *bd_addr, uint16_t *handle)
+{
+    uint8_t create_conn_params[13];
+    uint8_t bd_addr_bytes[6];
+    fd_set read_fds;
+    struct timeval timeout;
+    uint8_t event_buffer[256];
+    int result;
+    int retry_count = 0;
+
+    // Parse BD address
+    if (sscanf(bd_addr, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+               &bd_addr_bytes[5], &bd_addr_bytes[4], &bd_addr_bytes[3],
+               &bd_addr_bytes[2], &bd_addr_bytes[1], &bd_addr_bytes[0]) != 6) {
+        printf("Error: Invalid BD address format\n");
+        return -1;
+    }
+
+    // Build Create Connection parameters
+    memcpy(create_conn_params, bd_addr_bytes, 6);
+    create_conn_params[6] = 0x18; // Packet Type LSB (DM1, DH1, DM3, DH3, DM5, DH5)
+    create_conn_params[7] = 0xCC; // Packet Type MSB
+    create_conn_params[8] = 0x01; // Page Scan Repetition Mode (R1)
+    create_conn_params[9] = 0x00; // Reserved
+    create_conn_params[10] = 0x00; // Clock Offset LSB
+    create_conn_params[11] = 0x00; // Clock Offset MSB
+    create_conn_params[12] = 0x00; // Allow Role Switch (Master)
+
+    // Retry connection up to 3 times
+    while (retry_count < 3) {
+        printf("Connection attempt %d/3...\n", retry_count + 1);
+
+        // Send Create Connection command
+        if (send_hci_command(0x0405, create_conn_params, sizeof(create_conn_params)) < 0) {
+            printf("Error: Failed to send Create Connection command\n");
+            return -1;
+        }
+
+        // Wait for Connection Complete event (up to 30 seconds)
+        time_t start_time = time(NULL);
+        while (time(NULL) - start_time < 30) {
+            FD_ZERO(&read_fds);
+            FD_SET(hidl_fd, &read_fds);
+            timeout.tv_sec = 5;
+            timeout.tv_usec = 0;
+            result = select(hidl_fd + 1, &read_fds, NULL, NULL, &timeout);
+            if (result <= 0) continue;
+
+            if (FD_ISSET(hidl_fd, &read_fds)) {
+                ssize_t bytes_read = read(hidl_fd, event_buffer, sizeof(event_buffer));
+
+                if (bytes_read > 0 && event_buffer[0] == 0x04 && event_buffer[1] == 0x03) {
+                    // Connection Complete Event
+                    if (event_buffer[3] == 0x00) { // Success
+                        *handle = event_buffer[4] | (event_buffer[5] << 8);
+                        printf("Connection successful, handle: 0x%04X\n", *handle);
+                        return 0;
+                    } else {
+                        printf("Connection failed, status: 0x%02X\n", event_buffer[3]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        retry_count++;
+        if (retry_count < 3) {
+            printf("Retrying in 2 seconds...\n");
+            sleep(2);
+        }
+    }
+    printf("Error: Failed to establish connection after %d attempts\n", retry_count);
+    return -1;
+}
+
+/**
+ * Helper function to disconnect ACL connection via HIDL
+ */
+static int hidl_disconnect_connection(uint16_t handle)
+{
+    uint8_t disconnect_params[3];
+    disconnect_params[0] = handle & 0xFF;
+    disconnect_params[1] = (handle >> 8) & 0xFF;
+    disconnect_params[2] = 0x13; // Remote User Terminated Connection
+
+    if (send_hci_command(0x0406, disconnect_params, sizeof(disconnect_params)) < 0) {
+        return -1;
+    }
+
+    // Wait for Disconnection Complete event
+    fd_set read_fds;
+    struct timeval timeout;
+    uint8_t event_buffer[256];
+    int result;
+    time_t start_time = time(NULL);
+
+    while (time(NULL) - start_time < 5) { // 5 seconds timeout
+        FD_ZERO(&read_fds);
+        FD_SET(hidl_fd, &read_fds);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        result = select(hidl_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (result <= 0) continue;
+
+        if (FD_ISSET(hidl_fd, &read_fds)) {
+            ssize_t bytes_read = read(hidl_fd, event_buffer, sizeof(event_buffer));
+
+            if (bytes_read > 0 && event_buffer[0] == 0x04 && event_buffer[1] == 0x05) {
+                // Disconnection Complete Event
+                printf("Disconnection completed\n");
+                return 0;
+            }
+        }
+    }
+    printf("Timeout waiting for disconnection\n");
+    return -1;
+}
+
+/**
+ * Helper function to send ACL data via HIDL
+ */
+static int hidl_send_acl_data(uint16_t handle, uint8_t *data, uint16_t length)
+{
+    // In HIDL interface, ACL data is sent through the same write interface
+    // The HIDL service will handle the packet routing
+    ssize_t bytes_written = write(hidl_fd, data, length);
+    return (bytes_written == length) ? 0 : -1;
+}
+
+/**
+ * Helper function to parse Connection Complete event
+ */
+static int hidl_parse_connection_complete(uint8_t *event_data)
+{
+    if (event_data[0] == 0x04 && event_data[1] == 0x03 && event_data[3] == 0x00) {
+        return event_data[4] | (event_data[5] << 8);
+    }
+    return -1;
+}
+
+/**
+ * Helper function to parse Number of Completed Packets event
+ */
+static int hidl_parse_num_completed_packets(uint8_t *event_data)
+{
+    if (event_data[0] == 0x04 && event_data[1] == 0x13) {
+        uint8_t num_handles = event_data[3];
+        if (num_handles > 0) {
+            // Return completed packets for first handle
+            return event_data[6] | (event_data[7] << 8);
+        }
+    }
+    return 0;
+}
