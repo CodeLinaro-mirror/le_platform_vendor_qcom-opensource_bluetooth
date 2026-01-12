@@ -1186,22 +1186,10 @@ public class GattClient {
         }
 
         private void processConnectToBdaddr(Scan init) {
-            Log.d(TAG, "processConnectToBdaddr address:" + init.DeviceAddress);
             if(BleAppService.bleAdapter != null) {
-                if (BleAppService.mScannerService.mDevlistforConnToBdaddr.isEmpty()) {
-                    Log.d(TAG, "Device list is empty");
-                } else {
-                    Log.d(TAG, "Device list size: " + BleAppService.mScannerService.mDevlistforConnToBdaddr.size());
-                }
-               for (BluetoothDevice dev:BleAppService.mScannerService.mDevlistforConnToBdaddr) {
-                   Log.d(TAG, "mDevlistforConnToBdaddr address:" + dev.getAddress().toString());
-                   if(dev.getAddress().equals(init.DeviceAddress)) {
                 Log.i(TAG, "Connect to Address: " + init.DeviceAddress);
                 BluetoothDevice remoteDevice = BleAppService.bleAdapter.getRemoteDevice(init.DeviceAddress);
                 mgattClient.connect(remoteDevice, init.initPhy, init.autoConnect, init.transport);
-                BleAppService.mScannerService.mDevlistforConnToBdaddr.clear();
-                   }
-               }
             }
         }
 
