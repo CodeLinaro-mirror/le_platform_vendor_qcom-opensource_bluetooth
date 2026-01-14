@@ -38,7 +38,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <system/audio.h>
-#include <audio.h>
+//#include <audio.h>
 
 #include <hardware/hardware.h>
 #include "bthost_ipc.h"
