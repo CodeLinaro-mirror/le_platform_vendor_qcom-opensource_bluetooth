@@ -4,7 +4,17 @@ ifeq ($(BOARD_HAVE_BLUETOOTH_QCOM),true)
 PRODUCT_PACKAGES_DEBUG += gatt_tool_qti_internal
 PRODUCT_PACKAGES_DEBUG += l2test_ertm
 
+TARGET_NAME :=$(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX)
 ifneq ($(TARGET_BOARD_TYPE),auto)
+ifeq ($(TARGET_NAME),qssi_xrl)
+PRODUCT_PRODUCT_PROPERTIES += \
+    bluetooth.profile.gatt.enabled=true \
+    bluetooth.profile.avrcp.target.enabled=true \
+    bluetooth.profile.avrcp.controller.enabled=true \
+    bluetooth.profile.hid.host.enabled=true \
+    bluetooth.profile.hid.device.enabled=false \
+    bluetooth.profile.opp.enabled=true
+else
 # Set supported Bluetooth profiles to enabled
 PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.a2dp.source.enabled=true \
@@ -18,8 +28,8 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.opp.enabled=true \
     bluetooth.profile.pbap.server.enabled=true \
     bluetooth.profile.bas.client.enabled=true \
-    bluetooth.device_id.vendor_id=0x001D \
-
+    bluetooth.device_id.vendor_id=0x001D
+endif
 ifeq ($(TARGET_SUPPORTS_WEAR_ANDROID), true)
 PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.auto_connect_profiles.enabled=true
