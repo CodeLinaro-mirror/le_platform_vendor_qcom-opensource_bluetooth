@@ -13,7 +13,9 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.avrcp.controller.enabled=true \
     bluetooth.profile.hid.host.enabled=true \
     bluetooth.profile.hid.device.enabled=false \
-    bluetooth.profile.opp.enabled=true
+    bluetooth.profile.opp.enabled=true \
+    bluetooth.hfp.hf_client_autoconnect.enabled=true \
+    bluetooth.a2dp.sink_autoconnect.enable=true
 else
 # Set supported Bluetooth profiles to enabled
 PRODUCT_PRODUCT_PROPERTIES += \
