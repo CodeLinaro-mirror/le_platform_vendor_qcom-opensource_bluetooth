@@ -1,0 +1,113 @@
+<!--
+Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+SPDX-License-Identifier: BSD-3-Clause-Clear
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#2B2B2B">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="DckTimeSyncApplication"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="22sp"
+        android:layout_marginBottom="14dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Remote Device Address:"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etRemoteAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="00:11:22:33:44:55"
+        android:textColorHint="#888888"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:padding="12dp"
+        android:background="@android:drawable/edit_text"
+        android:backgroundTint="#4D4D4D"
+        android:inputType="text"
+        android:maxLines="1"
+        android:layout_marginBottom="8dp" />
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="2"
+        android:rowCount="2"
+        android:useDefaultMargins="true">
+
+        <Button
+            android:id="@+id/btnRegister"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:text="Register"
+            android:textAllCaps="true"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="#6D6D6D"
+            android:textColor="#FFFFFF"
+            android:padding="10dp" />
+
+        <Button
+            android:id="@+id/btnUnregister"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:text="UNREGISTER"
+            android:textAllCaps="true"
+            android:padding="10dp"
+            android:backgroundTint="#6D6D6D"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:text="CONNECT"
+            android:textAllCaps="true"
+            android:padding="10dp"
+            android:backgroundTint="#6D6D6D"
+            android:textColor="#FFFFFF" />
+
+        
+        <Button
+            android:id="@+id/btnDisconnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:text="DISCONNECT"
+            android:textAllCaps="true"
+            android:padding="10dp"
+            android:backgroundTint="#6D6D6D"
+            android:textColor="#FFFFFF" />
+
+    </GridLayout>
+
+    
+<TextView
+    android:id="@+id/tvStatus"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text=""
+    android:textColor="#FFFFFF"
+    android:textSize="12sp"
+    android:layout_marginTop="14dp"
+    android:layout_marginBottom="64dp" />
+
+
+</LinearLayout>
