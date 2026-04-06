@@ -337,6 +337,9 @@ public class SocketServer {
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
                     sendStr.append("                     DiscoverServices\n");
+                    sendStr.append("                     RefreshServices\n");
+                    sendStr.append("                     OffloadChar                   (Ex: OffloadChar ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;CharUuid:00002a00-0000-1000-8000-00805f9b34fb,00002a01-0000-1000-8000-00805f9b34fb;endpointId:10;hubId:1;)\n");
+                    sendStr.append("                     UnoffloadChar                 (Ex: UnoffloadChar SessionId:1)\n");
                     sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
                     sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;Value:01)\n");
                     sendStr.append("                     RegNotifications               (Ex: RegNotifications Operation:1(1->Notifications, 2->Indications, 3-> both);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
@@ -353,6 +356,8 @@ public class SocketServer {
                     sendStr.append("                       Register\n");
                     sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10,0x01;Permissions:0x01,0x10;Value:0x12)\n");
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                       OffloadChar                  (Ex: OffloadChar DeviceAddress:11:22:33:44:55:66;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;CharUuid:00002a00-0000-1000-8000-00805f9b34fb,00002a01-0000-1000-8000-00805f9b34fb;endpointId:10;hubId:1;)\n");
+                    sendStr.append("                       UnoffloadChar                (Ex: UnoffloadChar DeviceAddress:11:22:33:44:55:66;SessionId:1)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
@@ -914,6 +919,57 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if (tmp[0].equals("OffloadChar")) {
+                            OffloadCharacteristics OffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (OffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_BLE_OFFLOAD_CHAR,
+                                        OffloadCharParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("UnoffloadChar")) {
+                            String[] val = tmp[1].split(":", 2);
+                            if (val.length == 2) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_BLE_UNOFFLOAD_CHAR, Integer.valueOf(val[1]));
+                            BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ReadCharUUid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_READ_CHAR_UUID, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("DiscoverServiceUuid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_DISC_SRVC_UUID, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ConnUpdate")) {
+                            ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
+                            if (connUpdateParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
                         } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
@@ -1059,6 +1115,28 @@ public class SocketServer {
                                 processOutputState = NONE;
                                 msg = BleAppService.msghandler.obtainMessage(
                                         BleAppService.MSG_GS_START_BLE_REMOVE_SERVICE, tmp2[1]);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("OffloadChar")) {
+                            OffloadCharacteristics OffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (OffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_BLE_OFFLOAD_CHAR,
+                                        OffloadCharParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("UnoffloadChar")) {
+                            OffloadCharacteristics unOffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (unOffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_BLE_UNOFFLOAD_CHAR,
+                                        unOffloadCharParam);
                                 BleAppService.msghandler.sendMessage(msg);
                             } else {
                                 processOutputState = INVALID_INPUT;

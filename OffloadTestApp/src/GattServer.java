@@ -25,6 +25,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *  
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 package org.codeaurora.bluetooth.offload_testapp;
 
@@ -41,6 +45,8 @@ import android.os.Looper;
 import java.util.*;
 import java.util.List;
 import java.util.UUID;
+import java.util.Vector;
+import java.nio.ByteBuffer;
 import java.lang.*;
 
 import libcore.io.IoUtils;
@@ -51,12 +57,15 @@ import com.android.internal.util.StateMachine;
 
 import android.bluetooth.BluetoothDevice;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattServerCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattServer;
 import android.bluetooth.BluetoothProfile;
+import android.bluetooth.GattOffloadSession;
+import android.bluetooth.GattOffloadCapabilities;
 
 public class GattServer{
     public GattServerMessageHandler mGattServerHandler = null;
@@ -66,9 +75,13 @@ public class GattServer{
     public Map<BluetoothGattCharacteristic,String> mMap_char;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_indicate;
     public Map<BluetoothDevice, List<BluetoothGattCharacteristic>>mMap_notify;
-    public List<BluetoothGattService> services;
+    public List<BluetoothGattService> mServices;
+    private List<BluetoothGattCharacteristic> mCharacteristics = new ArrayList<BluetoothGattCharacteristic>();
     public BluetoothDevice PrepWriteDevice;
     private Context mcontext = null;
+    private ArrayList<GattOffloadSession> mSessions;
+
+    private static BluetoothAdapter bluetoothAdapter = BleAppService.bleAdapter;
 
     public static final int MSG_START_BLE_ADD_SERVICE = 0;
     public static final int MSG_START_BLE_REMOVE_SERVICE = 1;
@@ -79,12 +92,15 @@ public class GattServer{
     public static final int MSG_START_BLE_DISCONNECT = 6;
     public static final int MSG_START_BLE_REGISTER = 7;
     public static final int MSG_START_BLE_DEREGISTER = 8;
-    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_DEREGISTER;
+    public static final int MSG_START_BLE_OFFLOAD_CHAR = 9;
+    public static final int MSG_START_BLE_UNOFFLOAD_CHAR = 10;
+    public static final int MSG_GS_ACTION_MAX_VALUE = MSG_START_BLE_UNOFFLOAD_CHAR;
 
     public static int LOG_LEVEL = 3;
     public static String CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb";
     public static final String base_uuid = "0000-1000-8000-00805f9b34fb";
     public static int mtu_size = 23;
+    public static final int OFFLOAD_FAILURE = 0;
     StringBuilder PrintStr = new StringBuilder();
 
     public GattServer(Context mcontext) {
@@ -102,6 +118,7 @@ public class GattServer{
         Looper looper = thread.getLooper();
         mGattServerHandler = new GattServerMessageHandler(mcontext, looper);
         Service_List = new HashMap<String,BluetoothGattService>();
+        mSessions = new ArrayList<GattOffloadSession>();
     }
 
     /* Connection Class */
@@ -109,7 +126,7 @@ public class GattServer{
         private static final String TAG = "BleGattServer";
         private BluetoothGattServer mBluetoothGattserver = null;
         private Context context;
-        private int GATT_SUCCESS = 0x00;
+        public int GATT_SUCCESS = 0x00;
         private int GATT_FAILURE = 0x101;
         Message msg;
 
@@ -410,6 +427,37 @@ public class GattServer{
                     SocketServer.sendSocketData(PrintStr.toString());
                 }
             }
+
+            @Override
+            public void onCharacteristicsOffloaded(BluetoothDevice device, GattOffloadSession session, int status) {
+                Log.i(TAG, "onCharacteristicsOffloaded");
+                PrintStr.append("\nonCharacteristicsOffloaded!!");
+                PrintStr.setLength(0);
+                if(status == GATT_SUCCESS) {
+                    mSessions.add(session);
+                    PrintStr.append("\nSUCCESS");
+                    PrintStr.append("\nsessionId :");
+                    PrintStr.append(session.getSessionId());
+                } else {
+                    PrintStr.append("\nstatus");
+                    PrintStr.append(status);
+                    PrintStr.append("\nsessionId :");
+                    PrintStr.append(session.getSessionId());
+                }
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
+
+            @Override
+            public void onCharacteristicsUnoffloaded (BluetoothDevice device, int sessionId, int status) {
+                Log.i(TAG, "onOffloadCharacteristicsRemoved");
+                PrintStr.setLength(0);
+                PrintStr.append("\nonOffloadCharacteristicsRemoved!!");
+                PrintStr.append("\nStatus :");
+                PrintStr.append(status);
+                PrintStr.append("\nsessionId :");
+                PrintStr.append(sessionId);
+                SocketServer.sendSocketData(PrintStr.toString());
+            }
         };
     }
 
@@ -469,6 +517,16 @@ public class GattServer{
                     String bdAddr = (String) msg.obj;
                     processDisconnectReq(bdAddr);
                     break;
+                case MSG_START_BLE_OFFLOAD_CHAR:
+                    Log.d(TAG, "MSG_START_BLE_OFFLOAD_CHAR");
+                    OffloadCharacteristics characteristic = (OffloadCharacteristics) msg.obj;
+                    processGattOffloadChar(characteristic);
+                    break;
+                case MSG_START_BLE_UNOFFLOAD_CHAR:
+                    Log.d(TAG, "MSG_START_BLE_UNOFFLOAD_CHAR");
+                    OffloadCharacteristics unCharacteristic = (OffloadCharacteristics) msg.obj;
+                    processGattUnoffloadChar(unCharacteristic);
+                    break;
             }
         }
 
@@ -522,13 +580,9 @@ public class GattServer{
                 if(!Service_List.containsKey(AddServ.lserviceUUID.toString().toUpperCase())){
                     Log.d(TAG, AddServ.lserviceUUID.toString());
                     Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
-                    mgattServer.mBluetoothGattserver.addService(lService);
-                } else {
-                    mgattServer.mBluetoothGattserver.removeService(lService);
-                    Service_List.remove(AddServ.lserviceUUID.toString().toUpperCase());
-                    mgattServer.mBluetoothGattserver.addService(lService);
-                    Service_List.put(AddServ.lserviceUUID.toString().toUpperCase(),lService);
                 }
+                    mgattServer.mBluetoothGattserver.addService(lService);
+                    mCharacteristics.add(lService.getCharacteristic(AddServ.lcharUUID));
             } else {
                 PrintStr.setLength(0);
                 PrintStr.append("service was not Added/Modified");
@@ -584,10 +638,10 @@ public class GattServer{
             PrintStr.append("Services UUIDS :");
             SocketServer.sendSocketData(PrintStr.toString());
             PrintStr.setLength(0);
-            services = mgattServer.mBluetoothGattserver.getServices();
-            for (int i = 0; i < services.size(); i++) {
-                Log.d(TAG, services.get(i).getUuid().toString());
-                PrintStr.append(services.get(i).getUuid().toString());
+            mServices = mgattServer.mBluetoothGattserver.getServices();
+            for (int i = 0; i < mServices.size(); i++) {
+                Log.d(TAG, mServices.get(i).getUuid().toString());
+                PrintStr.append(mServices.get(i).getUuid().toString());
                 PrintStr.append("  ");
             }
             SocketServer.sendSocketData(PrintStr.toString());
@@ -617,6 +671,91 @@ public class GattServer{
                 if (remoteDevice != null) {
                     mgattServer.mBluetoothGattserver.cancelConnection(remoteDevice);
                 }
+            }
+        }
+
+        private boolean isGattOffloadSupported() {
+            GattOffloadCapabilities capabilities = bluetoothAdapter.getSupportedGattOffloadCapabilities();
+            if(capabilities.isServerOffloadSupported()) {
+                Log.i(TAG, "GattOffloadSupported, Server Capabilities!" + capabilities.getSupportedServerProperties());
+                PrintStr.setLength(0);
+                PrintStr.append("\nGattOffload Supported! Server Capabilities : ");
+                PrintStr.append(capabilities.getSupportedServerProperties());
+                SocketServer.sendSocketData(PrintStr.toString());
+                return true;
+            } else {
+                PrintStr.setLength(0);
+                PrintStr.append("\nGattOffload not Supported");
+                SocketServer.sendSocketData(PrintStr.toString());
+                return false;
+            }
+        }
+
+        private void processGattOffloadChar (OffloadCharacteristics characteristics) {
+            Log.i(TAG, "processGattOffloadChar!");
+            int sessionId = 0;
+            int match_found = 0;
+            List<BluetoothGattCharacteristic> mCharOffload = new ArrayList<BluetoothGattCharacteristic>();
+            BluetoothGattService service = Service_List.get(characteristics.serviceUUID.toString().toUpperCase());
+            if (service != null) {
+                for (UUID charUuid : characteristics.charUUIDs) {
+                    BluetoothGattCharacteristic characteristic = service.getCharacteristic(charUuid);
+                    mCharOffload.add(characteristic);
+                    if (mCharacteristics.contains(characteristic)) {
+                        match_found++;
+                    } else {
+                        match_found = 0;
+                    }
+                }
+                if (match_found == 0) {
+                    Log.e(TAG, "processGattOffloadChar, char not found in discovery!");
+                    return;
+                }
+                if (isGattOffloadSupported()) {
+                    BluetoothDevice device = getRemoteDevice(characteristics.deviceAddress);
+                    int status = mgattServer.mBluetoothGattserver.offloadCharacteristics(device, service, mCharOffload,
+                                 characteristics.endpointId, characteristics.hubId);
+                    if (status == mgattServer.GATT_SUCCESS) {
+                        PrintStr.setLength(0);
+                        PrintStr.append("\nOffload Char successful!");
+                        SocketServer.sendSocketData(PrintStr.toString());
+                    } else {
+                        Log.e(TAG, "processGattOffloadChar, offload failed!");
+                        PrintStr.setLength(0);
+                        PrintStr.append("\nOffload Char failed! status : ");
+                        PrintStr.append(status);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        return;
+                    }
+                } else {
+                    Log.e(TAG, "Offload not supported!");
+                }
+                mCharOffload.clear();
+            } else {
+                Log.e(TAG, "processGattOffloadChar, service not found in discovery!");
+            }
+        }
+
+        private void processGattUnoffloadChar(OffloadCharacteristics characteristic) {
+            Log.i(TAG, "processGattUnoffloadChar!");
+            GattOffloadSession session;
+            if (mSessions.size() != 0) {
+                for (int i = 0; i < mSessions.size(); i++)  {
+                    session = mSessions.get(i);
+                    if (session.getSessionId() == characteristic.sessionId) {
+                        session.close();
+                        PrintStr.append("\nUnoffloading Characteristic with SessionId : ");
+                        PrintStr.append(characteristic.sessionId);
+                        SocketServer.sendSocketData(PrintStr.toString());
+                        mSessions.remove(session);
+                        break;
+                    }
+                }
+            } else {
+                Log.e(TAG, "no active offload sessions");
+                PrintStr.setLength(0);
+                PrintStr.append("\nSession is not opened with the provided SessionId\n ");
+                SocketServer.sendSocketData(PrintStr.toString());
             }
         }
 

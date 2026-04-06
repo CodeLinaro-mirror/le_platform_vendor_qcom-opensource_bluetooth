@@ -57,6 +57,10 @@ import android.os.Looper;
 import java.lang.*;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.Vector;
+import java.util.ArrayList;
+import java.nio.ByteBuffer;
 
 import libcore.io.IoUtils;
 import android.app.Service;
@@ -64,6 +68,11 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothGattDescriptor;
 import androidx.core.app.NotificationCompat;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -167,7 +176,9 @@ public class BleAppService extends Service {
     public static final int MSG_GC_START_BLE_COC_OFFLOAD_CONNECT = MSG_MA_MAX_ACTION_VALUE + 28;
     public static final int MSG_GC_START_BLE_COC_OFFLOAD_LISTEN = MSG_MA_MAX_ACTION_VALUE + 29;
     public static final int MSG_GC_START_BLE_COC_SERVER_CLOSE = MSG_MA_MAX_ACTION_VALUE + 30;
-    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_START_BLE_COC_SERVER_CLOSE;
+    public static final int MSG_GC_BLE_OFFLOAD_CHAR = MSG_MA_MAX_ACTION_VALUE + 31;
+    public static final int MSG_GC_BLE_UNOFFLOAD_CHAR = MSG_MA_MAX_ACTION_VALUE + 32;
+    public static final int MSG_GC_MAX_ACTION_VALUE = MSG_GC_BLE_UNOFFLOAD_CHAR;
 
     /* State Machine Actions */
     public static final int MSG_SM_START_BLE_CONNECT = MSG_GC_MAX_ACTION_VALUE + 1;
@@ -200,7 +211,9 @@ public class BleAppService extends Service {
     public static final int MSG_GS_START_BLE_DISCONNECT = MSG_SM_MAX_ACTION_VALUE + 9;
     public static final int MSG_GS_START_BLE_REGISTER = MSG_SM_MAX_ACTION_VALUE + 10;
     public static final int MSG_GS_START_BLE_DEREGISTER = MSG_SM_MAX_ACTION_VALUE + 11;
-    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_START_BLE_DEREGISTER;
+    public static final int MSG_GS_BLE_OFFLOAD_CHAR = MSG_SM_MAX_ACTION_VALUE + 12;
+    public static final int MSG_GS_BLE_UNOFFLOAD_CHAR = MSG_SM_MAX_ACTION_VALUE + 13;
+    public static final int MSG_GS_MAX_ACTION_VALUE = MSG_GS_BLE_UNOFFLOAD_CHAR;
 
     @Override
     public void onCreate() {
@@ -813,6 +826,18 @@ public class BleAppService extends Service {
                           mgattclient.MSG_DEREGISTER_BLE_GATT_NOTIFICATIONS, RdWrClass);
                     mgattclient.mGattClientHandler.sendMessage(msg);
                     break;
+                case MSG_GC_BLE_OFFLOAD_CHAR:
+                    OffloadCharacteristics characteristic = (OffloadCharacteristics) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                        mgattclient.MSG_START_BLE_OFFLOAD_CHAR, characteristic);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
+                case MSG_GC_BLE_UNOFFLOAD_CHAR:
+                    int sessionId = (int) message.obj;
+                    msg = mgattclient.mGattClientHandler.obtainMessage(
+                        mgattclient.MSG_START_BLE_UNOFFLOAD_CHAR, sessionId);
+                    mgattclient.mGattClientHandler.sendMessage(msg);
+                    break;
                 case MSG_GC_START_BLE_GATT_RELIABLE_WRITE:
                     RdWrClass = (ReadWriteOp) message.obj;
                     msg = mgattclient.mGattClientHandler.obtainMessage(
@@ -1013,6 +1038,18 @@ public class BleAppService extends Service {
                     bdAddr = (String) message.obj;
                     msg = mgattserver.mGattServerHandler.obtainMessage(
                             mgattserver.MSG_START_BLE_DISCONNECT, bdAddr);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_BLE_OFFLOAD_CHAR:
+                    OffloadCharacteristics characteristic1 = (OffloadCharacteristics) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                        mgattserver.MSG_START_BLE_OFFLOAD_CHAR, characteristic1);
+                    mgattserver.mGattServerHandler.sendMessage(msg);
+                    break;
+                case MSG_GS_BLE_UNOFFLOAD_CHAR:
+                    OffloadCharacteristics unCharacteristic = (OffloadCharacteristics) message.obj;
+                    msg = mgattserver.mGattServerHandler.obtainMessage(
+                        mgattserver.MSG_START_BLE_UNOFFLOAD_CHAR, unCharacteristic);
                     mgattserver.mGattServerHandler.sendMessage(msg);
                     break;
                 case MSG_GC_START_BLE_COC_DATA_TX:
