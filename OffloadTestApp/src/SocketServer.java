@@ -128,38 +128,42 @@ public class SocketServer {
 
         public void run() {
             Log.d(TAG, "localServerSocket run()");
-            if (null != server) {
-                try {
-                    Log.d(TAG, "localSocketServer begins to accept()");
-                    client = server.accept();
-                } catch (IOException e) {
-                    Log.e(TAG, "localSocketServer accept() failed !!!");
-                    e.printStackTrace();
+            while (true) {
+                if (null != server) {
+                    try {
+                        Log.d(TAG, "localSocketServer begins to accept()");
+                        client = server.accept();
+                    } catch (IOException e) {
+                        Log.e(TAG, "localSocketServer accept() failed !!!");
+                        e.printStackTrace();
+                        break;
+                    }
+
+                    socketOpen = true;
+                    Log.d(TAG, "localSocket accepted");
+
+                    try {
+                        input = client.getInputStream();
+                        Log.d(TAG, "getInputStream");
+                    } catch (IOException e) {
+                        Log.e(TAG, "getInputStream() failed !!!");
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        output = client.getOutputStream();
+                        Log.d(TAG, "getOutputStream");
+                    } catch (IOException e) {
+                        Log.e(TAG, "getOutputStream() failed !!!");
+                        e.printStackTrace();
+                    }
+
+                    commHandler = new communicationHandler();
+                    commHandler.start();
+                } else {
+                    Log.d(TAG, "The LocalServerSocket is NULL");
+                    break;
                 }
-
-                socketOpen = true;
-                Log.d(TAG, "localSocket accepted");
-
-                try {
-                    input = client.getInputStream();
-                    Log.d(TAG, "getInputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getInputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                try {
-                    output = client.getOutputStream();
-                    Log.d(TAG, "getOutputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getOutputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                commHandler = new communicationHandler();
-                commHandler.start();
-            } else {
-                Log.d(TAG, "The LocalServerSocket is NULL");
             }
         }
     }
@@ -180,8 +184,7 @@ public class SocketServer {
                 } catch (IOException e) {
                     Log.e(TAG, "There is an exception when reading socket");
                     e.printStackTrace();
-                    closeSocketServer();
-                    INSTANCE.showMessage("Socket closed, restart app");
+                    closeConnection();
                     break;
                 }
 
@@ -195,7 +198,7 @@ public class SocketServer {
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    closeSocketServer();
+                    closeConnection();
                     break;
                 }
 
@@ -204,7 +207,7 @@ public class SocketServer {
                 }
 
                 if (closeReceived) {
-                    closeSocketServer();
+                    closeConnection();
                     break;
                 }
             }
@@ -346,6 +349,13 @@ public class SocketServer {
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
                     sendStr.append("                     ExecAbortReliableWrite         (Ex: ExecAbortReliableWrite Operation:1(1-> execute, 0 -> abort))\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_activate\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_deactivate\n");
+                    sendStr.append("                     InvokeGattOp gatt_app_unoffload_req\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_read_req (Ex: InvokeGattOp  gattClient_app_read_req <SessionId> <attrHandle>)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_write_req (Ex: InvokeGattOp gattClient_app_write_req SessionId:1 attrHandle:0x0001 val_len:10 write_cmd:1)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_tx_bulk_transfer (Ex: InvokeGattOp gattClient_tx_bulk_transfer SessionId: attrHandle: val_len: pktCnt:)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_rx_bulk_transfer (Ex:InvokeGattOp gattClient_rx_bulk_transfer SessionId:1 attrHandle: pktCnt:)\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Unregister\n");
                     sendStr.append("                     Back\n");
@@ -362,6 +372,11 @@ public class SocketServer {
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_app_activate\n");
+                    sendStr.append("                       InvokeGattOp gattServer_app_deactivate\n");
+                    sendStr.append("                       InvokeGattOp gattServer_send_app_notif (Ex: InvokeGattOp gattServer_send_app_notif sessionId: attrHandle: val_len:)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_tx_bulk_transfer (Ex: InvokeGattOp gattServer_tx_bulk_transfer sessionId: attrHandle: val_len: pktCnt:)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_rx_bulk_transfer (Ex: InvokeGattOp gattServer_rx_bulk_transfer sessionId:1 attrHandle: pktCnt:)\n");
                     sendStr.append("                       Disconnect                   (Ex: Disconnect 11:22:33:44:55:66)\n");
                     sendStr.append("                       Deregister\n");
                     sendStr.append("                       Back\n");
@@ -1173,7 +1188,7 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                        }  else {
+                        } else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if(tmp.length == 1) {
@@ -1211,8 +1226,8 @@ public class SocketServer {
         }
     }
 
-    public void closeSocketServer() {
-        Log.i(TAG, "closeSocketServer()");
+    public void closeConnection() {
+        Log.i(TAG, "closeConnection()");
         closeReceived = false;
         socketOpen = false;
         mainMenuState = MAIN_MENU;
@@ -1228,6 +1243,11 @@ public class SocketServer {
             }
             client = null;
         }
+    }
+
+    public void closeSocketServer() {
+        Log.i(TAG, "closeSocketServer()");
+        closeConnection();
 
         if (server != null) {
             try {
@@ -1263,8 +1283,7 @@ public class SocketServer {
                     } catch (IOException e) {
                         Log.e(TAG, "There is an exception when writing to socket");
                         e.printStackTrace();
-                        INSTANCE.closeSocketServer();
-                        INSTANCE.showMessage("Socket closed, restart app");
+                        INSTANCE.closeConnection();
                     }
                 } finally {
                     mutex.release();
