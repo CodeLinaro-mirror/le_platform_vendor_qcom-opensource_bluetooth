@@ -96,6 +96,7 @@ public class MainActivity extends Activity {
             // Parse the Bluetooth address from EditText
             byte[] address = parseBluetoothAddress();
             if (address != null) {
+                mBluetoothAddress = address;
                 String macAddress = bytesToHex(address);
                 Log.d(TAG, "Connecting to address: " + anonymizeAddress(macAddress));
                 updateStatus("Scanning for: " + macAddress);
@@ -518,8 +519,8 @@ public class MainActivity extends Activity {
                                      byte lmpEventId, char connEventCounter)
                 throws RemoteException {
             Log.d(TAG, "onEventGenerated callback received");
-            Log.d(TAG, "  Timestamp - systemTimeUs: " + timestamp.systemTimeUs +
-                       ", bluetoothTimeUs: " + timestamp.bluetoothTimeUs);
+            Log.d(TAG, "  Timestamp - systemTimeUs: " + timestamp.systemTimeUs + " us" +
+                       ", bluetoothTimeUs: " + timestamp.bluetoothTimeUs + " us");
             Log.d(TAG, "  AddressType: " + addressType);
             Log.d(TAG, "  Address: " + anonymizeAddress(bytesToHex(address)));
             Log.d(TAG, "  Direction: " + direction);
