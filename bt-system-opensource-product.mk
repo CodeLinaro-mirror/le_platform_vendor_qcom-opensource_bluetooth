@@ -15,7 +15,7 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.hid.device.enabled=false \
     bluetooth.profile.opp.enabled=true \
     bluetooth.hfp.hf_client_autoconnect.enabled=true \
-    bluetooth.a2dp.sink_autoconnect.enable=true
+    bluetooth.a2dp.sink_autoconnect.enabled=true
 else
 # Set supported Bluetooth profiles to enabled
 PRODUCT_PRODUCT_PROPERTIES += \
