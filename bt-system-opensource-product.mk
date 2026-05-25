@@ -18,7 +18,7 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.a2dp.sink_autoconnect.enable=true
 else
 # Set supported Bluetooth profiles to enabled
-PRODUCT_PRODUCT_PROPERTIES += \
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
     bluetooth.profile.a2dp.source.enabled=true \
     bluetooth.profile.avrcp.target.enabled=true \
     bluetooth.profile.avrcp.controller.enabled=true \
