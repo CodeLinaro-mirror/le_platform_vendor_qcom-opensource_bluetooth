@@ -6,7 +6,7 @@ PRODUCT_PACKAGES_DEBUG += l2test_ertm
 
 TARGET_NAME :=$(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX)
 ifneq ($(TARGET_BOARD_TYPE),auto)
-ifeq ($(TARGET_NAME),qssi_xrl)
+ifneq ($(filter $(TARGET_NAME), qssi_xrl qssi_lite),)
 PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.gatt.enabled=true \
     bluetooth.profile.avrcp.target.enabled=true \
@@ -18,7 +18,7 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.a2dp.sink_autoconnect.enable=true
 else
 # Set supported Bluetooth profiles to enabled
-PRODUCT_PRODUCT_PROPERTIES += \
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
     bluetooth.profile.a2dp.source.enabled=true \
     bluetooth.profile.avrcp.target.enabled=true \
     bluetooth.profile.avrcp.controller.enabled=true \
