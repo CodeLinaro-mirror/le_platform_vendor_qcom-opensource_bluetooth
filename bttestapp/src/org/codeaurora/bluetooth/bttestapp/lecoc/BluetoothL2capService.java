@@ -407,6 +407,18 @@ public class BluetoothL2capService extends Service implements L2capCocCallback {
         return (server != null && server.isConnected()) || 
                (client != null && client.isConnected());
     }
+
+    /**
+     * Get the currently connected BluetoothDevice (server or client side)
+     */
+    public BluetoothDevice getConnectedDevice() {
+        if (server != null && server.isConnected()) {
+            return server.getConnectedDevice();
+        } else if (client != null && client.isConnected()) {
+            return client.getConnectedDevice();
+        }
+        return null;
+    }
     
     // L2capCocCallback implementation
     
