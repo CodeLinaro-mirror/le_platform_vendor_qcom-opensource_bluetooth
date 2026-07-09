@@ -6,7 +6,7 @@ PRODUCT_PACKAGES_DEBUG += l2test_ertm
 
 TARGET_NAME :=$(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX)
 ifneq ($(TARGET_BOARD_TYPE),auto)
-ifeq ($(TARGET_NAME),qssi_xrl)
+ifneq ($(filter $(TARGET_NAME), qssi_xrl qssi_lite),)
 PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.gatt.enabled=true \
     bluetooth.profile.avrcp.target.enabled=true \
