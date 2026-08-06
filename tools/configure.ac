@@ -230,6 +230,7 @@ AC_CHECK_FUNCS([gettimeofday memset select socket strerror])
 AC_CONFIG_FILES([ \
          Makefile \
          hidl_client/Makefile \
+         btconfig/Makefile \
          ])
 
 AC_OUTPUT
