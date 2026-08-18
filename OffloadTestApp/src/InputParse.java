@@ -727,4 +727,80 @@ public class InputParse {
         }
     }
 
+    public OffloadCharacteristics OffloadCharacteristicsParse(String input){
+        String[] tmp2;
+        Log.d(TAG, "OffloadCharacteristicsParse()");
+        OffloadCharacteristics OffloadCharacteristicsParam = new OffloadCharacteristics();
+        OffloadCharacteristicsParam.charUUIDs = new ArrayList<UUID>();
+        String tmp[] = input.split(";");
+        int i=0;
+        for(i=0; i<tmp.length; i++) {
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("DeviceAddress")) {
+                    OffloadCharacteristicsParam.deviceAddress = tmp2[1].toUpperCase();
+                } else if (tmp2[0].equals("ServiceUuid")) {
+                    OffloadCharacteristicsParam.serviceUUID = UUID.fromString(tmp2[1]);
+                } else if (tmp2[0].equals("CharUuid")) {
+                    String tmp3[] = tmp2[1].split(",");
+                    for (String tmp3part : tmp3) {
+                        try {
+                            UUID uuid = UUID.fromString(tmp3part.trim());
+                            OffloadCharacteristicsParam.charUUIDs.add(uuid);
+                        } catch (IllegalArgumentException e) {
+                            System.out.println("Invalid UUID skipped: " + tmp3part.trim());
+                        }
+                    }
+                } else if (tmp2[0].equals("endpointId")) {
+                    try {
+                        String endpointIdStr = tmp2[1].startsWith("0x") ? tmp2[1].substring(2) : tmp2[1];
+                        OffloadCharacteristicsParam.endpointId = Long.parseUnsignedLong(endpointIdStr,16);
+                    } catch (NumberFormatException e) {
+                        Log.e(TAG,"Invalid hex string: " + tmp2[1]);
+                    }
+                } else if(tmp2[0].equals("hubId")) {
+                    try {
+                        String endpointIdStr = tmp2[1].startsWith("0x") ? tmp2[1].substring(2) : tmp2[1];
+                        OffloadCharacteristicsParam.hubId = Long.parseUnsignedLong(endpointIdStr,16);
+                    } catch (NumberFormatException e) {
+                        Log.e(TAG,"Invalid hex string: " + tmp2[1]);
+                    }
+                } else if (tmp2[0].equals("SessionId")) {
+                    OffloadCharacteristicsParam.sessionId = Integer.parseInt(tmp2[1]);
+                }
+            } else {
+                 break;
+            }
+        }
+        if(i == tmp.length){
+            return OffloadCharacteristicsParam ;
+        } else {
+            return null;
+        }
+    }
+
+    /* public UnOffloadCharacteristics UnOffloadCharacteristicsParse(String input){
+        String[] tmp2;
+        Log.d(TAG, "UnOffloadCharacteristicsParse()");
+        UnOffloadCharacteristics UnOffloadCharacteristicsParam = new UnOffloadCharacteristics();
+        String tmp[] = input.split(";");
+        int i=0;
+        for(i=0; i<tmp.length; i++) {
+            tmp2 = tmp[i].split(":",2);
+            if(tmp2.length == 2) {
+                if (tmp2[0].equals("DeviceAddress")) {
+                    UnOffloadCharacteristicsParam.deviceAddress = tmp2[1].toUpperCase();
+                } else if (tmp2[0].equals("SessionId")) {
+                    UnOffloadCharacteristicsParam.sessionId = Integer.parseInt(tmp2[1]);
+                }
+            } else {
+                 break;
+            }
+        }
+        if(i == tmp.length){
+            return UnOffloadCharacteristicsParam ;
+        } else {
+            return null;
+        }
+    } */
 }

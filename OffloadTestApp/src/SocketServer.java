@@ -128,38 +128,42 @@ public class SocketServer {
 
         public void run() {
             Log.d(TAG, "localServerSocket run()");
-            if (null != server) {
-                try {
-                    Log.d(TAG, "localSocketServer begins to accept()");
-                    client = server.accept();
-                } catch (IOException e) {
-                    Log.e(TAG, "localSocketServer accept() failed !!!");
-                    e.printStackTrace();
+            while (true) {
+                if (null != server) {
+                    try {
+                        Log.d(TAG, "localSocketServer begins to accept()");
+                        client = server.accept();
+                    } catch (IOException e) {
+                        Log.e(TAG, "localSocketServer accept() failed !!!");
+                        e.printStackTrace();
+                        break;
+                    }
+
+                    socketOpen = true;
+                    Log.d(TAG, "localSocket accepted");
+
+                    try {
+                        input = client.getInputStream();
+                        Log.d(TAG, "getInputStream");
+                    } catch (IOException e) {
+                        Log.e(TAG, "getInputStream() failed !!!");
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        output = client.getOutputStream();
+                        Log.d(TAG, "getOutputStream");
+                    } catch (IOException e) {
+                        Log.e(TAG, "getOutputStream() failed !!!");
+                        e.printStackTrace();
+                    }
+
+                    commHandler = new communicationHandler();
+                    commHandler.start();
+                } else {
+                    Log.d(TAG, "The LocalServerSocket is NULL");
+                    break;
                 }
-
-                socketOpen = true;
-                Log.d(TAG, "localSocket accepted");
-
-                try {
-                    input = client.getInputStream();
-                    Log.d(TAG, "getInputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getInputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                try {
-                    output = client.getOutputStream();
-                    Log.d(TAG, "getOutputStream");
-                } catch (IOException e) {
-                    Log.e(TAG, "getOutputStream() failed !!!");
-                    e.printStackTrace();
-                }
-
-                commHandler = new communicationHandler();
-                commHandler.start();
-            } else {
-                Log.d(TAG, "The LocalServerSocket is NULL");
             }
         }
     }
@@ -180,8 +184,7 @@ public class SocketServer {
                 } catch (IOException e) {
                     Log.e(TAG, "There is an exception when reading socket");
                     e.printStackTrace();
-                    closeSocketServer();
-                    INSTANCE.showMessage("Socket closed, restart app");
+                    closeConnection();
                     break;
                 }
 
@@ -195,7 +198,7 @@ public class SocketServer {
                     bytesRead = 0;
                     processInput(inputStr);
                 } else {
-                    closeSocketServer();
+                    closeConnection();
                     break;
                 }
 
@@ -204,7 +207,7 @@ public class SocketServer {
                 }
 
                 if (closeReceived) {
-                    closeSocketServer();
+                    closeConnection();
                     break;
                 }
             }
@@ -337,12 +340,22 @@ public class SocketServer {
                     sendStr.append("                     ConfigureMTU                   (Ex: ConfigureMTU 512)\n");
                     sendStr.append("                     ReqConnPriority                (Ex: ReqConnPriority 0/1/2)\n");
                     sendStr.append("                     DiscoverServices\n");
+                    sendStr.append("                     RefreshServices\n");
+                    sendStr.append("                     OffloadChar                   (Ex: OffloadChar ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;CharUuid:00002a00-0000-1000-8000-00805f9b34fb,00002a01-0000-1000-8000-00805f9b34fb;endpointId:10;hubId:1;)\n");
+                    sendStr.append("                     UnoffloadChar                 (Ex: UnoffloadChar SessionId:1)\n");
                     sendStr.append("                     RW_Char                        (Ex: RW_Char Operation:1(1->Write,2->Read);ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
                     sendStr.append("                     RW_Desc                        (Ex: RW_Desc Operation:2(1->Write,2->Read);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;DescUuid:00002902-0000-1000-8000-00805F9B34FB;Value:01)\n");
                     sendStr.append("                     RegNotifications               (Ex: RegNotifications Operation:1(1->Notifications, 2->Indications, 3-> both);ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     DeRegNotifications             (Ex: DeRegNotifications ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB)\n");
                     sendStr.append("                     ReliableWrite                  (Ex: ReliableWrite Operation:1;ServiceUuid:0000FF03-0000-1000-8000-00805F9B34FB;CharUuid:0000FF03-0000-1000-8000-00805F9B34FB;Value:10;WriteType:2;FormatType:1(1->string,2->int))\n");
                     sendStr.append("                     ExecAbortReliableWrite         (Ex: ExecAbortReliableWrite Operation:1(1-> execute, 0 -> abort))\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_activate\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_deactivate\n");
+                    sendStr.append("                     InvokeGattOp gatt_app_unoffload_req\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_read_req (Ex: InvokeGattOp  gattClient_app_read_req <SessionId> <attrHandle>)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_app_write_req (Ex: InvokeGattOp gattClient_app_write_req SessionId:1 attrHandle:0x0001 val_len:10 write_cmd:1)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_tx_bulk_transfer (Ex: InvokeGattOp gattClient_tx_bulk_transfer SessionId: attrHandle: val_len: pktCnt:)\n");
+                    sendStr.append("                     InvokeGattOp gattClient_rx_bulk_transfer (Ex:InvokeGattOp gattClient_rx_bulk_transfer SessionId:1 attrHandle: pktCnt:)\n");
                     sendStr.append("                     Disconnect\n");
                     sendStr.append("                     Unregister\n");
                     sendStr.append("                     Back\n");
@@ -353,10 +366,17 @@ public class SocketServer {
                     sendStr.append("                       Register\n");
                     sendStr.append("                       AddService                   (Ex: AddService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB;CharUuid:00002a06-0000-1000-8000-00805f9b34fb;Properties:0x10,0x01;Permissions:0x01,0x10;Value:0x12)\n");
                     sendStr.append("                       RemoveService                (Ex: RemoveService ServiceUuid:0000FF01-0000-1000-8000-00805F9B34FB)\n");
+                    sendStr.append("                       OffloadChar                  (Ex: OffloadChar DeviceAddress:11:22:33:44:55:66;ServiceUuid:0000180f-0000-1000-8000-00805f9b34fb;CharUuid:00002a00-0000-1000-8000-00805f9b34fb,00002a01-0000-1000-8000-00805f9b34fb;endpointId:10;hubId:1;)\n");
+                    sendStr.append("                       UnoffloadChar                (Ex: UnoffloadChar DeviceAddress:11:22:33:44:55:66;SessionId:1)\n");
                     sendStr.append("                       ClearServices\n");
                     sendStr.append("                       GetServices\n");
                     sendStr.append("                       SetPhy                       (Ex: SetPhy DeviceAddress:11:22:33:44:55:66;Tx_Phy:2;Rx_Phy:2;Phy_Opt:00)\n");
                     sendStr.append("                       ReadPhy                      (Ex: ReadPhy 11:22:33:44:55:66)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_app_activate\n");
+                    sendStr.append("                       InvokeGattOp gattServer_app_deactivate\n");
+                    sendStr.append("                       InvokeGattOp gattServer_send_app_notif (Ex: InvokeGattOp gattServer_send_app_notif sessionId: attrHandle: val_len:)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_tx_bulk_transfer (Ex: InvokeGattOp gattServer_tx_bulk_transfer sessionId: attrHandle: val_len: pktCnt:)\n");
+                    sendStr.append("                       InvokeGattOp gattServer_rx_bulk_transfer (Ex: InvokeGattOp gattServer_rx_bulk_transfer sessionId:1 attrHandle: pktCnt:)\n");
                     sendStr.append("                       Disconnect                   (Ex: Disconnect 11:22:33:44:55:66)\n");
                     sendStr.append("                       Deregister\n");
                     sendStr.append("                       Back\n");
@@ -914,6 +934,57 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if (tmp[0].equals("OffloadChar")) {
+                            OffloadCharacteristics OffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (OffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_BLE_OFFLOAD_CHAR,
+                                        OffloadCharParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("UnoffloadChar")) {
+                            String[] val = tmp[1].split(":", 2);
+                            if (val.length == 2) {
+                            processOutputState = NONE;
+                            msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_BLE_UNOFFLOAD_CHAR, Integer.valueOf(val[1]));
+                            BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ReadCharUUid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_READ_CHAR_UUID, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("DiscoverServiceUuid")) {
+                            ReadWriteOp readWriteCharOpParam = parse.ReadWriteOpParse(tmp[1]);
+                            if (readWriteCharOpParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_DISC_SRVC_UUID, readWriteCharOpParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("ConnUpdate")) {
+                            ConnUpdate connUpdateParam = parse.ConnUpdateParse(tmp[1]);
+                            if (connUpdateParam != null) {
+                                processOutputState = NONE;
+                                msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GC_START_BLE_CONN_UPDATE, connUpdateParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
                         } else if (tmp[0].equals("SetPhy")) {
                             PhyUpdate phyUpdateParam = parse.PhyUpdateParse(tmp[1]);
                             if (phyUpdateParam != null) {
@@ -1063,6 +1134,28 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
+                        } else if (tmp[0].equals("OffloadChar")) {
+                            OffloadCharacteristics OffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (OffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_BLE_OFFLOAD_CHAR,
+                                        OffloadCharParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
+                        } else if (tmp[0].equals("UnoffloadChar")) {
+                            OffloadCharacteristics unOffloadCharParam = parse.OffloadCharacteristicsParse(tmp[1]);
+                            if (unOffloadCharParam != null) {
+                                processOutputState = NONE;
+                                 msg = BleAppService.msghandler.obtainMessage(
+                                        BleAppService.MSG_GS_BLE_UNOFFLOAD_CHAR,
+                                        unOffloadCharParam);
+                                BleAppService.msghandler.sendMessage(msg);
+                            } else {
+                                processOutputState = INVALID_INPUT;
+                            }
                         } else if (tmp[0].equals("ReadPhy")) {
                             if (BleAppService.bleAdapter.
                                   checkBluetoothAddress(tmp[1].toUpperCase())) {
@@ -1095,7 +1188,7 @@ public class SocketServer {
                             } else {
                                 processOutputState = INVALID_INPUT;
                             }
-                        }  else {
+                        } else {
                             processOutputState = INVALID_INPUT;
                         }
                     } else if(tmp.length == 1) {
@@ -1133,8 +1226,8 @@ public class SocketServer {
         }
     }
 
-    public void closeSocketServer() {
-        Log.i(TAG, "closeSocketServer()");
+    public void closeConnection() {
+        Log.i(TAG, "closeConnection()");
         closeReceived = false;
         socketOpen = false;
         mainMenuState = MAIN_MENU;
@@ -1150,6 +1243,11 @@ public class SocketServer {
             }
             client = null;
         }
+    }
+
+    public void closeSocketServer() {
+        Log.i(TAG, "closeSocketServer()");
+        closeConnection();
 
         if (server != null) {
             try {
@@ -1185,8 +1283,7 @@ public class SocketServer {
                     } catch (IOException e) {
                         Log.e(TAG, "There is an exception when writing to socket");
                         e.printStackTrace();
-                        INSTANCE.closeSocketServer();
-                        INSTANCE.showMessage("Socket closed, restart app");
+                        INSTANCE.closeConnection();
                     }
                 } finally {
                     mutex.release();
