@@ -34,8 +34,18 @@ if (test "x${with_glib}" = "xyes"); then
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 fi
-PKG_CHECK_MODULES([AROUTE], [audio_route])
-AC_SUBST([AROUTE_CFLAGS])
+AC_ARG_ENABLE([audio],
+  [AS_HELP_STRING([--enable-audio], [Enable audio support])],
+  [case "${enableval}" in
+      yes) audio=true ;;
+      no)  audio=false ;;
+      *) AC_MSG_ERROR([bad value ${enableval} for --enable-audio]) ;;
+  esac],[audio=false])
+
+if test "x$audio" = "xtrue"; then
+   PKG_CHECK_MODULES([AROUTE], [audio_route])
+   AC_SUBST([AROUTE_CFLAGS])
+fi
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 
