@@ -1,0 +1,19 @@
+android_app {
+    name: "BtLmpEventTestApp",
+    srcs: [
+        "src/**/*.java",
+    ],
+    resource_dirs: ["res"],
+    manifest: "AndroidManifest.xml",
+
+    static_libs: [
+        "android.hardware.bluetooth.lmp_event-V1-java",
+    ],
+
+    owner: "qti",
+
+    platform_apis: true,
+    certificate: ":com.android.bluetooth.certificate",
+
+    optimize: { enabled: false },
+}
