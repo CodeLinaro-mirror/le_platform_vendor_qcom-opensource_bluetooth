@@ -8,6 +8,9 @@ package org.codeaurora.bluetooth.bttestapp.lecoc;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -28,6 +31,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -77,6 +81,28 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     private List<BluetoothDevice> discoveredDevices;
     private BluetoothDevice selectedDevice;
     
+    // LE Connection Interval UI components
+    private Spinner spinnerConnInterval;
+    private Button  btnSetConnInterval;
+
+    // LE PHY UI components
+    private Spinner spinnerTxPhy;
+    private Spinner spinnerRxPhy;
+    private Spinner spinnerPhyOptions;
+    private Button btnSetPhy;
+
+    // GATT connection used solely for setPreferredPhy() on the active LE link
+    private BluetoothGatt phyGatt;
+
+    // TX/RX PHY bitmask values matching spinner positions
+    // LE1M=0x01(bit0), LE2M=0x02(bit1), LECoded=0x04(bit2), HDT=0x10(bit4)
+    private static final int[] PHY_TX_RX_VALUES = {0x01, 0x02, 0x04, 0x10};
+
+    // PHY Options values matching spinner positions
+    // 0=No Preferred, HDT2=0x04(bit2), HDT3=0x08(bit3), HDT4=0x10(bit4),
+    // HDT6=0x20(bit5), HDT7.5=0x40(bit6)
+    private static final int[] PHY_OPTION_VALUES = {0, 0x04, 0x08, 0x10, 0x20, 0x40};
+
     // UI Handler for thread-safe updates
     private Handler uiHandler;
     
@@ -175,7 +201,9 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
      */
     private void updateUIFromService() {
         if (l2capService == null) return;
-        
+
+        boolean active = l2capService.hasActiveConnection();
+
         // Update server status
         updateServerButtons(l2capService.isServerRunning());
         updateServerStatus();
@@ -184,8 +212,14 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         updateClientStatus();
         
         // Update data controls
-        updateDataControls(l2capService.hasActiveConnection());
-        
+        updateDataControls(active);
+
+        // Update connection interval controls
+        updateConnIntervalControls(active);
+
+        // Update PHY controls
+        updatePhyControls(active);
+
         appendLog("Connected to L2CAP service");
     }
     
@@ -235,10 +269,66 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         btnSendFile.setOnClickListener(v -> sendFileData());
         btnClearLogs.setOnClickListener(v -> clearLogs());
         
+        // LE PHY Settings
+        spinnerTxPhy = findViewById(R.id.spinnerTxPhy);
+        spinnerRxPhy = findViewById(R.id.spinnerRxPhy);
+        spinnerPhyOptions = findViewById(R.id.spinnerPhyOptions);
+        btnSetPhy = findViewById(R.id.btnSetPhy);
+
+        // TX PHY spinner: LE1M(bit0), LE2M(bit1), LECoded(bit2), HDT(bit4)
+        String[] txRxPhyLabels = {
+            "LE 1M  (bit 0 = 0x01)",
+            "LE 2M  (bit 1 = 0x02)",
+            "LE Coded (bit 2 = 0x04)",
+            "HDT    (bit 4 = 0x10)"
+        };
+        ArrayAdapter<String> txPhyAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, txRxPhyLabels);
+        txPhyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTxPhy.setAdapter(txPhyAdapter);
+
+        ArrayAdapter<String> rxPhyAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, txRxPhyLabels);
+        rxPhyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerRxPhy.setAdapter(rxPhyAdapter);
+
+        // PHY Options spinner: decides coding/rate for HDT
+        String[] phyOptionLabels = {
+            "No Preferred (0)",
+            "HDT2  (bit 2 = 0x04)",
+            "HDT3  (bit 3 = 0x08)",
+            "HDT4  (bit 4 = 0x10)",
+            "HDT6  (bit 5 = 0x20)",
+            "HDT7.5 (bit 6 = 0x40)"
+        };
+        ArrayAdapter<String> phyOptionsAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, phyOptionLabels);
+        phyOptionsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerPhyOptions.setAdapter(phyOptionsAdapter);
+
+        btnSetPhy.setOnClickListener(v -> setLePhy());
+
+        // LE Connection Interval
+        spinnerConnInterval = findViewById(R.id.spinnerConnInterval);
+        btnSetConnInterval  = findViewById(R.id.btnSetConnInterval);
+        String[] connIntervalLabels = {
+            "High Priority  (7.5 – 15 ms)",
+            "Balanced       (30 – 50 ms)",
+            "Low Power      (100 – 125 ms)"
+        };
+        ArrayAdapter<String> connIntervalAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, connIntervalLabels);
+        connIntervalAdapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item);
+        spinnerConnInterval.setAdapter(connIntervalAdapter);
+        btnSetConnInterval.setOnClickListener(v -> setConnectionInterval());
+
         // Initialize UI state
         updateServerButtons(false);
         updateScanButtons(false);
         updateDataControls(false);
+        updateConnIntervalControls(false);
+        updatePhyControls(false);
         updateCreditsDisplay(0, 0);
         
         // Initialize status displays
@@ -606,11 +696,20 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     public void onConnectionStateChanged(boolean connected) {
         uiHandler.post(() -> {
             updateDataControls(connected);
+            updateConnIntervalControls(connected);
+            updatePhyControls(connected);
             updateServerButtons(l2capService != null && l2capService.isServerRunning());
             if (connected) {
                 appendLog("Connection established");
+                // Open the PHY GATT helper so setPreferredPhy() is ready to call
+                if (l2capService != null) {
+                    BluetoothDevice dev = l2capService.getConnectedDevice();
+                    if (dev != null) openPhyGatt(dev);
+                }
             } else {
                 appendLog("Connection lost");
+                // Release the PHY GATT helper when the L2CAP link drops
+                closePhyGatt();
             }
         });
     }
@@ -835,9 +934,196 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         }
     }
     
+    // -------------------------------------------------------------------------
+    // LE Connection Interval methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Enable or disable the Set Connection Interval button.
+     */
+    private void updateConnIntervalControls(boolean connected) {
+        if (btnSetConnInterval != null) {
+            btnSetConnInterval.setEnabled(connected);
+        }
+    }
+
+    /**
+     * Request a connection interval change via BluetoothGatt.requestConnectionPriority().
+     *
+     * Android CONNECTION_PRIORITY_* constants (note: BALANCED=0, HIGH=1, LOW_POWER=2):
+     *   BluetoothGatt.CONNECTION_PRIORITY_BALANCED  = 0  (30 – 50 ms)
+     *   BluetoothGatt.CONNECTION_PRIORITY_HIGH      = 1  (7.5 – 15 ms)
+     *   BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER = 2  (100 – 125 ms)
+     *
+     * Spinner order (user-friendly, high→low latency):
+     *   Position 0 → High Priority  → CONNECTION_PRIORITY_HIGH      (1)
+     *   Position 1 → Balanced       → CONNECTION_PRIORITY_BALANCED   (0)
+     *   Position 2 → Low Power      → CONNECTION_PRIORITY_LOW_POWER  (2)
+     *
+     * The GATT handle (phyGatt) is already open when the L2CAP CoC link is up,
+     * so no new connection is created here.
+     */
+    private void setConnectionInterval() {
+        if (phyGatt == null) {
+            appendLog("ConnInterval: GATT not ready – ensure LE connection is established first");
+            return;
+        }
+
+        // Map spinner position → correct Android CONNECTION_PRIORITY_* constant
+        // BALANCED=0, HIGH=1, LOW_POWER=2  (Android constants are NOT in latency order)
+        final int[] PRIORITY_MAP = {
+            BluetoothGatt.CONNECTION_PRIORITY_HIGH,       // spinner pos 0 → HIGH (1)
+            BluetoothGatt.CONNECTION_PRIORITY_BALANCED,   // spinner pos 1 → BALANCED (0)
+            BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER   // spinner pos 2 → LOW_POWER (2)
+        };
+        final String[] PRIORITY_LABELS = {
+            "High Priority (7.5–15 ms)",
+            "Balanced (30–50 ms)",
+            "Low Power (100–125 ms)"
+        };
+
+        int pos      = spinnerConnInterval.getSelectedItemPosition();
+        int priority = PRIORITY_MAP[pos];
+
+        appendLog("ConnInterval: requestConnectionPriority("
+                + PRIORITY_LABELS[pos] + " → priority=" + priority + ")");
+
+        try {
+            boolean sent = phyGatt.requestConnectionPriority(priority);
+            appendLog("ConnInterval: request " + (sent ? "sent" : "FAILED"));
+        } catch (Exception e) {
+            appendLog("ConnInterval: failed – " + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // LE PHY methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Enable or disable the Set PHY button based on connection state.
+     */
+    private void updatePhyControls(boolean connected) {
+        if (btnSetPhy != null) {
+            btnSetPhy.setEnabled(connected);
+        }
+    }
+
+    /**
+     * GATT callback used only for PHY operations.
+     * The GATT connection is opened automatically when the L2CAP CoC link
+     * comes up and is kept alive until the link drops.
+     */
+    private final BluetoothGattCallback phyGattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                appendLog("PHY GATT ready");
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                appendLog("PHY GATT disconnected");
+                gatt.close();
+                if (phyGatt == gatt) phyGatt = null;
+            }
+        }
+
+        @Override
+        public void onPhyUpdate(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
+            String result = (status == 0) ? "Success" : "Error(" + status + ")";
+            appendLog("PHY updated [" + result + "]"
+                    + "  TX: " + phyMaskToString(txPhy)
+                    + "  RX: " + phyMaskToString(rxPhy));
+        }
+
+        @Override
+        public void onPhyRead(BluetoothGatt gatt, int txPhy, int rxPhy, int status) {
+            appendLog("PHY read  TX: " + phyMaskToString(txPhy)
+                    + "  RX: " + phyMaskToString(rxPhy)
+                    + "  Status: " + status);
+        }
+    };
+
+    /**
+     * Open the helper GATT connection used for PHY operations.
+     * Called automatically when the L2CAP CoC connection is established.
+     */
+    private void openPhyGatt(BluetoothDevice device) {
+        if (phyGatt != null) return;   // already open
+        try {
+            phyGatt = device.connectGatt(this, false, phyGattCallback,
+                    BluetoothDevice.TRANSPORT_LE);
+            appendLog("PHY GATT connecting to " + device.getAddress());
+        } catch (SecurityException e) {
+            appendLog("PHY GATT: permission denied – " + e.getMessage());
+        }
+    }
+
+    /**
+     * Send HCI_LE_Set_PHY via setPreferredPhy().
+     *
+     * The GATT handle (phyGatt) is opened automatically when the L2CAP CoC
+     * connection is established, so this method contains no connection logic —
+     * it simply checks that the handle is available and calls setPreferredPhy().
+     */
+    private void setLePhy() {
+        if (phyGatt == null) {
+            appendLog("PHY: GATT not ready – ensure LE connection is established first");
+            return;
+        }
+
+        final int txPhy      = PHY_TX_RX_VALUES[spinnerTxPhy.getSelectedItemPosition()];
+        final int rxPhy      = PHY_TX_RX_VALUES[spinnerRxPhy.getSelectedItemPosition()];
+        final int phyOptions = PHY_OPTION_VALUES[spinnerPhyOptions.getSelectedItemPosition()];
+
+        appendLog("PHY: setPreferredPhy"
+                + "  TX=0x" + Integer.toHexString(txPhy)
+                + "  RX=0x" + Integer.toHexString(rxPhy)
+                + "  Options=0x" + Integer.toHexString(phyOptions));
+
+        try {
+            phyGatt.setPreferredPhy(txPhy, rxPhy, phyOptions);
+        } catch (Exception e) {
+            appendLog("PHY: setPreferredPhy() failed – " + e.getMessage());
+        }
+    }
+
+    /**
+     * Close the helper GATT connection used for PHY operations.
+     */
+    private void closePhyGatt() {
+        if (phyGatt != null) {
+            try {
+                phyGatt.disconnect();
+                phyGatt.close();
+            } catch (Exception e) {
+                Log.w(TAG, "closePhyGatt: " + e.getMessage());
+            }
+            phyGatt = null;
+        }
+    }
+
+    /**
+     * Convert a PHY bitmask to a human-readable string.
+     * Handles both TX/RX PHY bits and the raw value returned by onPhyUpdate.
+     */
+    private String phyMaskToString(int phy) {
+        if (phy == 0) return "None(0x00)";
+        List<String> parts = new ArrayList<>();
+        if ((phy & 0x01) != 0) parts.add("LE1M");
+        if ((phy & 0x02) != 0) parts.add("LE2M");
+        if ((phy & 0x04) != 0) parts.add("LECoded/HDT2");
+        if ((phy & 0x08) != 0) parts.add("HDT3");
+        if ((phy & 0x10) != 0) parts.add("HDT/HDT4");
+        if ((phy & 0x20) != 0) parts.add("HDT6");
+        if ((phy & 0x40) != 0) parts.add("HDT7.5");
+        return String.join("+", parts) + "(0x" + Integer.toHexString(phy) + ")";
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        // Close PHY GATT helper
+        closePhyGatt();
         
         // Unregister from service callbacks
         if (l2capService != null) {
