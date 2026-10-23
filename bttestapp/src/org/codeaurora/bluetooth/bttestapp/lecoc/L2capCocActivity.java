@@ -36,6 +36,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -58,6 +60,10 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     private static final String TAG = "L2capCocActivity";
     private static final int FILE_SELECT_REQUEST_CODE = 1001;
     private static final int CONFIG_REQUEST_CODE = 1002;
+
+    // File-transfer header: magic (4) + fileSize (8) + nameLen (2) + name (N)
+    private static final byte[] FILE_HEADER_MAGIC = {0x4C, 0x32, 0x46, 0x01};
+    private static final int FILE_HEADER_MIN_LENGTH = FILE_HEADER_MAGIC.length + 8 + 2;
     
     // UI Components
     private Button btnStartServer, btnStopServer, btnScanDevices, btnStopScan;
@@ -69,6 +75,13 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     // File selection
     private Uri selectedFileUri;
     private String selectedFileName;
+
+    // Received-file transfer state (populated from the file header packet,
+    // written straight to disk instead of kept in memory/logs)
+    private FileOutputStream receivedFileOutputStream;
+    private String receivingFileName;
+    private long expectedFileBytesRemaining;
+    private long receivedFileByteCount;
     
     // Service components
     private BluetoothL2capService l2capService;
@@ -108,6 +121,8 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     private static final int[] PHY_OPTION_VALUES = {0, 0x04, 0x08, 0x10, 0x20, 0x40};
 
     // HDT+ Settings UI components
+    private TextView headerHdtPlus;
+    private View llHdtPlusBody;
     private Spinner spinnerHdtBwExt, spinnerHdtIfh, spinnerHdtChs;
     private Spinner spinnerHdtBlockRepCToP, spinnerHdtBlockRepPToC;
     private Spinner spinnerHdtMaxBrCToP, spinnerHdtMaxBrPToC;
@@ -117,8 +132,20 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
             spinnerHdtRatePToC12, spinnerHdtRatePToC15;
     private Button btnSetHdtPlus;
 
+    // XDT Settings UI components
+    private TextView headerXdt;
+    private View llXdtBody;
+    private Spinner spinnerXdtEnable, spinnerXdtBlockRepCToP, spinnerXdtBlockRepPToC;
+    private Spinner spinnerXdtMaxBrCToP, spinnerXdtMaxBrPToC;
+    private Spinner spinnerXdtRateCToP4, spinnerXdtRateCToP6, spinnerXdtRateCToP8,
+            spinnerXdtRateCToP12, spinnerXdtRateCToP15;
+    private Spinner spinnerXdtRatePToC4, spinnerXdtRatePToC6, spinnerXdtRatePToC8,
+            spinnerXdtRatePToC12, spinnerXdtRatePToC15;
+    private Button btnSetXdt;
+
     // Max block repetition count values matching spinner positions
-    private static final int[] HDT_PLUS_BR_COUNT_VALUES =
+    // (shared by both the HDT+ and XDT block-repetition-count spinners)
+    private static final int[] BLOCK_REP_COUNT_VALUES =
             {0, 1, 2, 4, 8, 16, 32, 64, 128, 255};
 
     // UI Handler for thread-safe updates
@@ -246,6 +273,9 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         // Update HDT+ controls
         updateHdtPlusControls(active);
 
+        // Update XDT controls
+        updateXdtControls(active);
+
         appendLog("Connected to L2CAP service");
     }
     
@@ -338,6 +368,14 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         setupHdtPlusSpinners();
         btnSetHdtPlus.setOnClickListener(v -> setHdtPlusFeatures());
 
+        // XDT Settings
+        setupXdtSpinners();
+        btnSetXdt.setOnClickListener(v -> setXdtFeatures());
+
+        // Collapsible section headers
+        headerHdtPlus.setOnClickListener(v -> toggleSection(llHdtPlusBody, headerHdtPlus, "HDT+ Settings"));
+        headerXdt.setOnClickListener(v -> toggleSection(llXdtBody, headerXdt, "XDT Settings"));
+
         // LE Connection Interval
         spinnerConnInterval = findViewById(R.id.spinnerConnInterval);
         btnSetConnInterval  = findViewById(R.id.btnSetConnInterval);
@@ -360,6 +398,7 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         updateConnIntervalControls(false);
         updatePhyControls(false);
         updateHdtPlusControls(false);
+        updateXdtControls(false);
         updateCreditsDisplay(0, 0);
         
         // Initialize status displays
@@ -730,6 +769,7 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
             updateConnIntervalControls(connected);
             updatePhyControls(connected);
             updateHdtPlusControls(connected);
+            updateXdtControls(connected);
             updateServerButtons(l2capService != null && l2capService.isServerRunning());
             if (connected) {
                 appendLog("Connection established");
@@ -740,6 +780,7 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
                 }
             } else {
                 appendLog("Connection lost");
+                abortInProgressFileReceive();
                 // Release the PHY GATT helper when the L2CAP link drops
                 closePhyGatt();
             }
@@ -748,8 +789,142 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     
     @Override
     public void onDataReceived(byte[] data) {
-        String receivedData = new String(data);
-        appendLog("Received: " + receivedData);
+        if (expectedFileBytesRemaining > 0) {
+            handleFilePayload(data);
+            return;
+        }
+
+        if (isFileHeader(data)) {
+            startFileReceive(data);
+            return;
+        }
+
+        // Plain arbitrary data sent via the "Send Data" text box - short, so safe to log as-is
+        appendLog("Received: " + new String(data));
+    }
+
+    private boolean isFileHeader(byte[] data) {
+        if (data.length < FILE_HEADER_MIN_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < FILE_HEADER_MAGIC.length; i++) {
+            if (data[i] != FILE_HEADER_MAGIC[i]) {
+                return false;
+            }
+        }
+        int nameLen = ((data[FILE_HEADER_MAGIC.length + 8] & 0xFF) << 8)
+                | (data[FILE_HEADER_MAGIC.length + 9] & 0xFF);
+        return data.length == FILE_HEADER_MIN_LENGTH + nameLen;
+    }
+
+    /**
+     * Parses the file header packet and opens the destination file, named after
+     * the original file that was sent, under app-specific external storage.
+     */
+    private void startFileReceive(byte[] header) {
+        abortInProgressFileReceive();
+
+        int offset = FILE_HEADER_MAGIC.length;
+        long fileSize = 0;
+        for (int i = 0; i < 8; i++) {
+            fileSize = (fileSize << 8) | (header[offset++] & 0xFF);
+        }
+        int nameLen = ((header[offset] & 0xFF) << 8) | (header[offset + 1] & 0xFF);
+        offset += 2;
+        String rawName = new String(header, offset, nameLen, java.nio.charset.StandardCharsets.UTF_8);
+        String safeName = sanitizeFileName(rawName);
+
+        try {
+            File dir = getExternalFilesDir("L2capCocReceived");
+            if (dir != null && !dir.exists()) {
+                dir.mkdirs();
+            }
+            File outFile = uniqueFile(dir, safeName);
+            receivedFileOutputStream = new FileOutputStream(outFile);
+            receivingFileName = outFile.getName();
+            expectedFileBytesRemaining = fileSize;
+            receivedFileByteCount = 0;
+            appendLog("Incoming file: " + receivingFileName + " (" + formatBytes(fileSize) + ")");
+        } catch (IOException e) {
+            receivedFileOutputStream = null;
+            expectedFileBytesRemaining = 0;
+            appendLog("Failed to open file for received data: " + e.getMessage());
+        }
+    }
+
+    private void handleFilePayload(byte[] data) {
+        if (receivedFileOutputStream != null) {
+            try {
+                receivedFileOutputStream.write(data);
+            } catch (IOException e) {
+                appendLog("Error writing received data to file: " + e.getMessage());
+            }
+        }
+        receivedFileByteCount += data.length;
+        expectedFileBytesRemaining -= data.length;
+
+        if (expectedFileBytesRemaining <= 0) {
+            String name = receivingFileName;
+            long size = receivedFileByteCount;
+            closeReceivedFile();
+            appendLog("File received: " + name + " (" + formatBytes(size) + ")");
+        }
+    }
+
+    /** Strips directory separators/".." so a malicious peer can't write outside the target dir. */
+    private String sanitizeFileName(String name) {
+        String cleaned = name.replace('\\', '/');
+        int lastSlash = cleaned.lastIndexOf('/');
+        if (lastSlash != -1) {
+            cleaned = cleaned.substring(lastSlash + 1);
+        }
+        cleaned = cleaned.replace("..", "").trim();
+        return cleaned.isEmpty() ? "received_file" : cleaned;
+    }
+
+    /** Appends " (n)" before the extension if a file with this name already exists. */
+    private File uniqueFile(File dir, String name) {
+        File candidate = new File(dir, name);
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        String base = name;
+        String ext = "";
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) {
+            base = name.substring(0, dot);
+            ext = name.substring(dot);
+        }
+        int n = 1;
+        do {
+            candidate = new File(dir, base + "_" + n + ext);
+            n++;
+        } while (candidate.exists());
+        return candidate;
+    }
+
+    /** Closes and abandons any file transfer that was left mid-flight (e.g. on disconnect). */
+    private void abortInProgressFileReceive() {
+        if (receivedFileOutputStream != null && expectedFileBytesRemaining > 0) {
+            appendLog("File transfer incomplete: " + receivingFileName
+                    + " (" + formatBytes(receivedFileByteCount) + " of "
+                    + formatBytes(receivedFileByteCount + expectedFileBytesRemaining) + " received)");
+        }
+        closeReceivedFile();
+    }
+
+    private void closeReceivedFile() {
+        if (receivedFileOutputStream != null) {
+            try {
+                receivedFileOutputStream.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Error closing received file", e);
+            }
+            receivedFileOutputStream = null;
+        }
+        receivingFileName = null;
+        expectedFileBytesRemaining = 0;
+        receivedFileByteCount = 0;
     }
     
     @Override
@@ -815,7 +990,7 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
      */
     private void sendFileInChunks(Uri uri) throws IOException {
         L2capCocConfig config = L2capCocConfig.getInstance(this);
-        final int CHUNK_SIZE = Math.min(config.getBufferSize(), 1048576); // Use buffer size up to 1MB max
+        final int CHUNK_SIZE = Math.min(config.getBufferSize(), L2capCocConfig.MAX_BUFFER_SIZE);
         final byte[] buffer = new byte[CHUNK_SIZE];
 
         long totalBytes = 0;
@@ -832,11 +1007,25 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
             // Get file size for progress tracking (if available)
             try {
                 totalBytes = inputStream.available();
+                if (totalBytes <= 0) {
+                    totalBytes = queryFileSize(uri);
+                }
                 final long totalBytesFinal = totalBytes;
                 uiHandler.post(() -> appendLog("File size: " + formatBytes(totalBytesFinal)));
             } catch (IOException e) {
-                totalBytes = -1; // Unknown size
-                uiHandler.post(() -> appendLog("File size: Unknown"));
+                totalBytes = queryFileSize(uri);
+                final long totalBytesFinal = totalBytes;
+                uiHandler.post(() -> appendLog("File size: " + formatBytes(totalBytesFinal)));
+            }
+
+            if (totalBytes <= 0) {
+                throw new IOException("Unable to determine file size - required to send file header");
+            }
+
+            byte[] header = buildFileHeader(selectedFileName != null ? selectedFileName : "received_file",
+                    totalBytes);
+            if (l2capService == null || !l2capService.sendData(header)) {
+                throw new IOException("Failed to send file header - no active connection");
             }
 
             int bytesRead;
@@ -847,13 +1036,21 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
                 byte[] chunkData = new byte[bytesRead];
                 System.arraycopy(buffer, 0, chunkData, 0, bytesRead);
 
-                // Send chunk via service on UI thread
+                // Send chunk via service on background thread (already executing in one)
                 final int currentChunk = chunkCount;
                 final long currentSentBytes = sentBytes + bytesRead;
                 final long finalTotalBytes = totalBytes;
 
+                // Perform I/O on background thread to avoid ANR
+                boolean success = false;
+                if (l2capService != null) {
+                    success = l2capService.sendData(chunkData);
+                }
+
+                // Only post UI update to handler
+                final boolean finalSuccess = success;
                 uiHandler.post(() -> {
-                    if (l2capService != null && l2capService.sendData(chunkData)) {
+                    if (finalSuccess) {
                         String progressMsg = String.format("Sent chunk %d (%s)",
                             currentChunk, formatBytes(chunkData.length));
 
@@ -922,6 +1119,46 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         }
         
         return fileName;
+    }
+
+    /** Queries the content provider for the file's size when the input stream can't report it. */
+    private long queryFileSize(Uri uri) {
+        try (android.database.Cursor cursor = getContentResolver().query(
+                uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE);
+                if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                    return cursor.getLong(sizeIndex);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error querying file size", e);
+        }
+        return -1;
+    }
+
+    /**
+     * Builds the file-transfer header packet: magic + fileSize (8 bytes) +
+     * nameLen (2 bytes) + name (UTF-8), so the receiver can save the incoming
+     * data under its original filename/extension.
+     */
+    private byte[] buildFileHeader(String fileName, long fileSize) {
+        byte[] nameBytes = fileName.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] header = new byte[FILE_HEADER_MAGIC.length + 8 + 2 + nameBytes.length];
+        int offset = 0;
+
+        System.arraycopy(FILE_HEADER_MAGIC, 0, header, offset, FILE_HEADER_MAGIC.length);
+        offset += FILE_HEADER_MAGIC.length;
+
+        for (int i = 7; i >= 0; i--) {
+            header[offset++] = (byte) (fileSize >>> (i * 8));
+        }
+
+        header[offset++] = (byte) (nameBytes.length >>> 8);
+        header[offset++] = (byte) nameBytes.length;
+
+        System.arraycopy(nameBytes, 0, header, offset, nameBytes.length);
+        return header;
     }
     
     /**
@@ -1151,6 +1388,53 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     }
 
     // -------------------------------------------------------------------------
+    // HDT+ / XDT shared helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Toggle a collapsible section's visibility and flip its header's leading
+     * arrow indicator (▸ collapsed / ▾ expanded). Purely a UI concern —
+     * independent of connection state.
+     */
+    private void toggleSection(View body, TextView header, String title) {
+        boolean expanded = body.getVisibility() == View.VISIBLE;
+        body.setVisibility(expanded ? View.GONE : View.VISIBLE);
+        header.setText((expanded ? "▸ " : "▾ ") + title);
+    }
+
+    /**
+     * Resolve the Connection_Handle for the active L2CAP CoC connection via
+     * BluetoothDevice.getConnectionHandle() (hidden SystemApi, called via
+     * reflection) — the user never enters it manually.
+     * @param logPrefix prefix used for appendLog() messages (e.g. "HDT+", "XDT")
+     * @return the resolved connection handle, or -1 if it could not be resolved
+     */
+    private int resolveConnectionHandle(String logPrefix) {
+        if (phyGatt == null || l2capService == null) {
+            appendLog(logPrefix + ": GATT not ready – ensure LE connection is established first");
+            return -1;
+        }
+
+        BluetoothDevice device = l2capService.getConnectedDevice();
+        if (device == null) {
+            appendLog(logPrefix + ": no connected device");
+            return -1;
+        }
+
+        if (vendorCommands == null) {
+            appendLog(logPrefix + ": vendor command helper not ready");
+            return -1;
+        }
+
+        int connectionHandle = vendorCommands.getConnectionHandle(device, BluetoothDevice.TRANSPORT_LE);
+        if (connectionHandle < 0) {
+            appendLog(logPrefix + ": failed to resolve connection handle");
+            return -1;
+        }
+        return connectionHandle;
+    }
+
+    // -------------------------------------------------------------------------
     // HDT+ Settings methods
     // -------------------------------------------------------------------------
 
@@ -1169,6 +1453,8 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
      * list style used for the block-repetition-count spinners.
      */
     private void setupHdtPlusSpinners() {
+        headerHdtPlus = findViewById(R.id.headerHdtPlus);
+        llHdtPlusBody = findViewById(R.id.llHdtPlusBody);
         spinnerHdtBwExt = findViewById(R.id.spinnerHdtBwExt);
         spinnerHdtIfh = findViewById(R.id.spinnerHdtIfh);
         spinnerHdtChs = findViewById(R.id.spinnerHdtChs);
@@ -1204,9 +1490,9 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
             spinner.setAdapter(adapter);
         }
 
-        String[] brCountLabels = new String[HDT_PLUS_BR_COUNT_VALUES.length];
-        for (int i = 0; i < HDT_PLUS_BR_COUNT_VALUES.length; i++) {
-            brCountLabels[i] = String.valueOf(HDT_PLUS_BR_COUNT_VALUES[i]);
+        String[] brCountLabels = new String[BLOCK_REP_COUNT_VALUES.length];
+        for (int i = 0; i < BLOCK_REP_COUNT_VALUES.length; i++) {
+            brCountLabels[i] = String.valueOf(BLOCK_REP_COUNT_VALUES[i]);
         }
         Spinner[] brCountSpinners = {spinnerHdtMaxBrCToP, spinnerHdtMaxBrPToC};
         for (Spinner spinner : brCountSpinners) {
@@ -1220,32 +1506,10 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
     /**
      * Send the HCI VS Set HDT+ Features Enable command using the values selected
      * in the HDT+ Settings spinners.
-     *
-     * The Connection_Handle parameter is resolved automatically via
-     * BluetoothDevice.getConnectionHandle() (hidden SystemApi, called via
-     * reflection) on the device backing the active L2CAP CoC connection — the
-     * user never enters it manually.
      */
     private void setHdtPlusFeatures() {
-        if (phyGatt == null || l2capService == null) {
-            appendLog("HDT+: GATT not ready – ensure LE connection is established first");
-            return;
-        }
-
-        BluetoothDevice device = l2capService.getConnectedDevice();
-        if (device == null) {
-            appendLog("HDT+: no connected device");
-            return;
-        }
-
-        BluetoothVendorCommands vendorCommands = this.vendorCommands;
-        if (vendorCommands == null) {
-            appendLog("HDT+: vendor command helper not ready");
-            return;
-        }
-        int connectionHandle = vendorCommands.getConnectionHandle(device, BluetoothDevice.TRANSPORT_LE);
+        int connectionHandle = resolveConnectionHandle("HDT+");
         if (connectionHandle < 0) {
-            appendLog("HDT+: failed to resolve connection handle");
             return;
         }
 
@@ -1266,8 +1530,8 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
             hdtPlusFeatures |= BluetoothVendorCommands.HDT_PLUS_FEATURE_BLOCK_REP_P_TO_C;
         }
 
-        int brCToP = HDT_PLUS_BR_COUNT_VALUES[spinnerHdtMaxBrCToP.getSelectedItemPosition()];
-        int brPToC = HDT_PLUS_BR_COUNT_VALUES[spinnerHdtMaxBrPToC.getSelectedItemPosition()];
+        int brCToP = BLOCK_REP_COUNT_VALUES[spinnerHdtMaxBrCToP.getSelectedItemPosition()];
+        int brPToC = BLOCK_REP_COUNT_VALUES[spinnerHdtMaxBrPToC.getSelectedItemPosition()];
 
         int ratesCToP = 0;
         if (spinnerHdtRateCToP4.getSelectedItemPosition() == 1) {
@@ -1316,9 +1580,149 @@ public class L2capCocActivity extends Activity implements BluetoothL2capService.
         appendLog("HDT+: Set Features Enable " + (result ? "sent" : "FAILED"));
     }
 
+    // -------------------------------------------------------------------------
+    // XDT Settings methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Enable or disable the Set XDT Features button based on connection state.
+     */
+    private void updateXdtControls(boolean connected) {
+        if (btnSetXdt != null) {
+            btnSetXdt.setEnabled(connected);
+        }
+    }
+
+    /**
+     * Populate all XDT Settings spinners with dropdown labels, matching the
+     * "Disabled"/"Enabled" style used for feature-bit toggles, and the numeric
+     * list style used for the block-repetition-count spinners.
+     */
+    private void setupXdtSpinners() {
+        headerXdt = findViewById(R.id.headerXdt);
+        llXdtBody = findViewById(R.id.llXdtBody);
+        spinnerXdtEnable = findViewById(R.id.spinnerXdtEnable);
+        spinnerXdtBlockRepCToP = findViewById(R.id.spinnerXdtBlockRepCToP);
+        spinnerXdtBlockRepPToC = findViewById(R.id.spinnerXdtBlockRepPToC);
+        spinnerXdtMaxBrCToP = findViewById(R.id.spinnerXdtMaxBrCToP);
+        spinnerXdtMaxBrPToC = findViewById(R.id.spinnerXdtMaxBrPToC);
+        spinnerXdtRateCToP4 = findViewById(R.id.spinnerXdtRateCToP4);
+        spinnerXdtRateCToP6 = findViewById(R.id.spinnerXdtRateCToP6);
+        spinnerXdtRateCToP8 = findViewById(R.id.spinnerXdtRateCToP8);
+        spinnerXdtRateCToP12 = findViewById(R.id.spinnerXdtRateCToP12);
+        spinnerXdtRateCToP15 = findViewById(R.id.spinnerXdtRateCToP15);
+        spinnerXdtRatePToC4 = findViewById(R.id.spinnerXdtRatePToC4);
+        spinnerXdtRatePToC6 = findViewById(R.id.spinnerXdtRatePToC6);
+        spinnerXdtRatePToC8 = findViewById(R.id.spinnerXdtRatePToC8);
+        spinnerXdtRatePToC12 = findViewById(R.id.spinnerXdtRatePToC12);
+        spinnerXdtRatePToC15 = findViewById(R.id.spinnerXdtRatePToC15);
+        btnSetXdt = findViewById(R.id.btnSetXdt);
+
+        String[] toggleLabels = {"Disabled", "Enabled"};
+        Spinner[] toggleSpinners = {
+            spinnerXdtEnable, spinnerXdtBlockRepCToP, spinnerXdtBlockRepPToC,
+            spinnerXdtRateCToP4, spinnerXdtRateCToP6, spinnerXdtRateCToP8,
+            spinnerXdtRateCToP12, spinnerXdtRateCToP15,
+            spinnerXdtRatePToC4, spinnerXdtRatePToC6, spinnerXdtRatePToC8,
+            spinnerXdtRatePToC12, spinnerXdtRatePToC15
+        };
+        for (Spinner spinner : toggleSpinners) {
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_item, toggleLabels);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinner.setAdapter(adapter);
+        }
+
+        String[] brCountLabels = new String[BLOCK_REP_COUNT_VALUES.length];
+        for (int i = 0; i < BLOCK_REP_COUNT_VALUES.length; i++) {
+            brCountLabels[i] = String.valueOf(BLOCK_REP_COUNT_VALUES[i]);
+        }
+        Spinner[] brCountSpinners = {spinnerXdtMaxBrCToP, spinnerXdtMaxBrPToC};
+        for (Spinner spinner : brCountSpinners) {
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_item, brCountLabels);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinner.setAdapter(adapter);
+        }
+    }
+
+    /**
+     * Send the HCI VS LE XDT Features Enable command using the values selected
+     * in the XDT Settings spinners.
+     */
+    private void setXdtFeatures() {
+        int connectionHandle = resolveConnectionHandle("XDT");
+        if (connectionHandle < 0) {
+            return;
+        }
+
+        long xdtFeatures = 0;
+        if (spinnerXdtEnable.getSelectedItemPosition() == 1) {
+            xdtFeatures |= BluetoothVendorCommands.XDT_FEATURE_XDT;
+        }
+        if (spinnerXdtBlockRepCToP.getSelectedItemPosition() == 1) {
+            xdtFeatures |= BluetoothVendorCommands.XDT_FEATURE_BLOCK_REP_C_TO_P;
+        }
+        if (spinnerXdtBlockRepPToC.getSelectedItemPosition() == 1) {
+            xdtFeatures |= BluetoothVendorCommands.XDT_FEATURE_BLOCK_REP_P_TO_C;
+        }
+
+        int brCToP = BLOCK_REP_COUNT_VALUES[spinnerXdtMaxBrCToP.getSelectedItemPosition()];
+        int brPToC = BLOCK_REP_COUNT_VALUES[spinnerXdtMaxBrPToC.getSelectedItemPosition()];
+
+        int ratesCToP = 0;
+        if (spinnerXdtRateCToP4.getSelectedItemPosition() == 1) {
+            ratesCToP |= BluetoothVendorCommands.XDT_RATE_4;
+        }
+        if (spinnerXdtRateCToP6.getSelectedItemPosition() == 1) {
+            ratesCToP |= BluetoothVendorCommands.XDT_RATE_6;
+        }
+        if (spinnerXdtRateCToP8.getSelectedItemPosition() == 1) {
+            ratesCToP |= BluetoothVendorCommands.XDT_RATE_8;
+        }
+        if (spinnerXdtRateCToP12.getSelectedItemPosition() == 1) {
+            ratesCToP |= BluetoothVendorCommands.XDT_RATE_12;
+        }
+        if (spinnerXdtRateCToP15.getSelectedItemPosition() == 1) {
+            ratesCToP |= BluetoothVendorCommands.XDT_RATE_15;
+        }
+
+        int ratesPToC = 0;
+        if (spinnerXdtRatePToC4.getSelectedItemPosition() == 1) {
+            ratesPToC |= BluetoothVendorCommands.XDT_RATE_4;
+        }
+        if (spinnerXdtRatePToC6.getSelectedItemPosition() == 1) {
+            ratesPToC |= BluetoothVendorCommands.XDT_RATE_6;
+        }
+        if (spinnerXdtRatePToC8.getSelectedItemPosition() == 1) {
+            ratesPToC |= BluetoothVendorCommands.XDT_RATE_8;
+        }
+        if (spinnerXdtRatePToC12.getSelectedItemPosition() == 1) {
+            ratesPToC |= BluetoothVendorCommands.XDT_RATE_12;
+        }
+        if (spinnerXdtRatePToC15.getSelectedItemPosition() == 1) {
+            ratesPToC |= BluetoothVendorCommands.XDT_RATE_15;
+        }
+
+        appendLog("XDT: Set Features Enable"
+                + "  Handle=0x" + Integer.toHexString(connectionHandle)
+                + "  Features=0x" + Long.toHexString(xdtFeatures)
+                + "  BR_C_To_P=" + brCToP
+                + "  BR_P_To_C=" + brPToC
+                + "  Rates_C_To_P=0x" + Integer.toHexString(ratesCToP)
+                + "  Rates_P_To_C=0x" + Integer.toHexString(ratesPToC));
+
+        boolean result = vendorCommands.sendSetXdtFeaturesEnable(
+                connectionHandle, xdtFeatures, brCToP, brPToC, ratesCToP, ratesPToC);
+        appendLog("XDT: Set Features Enable " + (result ? "sent" : "FAILED"));
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        // Close any in-progress received-data file
+        abortInProgressFileReceive();
 
         // Close PHY GATT helper
         closePhyGatt();

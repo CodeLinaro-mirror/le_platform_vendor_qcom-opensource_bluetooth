@@ -355,16 +355,27 @@
             android:enabled="false"
             android:layout_marginBottom="8dp" />
 
-        <!-- HDT+ Settings -->
+        <!-- HDT+ Settings (collapsible) -->
         <TextView
+            android:id="@+id/headerHdtPlus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="HDT+ Settings"
+            android:text="▸ HDT+ Settings"
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="@android:color/black"
             android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="4dp" />
+
+        <LinearLayout
+            android:id="@+id/llHdtPlusBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
@@ -803,6 +814,424 @@
             android:text="Set HDT+ Features"
             android:enabled="false"
             android:layout_marginBottom="8dp" />
+
+        </LinearLayout>
+
+        <!-- XDT Settings (collapsible) -->
+        <TextView
+            android:id="@+id/headerXdt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="▸ XDT Settings"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="4dp" />
+
+        <LinearLayout
+            android:id="@+id/llXdtBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Features"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtEnable"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Block Repetitions (C→P):"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtBlockRepCToP"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Block Repetitions (P→C):"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtBlockRepPToC"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Block Repetitions"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Max BR C→P:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtMaxBrCToP"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Max BR P→C:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtMaxBrPToC"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rates (C→P)"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT4:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRateCToP4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT6:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRateCToP6"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT8:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRateCToP8"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT12:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRateCToP12"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT15:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRateCToP15"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rates (P→C)"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT4:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRatePToC4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT6:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRatePToC6"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT8:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRatePToC8"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT12:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRatePToC12"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="XDT15:"
+                android:textSize="14sp"
+                android:textColor="@android:color/black"
+                android:gravity="center_vertical" />
+
+            <Spinner
+                android:id="@+id/spinnerXdtRatePToC15"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2" />
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSetXdt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Set XDT Features"
+            android:enabled="false"
+            android:layout_marginBottom="8dp" />
+
+        </LinearLayout>
 
         <!-- Data Exchange -->
         <TextView

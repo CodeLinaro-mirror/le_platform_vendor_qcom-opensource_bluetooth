@@ -84,6 +84,22 @@ public class BluetoothVendorCommands {
     public static final int HDT_PLUS_RATE_12 = 0x08;
     public static final int HDT_PLUS_RATE_15 = 0x10;
 
+    // HCI VS LE XDT Features Enable command (HCI_VS_QBCE sub-command)
+    public static final int XDT_FEATURES_ENABLE_OCF = 0x051;
+    public static final int XDT_FEATURES_ENABLE_SUB_OPCODE = 0x48;
+
+    // Features bitmask values
+    public static final int XDT_FEATURE_XDT = 0x01;
+    public static final int XDT_FEATURE_BLOCK_REP_C_TO_P = 0x02;
+    public static final int XDT_FEATURE_BLOCK_REP_P_TO_C = 0x04;
+
+    // Rates_C_To_P / Rates_P_To_C bitmask values (shared for both directions)
+    public static final int XDT_RATE_4 = 0x01;
+    public static final int XDT_RATE_6 = 0x02;
+    public static final int XDT_RATE_8 = 0x04;
+    public static final int XDT_RATE_12 = 0x08;
+    public static final int XDT_RATE_15 = 0x10;
+
   private final class BtVendorCb implements BluetoothAdapter.BluetoothHciVendorSpecificCallback {
 
     @Override
@@ -501,55 +517,41 @@ public class BluetoothVendorCommands {
     }
 
     /**
-     * Send HCI VS Set HDT+ Features Enable command to enable/disable HDT+
-     * features on a given ACL or CIS connection.
-     * @param connectionHandle Connection Handle (0x0000 - 0x0EFF)
-     * @param hdtPlusFeatures HDT_Plus_Features bitmask (see HDT_PLUS_FEATURE_* constants)
-     * @param brCToP Max block repetitions Central to Peripheral (0x00 - 0xFF)
-     * @param brPToC Max block repetitions Peripheral to Central (0x00 - 0xFF)
-     * @param ratesCToP Rates_C_To_P bitmask (see HDT_PLUS_RATE_* constants)
-     * @param ratesPToC Rates_P_To_C bitmask (see HDT_PLUS_RATE_* constants)
-     * @return true if command was sent successfully
+     * Pack the shared 17-byte parameter layout used by both the Set HDT+
+     * Features Enable and Set XDT Features Enable commands: a 1-octet leading
+     * sub-opcode/function-code byte, followed by Connection_Handle (2),
+     * Features (8), BR_C_To_P (1), BR_P_To_C (1), Rates_C_To_P (2) and
+     * Rates_P_To_C (2), all little endian.
+     * @return the packed parameters, or null if any argument is out of range
      */
-    public boolean sendSetHdtPlusFeaturesEnable(int connectionHandle, long hdtPlusFeatures,
-            int brCToP, int brPToC, int ratesCToP, int ratesPToC) {
+    private byte[] packFeaturesEnableParameters(int leadingByte, int connectionHandle,
+            long features, int brCToP, int brPToC, int ratesCToP, int ratesPToC) {
         if (connectionHandle < 0x0000 || connectionHandle > 0x0EFF) {
             Log.e(TAG, "Invalid Connection_Handle: 0x" + Integer.toHexString(connectionHandle));
-            return false;
+            return null;
         }
         if (brCToP < 0x00 || brCToP > 0xFF || brPToC < 0x00 || brPToC > 0xFF) {
             Log.e(TAG, "Invalid BR_C_To_P/BR_P_To_C: " + brCToP + "/" + brPToC);
-            return false;
+            return null;
         }
         if (ratesCToP < 0 || ratesCToP > 0xFFFF || ratesPToC < 0 || ratesPToC > 0xFFFF) {
             Log.e(TAG, "Invalid Rates_C_To_P/Rates_P_To_C: " + ratesCToP + "/" + ratesPToC);
-            return false;
-        }
-
-        if (DBG) {
-            Log.d(TAG, "Sending Set HDT+ Features Enable - Handle: 0x" +
-                    Integer.toHexString(connectionHandle) +
-                    ", Features: 0x" + Long.toHexString(hdtPlusFeatures) +
-                    ", BR_C_To_P: 0x" + Integer.toHexString(brCToP) +
-                    ", BR_P_To_C: 0x" + Integer.toHexString(brPToC) +
-                    ", Rates_C_To_P: 0x" + Integer.toHexString(ratesCToP) +
-                    ", Rates_P_To_C: 0x" + Integer.toHexString(ratesPToC));
+            return null;
         }
 
         byte[] parameters = new byte[17];
         int paramIndex = 0;
 
-        // Function_Code (1 octet) - identifies this as the Set HDT+ Features
-        // Enable sub-command within the shared vendor opcode
-        parameters[paramIndex++] = (byte) HDT_PLUS_FEATURES_ENABLE_FUNCTION_CODE;
+        // Leading sub-opcode/function-code byte
+        parameters[paramIndex++] = (byte) leadingByte;
 
         // Connection_Handle (2 octets, little endian)
         parameters[paramIndex++] = (byte) (connectionHandle & 0xFF);
         parameters[paramIndex++] = (byte) ((connectionHandle >> 8) & 0xFF);
 
-        // HDT_Plus_Features (8 octets, little endian)
+        // Features (8 octets, little endian)
         for (int i = 0; i < 8; i++) {
-            parameters[paramIndex++] = (byte) ((hdtPlusFeatures >> (8 * i)) & 0xFF);
+            parameters[paramIndex++] = (byte) ((features >> (8 * i)) & 0xFF);
         }
 
         // BR_C_To_P / BR_P_To_C (1 octet each)
@@ -564,7 +566,71 @@ public class BluetoothVendorCommands {
         parameters[paramIndex++] = (byte) (ratesPToC & 0xFF);
         parameters[paramIndex++] = (byte) ((ratesPToC >> 8) & 0xFF);
 
+        return parameters;
+    }
+
+    /**
+     * Send HCI VS Set HDT+ Features Enable command to enable/disable HDT+
+     * features on a given ACL or CIS connection.
+     * @param connectionHandle Connection Handle (0x0000 - 0x0EFF)
+     * @param hdtPlusFeatures HDT_Plus_Features bitmask (see HDT_PLUS_FEATURE_* constants)
+     * @param brCToP Max block repetitions Central to Peripheral (0x00 - 0xFF)
+     * @param brPToC Max block repetitions Peripheral to Central (0x00 - 0xFF)
+     * @param ratesCToP Rates_C_To_P bitmask (see HDT_PLUS_RATE_* constants)
+     * @param ratesPToC Rates_P_To_C bitmask (see HDT_PLUS_RATE_* constants)
+     * @return true if command was sent successfully
+     */
+    public boolean sendSetHdtPlusFeaturesEnable(int connectionHandle, long hdtPlusFeatures,
+            int brCToP, int brPToC, int ratesCToP, int ratesPToC) {
+        if (DBG) {
+            Log.d(TAG, "Sending Set HDT+ Features Enable - Handle: 0x" +
+                    Integer.toHexString(connectionHandle) +
+                    ", Features: 0x" + Long.toHexString(hdtPlusFeatures) +
+                    ", BR_C_To_P: 0x" + Integer.toHexString(brCToP) +
+                    ", BR_P_To_C: 0x" + Integer.toHexString(brPToC) +
+                    ", Rates_C_To_P: 0x" + Integer.toHexString(ratesCToP) +
+                    ", Rates_P_To_C: 0x" + Integer.toHexString(ratesPToC));
+        }
+
+        byte[] parameters = packFeaturesEnableParameters(HDT_PLUS_FEATURES_ENABLE_FUNCTION_CODE,
+                connectionHandle, hdtPlusFeatures, brCToP, brPToC, ratesCToP, ratesPToC);
+        if (parameters == null) {
+            return false;
+        }
+
         return sendVendorCommand(HDT_PLUS_FEATURES_ENABLE_OCF, parameters);
+    }
+
+    /**
+     * Send HCI VS LE XDT Features Enable command to enable/disable XDT and
+     * other features such as Block Repetitions on a given ACL or CIS connection.
+     * @param connectionHandle Connection Handle (0x0000 - 0x0EFF)
+     * @param xdtFeatures Features bitmask (see XDT_FEATURE_* constants)
+     * @param brCToP Max block repetitions Central to Peripheral (0x00 - 0xFF)
+     * @param brPToC Max block repetitions Peripheral to Central (0x00 - 0xFF)
+     * @param ratesCToP Rates_C_To_P bitmask (see XDT_RATE_* constants)
+     * @param ratesPToC Rates_P_To_C bitmask (see XDT_RATE_* constants)
+     * @return true if command was sent successfully
+     */
+    public boolean sendSetXdtFeaturesEnable(int connectionHandle, long xdtFeatures,
+            int brCToP, int brPToC, int ratesCToP, int ratesPToC) {
+        if (DBG) {
+            Log.d(TAG, "Sending Set XDT Features Enable - Handle: 0x" +
+                    Integer.toHexString(connectionHandle) +
+                    ", Features: 0x" + Long.toHexString(xdtFeatures) +
+                    ", BR_C_To_P: 0x" + Integer.toHexString(brCToP) +
+                    ", BR_P_To_C: 0x" + Integer.toHexString(brPToC) +
+                    ", Rates_C_To_P: 0x" + Integer.toHexString(ratesCToP) +
+                    ", Rates_P_To_C: 0x" + Integer.toHexString(ratesPToC));
+        }
+
+        byte[] parameters = packFeaturesEnableParameters(XDT_FEATURES_ENABLE_SUB_OPCODE,
+                connectionHandle, xdtFeatures, brCToP, brPToC, ratesCToP, ratesPToC);
+        if (parameters == null) {
+            return false;
+        }
+
+        return sendVendorCommand(XDT_FEATURES_ENABLE_OCF, parameters);
     }
 
     /**

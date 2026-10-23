@@ -21,6 +21,7 @@ public class L2capCocConfig {
     
     // Default values (original static values)
     public static final int DEFAULT_BUFFER_SIZE = 1048576;
+    public static final int MAX_BUFFER_SIZE = 52428800; // 50 MB
     public static final int DEFAULT_MAX_CREDITS = 10;
     public static final int DEFAULT_HEADER_SIZE = 4;
     public static final int DEFAULT_PSM = 0x0080;
@@ -94,7 +95,7 @@ public class L2capCocConfig {
     
     // Setters with validation
     public boolean setBufferSize(int bufferSize) {
-        if (bufferSize < 64 || bufferSize > 1048576) {
+        if (bufferSize < 64 || bufferSize > MAX_BUFFER_SIZE) {
             return false; // Invalid range
         }
         this.bufferSize = bufferSize;
@@ -144,7 +145,7 @@ public class L2capCocConfig {
      * Validate current configuration
      */
     public boolean isValid() {
-        return bufferSize >= 64 && bufferSize <= 1048576 &&
+        return bufferSize >= 64 && bufferSize <= MAX_BUFFER_SIZE &&
                maxCredits >= 1 && maxCredits <= 1000 &&
                headerSize >= 2 && headerSize <= 16 &&
                psm >= 1 && psm <= 32767;
@@ -162,7 +163,7 @@ public class L2capCocConfig {
      * Get validation ranges as string
      */
     public static String getValidationRanges() {
-        return "Buffer Size: 64-1048576 bytes\n" +
+        return "Buffer Size: 64-" + MAX_BUFFER_SIZE + " bytes\n" +
                "Max Credits: 1-1000\n" +
                "Header Size: 2-16 bytes\n" +
                "PSM: 1-32767";

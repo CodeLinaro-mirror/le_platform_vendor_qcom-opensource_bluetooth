@@ -119,7 +119,7 @@ public class L2capCocConfigActivity extends Activity {
             
             if (!config.setBufferSize(bufferSize)) {
                 allValid = false;
-                errorMsg.append("Buffer Size must be 64-1048576 bytes\n");
+                errorMsg.append("Buffer Size must be 64-" + L2capCocConfig.MAX_BUFFER_SIZE + " bytes\n");
             }
             
             if (!config.setMaxCredits(maxCredits)) {
